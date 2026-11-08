@@ -496,7 +496,9 @@ function manPlow(){
 }
 function manStep(dt){
   const m=man;m.vy+=G*dt*(m.pwr==='towel'&&m.gt<1.8&&!m.dive?.3:1);m.x+=m.vx*dt;m.y+=m.vy*dt;m.gt+=dt;if(m.hitCd>0)m.hitCd-=dt;
-  if(m.y+m.R>=GY){m.y=GY-m.R;const s=Math.hypot(m.vx,m.vy);dust(m.x,GY-2,5,10);if(s>260)shake=Math.max(shake,4);stick();return}
+  if(m.y+m.R>=GY){m.y=GY-m.R;const s=Math.hypot(m.vx,m.vy);dust(m.x,GY-2,5,10);if(s>260)shake=Math.max(shake,4);
+    if(s>420&&m.vy>120&&(m.bounces|0)<2){m.bounces=(m.bounces|0)+1;m.vy*=-.34;m.vx*=.72;SFX.thud&&SFX.thud(.5);dust(m.x,GY-2,8,14);ring(m.x,GY-4,30,'#d9c9a0');if(m.jg){m.jg.sq=1;m.jg.sa=Math.PI/2;m.jg.st=0}return}   // a hard landing skips once or twice before he sticks
+    stick();return}
   manPlow()}
 function launch(){const dx=SX-man.x,dy=SY-man.y;if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}
   const sp0=1-.5*man.inf;man.R=14*(1+.9*man.inf);man.vx=dx*9.2*sp0;man.vy=dy*9.2*sp0;man.mode='fly';if(man.inf>.6){ST().inflated++;popText(man.x,man.y-60,'HOT AIR!','#9fd8ff',26)}
@@ -1516,7 +1518,7 @@ function drawTexts(){for(const t of texts){ctx.globalAlpha=Math.min(1,(t.l-t.t)*
 //  JIGGLE: belly + rear hang off him on springs (cells; 1 cell = V px).  Fed by his acceleration, gravity taken out in flight.
 //  Pure decoration: nothing in the physics reads these numbers.
 // =====================================================================
-const JIG_GAIN=.45,JIG_RGAIN=.35,JIG_MAX=1.5,JVIS=.5;      // JVIS = how much of a cell shows on screen (1 cell would be a huge 16 design units)
+const JIG_GAIN=.55,JIG_RGAIN=.42,JIG_MAX=1.8,JVIS=.5;      // JVIS = how much of a cell shows on screen (1 cell would be a huge 16 design units)
 function jigNew(){return{px:0,py:0,vx:0,vy:0,has:false,bx:0,by:0,bvx:0,bvy:0,rx:0,ry:0,rvx:0,rvy:0,sq:0,sa:0,st:0,pk:0}}
 function jigStep(m,dt){
   const j=m.jg;if(!j||dt<=0)return;
@@ -1531,8 +1533,8 @@ function jigStep(m,dt){
     j.bvx-=dvx*JIG_GAIN;j.bvy-=dvy*JIG_GAIN;j.rvx-=dvx*JIG_RGAIN;j.rvy-=dvy*JIG_RGAIN;
     if(mag>20){j.sq=1;j.sa=Math.atan2(dvy,dvx);j.st=(dvx*pvx+dvy*pvy)>=0?1:0;       // speeding up = stretch, slamming into something = squash
       if(!j.st&&(m.mode==='fly'||m.mode==='stuck'))SFX.jiggle()}}
-  j.bvx+=(-400*j.bx-7*j.bvx)*dt;j.bvy+=(-400*j.by-7*j.bvy)*dt;
-  j.rvx+=(-250*j.rx-6*j.rvx)*dt;j.rvy+=(-250*j.ry-6*j.rvy)*dt;
+  j.bvx+=(-400*j.bx-4.6*j.bvx)*dt;j.bvy+=(-400*j.by-4.6*j.bvy)*dt;
+  j.rvx+=(-250*j.rx-4*j.rvx)*dt;j.rvy+=(-250*j.ry-4*j.rvy)*dt;
   j.bx=clamp(j.bx+j.bvx*dt,-JIG_MAX,JIG_MAX);j.by=clamp(j.by+j.bvy*dt,-JIG_MAX,JIG_MAX);
   j.rx=clamp(j.rx+j.rvx*dt,-JIG_MAX,JIG_MAX);j.ry=clamp(j.ry+j.rvy*dt,-JIG_MAX,JIG_MAX);
   j.sq*=Math.pow(.88,dt*60);
