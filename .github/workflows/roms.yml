@@ -19,6 +19,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: make -C ds
+      - name: Inspect the ROM
+        run: |
+          export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
+          ls -la ds/mandex.nds ds/*.elf ds/*.arm9 2>&1
+          arm-none-eabi-readelf -lS ds/mandex.elf | head -70
+          ndstool -i ds/mandex.nds 2>&1 | head -60
+          grep -n "itcm\|dtcm" ds/mandex.map | head -20
+          arm-none-eabi-size ds/mandex.elf
+          ls $DEVKITPRO/calico/bin $DEVKITPRO/calico/share 2>&1 | head -30
       - uses: actions/upload-artifact@v4
         with: { name: rom-nds, path: ds/mandex.nds, if-no-files-found: error }
 
