@@ -447,7 +447,8 @@ function explodeMan(){const m=man;ST().pops++;pdTouch();men--;
 function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long and he goes pop
   m.inf=Math.min(1,m.inf+dt/3.6);m.airT+=dt;
   if(m.airT>.07){m.airT=0;SFX.hiss();P({k:6,x:VX+(rnd()-.5)*10,y:VY+16,vx:(rnd()-.5)*70,vy:-30-rnd()*50,l:.5,l0:.5,s:3+rnd()*3,c:'#cfe9ff'});
-    if(m.inf>.5){SFX.creak(m.inf)}}
+    if(m.inf>.5){SFX.creak(m.inf)}
+    if(m.inf>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
   if(m.inf>=1)explodeMan()}
 function drawValve(){
   const m=man,f=m.mode==='aim'?m.inf:0,t=time;
@@ -1476,13 +1477,13 @@ const MAN_FRAMES={
   SLEEP_A:_F(.36,[1.7,-40.9]),SLEEP_B:_F(.36,[2,-39.9]),SAD:_F(.36,[0,-39]),
   CAPE_A:_F(.36,[0,-44]),SPIN_0:_F(.36,[0,-44]),SPIN_1:_F(.36,[0,-44]),SPIN_2:_F(.36,[0,-44]),SPIN_3:_F(.36,[0,-44]),SPIN_4:_F(.36,[0,-44]),SPIN_5:_F(.36,[0,-44]),SPIN_6:_F(.36,[0,-44]),SPIN_7:_F(.36,[0,-44]),SPIN_8:_F(.36,[0,-44]),SPIN_9:_F(.36,[0,-44]),SPIN_10:_F(.36,[0,-44]),SPIN_11:_F(.36,[0,-44]),SPIN_12:_F(.36,[0,-44]),SPIN_R1:_F(.36,[0,-44]),SPIN_R2:_F(.36,[0,-44]),SPIN_R3:_F(.36,[0,-44]),SPIN_R4:_F(.36,[0,-44]),SPIN_R5:_F(.36,[0,-44]),SPIN_R6:_F(.36,[0,-44]),SPIN_R7:_F(.36,[0,-44]),SPIN_R8:_F(.36,[0,-44]),SPIN_R9:_F(.36,[0,-44]),SPIN_R10:_F(.36,[0,-44]),SPIN_R11:_F(.36,[0,-44]),SPIN_BL:_F(.36,[0,-44]),SPIN_BR:_F(.36,[0,-44]),OOPS_A:_F(.36,[0,-44]),OOPS_B:_F(.36,[0,-44]),OOPS_C:_F(.36,[0,-44]),OOPS_D:_F(.36,[0,-44]),OOPS_E:_F(.36,[0,-44]),OOPS_F:_F(.36,[0,-44]),OOPS_G:_F(.36,[0,-44]),OOPS_H:_F(.36,[0,-44]),BACK_C:_F(.36,null),BACK_L:_F(.36,null),BACK_R:_F(.36,null),FART_A:_F(.36,null),FART_B:_F(.36,null)};
 function P(o){if(parts.length<1400)parts.push(o)}
-function sweat(x,y){for(let i=0;i<2;i++)P({k:7,x:x+(rnd()-.5)*14,y,vx:(rnd()<.5?-1:1)*(40+rnd()*60),vy:-90-rnd()*90,l:.9,l0:.9,s:2.4+rnd()*1.4,c:'#bfe8ff'})}
+function sweat(x,y){P({k:7,g:1,x:x+(rnd()-.5)*10,y:y+(rnd()-.5)*4,vx:(rnd()-.5)*6,vy:0,l:1.1,l0:1.1,s:1.6+rnd()*.9,c:'#bfe8ff'})}   // a bead forms on the skin, swells, then trickles down
 function updParts(dt){
   for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0){parts.splice(i,1);continue}
     if(p.k===1||p.k===6){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.98;p.vy*=.99;continue}
     if(p.k===5||(p.k===8&&p.sp))continue;
     if(p.k>=9){p.x+=p.vx*dt;p.y+=p.vy*dt;continue}
-    p.vy+=(p.k===2?G*.4:G)*dt;const ox=p.x,oy=p.y;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.k===4){p.vx*=.97;p.vy=Math.min(p.vy,90);p.r+=dt*6}
+    p.vy+=(p.k===2?G*.4:p.g?G*.12:G)*dt;const ox=p.x,oy=p.y;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.k===4){p.vx*=.97;p.vy=Math.min(p.vy,90);p.r+=dt*6}
     if(p.y>GY-2){p.y=GY-2;p.vy*=-.3;p.vx*=.6;if(p.k===8&&!p.sp){p.sp=1;SFX.booger()}}
     if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}}
 function updTexts(dt){for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=28*dt;if(t.t>t.l)texts.splice(i,1)}}
@@ -1497,7 +1498,7 @@ function drawParts(){
     else if(p.k===5){ctx.globalAlpha=a;ctx.strokeStyle=p.c;ctx.lineWidth=4*a+1;ctx.beginPath();ctx.arc(p.x,p.y,p.s*(1-a),0,7);ctx.stroke()}
     else if(p.k===6){ctx.globalAlpha=a*.5;const r=p.s*(1+(1-a)*1.7);ctx.fillStyle=p.c||'#a6d63c';ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fill();
       ctx.globalAlpha=a*.35;ctx.fillStyle='#d6f27a';ctx.beginPath();ctx.arc(p.x-r*.25,p.y-r*.25,r*.5,0,7);ctx.fill()}
-    else if(p.k===7){ctx.globalAlpha=Math.min(1,a*2);ctx.fillStyle=p.c||'#bfe8ff';ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,7);ctx.moveTo(p.x-p.s*.8,p.y-p.s*.4);ctx.lineTo(p.x,p.y-p.s*2.3);ctx.lineTo(p.x+p.s*.8,p.y-p.s*.4);ctx.fill();
+    else if(p.k===7){const gr=p.g?Math.min(1,(p.l0-p.l)*2.2):1,sz=p.s*gr;ctx.globalAlpha=Math.min(1,a*2)*.9;ctx.fillStyle=p.c||'#bfe8ff';ctx.beginPath();ctx.arc(p.x,p.y,sz,0,7);if(!p.g){ctx.moveTo(p.x-sz*.8,p.y-sz*.4);ctx.lineTo(p.x,p.y-sz*2.3);ctx.lineTo(p.x+sz*.8,p.y-sz*.4)}ctx.fill();if(p.g){ctx.fillStyle='rgba(255,255,255,.8)';ctx.beginPath();ctx.arc(p.x-sz*.3,p.y-sz*.3,sz*.3,0,7);ctx.fill()}
       ctx.fillStyle='rgba(255,255,255,.8)';ctx.fillRect(p.x-p.s*.5,p.y-p.s*.3,p.s*.45,p.s*.45)}
     else if(p.k===8){ctx.globalAlpha=Math.min(1,a*2);const fl=p.sp?1.6:1;ctx.fillStyle='#9be15a';ctx.strokeStyle='#4f8f22';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(p.x,p.y+(p.sp?p.s*.4:0),p.s*fl,p.s*(p.sp?.55:1),0,0,7);ctx.fill();ctx.stroke();
       ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(p.x-p.s*.5,p.y-p.s*.5,p.s*.5,p.s*.35)}
