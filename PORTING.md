@@ -238,3 +238,9 @@ DC:  analog stick pulls the man back, A launches / belly flops; START next/retry
 
 
 Title pan: both consoles keep the whole 16:9 title picture and slowly pan right to the man and back (hold, glide, hold, glide; 560 frames), so the full landscape is seen on the small screens. Shots: docs/title_pan.png (top DS, bottom DC). Not run on real hardware or an emulator.
+
+
+OOPS gag (consoles): the rare version of the cape taunt, as in the HTML (1 in MI_OOPS_ODDS = 5).  tools/gen_manspr.py now also draws OOPS_A..H
+(boxers slip, wobble, EEK, cover up, SNAP, WHEW) into art/manspr.h; art/manidle.h has GAG_OOPS (only ever picked as a cape taunt) and the new fx
+FX_EEK / FX_SNAP / FX_WHEW.  DS: two new tone effects (SFX_EEK, SFX_WHEW) plus EEK! / SNAP! popups, SNAP reuses the slap + boing sounds.  DC: sweat / spark
+particles.  Shots: docs/ds_oops_sheet.png, docs/dc_oops_sheet.png.  Run on a desktop test setup only; no real DS / Dreamcast / emulator, sounds never heard.

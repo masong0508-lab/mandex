@@ -93,6 +93,9 @@ static void idle_fx(int fx, real wx, real wy, int face, int sc, int popups){
   case FX_SNIFF: sfx_play(SFX_STRETCH, 64); break;
   case FX_WHOOSH: sfx_play(SFX_WHOOSH, 64); for(int k = 0; k < 4; k++) spawn(PT_DUST, wx + RI(rnd(9) - 4) * sc, wy - RI(rnd(5)) * sc, rnd(9) - 4, rnd(5) - 2, 0, 22); break;
   case FX_TAUNT: sfx_play(SFX_TAUNT, 64); if(popups) popup(wx, wy - RI(7), "NYAH NYAH!", C_PINK); break;
+  case FX_EEK:   sfx_play(SFX_EEK, 64); spawn(PT_SWEAT, wx - R(2) * sc, wy - R(5) * sc, -6, -10, 0, 30); spawn(PT_SWEAT, wx + R(2) * sc, wy - R(5) * sc, 6, -10, 0, 30); if(popups) popup(wx, wy - RI(7), "EEK!", C_RED2); break;
+  case FX_SNAP:  sfx_play(SFX_SLAP, 64); sfx_play(SFX_BOING, 64); if(popups) popup(wx, wy - RI(5), "SNAP!", C_GOLD); break;
+  case FX_WHEW:  sfx_play(SFX_WHEW, 64); break;
   }
 }
 

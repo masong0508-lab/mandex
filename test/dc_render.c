@@ -51,7 +51,7 @@ int main(void){
   frame("/tmp/dc_after.ppm"); printf("dc frames rendered; cells=%d\n",mx_cells_left(&world));
   /* idle gags: stand in the sling, photograph every distinct frame of every gag once */
   mx_load(&world,0); for(int i=0;i<90;i++) tick(0);
-  { unsigned char seen[64] = {0}; int n = 0, lg = -2, ls = -2;
+  { unsigned char seen[128] = {0}; int n = 0, lg = -2, ls = -2;
     int forced = 0;                                         /* FORCE_GAG=7 photographs just that gag (7 = the cape taunt, a turn with the towel) */
     for(int i=0;i<2000 && n<(getenv("FORCE_GAG")?40:12);i++){ tick(1);
       if(!forced && getenv("FORCE_GAG") && mi.gag < 0 && mi.total > 0){ forced = 1; mi.gag = atoi(getenv("FORCE_GAG")); mi.step = 0; mi.t = 0; }

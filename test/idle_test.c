@@ -7,7 +7,8 @@
 static int bad;
 #define CHECK(c, ...) do{ if(!(c)){ printf("FAIL: " __VA_ARGS__); printf("\n"); bad++; } }while(0)
 int main(void){
-  for(int g = 0; g < GAG_COUNT; g++){
+  for(int g = 0; g <= GAG_OOPS; g++){
+    if(g == GAG_COUNT) continue;
     int n = 0, total = 0;
     while(MI_GAGS[g][n].ticks){ const MiStep *s = &MI_GAGS[g][n];
       CHECK(s->frame < MSF_COUNT, "gag %d step %d: frame %d out of range", g, n, s->frame);
@@ -20,7 +21,7 @@ int main(void){
   for(int p = 0; p < 40; p++) CHECK(mi_dance_frame(p) < MSF_COUNT, "dance frame");
   /* run 10 minutes of nobody touching anything */
   MiState s = {0}; mi_reset(&s);
-  int started[GAG_COUNT + 1] = {0}, prev = -1, lastg = -1, fxs[FX_COUNT] = {0}, slept = -1;
+  int started[GAG_OOPS + 1] = {0}, prev = -1, lastg = -1, fxs[FX_COUNT] = {0}, slept = -1;
   for(int t = 0; t < 60 * 600; t++){
     mi_update(&s);
     if(s.fx) fxs[s.fx]++;
@@ -31,12 +32,12 @@ int main(void){
   }
   CHECK(slept > 0 && slept < 60 * 25, "never fell asleep (%d)", slept);
   /* gags before he nods off are few, so run many short sessions to see that all of them come up */
-  int seen[GAG_COUNT] = {0};
+  int seen[GAG_OOPS + 1] = {0};
   for(int seed = 1; seed < 400; seed++){
     MiState q = {0}; q.rng = seed * 7919u; mi_reset(&q);
-    for(int t = 0; t < 1100; t++){ mi_update(&q); if(q.gag >= 0 && q.gag < GAG_COUNT) seen[q.gag] = 1; }
+    for(int t = 0; t < 1100; t++){ mi_update(&q); if(q.gag >= 0 && q.gag != GAG_COUNT) seen[q.gag] = 1; }
   }
-  for(int g = 0; g < GAG_COUNT; g++) CHECK(seen[g], "gag %d never played", g);
+  for(int g = 0; g <= GAG_OOPS; g++) if(g != GAG_COUNT) CHECK(seen[g], "gag %d never played", g);
   /* waking up */
   mi_reset(&s); CHECK(s.gag == -1 && s.total == 0, "reset did not wake him");
   printf("fell asleep after %.1f s; fx counts: slap %d boing %d grunt %d burp %d fart %d flick %d yawn %d snore %d sniff %d whoosh %d taunt %d\n", slept / 60.0,

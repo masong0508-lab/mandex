@@ -44,17 +44,24 @@ NEW_FRAMES = ["BELLY_A", "BELLY_B", "SCRATCH_A", "SCRATCH_B", "BURP_A", "BURP_B"
 def spin_th(name):
     """turn angle (degrees) and head lead of a spin frame, the same numbers as spinKey() in the HTML"""
     if name in ("SPIN_BL", "SPIN_BR"): return 180, 0
+    if name.startswith("OOPS_"): return 180, OOPS_LD[name]
     th = int(name[6:] if name.startswith("SPIN_R") else name[5:]) * 15
     m = min(1.0, th / 20.0, (180 - th) / 20.0)
     return th, (-12 if name.startswith("SPIN_R") else 12) * m
+# the rare "oops" gag (boxers slip off in the cape taunt): drawn by the HTML as part of the spin poses; the head's lead angle of each frame, as in OOPS_POSE
+OOPS_NAMES = ["OOPS_" + c for c in "ABCDEFGH"]
+OOPS_LD = dict(zip(OOPS_NAMES, (0, 0, 0, -112, -122, -118, -120, -104)))
+NEW_FRAMES += OOPS_NAMES
+def spiny(name): return name.startswith("SPIN_") or name.startswith("OOPS_")      # frames that turn around: shared head / body handling
 ALIAS = {n: "IDLE_A" for n in NEW_FRAMES}
 ALIAS.update({"CAPE_A": "FLEX_A", "BACK_C": "FLEX_A", "BACK_L": "FLEX_A", "BACK_R": "FLEX_B", "FART_A": "FLEX_A", "FART_B": "FLEX_B"})
 ALIAS.update({n: ("IDLE_A" if spin_th(n)[0] < 90 else "FLEX_B") for n in SPIN_NAMES})
+ALIAS.update({n: "FLEX_B" for n in OOPS_NAMES})
 # jiggle blobs in design units (centre x, y, radius): belly and rear, per body family
 BLOBS = {"front": ((0, -2, 21), (0, 10, 21)), "back": ((0, -6, 20), (0, 10, 21)),
          "fly": ((2, -2, 19), (-13, 6, 14)), "dive": ((3, -2, 17), (-13, 6, 14)), "star": ((0, -2, 21), (0, 12, 20))}
 def family(name):
-    if name.startswith("BACK") or name.startswith("FART") or (name.startswith("SPIN_") and spin_th(name)[0] >= 120): return "back"
+    if name.startswith("BACK") or name.startswith("FART") or (name.startswith("SPIN_") and spin_th(name)[0] >= 120) or name.startswith("OOPS_"): return "back"
     if name.startswith("FLY"): return "fly"
     if name == "DIVE": return "dive"
     if name.startswith("STUCK"): return "star"
@@ -188,7 +195,7 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
     """the generated heads are only ~10 px wide, so the face is pixelled by hand on top of the HTML shapes"""
     key = {'B': 'BLK', 'G': 'GOLD', 'g': 'GOLD2', 'w': 'WH', 'h': 'HAIR', 'H': 'HAIR2', 'o': 'RIM', 'm': 'MOUTH', 't': 'TONG', 's': 'SKD', 'k': 'SKM', 'S': 'SK'}
     hx, hy = (int(round(ax + head[0] * ppu)), int(round(ay + head[1] * ppu))) if head else (ax, ay - 16)   # head centre
-    if name.startswith("SPIN_") and name not in ("SPIN_BL", "SPIN_BR"):   # the turn: the head has its own angle (th + lead); front, narrowing, profile, then the back
+    if spiny(name) and name not in ("SPIN_BL", "SPIN_BR"):   # the turn: the head has its own angle (th + lead); front, narrowing, profile, then the back
         th, ld = spin_th(name); a = abs(th + ld)
         if a < 125:
             hk = {k: PI[v] for k, v in manhead.KEY.items()}
@@ -200,8 +207,8 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
             wipe_head(idx, hx, hy, ppu)
             stamp(idx, rows, hx - ox, hy - top, hk)
             return
-    if name.startswith("BACK") or name.startswith("FART") or name.startswith("SPIN_"):          # the back of a proper head, replacing the muddy generated one
-        if name.startswith("SPIN_") and head:
+    if name.startswith("BACK") or name.startswith("FART") or spiny(name):          # the back of a proper head, replacing the muddy generated one
+        if spiny(name) and head:
             # the spin frames have a raised hand / towel next to the head, so the top-row search below can lock onto the wrong thing:
             # take the head position straight from the model instead
             xc = hx; yt = int(round(ay + (head[1] - 24.0) * ppu))        # top of the top-knot
@@ -209,7 +216,7 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
             win = idx[:, max(0, ax - 8):ax + 9]
             rows_ = np.nonzero(win.any(axis=1))[0]
             yt = int(rows_[0]); xs_ = np.nonzero(win[yt])[0] + max(0, ax - 8); xc = int(round(xs_.mean()))
-        if name.startswith("SPIN_") and head: wipe_head(idx, hx, hy, ppu)
+        if spiny(name) and head: wipe_head(idx, hx, hy, ppu)
         else: idx[yt:yt + 11, max(0, xc - 8):xc + 9] = 0
         hk = {k: PI[v] for k, v in manhead.KEY.items()}
         bh = manhead.back_head()                                   # a round head is about as wide from every side, so one width for every turn angle
@@ -311,7 +318,7 @@ def main():
             src = name
             if has_api and name in meta:
                 call, ppu, head = f"drawManFrame('{name}')", meta[name]["ppu"], meta[name].get("head")
-                if name.startswith("SPIN_") and head and pg.evaluate("typeof spinSway === 'function'"):
+                if spiny(name) and head and pg.evaluate("typeof spinSway === 'function'"):
                     # the body sways and crouches over the planted feet, so the head is not at the same place in every frame
                     head = pg.evaluate("(n) => { const q = SPIN_POSE[n], h = q.hip || 0, s = spinSway(q.th, q.psi || 0, h); return [s.shx - h * 0.35, -44 + s.bob]; }", name)
             elif name in legacy:
@@ -352,7 +359,7 @@ def main():
         idx[A] = index_of(C[A].astype(np.int32))
         idx = np.pad(idx, ((6, 0), (5, 5))); ax += 5; ay += 6         # room for the bigger head, trimmed again below
         paint_face(src, idx, int(ax), int(ay), PI, ppu, head)
-        if name.startswith("BACK") or name.startswith("FART") or name.startswith("SPIN_"): shade_butt(idx, PI, int(ay))
+        if name.startswith("BACK") or name.startswith("FART") or name.startswith("SPIN_"): shade_butt(idx, PI, int(ay))   # (the oops frames keep the HTML's own bare / boxer shading)
         ys, xs = np.nonzero(idx); y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
         idx = idx[y0:y1, x0:x1]; ax -= x0; ay -= y0; h, w = idx.shape
         (bx, by, br), (rx, ry, rr) = BLOBS[family(name)]

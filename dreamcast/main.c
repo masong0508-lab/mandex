@@ -187,6 +187,9 @@ static void idle_fx(int fx, float wx, float wy, int face){
   case FX_FLICK: spawn_k(PK_BIT, mxp, myp, face * (140 + frand() * 60), -(60 + frand() * 50), 1.2f, argb(125, 255, 90, 255)); break;
   case FX_WHOOSH: for(int k = 0; k < 6; k++) spawn_k(PK_BIT, wx + (frand() - 0.5f) * 8, wy - frand() * 5, (frand() - 0.5f) * 160, (frand() - 0.5f) * 80, 0.5f, argb(255, 160, 205, 255)); break;
   case FX_TAUNT: for(int k = 0; k < 4; k++) spawn_k(PK_BIT, wx + (frand() - 0.5f) * 5, wy + 2, (frand() - 0.5f) * 90, -frand() * 120, 0.6f, argb(255, 255, 255, 255)); break;
+  case FX_EEK:   for(int k = 0; k < 4; k++) spawn_k(PK_SWEAT, wx + (k & 1 ? 2 : -2), wy - 5, (k & 1 ? 1 : -1) * (30 + 15 * k), -90, 0.6f, argb(190, 230, 255, 255)); break;
+  case FX_SNAP:  for(int k = 0; k < 4; k++) spawn_k(PK_BIT, wx + (frand() - 0.5f) * 5, wy - 3, (frand() - 0.5f) * 120, -frand() * 90, 0.5f, argb(255, 255, 210, 60)); break;
+  case FX_WHEW:  spawn_k(PK_SWEAT, wx + 3, wy - 6, 30, -60, 0.8f, argb(200, 190, 232, 255)); break;
   case FX_SNORE: spawn_k(PK_ZZZ, wx + face * 3, wy - 5, 20 * face, -45, 1.4f, argb(255, 255, 255, 255)); break;
   default: break;
   }
