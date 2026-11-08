@@ -10,6 +10,9 @@ echo "float vs fixed per-shot comparison:"
 paste -d'|' float.txt fixed.txt | grep " L[0-9]" | sed 's/score=[0-9]*//g' | awk -F'|' '{print $1 "  ||  fixed: " substr($2, index($2,"destroyed"))}'
 echo "--- libnds hardware-math hooks vs software fixed point (must be bit-identical) ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DMX_LIBNDS_MATH -Istubs -I../core ../core/mx.c host_test.c -lm -o test_fixed_hw && ./test_fixed_hw > fixed_hw.txt && cmp fixed.txt fixed_hw.txt && echo "identical"
+echo "--- air valve + power-up rules (float and fixed) ---"
+gcc -std=c99 -O2 -I../core ../core/mx.c valve_test.c -lm -o valve_float && ./valve_float | tail -n 1
+gcc -std=c99 -O2 -DMX_FIXED -I../core ../core/mx.c valve_test.c -lm -o valve_fixed && ./valve_fixed | tail -n 1
 echo "--- wobble / block-kind physics (fixed point): sway, snaps, topple, sand, rubber ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DKICKV=10 -I../core wobble_test.c -lm -o wobble_test && ./wobble_test
 echo "--- robustness sweep (560 random shot sequences per math mode; must never hang) ---"

@@ -8,7 +8,7 @@
 # mode here (SH-4 has an FPU), unlike the DS build.
 
 TARGET = mandex.elf
-OBJS   = main.o ../core/mx.o ../core/cloth.o
+OBJS   = main.o ../core/mx.o ../core/mx_meta.o ../core/cloth.o
 
 KOS_CFLAGS += -std=gnu99 -O2 -I../core -I../art
 

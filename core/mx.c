@@ -9,7 +9,8 @@
 #define GRAV      R(112.5)
 #define KCOST     R(17.19)      /* energy cost per hp */
 #define RC        R(0.5)        /* chunk cell radius */
-#define MAN_R     R(1.75)
+#define MAN_R0    R(1.75)
+#define MAN_R     (m->rad)       /* grows when he is inflated; every user has `MxMan *m` in scope */
 #ifndef SUBSTEPS
 #define SUBSTEPS  4      /* physics steps per frame; the DS build may lower this */
 #endif
@@ -672,8 +673,22 @@ static void clean_chunks(MxWorld *w, real dt){
 }
 
 /* ============================================================ the man */
+static real damage_cell(MxWorld *w, int x, int y, real d);
+static void kill_target(MxWorld *w, MxTarget *t);
 static void stick(MxWorld *w){
   MxMan *m = &w->man;
+  if(m->pwr == PW_SPLAT && !m->splatted){            /* splat power-up: a huge goo blast where he lands */
+    m->splatted = 1;
+    int cx = rfloor(m->x), cy = rfloor(m->y);
+    for(int j = -7; j <= 7; j++) for(int i = -7; i <= 7; i++) if(i * i + j * j <= 49) damage_cell(w, cx + i, cy + j, RI(9));
+    for(int i = 0; i < w->ntargets; i++){
+      MxTarget *t = &w->targets[i];
+      real dx = t->x - m->x, dy = t->y - m->y;
+      if(t->alive && rmul(dx, dx) + rmul(dy, dy) < RI(112)) kill_target(w, t);   /* 10.6 cells */
+    }
+    ev(w, EV_SPLOOSH, m->x, m->y, 0, 0, 0);
+    if(w->shake < R(10)) w->shake = R(10);
+  }
   m->mode = MAN_STUCK; m->vx = m->vy = 0; m->t = 0; m->gooT = 0;
   if(w->shake < R(4)) w->shake = R(4);
   ev(w, EV_SPLAT, m->x, m->y, 0, 0, 0);
@@ -711,19 +726,19 @@ static void bounce_rubber(MxWorld *w){
 static MX_HOT void man_plow(MxWorld *w){
   bounce_rubber(w);
   MxMan *m = &w->man;
-  real mass = m->dive ? R(2.6) : RI(1);
+  real mass = rmul(m->dive ? R(2.6) : RI(1), RI(1) + rmul(m->inf, R(1.5)));
   real s2 = rmul(m->vx, m->vx) + rmul(m->vy, m->vy);
   real E = rmul(R(0.5), rmul(mass, s2)), E0 = E;
   int touched = 0;
   int x0 = rfloor(m->x - MAN_R), x1 = rfloor(m->x + MAN_R), y0 = rfloor(m->y - MAN_R), y1 = rfloor(m->y + MAN_R);
-  struct { real d2; int x, y; } list[25];
+  struct { real d2; int x, y; } list[64];
   int n = 0;
   real rr = rmul(MAN_R, MAN_R);
   for(int y = y0; y <= y1; y++) for(int x = x0; x <= x1; x++){
     if(!INB(x, y) || !w->grid[IDX(x, y)] || w->grid[IDX(x, y)] == MX_RUBBER) continue;
     real qx = rclamp(m->x, RI(x), RI(x + 1)), qy = rclamp(m->y, RI(y), RI(y + 1));
     real dx = m->x - qx, dy = m->y - qy, d2 = rmul(dx, dx) + rmul(dy, dy);
-    if(d2 >= rr || n >= 25) continue;
+    if(d2 >= rr || n >= 64) continue;
     int p = n++;
     while(p > 0 && list[p-1].d2 > d2){ list[p] = list[p-1]; p--; }
     list[p].d2 = d2; list[p].x = x; list[p].y = y;
@@ -791,10 +806,18 @@ static MX_HOT void man_plow(MxWorld *w){
 
 static void man_step(MxWorld *w, real dt){
   MxMan *m = &w->man;
-  m->vy += rmul(GRAV, dt); m->x += rmul(m->vx, dt); m->y += rmul(m->vy, dt); m->gt += dt;
+  real g = GRAV;
+  if(m->pwr == PW_TOWEL && m->gt < R(1.8) && !m->dive) g = rmul(g, R(0.3));      /* towel wings: glide */
+  m->vy += rmul(g, dt); m->x += rmul(m->vx, dt); m->y += rmul(m->vy, dt); m->gt += dt;
   if(m->hitCd > 0) m->hitCd -= dt;
   if(m->y + MAN_R >= RI(MX_ROWS)){
     m->y = RI(MX_ROWS) - MAN_R;
+    real sp2 = rmul(m->vx, m->vx) + rmul(m->vy, m->vy);
+    if(sp2 > RI(2756) && m->vy > RI(15) && m->bounces < 2){       /* a hard landing skips once or twice before he sticks (52 cells/s) */
+      m->bounces++; m->vy = -rmul(m->vy, R(0.34)); m->vx = rmul(m->vx, R(0.72));
+      ev(w, EV_THUD, m->x, m->y, 0, R(0.5), 0);
+      return;
+    }
     stick(w);
     return;
   }
@@ -805,6 +828,7 @@ static void next_man(MxWorld *w){
   memset(&w->man, 0, sizeof w->man);
   if(w->men > 0){ w->man.mode = MAN_AIM; w->man.x = MX_ANCHOR_X; w->man.y = MX_ANCHOR_Y; }
   else w->man.mode = MAN_NONE;
+  w->man.rad = MAN_R0;
 }
 
 void mx_set_pull(MxWorld *w, real dx, real dy){
@@ -813,18 +837,38 @@ void mx_set_pull(MxWorld *w, real dx, real dy){
   real d = rsqrt(rmul(dx, dx) + rmul(dy, dy));
   if(d > MX_PULL_MAX){ real k = rdiv(MX_PULL_MAX, d); dx = rmul(dx, k); dy = rmul(dy, k); }
   m->x = MX_ANCHOR_X + dx; m->y = MX_ANCHOR_Y + dy;
+  { real vx = m->x - MX_VALVE_X, vy = m->y - MX_VALVE_Y;
+    if(rmul(vx, vx) + rmul(vy, vy) < R(14)){ m->x = MX_VALVE_X; m->y = MX_VALVE_Y; m->vlv = 1; }   /* 3.75 cells */
+    else { m->vlv = 0; m->seated = 0; } }
 }
 void mx_release(MxWorld *w){
   MxMan *m = &w->man;
   if(m->mode != MAN_AIM || w->state != MX_PLAY) return;
+  if(m->vlv){ m->seated = 1; return; }                  /* let go ON the valve: he stays and keeps filling; drag him off to fire */
   real dx = MX_ANCHOR_X - m->x, dy = MX_ANCHOR_Y - m->y;
   if(rmul(dx, dx) + rmul(dy, dy) < R(3)){ m->x = MX_ANCHOR_X; m->y = MX_ANCHOR_Y; return; }
-  m->vx = rmul(dx, R(9.2)); m->vy = rmul(dy, R(9.2));
+  { real sp0 = RI(1) - rmul(m->inf, R(0.5));            /* inflated: slower but bigger and heavier */
+    m->rad = rmul(MAN_R0, RI(1) + rmul(m->inf, R(0.9)));
+    m->vx = rmul(rmul(dx, R(9.2)), sp0); m->vy = rmul(rmul(dy, R(9.2)), sp0);
+    if(m->inf > R(0.6)) w->st_inflated++;
+    if(w->pw_sel){ m->pwr = (uint8_t)w->pw_sel; w->pw_left[w->pw_sel]--; w->st_pw[w->pw_sel]++; w->pw_sel = 0; } }
   m->mode = MAN_FLY; m->gt = 0; w->men--;
   ev(w, EV_LAUNCH, m->x, m->y, 0, 0, 0);
 }
+void mx_select_power(MxWorld *w, int pw){
+  if(w->man.mode != MAN_AIM || pw < PW_BEANS || pw > PW_SPLAT || w->pw_left[pw] <= 0) return;
+  w->pw_sel = (w->pw_sel == pw) ? 0 : pw;
+}
 void mx_dive(MxWorld *w){
   MxMan *m = &w->man;
+  if(m->mode == MAN_FLY && m->pwr == PW_BEANS && !m->beaned){     /* beans: a fart jet along his flight */
+    m->beaned = 1;
+    real sp = rsqrt(rmul(m->vx, m->vx) + rmul(m->vy, m->vy));
+    if(sp > 0){ m->vx += rmul(rdiv(m->vx, sp), RI(65)); m->vy += rmul(rdiv(m->vy, sp), RI(65)) - RI(10); }
+    ev(w, EV_FART, m->x, m->y, 0, 0, 0);
+    if(w->shake < R(5)) w->shake = R(5);
+    return;
+  }
   if(m->mode != MAN_FLY || m->dive) return;
   m->dive = 1; m->vx = rmul(m->vx, R(0.4));
   if(m->vy < 0) m->vy = 0;
@@ -1013,6 +1057,7 @@ void mx_load(MxWorld *w, int level){
   w->wob_enabled = first ? 1 : keep_wob;
   w->level = level; w->state = MX_PLAY; w->men = MEN[level]; w->banner = R(2.4);
   build(w, level);
+  w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = 1;
   w->sand_on = 1;
   /* anything that wouldn't hold at spawn is welded in place, so levels never collapse on load */
   support_pass(w);
@@ -1073,6 +1118,18 @@ void mx_update(MxWorld *w, real dt){
   if(w->flash > 0) w->flash -= dt;
   w->shake = rmul(w->shake, R(0.9));
   MxMan *m = &w->man;
+
+  if(m->mode == MAN_AIM && (m->vlv || m->seated)){        /* on the air valve: fill up, and burst if he stays too long */
+    if(m->seated){ m->x = MX_VALVE_X; m->y = MX_VALVE_Y; }
+    m->inf += rdiv(dt, R(3.6)); m->airT += dt;
+    if(m->airT > R(0.07)){ m->airT = 0; ev(w, EV_AIR, m->x, m->y, 0, m->inf, 0); }
+    if(m->inf >= RI(1)){
+      m->inf = RI(1); w->st_pops++; w->men--;
+      ev(w, EV_AIRPOP, m->x, m->y, 0, 0, 0);
+      if(w->shake < R(16)) w->shake = R(16);
+      m->mode = MAN_WAIT; w->waitT = 0; m->vlv = m->seated = 0;
+    }
+  }
 
   if(m->mode == MAN_FLY){
     for(int i = 0; i < 8 && m->mode == MAN_FLY; i++){

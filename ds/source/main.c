@@ -19,6 +19,7 @@
 #include <nds.h>
 #include <string.h>
 #include "mx.h"
+#include "mx_meta.h"
 #include "gfx.h"
 #include "sfx.h"
 #define MS_ENUM_ONLY
@@ -38,6 +39,14 @@ static u8 buf_top[256 * 192], buf_bot[256 * 192];
 enum { ST_TITLE, ST_PLAY, ST_PAUSE };
 static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
 static int disp_score, cells0 = 1, end_t, was_state, best[MX_NUM_LEVELS];
+static MxStats stats;                 /* achievements / outfits for this session (the DS has no save) */
+static int outfit_sel, toast_t = -1, toast_id, toast_q[4], toast_nq;
+static void toast_push(int id){ if(toast_nq < 4) toast_q[toast_nq++] = id; }
+static void toast_tick(void){
+  if(toast_t >= 0){ if(++toast_t > 150) toast_t = -1; }
+  if(toast_t < 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i-1] = toast_q[i]; toast_nq--; toast_t = 0; sfx_play(SFX_TARGET, 64); }
+}
+
 static int pad_dx, pad_dy, pad_used, dragging;
 static int MAXHP[MX_NMAT];                    /* filled from the core's material table */
 
@@ -181,6 +190,23 @@ static void on_events(void){
     case EV_LAUNCH: sfx_play(SFX_LAUNCH, pan); dragging = 0; break;
     case EV_DIVE:   sfx_play(SFX_DIVE, pan); break;
     case EV_POP:    for(int k = 0; k < 6; k++) spawn(PT_GOO, e->x, e->y, rnd(17) - 8, -rnd(17), 0, 40); sfx_play(SFX_POP, pan); break;
+    case EV_AIR:                                            /* air valve hiss: little white puffs, belly creaks */
+      spawn(PT_DUST, MX_VALVE_X + RI(rnd(3) - 1), MX_VALVE_Y + RI(3), rnd(7) - 3, -rnd(6), 0, 14 + rnd(6));
+      if(rnd(4) == 0) sfx_play(SFX_STRETCH, pan);
+      break;
+    case EV_AIRPOP:
+      for(int k = 0; k < 18; k++) spawn(PT_GOO, e->x, e->y, rnd(41) - 20, -rnd(25), 0, 70 + rnd(40));
+      for(int k = 0; k < 10; k++) spawn(PT_SPARK, e->x, e->y, rnd(41) - 20, rnd(31) - 22, k & 1 ? C_RED : C_WHITE, 16 + rnd(10));
+      sfx_play(SFX_BOOM, pan); popup(e->x, e->y - RI(4), "POP!", C_RED); ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
+      break;
+    case EV_FART:
+      for(int k = 0; k < 10; k++) spawn(PT_STINK, e->x, e->y, rnd(17) - 8, rnd(11) - 5, 0, 40 + rnd(20));
+      sfx_play(SFX_FART, pan); popup(e->x, e->y - RI(3), "PFFRT!", C_GOO);
+      break;
+    case EV_SPLOOSH:
+      for(int k = 0; k < 24; k++) spawn(PT_GOO, e->x, e->y, rnd(51) - 25, -rnd(30), 0, 80 + rnd(40));
+      sfx_play(SFX_SPLAT, pan); popup(e->x, e->y - RI(4), "SPLOOSH!", C_GOO); ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
+      break;
     case EV_WIN:    sfx_play(SFX_WIN, 64); music_set(0); break;
     case EV_LOSE:   sfx_play(SFX_LOSE, 64); music_set(0); break;
     }
@@ -308,6 +334,25 @@ static void man_with_towel(u8 *b, ClothActor *ta, int x, int y, int ppc, int fac
   if(ta->live) gfx_cloth(b, &ta->c, x, y, ppc, face, 1);
 }
 
+/* the air valve: a pipe with an orange nozzle, a gauge, and a pressure bar while he is on it */
+static void draw_valve(const View *v){
+  int ppc = v->ppc, x = vx(v, MX_VALVE_X), y = vy(v, MX_VALVE_Y), gy = MX_ROWS * ppc - v->cy;
+  const MxMan *m = &world.man; int f = m->mode == MAN_AIM ? (int)((m->inf * 100) >> 12) : 0;
+  int th = ppc * 3 / 4 < 2 ? 2 : ppc * 3 / 4;
+  gfx_rect(v->buf, x - ppc * 2, gy - 2, ppc * 4, 3, C_GRAY);
+  gfx_rect(v->buf, x - th / 2, y + ppc, th, gy - y - ppc, C_SUIT);
+  gfx_rect(v->buf, x - th / 2, y + ppc, th > 2 ? th / 2 : 1, gy - y - ppc, C_GRAY);
+  gfx_tri(v->buf, x - ppc * 2, y + ppc * 2, x + ppc * 2, y + ppc * 2, x, y + 1, C_FIRE);                    /* nozzle */
+  int gx = x - ppc * 4, gyy = y + ppc * 8;
+  gfx_ell(v->buf, gx, gyy, ppc * 2 + 1, ppc * 2 + 1, C_BLACK); gfx_ell(v->buf, gx, gyy, ppc * 2, ppc * 2, C_WHITE);
+  gfx_line(v->buf, gx, gyy, gx + (f - 50) * ppc / 30, gyy - ppc, f > 75 ? C_RED : C_BLACK);               /* needle */
+  if(m->mode == MAN_AIM && f > 0){
+    gfx_rect(v->buf, x - ppc * 5, y - ppc * 9, ppc * 10, ppc + 2, C_UIBG);
+    gfx_rect(v->buf, x - ppc * 5 + 1, y - ppc * 9 + 1, f * (ppc * 10 - 2) / 100, ppc, f < 50 ? C_GOO : f < 80 ? C_GOLD : C_RED);
+    if(f > 70 && (frame & 4)) gfx_text_c(v->buf, x, y - ppc * 12, "DANGER", C_RED, C_BLACK, 1);
+  } else if(m->mode == MAN_AIM && !dragging && (frame & 32)) gfx_text_c(v->buf, x, y + ppc * 12, "AIR", C_WHITE, C_BLACK, 1);
+}
+
 static void draw_man(const View *v){
   const MxMan *m = &world.man;
   if(m->mode == MAN_NONE || m->mode == MAN_WAIT) return;
@@ -320,6 +365,15 @@ static void draw_man(const View *v){
   if(m->mode == MAN_AIM) gfx_ell(v->buf, x, y + v->ppc, v->ppc * 2, v->ppc * 3 / 2, C_HAIR2);        /* sling pouch */
   if(m->mode == MAN_AIM && !dragging) man_with_towel(v->buf, &tow_play, x, y, v->ppc, face, mi_frame(&mi, frame), &jg);   /* idle gags */
   else spr_man_j(v->buf, x, y, v->ppc, face, pose, frame, &jg);
+  if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){                 /* only the belly swells; the face flushes red near the end */
+    int f = (int)((m->inf * 100) >> 12), p = v->ppc, rx = p * (2 + f * 5 / 40), ry = p * (2 + f * 4 / 40);
+    int bx = x + face * p * f / 60, by = y + p + p * f / 80;
+    gfx_ell(v->buf, bx, by, rx + 1, ry + 1, C_SKIN2); gfx_ell(v->buf, bx, by, rx, ry, C_SKIN);
+    gfx_ell(v->buf, bx - rx / 3, by - ry / 2, rx / 4 + 1, ry / 5 + 1, C_SKIN3);                       /* shine */
+    if(f > 30) for(int k = -1; k <= 1; k++) gfx_line(v->buf, bx + rx / 3, by + k * ry / 3, bx + rx * 4 / 5, by + k * ry / 3, C_SKIN2);   /* stretch marks */
+    gfx_ell(v->buf, bx + face * rx * 3 / 4, by + ry / 8, 1 + f / 40, 1 + f / 40, C_SKIN2);            /* belly button */
+    if(f > 45) gfx_ell(v->buf, x, y - p * 3, p + 1 + f / 50, p, (f > 85 && (frame & 4)) ? C_RED2 : C_RED);   /* blush */
+  }
 }
 
 static void draw_parts(const View *v){
@@ -374,6 +428,7 @@ static void draw_world(const View *v, int parallax){
   draw_voxels(v);
   draw_chunks(v);
   draw_targets(v);
+  draw_valve(v);
   draw_man(v);
   draw_band(v, 1);
   draw_aim_dots(v);
@@ -423,6 +478,13 @@ static void top_hud(u8 *b){
   gfx_text_o(b, 70 + 30 + gfx_text_w(gfx_int(pct), 1) + 2, 15, "%", C_WHITE, C_BLACK, 1);
   gfx_text_o(b, 4, 24, "LANDLORDS", C_WHITE, C_BLACK, 1);
   draw_hats(b, 46, 28);
+  toast_tick();
+  if(toast_t >= 0){
+    int y = toast_t < 12 ? toast_t * 3 - 36 : toast_t > 138 ? (150 - toast_t) * 3 - 36 : 0;      /* slides down, waits, slides up */
+    gfx_rect(b, 28, 100 + y - 34 + 34, 200, 26, C_UIBG); gfx_rect(b, 28, 100 + y, 200, 1, C_GOLD); gfx_rect(b, 28, 125 + y, 200, 1, C_GOLD);
+    gfx_text_c(b, 128, 104 + y, "ACHIEVEMENT", C_GOLD, C_UIBG, 1);
+    gfx_text_c(b, 128, 114 + y, mx_ach_name(toast_id), C_WHITE, C_UIBG, 1);
+  }
 }
 
 static void banner(u8 *b){
@@ -489,11 +551,28 @@ static void bottom_aim(View *v){
   gfx_rect(v->buf, 6, 180, 82, 8, C_UIBG); gfx_rect(v->buf, 7, 181, 80, 6, C_DARK);
   gfx_rect(v->buf, 7, 181, gfx_clamp(pct, 0, 100) * 80 / 100, 6, pct < 50 ? C_GOO : pct < 85 ? C_GOLD : C_RED);
   if(pct < 14 && (frame & 32)) gfx_text_c(v->buf, 150, 40, "DRAG THE MAN BACK, LET GO TO FLING", C_WHITE, C_BLACK, 1);
+  static const char *const PWN[3] = { "BEANS", "TOWEL", "SPLAT" };      /* one use each per level; touch to arm, then fling */
+  for(int k = 0; k < 3; k++){
+    int left = world.pw_left[k + 1], on = world.pw_sel == k + 1;
+    gfx_rect(v->buf, 96 + k * 52, 172, 50, 16, on ? C_GOLD : C_UIBG);
+    gfx_rect(v->buf, 96 + k * 52, 172, 50, 1, C_UILINE);
+    gfx_text_c(v->buf, 96 + k * 52 + 25, 176, PWN[k], on ? C_BLACK : left ? C_WHITE : C_GRAY, on ? C_GOLD : C_UIBG, 1);
+  }
+  if(world.pw_sel) gfx_text_c(v->buf, 128, 160, world.pw_sel == PW_BEANS ? "TAP IN THE AIR = FART JET" : world.pw_sel == PW_TOWEL ? "TOWEL: GLIDE FURTHER" : "SPLAT: BIG GOO BLAST", C_GOLD, C_BLACK, 1);
 }
 
 /* ------------------------------------------------------------------ title */
+/* outfit: recolour the man's boxers and towel palette entries (MS_PAL 5,6,7 boxers; 13,14,15 towel) */
+static void apply_outfit(int o){
+  uint8_t sh[6][3]; mx_outfit_shades(o, sh);
+  static const int idx[6] = { 5, 6, 7, 13, 14, 15 };
+  for(int k = 0; k < 6; k++){
+    u16 c = RGB15(sh[k][0] >> 3, sh[k][1] >> 3, sh[k][2] >> 3);
+    gfx_pal[C_MAN0 + idx[k]] = c; BG_PALETTE[C_MAN0 + idx[k]] = c; BG_PALETTE_SUB[C_MAN0 + idx[k]] = c;
+  }
+}
 static void load_level(int l){
-  mx_load(&world, l);
+  mx_load(&world, l); mx_meta_level_start(&stats, &world);
   mx_set_substeps(&world, world.substeps > MX_DS_MAX_SUBSTEPS ? MX_DS_MAX_SUBSTEPS : world.substeps);
   cells0 = mx_cells_left(&world); disp_score = 0; end_t = 0; was_state = MX_PLAY; dragging = 0; pad_used = 0;
   memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops);
@@ -543,6 +622,11 @@ static void title_bottom(View *v){
   if(frame & 32) gfx_text_c(v->buf, 128, 174, "TOUCH SCREEN OR PRESS A", C_WHITE, C_UIBG, 1);
   else           gfx_text_c(v->buf, 128, 174, "TO START", C_GOLD, C_UIBG, 1);
   gfx_text_c(v->buf, 128, 183, "Y = MUSIC", C_UILINE, C_UIBG, 1);
+  gfx_text(v->buf, 4, 183, "R: OUTFIT", C_UILINE, 1);
+  gfx_text(v->buf, 256 - 4 - gfx_text_w("ACH 00/25", 1), 183, "ACH", C_UILINE, 1);
+  gfx_text(v->buf, 256 - 4 - gfx_text_w("00/25", 1), 183, gfx_int(mx_ach_count(&stats)), C_GOLD, 1);
+  gfx_text(v->buf, 256 - 4 - gfx_text_w("/25", 1), 183, "/25", C_UILINE, 1);
+  gfx_text_c(v->buf, 128, 46, mx_outfit(outfit_sel)->name, C_PINK, C_BLACK, 1);
 }
 
 /* ---------------------------------------------------------------------- main */
@@ -588,6 +672,7 @@ int main(void){
   music_set(music_pref);
   STAGE(3, RGB15(0,0,31));                             /* blue */
 
+  mx_meta_init(&stats); apply_outfit(0);
   load_level(sel_level);
   STAGE(4, RGB15(31,31,0));                            /* yellow */
   int slow_frames = 0, fast_frames = 0, phys_ticks = 0;
@@ -608,6 +693,10 @@ int main(void){
       if(down & KEY_RIGHT) ch = 1;
       if((down & KEY_TOUCH) && hit(&t, 0, 0, 48, 48)) ch = -1;
       if((down & KEY_TOUCH) && hit(&t, 208, 0, 48, 48)) ch = 1;
+      if(down & KEY_R){                                          /* next unlocked outfit; locked ones are skipped */
+        for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
+        apply_outfit(outfit_sel); sfx_play(SFX_CLICK, 64);
+      }
       if(ch){ sel_level = (sel_level + ch + MX_NUM_LEVELS) % MX_NUM_LEVELS; load_level(sel_level); sfx_play(SFX_CLICK, 64); }
       else if((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)){
         app = ST_PLAY; load_level(sel_level); sfx_play(SFX_CLICK, 64); music_set(music_pref);
@@ -630,6 +719,10 @@ int main(void){
       MxMan *m = &world.man;
       if(m->mode == MAN_AIM){
         View av = { buf_bot, 4, 0, 56 };
+        if(down & KEY_TOUCH){
+          for(int k = 0; k < 3; k++) if(hit(&t, 96 + k * 52, 172, 50, 16)){ mx_select_power(&world, k + 1); sfx_play(SFX_CLICK, 64); }
+        }
+        if(down & KEY_X){ int nx = world.pw_sel; for(int tries = 0; tries < 4; tries++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; } if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); sfx_play(SFX_CLICK, 64); }
         if(down & KEY_TOUCH){
           int dx = t.px - vx(&av, m->x), dy = t.py - vy(&av, m->y);
           dragging = dx * dx + dy * dy < 34 * 34;                         /* grab the man */
@@ -690,9 +783,11 @@ int main(void){
           else if(world.substeps < MX_DS_MAX_SUBSTEPS) mx_set_substeps(&world, world.substeps + 1); } }
       else { slow_frames = 0; fast_frames = 0; }
       on_events();
+      mx_meta_events(&stats, &world);
+      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a);
       update_parts();
       if(world.state != MX_PLAY){
-        if(was_state == MX_PLAY){ end_t = 0; if(world.state == MX_WIN && world.score > best[world.level]) best[world.level] = world.score; }
+        if(was_state == MX_PLAY){ end_t = 0; if(world.state == MX_WIN){ if(world.score > best[world.level]) best[world.level] = world.score; mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); } }
         end_t++;
       }
       was_state = world.state;
