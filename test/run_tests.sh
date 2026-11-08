@@ -27,9 +27,9 @@ echo "--- towel cloth (core/cloth.c): stays finite and the right length, moves, 
 gcc -std=gnu99 -O2 -Wall -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm -o cloth_float && ./cloth_float | grep -v "^  p"
 gcc -std=gnu99 -O2 -Wall -DMX_FIXED -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm -o cloth_fixed && ./cloth_fixed | grep -v "^  p"
 echo "--- DS front-end: real main loop on stub libnds, scripted stylus play on levels 1, 4, 6, 7 ---"
-gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Istubs -I../core -I../art -I../ds/source ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../core/mx.c ../core/cloth.c -lm -o ds_render
+gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Istubs -I../core -I../art -I../ds/source ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_render
 for L in 0 3 5 6; do ./ds_render /tmp/dsL$L 12000 $L | grep -v "^  chunk"; done
 echo "--- idle gags: every step valid, every gag ends and plays, he falls asleep, input wakes him ---"
 gcc -std=c99 -O2 -Wall -Wno-unused-function -I../art idle_test.c -o idle_test && ./idle_test
 echo "--- Dreamcast front-end drawing on the host (software rasteriser instead of the PVR): jiggle, gags, win/lose ---"
-gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -Istubs -I../core -I../art ../core/mx.c ../core/cloth.c dc_render.c -lm -o dc_render && ./dc_render
+gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -Istubs -I../core -I../art ../core/mx.c ../core/mx_meta.c ../core/cloth.c dc_render.c -lm -o dc_render && ./dc_render

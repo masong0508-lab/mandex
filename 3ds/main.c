@@ -17,12 +17,16 @@
 #include <stdbool.h>
 #include <math.h>
 #include "mx.h"
+#include "mx_meta.h"
 
 static MxWorld world;
 enum { ST_TITLE, ST_PLAY };
 static int app = ST_TITLE, sel = 0, frame, dragging, pad_used, cells0 = 1;
 static float pad_dx, pad_dy;
 static int best[MX_NUM_LEVELS];
+static MxStats stats;                                   /* session achievements / outfits (no save on the 3DS yet) */
+static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
+static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
 
 /* ---------------------------------------------------------------- pixels */
 typedef struct { u8 *fb; int w, h; } Scr;                       /* w x h in screen terms (400x240 or 320x240) */
@@ -147,10 +151,17 @@ static void draw_man(const View *v){
   if(m->mode == MAN_NONE || m->mode == MAN_WAIT) return;
   int p = v->ppc, x = VX(v, RTOF(m->x)), y = VY(v, RTOF(m->y));
   if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); }
+  const MxOutfit *of = mx_outfit(outfit_sel);
   disc(v->s, x, y, p * 2 - 1, RGB(244, 183, 142));                          /* body */
-  rect(v->s, x - p * 2 + 2, y + p / 2, p * 4 - 4, p, RGB(224, 36, 58));     /* red boxers */
-  disc(v->s, x + (m->vx >= 0 ? p / 2 : -p / 2), y - p * 2, p, RGB(244, 183, 142));
-  rect(v->s, x - p * 2, y - p, p, p * 2, RGB(255, 158, 200));               /* pink towel */
+  if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){             /* only the belly swells */
+    float f = RTOF(m->inf); int r = (int)(p * (2 + f * 3.2f)), bx = x + (int)(p * f * 1.5f);
+    disc(v->s, bx, y + p / 2, r + 1, RGB(205, 135, 100)); disc(v->s, bx, y + p / 2, r, RGB(244, 183, 142));
+    disc(v->s, bx - r / 3, y + p / 2 - r / 3, r / 5 + 1, RGB(255, 215, 180));
+    if(f > .45f) disc(v->s, x, y - p * 2, p + 1, RGB(235, 40 + (int)(40 * (1 - f)), 50));   /* red in the face */
+  }
+  rect(v->s, x - p * 2 + 2, y + p / 2, p * 4 - 4, p, RGB(of->br[0], of->br[1], of->br[2]));     /* boxers */
+  disc(v->s, x + (m->vx >= 0 ? p / 2 : -p / 2), y - p * 2, p, (m->inf > .45f) ? RGB(235, 90, 90) : RGB(244, 183, 142));
+  rect(v->s, x - p * 2, y - p, p, p * 2, RGB(of->tow[0], of->tow[1], of->tow[2]));               /* towel */
 }
 static void draw_sling(const View *v){
   int sx = VX(v, RTOF(MX_ANCHOR_X)), sy = VY(v, RTOF(MX_ANCHOR_Y)), p = v->ppc;
@@ -174,8 +185,16 @@ static void draw_aim(const View *v){
 static void draw_parts(const View *v){
   for(int i = 0; i < NP; i++) if(parts[i].life > 0) rect(v->s, VX(v, parts[i].x), VY(v, parts[i].y), 2, 2, parts[i].c);
 }
+static void draw_valve(const View *v){
+  int p = v->ppc, x = VX(v, RTOF(MX_VALVE_X)), y = VY(v, RTOF(MX_VALVE_Y)), gy = VY(v, (float)MX_ROWS);
+  const MxMan *m = &world.man; int f = m->mode == MAN_AIM ? (int)(RTOF(m->inf) * 100) : 0;
+  rect(v->s, x - p * 2, gy - 2, p * 4, 3, RGB(110, 115, 130));
+  rect(v->s, x - p / 2 - 1, y + p, p + 2, gy - y - p, RGB(74, 85, 104));
+  rect(v->s, x - p, y, p * 2, p * 2, RGB(255, 160, 40));                         /* nozzle */
+  if(m->mode == MAN_AIM && f > 0){ rect(v->s, x - p * 5, y - p * 9, p * 10, p, RGB(20, 24, 40)); rect(v->s, x - p * 5 + 1, y - p * 9 + 1, f * (p * 10 - 2) / 100, p - 2, f < 50 ? RGB(125, 255, 90) : f < 80 ? RGB(255, 210, 63) : RGB(255, 70, 70)); }
+}
 static void draw_world(const View *v){
-  draw_sky(v); draw_cells(v); draw_landlords(v); draw_sling(v); draw_aim(v); draw_man(v); draw_parts(v);
+  draw_sky(v); draw_cells(v); draw_landlords(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
 }
 
 /* ---------------------------------------------------------------- HUD / panels */
@@ -189,6 +208,7 @@ static void draw_hud(void){
   text(&top, 6, 224, "MEN", 2, RGB(190, 190, 190)); itoa_(world.men, b); text(&top, 40, 224, b, 2, RGB(255, 255, 255));
   text(&top, 80, 224, "LANDLORDS", 2, RGB(255, 138, 138)); sprintf(b, "%d/%d", alive(), world.ntargets); text(&top, 168, 224, b, 2, RGB(255, 255, 255));
   sprintf(b, "%06d", world.score); text(&top, 394 - tw(b, 2), 224, b, 2, RGB(255, 255, 255));
+  if(toast_t > 0 && toast_id >= 0){ rect(&top, 100, 30, 200, 30, RGB(20, 24, 40)); textc(&top, 200, 33, "ACHIEVEMENT", 1, RGB(255, 210, 63)); textc(&top, 200, 45, mx_ach_name(toast_id), 2, RGB(255, 255, 255)); }
 }
 static void draw_end(void){
   if(world.state == MX_PLAY) return;
@@ -201,7 +221,7 @@ static void draw_end(void){
 
 /* ---------------------------------------------------------------- flow */
 static void load_level(int l){
-  mx_load(&world, l);
+  mx_load(&world, l); mx_meta_level_start(&stats, &world);
   memset(parts, 0, sizeof parts);
   cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1;
   dragging = 0; pad_used = 0; pad_dx = pad_dy = 0;
@@ -225,10 +245,13 @@ int main(void){
     if(app == ST_TITLE){
       if(down & (KEY_RIGHT | KEY_R)){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & (KEY_LEFT | KEY_L)){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
+      if(down & KEY_Y){ for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } }
       if(down & (KEY_A | KEY_TOUCH)){ app = ST_PLAY; load_level(sel); }
     } else {
       MxMan *m = &world.man;
       if(down & KEY_SELECT) load_level(world.level);
+      if((down & KEY_L) && m->mode == MAN_AIM){ int nx = world.pw_sel; for(int k = 0; k < 4; k++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; }
+        if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); }
       if(down & KEY_X){ app = ST_TITLE; sel = world.level; load_level(sel); }
       if(world.state != MX_PLAY){
         if(down & (KEY_A | KEY_TOUCH)){
@@ -242,6 +265,7 @@ int main(void){
           mx_set_pull(&world, R(1) * (cx - RTOF(MX_ANCHOR_X)), R(1) * (cy - RTOF(MX_ANCHOR_Y)));
         }
         if((up & KEY_TOUCH) && dragging){ dragging = 0; mx_release(&world); }
+        if(!dragging && !pad_used && m->seated){}                      /* seated on the valve: leave him there until he is dragged off */
         if(held & (KEY_DLEFT | KEY_DRIGHT | KEY_DUP | KEY_DDOWN | KEY_CPAD_LEFT | KEY_CPAD_RIGHT | KEY_CPAD_UP | KEY_CPAD_DOWN)){
           if(held & (KEY_DLEFT | KEY_CPAD_LEFT)) pad_dx -= .25f;
           if(held & (KEY_DRIGHT | KEY_CPAD_RIGHT)) pad_dx += .25f;
@@ -255,8 +279,12 @@ int main(void){
       }
       mx_update(&world, R(1.0 / 60.0));
       on_events();
+      mx_meta_events(&stats, &world);
+      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a);
+      if(toast_t > 0){ if(++toast_t > 150){ toast_t = 0; toast_id = -1; } }
+      if(toast_t == 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i-1] = toast_q[i]; toast_nq--; toast_t = 1; }
       tick_parts();
-      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN && world.score > best[world.level]) best[world.level] = world.score;
+      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); if(world.score > best[world.level]) best[world.level] = world.score; }
       was_state = world.state;
     }
 
@@ -270,12 +298,14 @@ int main(void){
       textc(&top, 200, 100, "THE LANDLORD SMASHER", 2, RGB(255, 255, 255));
       char b[48]; sprintf(b, "< LEVEL %d  %s >", sel + 1, mx_level_name(sel)); textc(&top, 200, 150, b, 2, RGB(255, 255, 255));
       textc(&top, 200, 176, "A / TOUCH = PLAY", 2, RGB(125, 255, 90));
+      { char ob[64]; sprintf(ob, "Y: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {
       draw_hud(); draw_end();
     }
     draw_world(&vb);
     if(app == ST_PLAY){
       if(world.man.mode == MAN_AIM && !dragging && world.state == MX_PLAY) textc(&bot, 200, 12, "DRAG BACK AND LET GO", 2, RGB(255, 255, 255));
+      if(world.man.mode == MAN_AIM && world.state == MX_PLAY){ static const char *const PWN[4] = { "NONE", "BEANS", "TOWEL", "SPLAT" }; char pb[48]; sprintf(pb, "L: POWER-UP %s", PWN[world.pw_sel]); textc(&bot, 160, 228, pb, 1, world.pw_sel ? RGB(255, 210, 63) : RGB(200, 200, 200)); }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
     } else textc(&bot, 160, 12, "TOUCH TO START", 2, RGB(255, 255, 255));
     gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();
