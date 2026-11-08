@@ -1,0 +1,47 @@
+name: Release
+
+# Push a tag like v0.1.0 to run the host tests, build the DS ROM, and attach the ROM and the browser game to a release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh test/run_tests.sh
+
+  ds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -C ds
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-nds
+          path: ds/mandex.nds
+          if-no-files-found: error
+
+  release:
+    needs: [test, ds]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: mandex-nds
+          path: dist
+      - run: cp web/index.html dist/mandex.html
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/mandex.nds
+            dist/mandex.html

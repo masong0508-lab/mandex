@@ -1,0 +1,30 @@
+name: Build Nintendo DS
+
+# NOTE: ds/Makefile had never been run when this workflow was added (no devkitPro was available to the author), so the
+# first run may show real compile or link problems.  Fix those, they are what the workflow is for.
+on:
+  push:
+    branches: [main]
+    paths: ["ds/**", "core/**", "art/**", ".github/workflows/build-ds.yml"]
+  pull_request:
+    paths: ["ds/**", "core/**", "art/**", ".github/workflows/build-ds.yml"]
+  workflow_dispatch:
+
+jobs:
+  ds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          echo "DEVKITPRO=$DEVKITPRO DEVKITARM=$DEVKITARM"
+          arm-none-eabi-gcc --version | head -1
+      - name: Build mandex.nds
+        run: make -C ds
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-nds
+          path: ds/mandex.nds
+          if-no-files-found: error

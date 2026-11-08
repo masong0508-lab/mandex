@@ -1,0 +1,28 @@
+name: Regenerate man sprites
+
+# Manual.  Renders every pose of the man from web/index.html (his own drawing code) in headless Chromium and rebuilds
+# art/manspr.h plus the contact sheet docs/man_sprites.png.  Download the artifact and commit it if you like the result.
+# (Not run automatically: anti-aliasing can differ a little between Chromium builds, which would show up as noise.)
+on:
+  workflow_dispatch:
+
+jobs:
+  sprites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy pillow playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python tools/gen_manspr.py web/index.html
+      - name: How much changed
+        run: git status --short && git diff --stat
+      - uses: actions/upload-artifact@v4
+        with:
+          name: man-sprites
+          path: |
+            art/manspr.h
+            docs/man_sprites.png

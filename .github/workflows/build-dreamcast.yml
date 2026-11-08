@@ -1,0 +1,36 @@
+name: Build Dreamcast (experimental)
+
+# NOTE: dreamcast/Makefile had never been run when this workflow was added, and the KallistiOS image below is a
+# community image whose layout was not checked.  The step that sources KOS searches for environ.sh; if your image keeps it
+# somewhere unusual, change KOS_IMAGE or the search.  This job is allowed to fail so it never turns the repo red.
+on:
+  push:
+    branches: [main]
+    paths: ["dreamcast/**", "core/**", "art/**", ".github/workflows/build-dreamcast.yml"]
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Docker image with a built KallistiOS toolchain
+        default: kazade/dreamcast-sdk:latest
+
+jobs:
+  dreamcast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    container: ${{ inputs.image || 'kazade/dreamcast-sdk:latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build mandex.elf
+        shell: bash
+        run: |
+          ENV_SH="$(ls /opt/toolchains/dc/kos/environ.sh /usr/local/kos/environ.sh /opt/kos/environ.sh 2>/dev/null | head -1)"
+          [ -n "$ENV_SH" ] || ENV_SH="$(find / -name environ.sh -path '*kos*' 2>/dev/null | head -1)"
+          echo "using $ENV_SH"
+          source "$ENV_SH"
+          make -C dreamcast
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-elf
+          path: dreamcast/mandex.elf
+          if-no-files-found: error

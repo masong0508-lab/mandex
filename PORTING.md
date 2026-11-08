@@ -1,0 +1,195 @@
+# MANDEX console ports - status
+
+One shared C core, two front-ends.
+
+```
+core/mx.h, mx.c            portable game + physics (no platform calls, no malloc)
+ds/source/main.c           DS game loop: dual-screen cameras, input, particles, HUD, title/pause/win/lose
+ds/source/gfx.c, gfx.h     DS software renderer toolkit: palette, material tiles, parallax sky, font, sprites
+ds/source/sfx.c, sfx.h     DS sound: glide/arpeggio effects on PSG + noise channels, small chiptune loop
+dreamcast/main.c           Dreamcast front-end (KallistiOS PVR) - still the first-cut one
+art/manspr.h               GENERATED man pixel art shared by both consoles (tools/gen_manspr.py)
+tools/gen_manspr.py        builds art/manspr.h from the HTML prototype (needs Playwright, only for this step)
+test/                      host regression tests, robustness sweep, DS/DC host harnesses
+docs/                      screenshots rendered by the host harness (real DS drawing code)
+```
+
+## IDLE / GROSS-OUT / JIGGLE pass (DS + Dreamcast + HTML)
+New man frames (27 in all, `art/manspr.h`, made by `tools/gen_manspr.py` from the HTML art): belly bounce A/B, belly
+scratch A/B, burp A/B, nose pick A/B, yawn, sleep A/B (snot bubble), sad, back view centre/left/right (butt wiggle),
+fart A/B.  Each frame also carries belly and rear "blob" centres and radii for the jiggle.
+- `art/manidle.h` (header only, shared by DS and DC): 7 gags (belly slap, butt wiggle, belly scratch + sniff, burp,
+  fart, nose pick + flick, yawn) are tables of `{frame, ticks, fx}`.  A random gag starts after 3-5 s of no input
+  (never the same one twice), he falls asleep after 20 s, any input wakes him.  The front-end only has to call
+  `mi_update()` each tick, draw `mi_frame()` and react to `mi.fx` (sound / particles).  `mi_dance_frame()` is the
+  victory butt-wiggle loop.  `test/idle_test.c` checks the tables.
+- Gross-out effects: green stink clouds (burp, fart, a thin trail while flying), flies after a fart, a flicked
+  booger, sweat when the sling is pulled hard, Zzz while asleep.  DS also has sounds (slap, boing, grunt, burp,
+  fart, flick, yawn, snore: all PSG/noise note lists in `ds/source/sfx.c`) and "BUUURP!" / "PFFFFT!" popups.
+  Dreamcast has no sound yet, so its gags are visual only, and no text popups.
+- Win screen: two men doing the butt-wiggle dance.  Lose screen: the sad pose.  DS title: he flexes, with gags too.
+- Jiggle physics (cosmetic, in `core/mx.c: man_jiggle`, so all ports agree): the man's belly and rear are two damped
+  springs (belly K400/D7, rear K250/D6, clamp 1.5 cells) kicked by his change of velocity while flying, when he hits
+  something and when he drops; hits also squash him about 12% along the impact direction.  It never touches the
+  rigid-body or lattice simulation.  DS draws it by shifting pixels near the belly / rear blob (`blit_frame` jiggle
+  path in `gfx.c`); Dreamcast shifts the quads of each pixel run.
+- Host checks: `test/wobble_test.c` [7] (spring peaks, calm after the hit), `test/idle_test.c`, DS idle screenshots
+  (`IDLE_SHOTS=1 ./ds_render ...`), Dreamcast host render (`dc_render`: idle sheet, jiggle shots, win, lose).
+- Faces / back view (latest pass): the generated heads were only ~12 px wide and looked muddy, so `tools/manhead.py`
+  holds hand-pixelled heads that replace them: a 19x19 front head (12 expressions: cool shades, scream, happy, bliss,
+  burp, tight-shut, cross-eyed, yawn, sleep, sad, dizzy ...), a side head for flying / diving, a small head for the
+  stuck pose, and a back-of-head (hair whorl, ears, neck) for the butt-wiggle and fart poses.  `gen_manspr.py` pads
+  the sprites, wipes the old head, paints these, then trims.  5 extra palette colours are used only by these faces
+  (hair shine, blush, iris, lip, tooth): the palette is now 27 entries (DS loads them at `C_MAN0`=160..186).
+  The butt is re-shaded in the generator (`shade_butt`): two round cheeks, dark cleft, highlights.  Love handles
+  and the new face / butt look in the HTML come from `drawManFrame` itself (backup `mandex_pre_look.html`).
+- NOT verified: sounds were never heard; no real DS / Dreamcast run, so speed and the look on real screens are unknown.
+  The jiggle blit on DS costs extra pixels only while he is actually moving.
+
+## NEW MAN SPRITES pass (DS + Dreamcast)
+- The man now matches the HTML prototype: curvy dad bod, belly roll, chest hair, tube socks, brown shoes, briefs with the gold
+  logo, towel cape, gold shades + handlebar mustache. `docs/man_sprites.png` shows every frame (zoomed 4x).
+- **10 frames**: aim idle (2, belly sways), drag/yelling, flex (2, used on the title screen), flying (2, legs + cape), belly-flop ball,
+  stuck/dizzy star (2). DS: dragging the man in the sling switches to the yelling frame; the HUD shows head-and-shoulders busts.
+- They are **generated, not hand-drawn**: `python3 tools/gen_manspr.py` runs the HTML's own drawing code in headless Chromium,
+  shrinks it to chunky pixel art (outlined, fixed 22-colour palette) and writes `art/manspr.h`, which both consoles include.
+  The faces are then pixelled by hand in that script (the generated heads were too small to read). Edit the script, rerun, done.
+- DS: one palette block (`C_MAN0`), nearest-neighbour blit at any zoom (art is authored at 4 px/cell). Dreamcast: one quad per
+  horizontal run of the same colour (~300 quads per man).
+- Not done / caveats: frames are not rotated in flight (the HTML rotates the man; the consoles show him level); no walk/win/lose
+  animations beyond the frames above; looked at in host screenshots only, not on a real DS screen or on a Dreamcast.
+
+## WOBBLE + BLOCK KINDS pass (all ports share this: it lives in `core/mx.c`)
+**What you will see**
+- Buildings now **wobble**. Every standing voxel is a mass on springs to its 4 neighbours. A hit, blast or landing
+  rubble injects velocity that travels through the structure as a wave; tall things lean further (inverted-pendulum
+  term), then settle. Voxels are drawn at their displaced position (DS, Dreamcast and HTML all do this).
+- If a joint is stretched past its break strain it **snaps** (dark crack line on the voxel, dust + creak). Snapped joints
+  count as gaps in the support check, so a building can shear along the crack and the top half **topples**,
+  leaving with the speed and spin it had while swaying.
+- Landlords ride the wobbling floor under them (`mx_target_offset`).
+- **8 block kinds**, each with its own density, health, stiffness, damping, break strain, bounce, friction, brittleness:
+
+| kind | feels like |
+|---|---|
+| wood | light, bendy, creaks, sways a lot |
+| brick | medium; stiff, snaps when sheared hard |
+| stone | heavy, barely moves, hard to break |
+| glass | light, tiny break strain: windows pop first, shards bounce |
+| TNT | as before (chain blasts); wobbles like light wood |
+| steel | very heavy and strong, rings the longest |
+| **rubber** (new) | pink; the man **bounces** off it (e=0.92) and it jiggles for seconds |
+| **sand** (new) | no cohesion: falls, piles at 45 degrees, slumps when dug out, never becomes a chunk |
+
+- Two new levels: **6 Bouncy Castle** (rubber walls) and **7 Sandcastle Shakedown** (sand mounds + houses).
+
+**Core changes**: `MatProp` table, lattice (`wob_*`, `wobble_step`, `wobble_check`, active-cell list), `sand_step`, `bounce_rubber`,
+joint-aware `support_pass`, chunks inherit displaced position / velocity / spin, per-material restitution + friction,
+`EV_CRACK` / `EV_BOUNCE` events, `mx_material_hp()`, `mx_cell_cracked()`, `mx_target_offset()`, `mx_set_wobble()`.
+
+**Front-ends**: DS draws offsets + crack states + rubber/sand tiles + new particles/sounds (CRACK, BOUNCE);
+Dreamcast draws offsets/cracks/new particles; HTML prototype has its own JS port of the same lattice.
+
+**Verified on the host machine** (`sh test/run_tests.sh`)
+- All 7 levels stand untouched for 10 s: no chunks, no cracks, lattice asleep.
+- Per-kind sway test (6x30 tower, one shove): wood 0.52 cells peak, settles ~3.6 s; brick 0.25 / 1.9 s; stone 0.15 / <1.7 s;
+  steel 0.14 / 4.4 s; rubber 0.91 / 5.5 s; glass pops windows first.
+- Forced shear on a 40-tall tower: the upper 155 cells leave moving sideways with spin and fall as one piece.
+- Sand mound slumps into a dug hole and stands untouched; man thrown at a wall: brick stops him (wall takes damage),
+  rubber sends him back at ~41 cells/s with no wall damage.
+- **560 random-shot sequences (280 per math mode) never hang**. Two real hangs were found and fixed on the way: a
+  sheared-off slab that stayed skewed forever (fixed by a weak pull-home spring) and the lattice never going to sleep.
+- With the lattice switched off the sweep also never hangs; libnds-math path is still bit-identical to software fixed point.
+- Real DS main loop on the stub libnds on levels 1, 4, 6, 7; screenshots `docs/ds_7..9`.
+
+**NOT verified / honest caveats**
+- **DS speed is the big unknown.** Estimate only: the lattice is awake ~79% of play frames, ~340 standing voxels, 3 sub-steps
+  per frame, roughly 300k ARM9 cycles (~4-5 ms) per frame on top of the old solver. Never measured on hardware or an emulator.
+  The DS code already drops substeps first and then **switches the lattice off** when the solver exceeds ~9 ms (and brings it back
+  after 2 s of headroom). Check the L profiler first. Build knob: `-DMX_WOB_STEPS=3`; do not go below 3 with the shipped stiffness (unstable).
+- With the lattice off, destruction is much weaker (random-shot win rate falls from ~8-10% to ~0%): hits no longer shear
+  joints loose. So the DS fallback makes levels harder, not just uglier.
+- Numbers (K, damping, break strain) were tuned by watching sway amplitudes and settle times, not against real-world values.
+  Peak sway for normal hits is 0.15-0.9 cells (1-4 px on DS); big hits go further.
+- Sounds (`CRACK`, `BOUNCE`) have never been heard. Dreamcast still has no sound at all.
+- The Makefiles, libnds and KOS calls remain unbuilt / unverified, as before.
+
+## DS build: what changed in the earlier pass
+**Presentation** (screenshots in `docs/`)
+- Both screens used. TOP = action camera (4 px/voxel, smooth scrolling, follows the man, lingers on
+  explosions/evictions, screen shake, parallax sky + hills). BOTTOM = touch screen: while aiming it
+  zooms to the sling at 4 px/voxel with a trajectory preview (stops where it would hit a wall) and a
+  power bar; in flight it becomes a 2 px/voxel overview with a HUD strip and RESTART / MENU buttons.
+- Generated 2/3/4 px material tiles with bevels, wood grain, brick joints, stone speckle, glass glints, TNT
+  label, steel rivets, 3 damage states. Wallpapered interiors (rooms are exported by the core).
+- Redrawn man (curvy dad bod, belly overhanging a waistband, briefs, tube socks, receding hair,
+  proud mustache, towel cape in flight, goo coat + drips when stuck, different poses for aim/fly/dive/stuck)
+  and landlords (top hat, monocle, briefcase, scared faces when the man is close).
+- Particle types (debris, fire/smoke, sparks, goo, dust, stars, flying top hats), text popups
+  ("EVICTED!", "NO RENT!", "BOOM!"), 3x5 bitmap font, title screen with level select, pause, win panel
+  with 1-3 stars and a score count-up, lose panel, per-level best score (RAM only).
+- Sound: sweeps/arpeggios instead of flat beeps, stereo pan from the event's x position, rate limits,
+  graceful drop when the 6 PSG / 2 noise channels are busy, 32-step music loop (Y toggles).
+- D-pad + A control scheme as an alternative to the stylus.
+
+**Performance work (core, shared with Dreamcast)**
+- ARM-mode build for the solver and blitters, solver hot paths in ITCM (`MX_HOT_ITCM`), libnds hardware
+  divide/sqrt via `mulf32/divf32/sqrtf32` (`MX_LIBNDS_MATH`), adaptive physics substeps (2..3, chosen from
+  measured frame cost via `cpuStartTiming`), optional support-pass interval, interior-voxel contact culling.
+- On-device profiler: press **L** to show physics time (x0.1 ms), current substeps, and contact checks.
+  Use it first on real hardware - none of the numbers below are DS timings.
+
+**Core bugs found and fixed while doing this**
+1. A slowly creeping rubble chunk could keep a level from ever ending (the lose check waited for all chunks
+   to sleep; one never did). Sleep now relaxes with age, a second 1-second net-displacement test catches
+   jittering stacks, and there is an 8-second safety net. Found by a new random-shot sweep.
+2. In fixed point the 8 man substeps lost ~6% of time (`dt/8` truncation) and the chunk substeps ~3%. Slices now
+   add up exactly to `dt`. Fixed-point dive shots now agree with float (22 -> 23 of 25 shots match closely).
+3. Front-end: the first-cut DS code DMA'd from a cached RAM buffer without flushing the data cache. Now
+   `DC_FlushRange` before each `dmaCopy`.
+
+## Verified here (host machine only)
+- `sh test/run_tests.sh` builds the core in float and fixed point; all 7 levels stand on their own;
+  35 scripted shots run, float/fixed agree closely; **560 random shot sequences (280 per math mode) never hang**.
+- Path with libnds hardware-math hooks (`-DMX_LIBNDS_MATH`, against a stub implementing the documented
+  mulf32/divf32/sqrtf32 semantics) is bit-identical to the software path on all 35 shots.
+- The REAL `ds/source/*.c` game loop runs on a stub libnds with scripted stylus input: title -> level select ->
+  aim -> fling -> belly flop -> evictions -> win/lose panels, on levels 1, 3 and 5. Both screens were dumped and
+  inspected (`docs/`). The sound stub enforces the 6 PSG / 2 noise limit: no overruns, peak PSG 4/6.
+- Dreamcast front-end still builds and renders against the updated core.
+
+## Honest numbers
+- Interior-voxel contact culling only removes ~6% of contact checks on the shipped levels (34.8 -> 37.1
+  checks/frame without it). It helps more on large intact chunks; it is not the big win I hoped for.
+- Bit-identical core results before/after the speed hooks (float and fixed) - until the two fixes above,
+  which intentionally change behaviour slightly.
+
+## NOT verified (no toolchains / hardware available)
+- `ds/Makefile` and `dreamcast/Makefile` have never been run. DS needs devkitPro (devkitARM + libnds);
+  Dreamcast needs KallistiOS.
+- No emulator or hardware run: **DS frame time is unknown**. The profiler (L) exists for this. First levers if it
+  is slow: `-DMX_DS_MAX_SUBSTEPS=2`, `-DMX_SUPPORT_INTERVAL=2`, fewer particles (`NPART`), 30 fps physics.
+- libnds / KOS calls were written from memory; the stubs only prove self-consistency. Most likely first-build
+  nits: `soundSetFreq` / `soundPlayPSG` signatures, `BG_GFX_SUB` / `BG_PALETTE_SUB` / `bgInitSub` names,
+  the `.itcm` section attribute, and ndstool rules in `ds_rules`.
+- Sound has never been heard; the tune and effect timings are untested by ear.
+- Music/SFX channel usage assumes libnds returns a negative id when no channel is free.
+- Best scores are in RAM only (no FAT/save).
+
+## Build
+DS:         `cd ds && make`            -> mandex.nds  (melonDS / DeSmuME / flashcart)
+Dreamcast:  `cd dreamcast && make`     -> mandex.elf  (Flycast / redream / selfboot)
+Host tests: `sh test/run_tests.sh`     (also regenerates PPM screen dumps via `test/ds_render`)
+
+## Controls
+DS:  stylus - drag the man back, lift to fling; tap in flight = belly flop.
+     D-pad moves the man in the sling, A flings / flops.  START pause / next / retry.  SELECT restart.
+     Y music.  L profiler.  B (when paused or after a level) back to the menu.
+DC:  analog stick pulls the man back, A launches / belly flops; START next/retry; Y restart.
+
+## Next steps (suggested order)
+1. Build both Makefiles; run in melonDS and Flycast; fix API nits.
+2. DS: read the profiler on a real console/emulator; tune substeps, particles, `MX_SUPPORT_INTERVAL`.
+3. DC: bring it up to the DS front-end's level (text, HUD, sound via AICA from the same event list, sprites).
+4. DC 3D upgrade (64x32x24 voxels, instanced cubes, 3D support flood fill) - core stays 2D until then.
+5. Saves: DS FAT/SRAM for best scores; DC VMU.

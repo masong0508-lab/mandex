@@ -1,0 +1,26 @@
+# build output
+*.nds
+*.elf
+*.bin
+*.o
+*.d
+build/
+ds/build/
+dreamcast/*.o
+
+# host test binaries and dumps
+test/test_float
+test/test_fixed
+test/test_fixed_hw
+test/wobble_test
+test/sweep_*
+test/prof_*
+test/ds_render
+test/dc_render
+test/idle_test
+test/*.txt
+*.ppm
+
+# python
+__pycache__/
+*.pyc
