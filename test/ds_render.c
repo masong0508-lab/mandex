@@ -87,7 +87,11 @@ void swiWaitForVBlank(void){
   vf++;
   g_keys = 0; /* default: nothing held; script sets below */
   int mode = world.man.mode;
-  if(app == ST_TITLE){
+  if(app == ST_TITLE && getenv("TITLE_SHOTS")){                    /* just sit on the title and photograph the pan: logo end, mid glide, the man */
+    if(title_t == 30) shot("tpan0");
+    if(title_t == 170) shot("tpan1");
+    if(title_t == 330){ shot("tpan2"); printf("title pan shots taken\n"); exit(0); }
+  } else if(app == ST_TITLE){
     if(vf == 6) shot("title");
     for(int k = 0; k < start_clicks; k++) if(vf == 8 + k * 2) g_keys |= KEY_RIGHT;
     if(vf == 8 + start_clicks * 2 + 4) shot("title2");

@@ -235,3 +235,6 @@ DC:  analog stick pulls the man back, A launches / belly flops; START next/retry
   DS: RLE, unpacked once into a 48 KB buffer, memcpy'd to the top screen each frame; the text colours (palette slots < 64) are untouched.
   Dreamcast: ~9.6k flat quads (horizontal runs merged with identical runs below), drawn at 2x; PRESS START is ~460 more.
 - Not run on hardware or in an emulator: the DS/Dreamcast title code is checked only by the host harnesses (`docs/ds_1_title.png`, `docs/dc_title.png`) and the CI compile.
+
+
+Title pan: both consoles keep the whole 16:9 title picture and slowly pan right to the man and back (hold, glide, hold, glide; 560 frames), so the full landscape is seen on the small screens. Shots: docs/title_pan.png (top DS, bottom DC). Not run on real hardware or an emulator.

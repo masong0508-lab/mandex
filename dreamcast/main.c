@@ -212,13 +212,23 @@ static void fx_step(int calm, int strain){
   }
 }
 
-/* The title: the man dropping butt-first on a landlord (art/title.h, made by tools/gen_title.py from the HTML title, logo included).  Flat quads at 2x, like
-   everything else here; PRESS START is a second small set of quads that blinks. */
+/* The title: the whole landscape with the man dropping butt-first on a landlord (art/title.h, made by tools/gen_title.py from the HTML title, logo included).
+   Flat quads at 2x like everything else here.  The picture is wider than the screen, so the screen pans across it: hold on the logo, glide right to the man,
+   hold, glide back.  PRESS START is a second small set of quads that blinks. */
 static int on_title = 1, title_t;
+static int title_pan(int t, int range){                 /* 0..range for tick t: hold (90), glide right (160), hold (150), glide back (160), smoothstep */
+  t %= 560;
+  int k = t < 90 ? 0 : t < 250 ? t - 90 : t < 400 ? 160 : t < 560 ? 160 - (t - 400) : 0;
+  int u = (k * 256) / 160;
+  return (range * ((u * u * (3 * 256 - 2 * u)) >> 16)) >> 8;
+}
 static void draw_title(void){
+  int pan = title_pan(title_t, TITLE_DC_W * 2 - 640);   /* whole pixels, so neighbouring quads never leave a seam */
   for(int i = 0; i < TITLE_DC_NRECT; i++){
     const unsigned short *r = TITLE_DC_RECT[i]; const unsigned char *c = &TITLE_DC_PAL[r[4] * 3];
-    quad(r[0] * 2.0f, r[1] * 2.0f, r[2] * 2.0f, r[3] * 2.0f, Z_BG, argb(c[0], c[1], c[2], 255));
+    int x = r[0] * 2 - pan, w = r[2] * 2;
+    if(x + w <= 0 || x >= 640) continue;
+    quad((float)x, r[1] * 2.0f, (float)w, r[3] * 2.0f, Z_BG, argb(c[0], c[1], c[2], 255));
   }
   if((title_t >> 5) & 1) return;
   for(int i = 0; i < TITLE_START_NRECT; i++){

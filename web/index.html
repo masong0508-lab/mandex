@@ -1545,12 +1545,12 @@ function drawEnd(){
   if(win){const st=men>=2?3:men>=1?2:1;for(let i=0;i<3;i++)star(W/2-10+i*70,260,28,i<st)}
   txt('SCORE  '+Math.round(score),W/2+80,330,28,'#fff','center');
   ctx.globalAlpha=.7+.3*Math.sin(time*4);txt(win?'click / tap for next level':'click / tap to retry',W/2+80,380,20,'#ffd23f','center');ctx.globalAlpha=1}
-// the same picture cropped to 4:3 for the consoles (tools/gen_title.py draws it into a w x h canvas); words = also bake the logo in (the Dreamcast has no font)
+// the WHOLE title picture (the full backdrop, no text but the logo) for the consoles: tools/gen_title.py draws it into a w x h canvas and the small screens pan across it; words = bake the logo in (the Dreamcast has no font)
 function drawTitlePicture(w,h,t,words){
-  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);const k=h/H;ctx.save();ctx.scale(k,k);ctx.translate(-150,0);
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);const k=h/H;ctx.save();ctx.scale(k,k);
   ctx.drawImage(bgA,0,0);for(const c of clouds)drawCloud(c);ctx.drawImage(bgB,0,0);ctx.fillStyle='rgba(10,14,30,.35)';ctx.fillRect(0,0,W,H);
-  ctx.save();ctx.translate(690,GY-4);ctx.scale(2.35,2.35);drawSlamScene(t);ctx.restore();
-  if(words){ctx.save();ctx.translate(345,150);ctx.rotate(-.03);txt('MANDEX',0,0,84,'#ffd23f','center','#7a1a1a');ctx.restore()}
+  ctx.save();ctx.translate(700,GY-4);ctx.scale(2.2,2.2);drawSlamScene(t);ctx.restore();
+  if(words){ctx.save();ctx.translate(270,170);ctx.rotate(-.03);txt('MANDEX',0,0,96,'#ffd23f','center','#7a1a1a');ctx.restore()}
   ctx.restore()}
 function drawTitle(){
   ctx.fillStyle='rgba(10,14,30,.35)';ctx.fillRect(0,0,W,H);

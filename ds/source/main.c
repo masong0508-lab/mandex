@@ -497,23 +497,32 @@ static void load_level(int l){
   ev_ft = 0; fx = RI(88); fy = RI(38);
 }
 
-/* The title picture (art/title.h, made by tools/gen_title.py from the HTML title): the man dropping butt-first on a landlord.  It is stored run-length coded
-   and unpacked once.  Its colours live in sub-engine palette slots TITLE_DS_BASE.. (the text colours below them are untouched), so the picture is swapped in
-   only while the title is up (see present()). */
+/* The title picture (art/title.h, made by tools/gen_title.py from the HTML title): the whole landscape with the man dropping butt-first on a landlord.  It is
+   wider than the screen, so the screen pans across it: hold on the logo, glide right to the man, hold, glide back.  It is stored run-length coded and unpacked
+   once.  Its colours live in sub-engine palette slots TITLE_DS_BASE.. (the text colours below them are untouched), so the picture is swapped in only while the
+   title is up (see present()). */
 static u8 title_img[TITLE_DS_W * TITLE_DS_H];
-static int title_ready, title_pal_on;
+static int title_ready, title_pal_on, title_t;
 static void title_unpack(void){
   int n = 0;
   for(int i = 0; i + 1 < TITLE_DS_RLE_LEN && n < TITLE_DS_W * TITLE_DS_H; i += 2)
     for(int r = TITLE_DS_RLE[i]; r > 0 && n < TITLE_DS_W * TITLE_DS_H; r--) title_img[n++] = (u8)(TITLE_DS_RLE[i + 1] + TITLE_DS_BASE);
   title_ready = 1;
 }
+/* 0..range for tick t: hold (90), glide right (160), hold (150), glide back (160), smoothstep both ways */
+static int title_pan(int t, int range){
+  t %= 560;
+  int k = t < 90 ? 0 : t < 250 ? t - 90 : t < 400 ? 160 : t < 560 ? 160 - (t - 400) : 0;
+  int u = (k * 256) / 160;
+  return (range * ((u * u * (3 * 256 - 2 * u)) >> 16)) >> 8;
+}
 
 static void title_top(View *v){
   if(!title_ready) title_unpack();
-  memcpy(v->buf, title_img, sizeof title_img);
-  gfx_text(v->buf, 13, 33, "MANDEX", C_BLACK, 6);
-  gfx_text_o(v->buf, 10, 30, "MANDEX", C_GOLD, C_RED2, 6);
+  int pan = title_pan(title_t++, TITLE_DS_W - 256);
+  for(int y = 0; y < 192; y++) memcpy(v->buf + y * 256, title_img + y * TITLE_DS_W + pan, 256);
+  gfx_text(v->buf, 13 - pan, 33, "MANDEX", C_BLACK, 6);                  /* the logo sits in the picture, so it slides away with it */
+  gfx_text_o(v->buf, 10 - pan, 30, "MANDEX", C_GOLD, C_RED2, 6);
   gfx_text_o(v->buf, 12, 174, "DRAG + LIFT: FLING   TAP: FLOP", C_WHITE, C_BLACK, 1);
 }
 
@@ -540,6 +549,7 @@ static void present(void){
   swiWaitForVBlank();
   if(title_pal_on != (app == ST_TITLE)){                         /* the top screen's palette: the title picture on the title, the game's otherwise */
     title_pal_on = app == ST_TITLE;
+    if(title_pal_on) title_t = 0;                                /* the pan starts from the logo every time the title comes up */
     for(int k = 0; k < TITLE_DS_NCOL; k++)
       BG_PALETTE_SUB[TITLE_DS_BASE + k] = title_pal_on ? RGB15(TITLE_DS_PAL[k * 3] >> 3, TITLE_DS_PAL[k * 3 + 1] >> 3, TITLE_DS_PAL[k * 3 + 2] >> 3) : gfx_pal[TITLE_DS_BASE + k];
   }

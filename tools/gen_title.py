@@ -6,10 +6,10 @@ the man dropping butt-first on a landlord.
   1. loads the HTML in headless Chromium (needs Playwright; only this tool needs it)
   2. draws the picture 4x too big, box-filters it down, quantises it to a small palette (no dithering: flat cartoon colours)
   3. writes art/title.h with
-       DS : 256x192, run-length coded, <= 192 colours.  Shown on the top screen, palette slots 64..255 of the sub engine
-            (the text colours below slot 64 stay as they are).  Text is drawn on top by the game, so the picture has none.
-       DC : 320x240 drawn at 2x as flat PVR quads (the Dreamcast build has no font and no textures yet).  The picture has the
-            MANDEX logo baked in.  A 640x480 "PRESS START" strip is a second, tiny set of quads that the game blinks.
+       DS : 341x192 (the WHOLE title picture), run-length coded, <= 192 colours.  Shown on the top screen, which pans across it;
+            palette slots 64..255 of the sub engine (the text colours below slot 64 stay as they are).  The logo is drawn by the game.
+       DC : 426x240 drawn at 2x as flat PVR quads (the Dreamcast build has no font and no textures yet); the screen pans across it.
+            The MANDEX logo is baked in.  A 640x480 "PRESS START" strip is a second, tiny set of quads that the game blinks.
      and a preview PNG.
 
 Usage:  python3 tools/gen_title.py [path/to/mandex.html]   (default: web/index.html)
@@ -25,8 +25,8 @@ OUT_H = os.path.join(HERE, "..", "art", "title.h")
 OUT_PNG = os.path.join(HERE, "..", "docs", "title_art.png")
 SS = 4
 T = 1.1                      # the moment of the animation that is frozen into the picture
-DS_W, DS_H, DS_COLORS, DS_BASE = 256, 192, 190, 64
-DC_W, DC_H, DC_COLORS = 320, 240, 96
+DS_W, DS_H, DS_COLORS, DS_BASE = 341, 192, 190, 64      # the whole 16:9 picture; the 256-wide screen pans across it
+DC_W, DC_H, DC_COLORS = 426, 240, 104
 
 
 def render(page, w, h, words):
@@ -36,10 +36,17 @@ def render(page, w, h, words):
     return im.resize((w, h), Image.BOX)
 
 
+KEEP = [(255, 126, 176), (255, 79, 143), (244, 183, 142), (217, 143, 100), (224, 36, 58), (255, 210, 63), (122, 26, 26), (255, 255, 255)]   # towel, skin, boxers, logo: never merged away
+
+
 def quant(im, n):
-    q = im.quantize(colors=n, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-    pal = np.array(q.getpalette()[: 3 * n], dtype=np.uint8).reshape(-1, 3)
-    return np.array(q, dtype=np.uint8), pal
+    q = im.quantize(colors=n - len(KEEP), method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    pal = [tuple(c) for c in np.array(q.getpalette()[: 3 * (n - len(KEEP))], dtype=np.uint8).reshape(-1, 3)] + KEEP
+    pimg = Image.new("P", (1, 1))
+    flat = [v for c in pal for v in c]
+    pimg.putpalette(flat + list(pal[0]) * (256 - len(pal)))          # unused slots repeat colour 0, so nothing maps to a stray black
+    idx = np.array(im.quantize(palette=pimg, dither=Image.Dither.NONE), dtype=np.uint8)
+    return np.where(idx >= len(pal), 0, idx).astype(np.uint8), np.array(pal, dtype=np.uint8)
 
 
 def rle(idx):
@@ -145,9 +152,9 @@ def main():
     h += "#endif\n"
     open(OUT_H, "w").write(h)
 
-    prev = Image.new("RGB", (DS_W * 2 + DC_W * 2 + 24, max(DS_H * 2, DC_H * 2)), (30, 30, 40))
+    prev = Image.new("RGB", (max(DS_W, DC_W) * 2 + 16, DS_H * 2 + DC_H * 2 + 24), (30, 30, 40))
     prev.paste(Image.fromarray(ds_pal[ds_idx]).resize((DS_W * 2, DS_H * 2), Image.NEAREST), (8, 0))
-    prev.paste(Image.fromarray(dc_pal[dc_idx]).resize((DC_W * 2, DC_H * 2), Image.NEAREST), (DS_W * 2 + 16, 0))
+    prev.paste(Image.fromarray(dc_pal[dc_idx]).resize((DC_W * 2, DC_H * 2), Image.NEAREST), (8, DS_H * 2 + 16))
     prev.save(OUT_PNG)
     print("DS: %d colours, %d RLE bytes (%d%% of raw)" % (len(ds_pal), len(ds_r), 100 * len(ds_r) // (DS_W * DS_H)))
     print("DC: %d colours, %d rects (+%d for PRESS START)" % (len(dc_pal), len(dc_r), len(st_r)))

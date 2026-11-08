@@ -36,6 +36,7 @@ int main(void){
   pvr_poly_hdr_t h; (void)h;
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
   memset(fb,0,sizeof fb); title_t=0; draw_title(); dump("/tmp/dc_title.ppm"); title_t=40; draw_title(); dump("/tmp/dc_title_blink.ppm");   /* the title, and the half of the blink with no PRESS START */
+  { const int T[3] = { 30, 170, 330 }; for(int k = 0; k < 3; k++){ char fn[48]; snprintf(fn, sizeof fn, "/tmp/dc_tpan%d.ppm", k); memset(fb,0,sizeof fb); title_t = T[k]; draw_title(); dump(fn); } }   /* the pan: logo end, mid glide, the man */
   mx_load(&world,4);
   for(int i=0;i<90;i++) tick(0);
   mx_set_pull(&world,-11.5f*cosf(0.45f),11.5f*sinf(0.45f)); frame("/tmp/dc_pull.ppm");
