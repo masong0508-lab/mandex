@@ -20,9 +20,13 @@ jobs:
       - name: Toolchain
         run: |
           echo "DEVKITPRO=$DEVKITPRO DEVKITARM=$DEVKITARM"
+          export PATH=$DEVKITARM/bin:$PATH
           arm-none-eabi-gcc --version | head -1
-          ls $DEVKITPRO $DEVKITPRO/libnds $DEVKITPRO/calico 2>&1 | head -40
           ls $DEVKITPRO/calico/lib $DEVKITPRO/libnds/lib 2>&1 | head -20
+          for f in $DEVKITPRO/libnds/lib/libnds9.a $DEVKITPRO/calico/lib/libcalico_ds9.a; do
+            echo "== $f"; arm-none-eabi-nm -A $f 2>&1 | grep -E " [TDBRW] (initSystem|__libnds_mpu_setup|__dsimode|__secure_area__|__libnds_exit)$" || echo "(none of the crt0 symbols here)"
+          done
+          cat $DEVKITARM/arm-none-eabi/lib/ds_arm9.specs 2>&1 | head -30
       - name: Build mandex.nds
         run: make -C ds
       - uses: actions/upload-artifact@v4
