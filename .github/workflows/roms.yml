@@ -30,6 +30,13 @@ jobs:
           make -C ds SPECS=-specs=$DEVKITPRO/calico/share/ds9-legacy.specs
           python3 tools/ntr_patch.py ds/mandex.nds out/mandex_classic.nds
           for f in out/*.nds; do echo "== $f"; ndstool -i $f | grep -i "unit code\|ARM9 entry\|ARM9 RAM\|ARM7 entry\|Header CRC\|DSi"; done
+      - name: Diagnostics (full headers, installed libnds flavours)
+        run: |
+          export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
+          ndstool -i out/mandex_classic.nds || true
+          ls $DEVKITPRO $DEVKITPRO/libnds $DEVKITPRO/calico $DEVKITPRO/calico/share 2>&1 | head -60
+          find $DEVKITPRO -name "*.arm7*" -o -name "default.elf" -o -name "ds7*.elf" -o -name "ds_arm9*.specs" 2>/dev/null | head -20
+          grep -n "ndstool\|_ARM7\|TWL\|twl" $DEVKITPRO/calico/share/ds_rules | head -30
       - uses: actions/upload-artifact@v4
         with:
           name: rom-nds
