@@ -1,0 +1,93 @@
+name: ROMs
+
+# Builds both ports and packs them into ONE zip (artifact "mandex-roms" on the run; nothing is published anywhere else):
+#   mandex.nds  - Nintendo DS (melonDS / DeSmuME / flashcart)
+#   mandex.cdi  - Sega Dreamcast disc image (Flycast / redream / burn or SD-card loaders)
+#   mandex.elf  - the same Dreamcast program as a bare ELF (dev loaders only; emulators want the .cdi)
+# The DS ROM is also launched for a few seconds in DeSmuME under a virtual display as a smoke test (does it boot, does the screen show anything).
+on:
+  push:
+    branches: [main]
+    paths: ["ds/**", "dreamcast/**", "core/**", "art/**", ".github/workflows/roms.yml"]
+  workflow_dispatch:
+
+jobs:
+  ds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -C ds
+      - uses: actions/upload-artifact@v4
+        with: { name: rom-nds, path: ds/mandex.nds, if-no-files-found: error }
+
+  dreamcast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: kazade/dreamcast-sdk:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        shell: bash
+        run: |
+          ENV_SH=""
+          for f in /opt/toolchains/dc/kos/environ.sh /usr/local/kos/environ.sh /opt/kos/environ.sh; do [ -f "$f" ] && ENV_SH="$f" && break; done || true
+          [ -n "$ENV_SH" ] || { echo "no KallistiOS environ.sh found"; exit 1; }
+          source "$ENV_SH"
+          make -C dreamcast
+          cd dreamcast
+          mkdcdisc -e mandex.elf -o mandex.cdi -n MANDEX 2>&1 | tail -20
+          ls -la mandex.elf mandex.cdi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rom-dreamcast
+          path: |
+            dreamcast/mandex.elf
+            dreamcast/mandex.cdi
+          if-no-files-found: error
+
+  smoke-ds:
+    needs: ds
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: rom-nds }
+      - name: Launch in DeSmuME
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq desmume xvfb imagemagick x11-utils >/dev/null
+          export LIBGL_ALWAYS_SOFTWARE=1
+          xvfb-run -a -s "-screen 0 1024x768x24" bash -c '
+            desmume-cli --disable-sound mandex.nds > desmume.log 2>&1 &
+            PID=$!
+            for t in 4 8 14; do
+              sleep $t
+              if kill -0 $PID 2>/dev/null; then echo "t+$t: still running"; else echo "t+$t: EXITED"; fi
+              import -window root shot$t.png 2>/dev/null || true
+              echo "mean brightness of the screen: $(convert shot$t.png -colorspace Gray -format "%[fx:mean]" info: 2>/dev/null)"
+              echo "distinct colours: $(convert shot$t.png -format "%k" info: 2>/dev/null)"
+            done
+            kill $PID 2>/dev/null || true'
+          echo "--- desmume log"; tail -20 desmume.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: smoke-ds-shots, path: "shot*.png", if-no-files-found: ignore }
+
+  package:
+    needs: [ds, dreamcast]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: rom-nds, path: pack }
+      - uses: actions/download-artifact@v4
+        with: { name: rom-dreamcast, path: pack }
+      - name: Zip
+        run: |
+          cd pack && ls -la
+          printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - melonDS / DeSmuME / flashcart\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
+          zip -9 ../mandex-roms.zip mandex.nds mandex.cdi mandex.elf README.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: mandex-roms, path: mandex-roms.zip }
