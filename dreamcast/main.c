@@ -25,6 +25,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "mx.h"
+#include "mx_meta.h"
 #include "cloth.h"
 
 KOS_INIT_FLAGS(INIT_DEFAULT);
@@ -148,6 +149,38 @@ static void spawn(float x, float y, uint32 c, float spd){
   spawn_k(PK_BIT, x, y, (frand() - 0.5f) * spd, -frand() * spd, 0.7f + frand() * 0.8f, c);
 }
 
+/* ---- achievements / outfits (session only: no save on this build) ---- */
+static MxStats stats;
+static int outfit_sel, toast_id = -1, toast_q[6], toast_nq; static float toast_t;
+static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
+static void toast_tick(void){
+  if(toast_id >= 0){ toast_t += DT; if(toast_t > 2.8f) toast_id = -1; }
+  if(toast_id < 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i - 1] = toast_q[i]; toast_nq--; toast_t = 0; }
+}
+/* the man's colours: boxers (red family) and towel (pink family) are re-tinted in the decoded atlas by hue, keeping each texel's brightness */
+static unsigned short *man_px;
+static void recolor_man(int o){
+  if(!man_px || !tx_man) return;
+  uint8_t sh[6][3]; mx_outfit_shades(o, sh);
+  size_t tot = (size_t)DCT_MAN_W * DCT_MAN_H;
+  unsigned short *tmp = (unsigned short *)malloc(tot * 2);
+  if(!tmp) return;
+  for(size_t i = 0; i < tot; i++){
+    unsigned short v = man_px[i]; unsigned a = (v >> 12) & 15, r = ((v >> 8) & 15) * 17, g = ((v >> 4) & 15) * 17, b = (v & 15) * 17;
+    int mx_ = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b), d = mx_ - mn;
+    if(a && d * 100 > 40 * mx_ && r == (unsigned)mx_ && r > 120 && b > g){      /* saturated, red-dominant and leaning to blue (not skin or hair) */
+      int pink = b * 100 > 45 * (int)r;                                         /* the towel is the pinker one */
+      const uint8_t *tc = pink ? sh[3] : sh[0];
+      int lum = (int)r * 100 / (pink ? 255 : 224);
+      int nr = tc[0] * lum / 100, ng = tc[1] * lum / 100, nb = tc[2] * lum / 100;
+      nr = nr > 255 ? 255 : nr; ng = ng > 255 ? 255 : ng; nb = nb > 255 ? 255 : nb;
+      v = (unsigned short)((a << 12) | ((nr >> 4) << 8) | ((ng >> 4) << 4) | (nb >> 4));
+    }
+    tmp[i] = v;
+  }
+  pvr_txr_load(tmp, tx_man, (uint32)(tot * 2));
+  free(tmp);
+}
 static void handle_events(void){
   for(int i = 0; i < world.nev; i++){
     const MxEvent *e = &world.ev[i];
@@ -160,6 +193,10 @@ static void handle_events(void){
                     break;                                          /* TODO: creak sound on the AICA */
     case EV_BOUNCE: for(int k = 0; k < 10; k++) spawn(e->x, e->y, k & 1 ? argb(255, 126, 176, 255) : argb(255, 255, 255, 255), 420); break;
     case EV_TARGET: for(int k = 0; k < 14; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 360); break;
+    case EV_AIR:     spawn_k(PK_SWEAT, MX_VALVE_X + (frand() - 0.5f) * 2, MX_VALVE_Y + 3, (frand() - 0.5f) * 40, -40 - frand() * 40, 0.5f, argb(220, 235, 255, 255)); break;
+    case EV_AIRPOP:  for(int k = 0; k < 30; k++) spawn(e->x, e->y, k & 1 ? argb(255, 60, 60, 255) : k & 2 ? argb(255, 240, 220, 255) : argb(125, 255, 90, 255), 700); break;
+    case EV_FART:    for(int k = 0; k < 10; k++) spawn_k(PK_STINK, e->x, e->y, (frand() - 0.5f) * 140, (frand() - 0.5f) * 90, 1.2f, argb(180, 225, 60, 255)); break;
+    case EV_SPLOOSH: for(int k = 0; k < 40; k++) spawn(e->x, e->y, argb(125, 255, 90, 255), 760); break;
     default: break;   /* TODO: AICA sound for EV_CRUNCH / EV_LAUNCH / EV_THUD / ... */
     }
   }
@@ -299,6 +336,7 @@ static void draw_title(void){
   int pan = title_pan(title_t, 852 - 640);
   tquad(&hdr_ttl, DCT_TTL_W, DCT_TTL_H, (float)-pan, 0, 852, 480, 0, 0, 852, 480, Z_BG, WHITE);
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
+  { char tb[64]; snprintf(tb, sizeof tb, "< LEFT/RIGHT: OUTFIT - %s >", mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD); }
 }
 
 /* ---- the world ---- */
@@ -389,6 +427,17 @@ static void draw_all(void){
     float wx, wy; mx_target_offset(&world, t, &wx, &wy);
     draw_landlord(X(t->x + wx), Y(t->y + wy) + sinf(world.time * 5 + t->t) * 0.5f, Z_TARGET);
   }
+  /* the air valve */
+  { float vx = X(MX_VALVE_X), vy = Y(MX_VALVE_Y), gy = Y((float)MX_ROWS); int f = m->mode == MAN_AIM ? (int)(m->inf * 100) : 0;
+    quad(vx - 14, gy - 4, 28, 5, Z_MAN - 0.6f, argb(110, 115, 130, 255));
+    quad(vx - 4, vy + 6, 8, gy - vy - 6, Z_MAN - 0.5f, argb(74, 85, 104, 255));
+    quad(vx - 4, vy + 6, 3, gy - vy - 6, Z_MAN - 0.45f, argb(150, 160, 175, 255));
+    quad(vx - 7, vy + 2, 14, 8, Z_MAN - 0.4f, argb(255, 160, 40, 255));                                            /* nozzle */
+    puff(vx - 20, vy + 40, 10, Z_MAN - 0.4f, argb(20, 20, 20, 255)); puff(vx - 20, vy + 40, 8.5f, Z_MAN - 0.38f, WHITE);
+    { float a = 3.14159f * (0.85f + 1.3f * f / 100.0f); seg(vx - 20, vy + 40, vx - 20 + cosf(a) * 7, vy + 40 + sinf(a) * 7, 1.6f, Z_MAN - 0.3f, f > 75 ? argb(220, 30, 30, 255) : argb(20, 20, 20, 255)); }
+    if(m->mode == MAN_AIM && f > 0){ quad(vx - 25, vy - 52, 50, 8, Z_HUD, argb(20, 24, 40, 255)); quad(vx - 24, vy - 51, 48.0f * f / 100.0f, 6, Z_HUD + 0.1f, f < 50 ? argb(125, 255, 90, 255) : f < 80 ? argb(255, 210, 63, 255) : argb(255, 70, 70, 255));
+      if(f > 70 && ((int)(world.time * 8) & 1)) text("DANGER", vx, vy - 58, 12, argb(255, 70, 70, 255), 1, Z_HUD); }
+    else if(m->mode == MAN_AIM && ((int)(world.time * 2) & 1)) text("AIR", vx, vy + 70, 11, WHITE, 1, Z_HUD); }
   /* the aiming dots */
   if(m->mode == MAN_AIM){
     float dx = m->x - MX_ANCHOR_X, dy = m->y - MX_ANCHOR_Y;
@@ -413,6 +462,13 @@ static void draw_all(void){
     else if(m->mode == MAN_STUCK){ puff(x, y + 6, 30, Z_MAN - 0.2f, argb(111, 227, 74, 200)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
     else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
     man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
+    if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){               /* only the belly swells; the face flushes as the pressure builds */
+      float f = m->inf, rx = 11 + f * 28, ry = 10 + f * 24, bx = x + face * f * 10, by = y + 6 + f * 4;
+      puff(bx, by, (rx > ry ? rx : ry) + 2, Z_MAN + 0.3f, argb(205, 135, 100, 255)); puff(bx, by, (rx > ry ? rx : ry), Z_MAN + 0.4f, argb(244, 183, 142, 255));
+      puff(bx - rx * 0.3f, by - ry * 0.45f, rx * 0.22f, Z_MAN + 0.5f, argb(255, 215, 180, 180));
+      puff(bx + face * rx * 0.8f, by + ry * 0.1f, 2 + f * 3, Z_MAN + 0.5f, argb(205, 135, 100, 255));
+      if(f > 0.45f){ float al = (f - 0.45f) * 1.6f; if(al > 0.75f) al = 0.75f; puff(x, y - 16, 9 + f * 3, Z_MAN + 0.45f, argb(235, 40, 50, (int)(255 * al))); }
+    }
   }
   if(m->mode == MAN_AIM)
     seg(XB(MX_ANCHOR_X) - 6.0f, YB(MX_ANCHOR_Y) + 13.8f, X(m->x) - 1.0f, Y(m->y) + 3.8f, 2.8f, Z_MAN + 1.0f, argb(42, 22, 10, 255));
@@ -446,6 +502,16 @@ static void draw_all(void){
   if(hint_t > 0 && world.state == MX_PLAY && m->mode == MAN_AIM)
     text("PULL BACK WITH THE STICK, RELEASE WITH A!", 340, 330, 18, argb(255, 255, 255, 160 + (int)(95 * sinf(world.time * 5))), 1, Z_HUD);
   if(m->mode == MAN_FLY && !m->dive) text("PRESS A = BELLY FLOP", 320, 466, 20, argb(255, 255, 255, 205), 1, Z_HUD);
+  if(world.state == MX_PLAY && m->mode == MAN_AIM){
+    static const char *const PWN[4] = { "NONE", "BEANS", "TOWEL", "SPLAT" };
+    snprintf(buf, sizeof buf, "X: POWER-UP  %s%s", PWN[world.pw_sel], world.pw_sel ? "" : " (B/T/S x1)");
+    text(buf, 12, 466, 14, world.pw_sel ? argb(255, 210, 63, 255) : argb(255, 255, 255, 200), 0, Z_HUD);
+    snprintf(buf, sizeof buf, "LEFT-DOWN STICK = AIR VALVE: A on it to sit and inflate");
+    if(m->inf <= 0) text(buf, 628, 466, 11, argb(255, 255, 255, 150), 2, Z_HUD);
+  }
+  toast_tick();
+  if(toast_id >= 0){ float y = toast_t < 0.25f ? -60 + toast_t * 4 * 100 : toast_t > 2.55f ? (2.8f - toast_t) * 4 * 100 - 60 : 40;
+    quad(190, y, 260, 44, Z_HUD + 1, argb(20, 24, 40, 230)); text("ACHIEVEMENT", 320, y + 17, 12, argb(255, 210, 63, 255), 1, Z_HUD + 1.1f); text(mx_ach_name(toast_id), 320, y + 36, 16, WHITE, 1, Z_HUD + 1.1f); }
   if(world.banner > 0 && world.state == MX_PLAY){
     int a = (int)(255 * (world.banner > 1 ? 1.0f : world.banner));
     text(nm, 320, 180, 40, argb(255, 255, 255, a), 1, Z_HUD);
@@ -476,7 +542,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ mx_load(&world, n); hint_t = 420; }
+static void load_level(int n){ mx_load(&world, n); mx_meta_level_start(&stats, &world); hint_t = 420; }
 
 static void gfx_init(void){
   pvr_init_defaults();
@@ -488,6 +554,8 @@ static void gfx_init(void){
   tx_bgb = load_tex(DCT_BGB_RLE, DCT_BGB_RLE_LEN, DCT_BGB_W, DCT_BGB_H);
   tx_atl = load_tex(DCT_ATL_RLE, DCT_ATL_RLE_LEN, DCT_ATL_W, DCT_ATL_H);
   tx_man = load_tex(DCT_MAN_RLE, DCT_MAN_RLE_LEN, DCT_MAN_W, DCT_MAN_H);
+  { size_t tot = (size_t)DCT_MAN_W * DCT_MAN_H; man_px = (unsigned short *)malloc(tot * 2);       /* a copy of the atlas so outfits can re-tint it */
+    if(man_px){ size_t n = 0; for(int i = 0; i + 1 < DCT_MAN_RLE_LEN && n < tot; i += 2){ unsigned cnt = DCT_MAN_RLE[i]; unsigned short v = DCT_MAN_RLE[i + 1]; while(cnt-- && n < tot) man_px[n++] = v; } } }
   tx_ttl = load_tex(DCT_TTL_RLE, DCT_TTL_RLE_LEN, DCT_TTL_W, DCT_TTL_H);
   make_hdr(&hdr_bga, PVR_TXRFMT_RGB565, DCT_BGA_W, DCT_BGA_H, tx_bga);
   make_hdr(&hdr_bgb, PVR_TXRFMT_ARGB1555, DCT_BGB_W, DCT_BGB_H, tx_bgb);
@@ -509,6 +577,10 @@ int main(int argc, char **argv){
     if(st){
       uint32 pressed = st->buttons & ~prev; prev = st->buttons;
       if(on_title){
+        if(pressed & (CONT_DPAD_RIGHT | CONT_DPAD_LEFT)){
+          for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + ((pressed & CONT_DPAD_RIGHT) ? k : MX_NUM_OUTFITS - k)) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
+          recolor_man(outfit_sel);
+        }
         if(pressed & (CONT_START | CONT_A)){ on_title = 0; if(tx_ttl){ pvr_mem_free(tx_ttl); tx_ttl = 0; } }
       } else if(world.state != MX_PLAY){
         if(pressed & CONT_START) load_level(world.state == MX_WIN ? world.level + 1 : world.level);
@@ -518,7 +590,9 @@ int main(int argc, char **argv){
           float jx = st->joyx / 127.0f, jy = st->joyy / 127.0f;
           if(fabsf(jx) < 0.12f) jx = 0;
           if(fabsf(jy) < 0.12f) jy = 0;
-          mx_set_pull(&world, jx * MX_PULL_MAX, jy * MX_PULL_MAX);
+          if(pressed & CONT_X){ int nx = world.pw_sel; for(int k = 0; k < 4; k++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; }
+            if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); }
+          if(!(world.man.seated && jx == 0 && jy == 0)) mx_set_pull(&world, jx * MX_PULL_MAX, jy * MX_PULL_MAX);   /* seated on the valve: a centred stick leaves him there */
           if(pressed & CONT_A){ mx_release(&world); hint_t = 0; }
         } else if(pressed & CONT_A) mx_dive(&world);
       }
@@ -527,6 +601,9 @@ int main(int argc, char **argv){
     else {
       mx_update(&world, DT);
       handle_events();
+      mx_meta_events(&stats, &world);
+      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a);
+      { static int was = MX_PLAY; if(world.state == MX_WIN && was == MX_PLAY){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); } was = world.state; }
       if(hint_t > 0) hint_t--;
       {
         int calm = st && world.state == MX_PLAY && world.man.mode == MAN_AIM && world.banner <= 0 && !st->buttons && abs(st->joyx) < 30 && abs(st->joyy) < 30;
