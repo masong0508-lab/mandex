@@ -21,9 +21,11 @@ One game, three front-ends sharing the same physics idea:
 
 - **Destruction physics**: voxel buildings sit on springs (they sway, crack, snap and topple); wood, brick, stone, glass,
   TNT, steel, rubber and sand all behave differently.  Rubber boings the man back.
-- **The man**: 31 pixel-art poses.  Idle gags (belly slap, butt wiggle, belly scratch, burp, fart, nose pick, yawn, and
-  a cape taunt where he spins round, whips off his cape and wags his butt), gross-out effects (stink clouds, flies,
+- **The man**: 54 pixel-art poses.  Idle gags (belly slap, butt wiggle, belly scratch, burp, fart, nose pick, yawn, and
+  a cape taunt where he steps round on his feet, whips off his cape and flags a real cloth towel while he wags his butt), gross-out effects (stink clouds, flies,
   boogers, sweat), a sleep with snot bubble after 20 s, a victory butt-wiggle dance and a sad slump on defeat.
+- **The towel** is a small cloth simulation (`core/cloth.c`, recipe in `docs/CLOTH.md`): it flutters, folds and turns edge-on
+  with his body, the same in the browser, on the DS and on the Dreamcast.
 - **Body jiggle**: his belly and rear are damped springs, kicked while he flies, hits something or drops, plus an
   impact squash.  It is cosmetic and never touches the physics.
 

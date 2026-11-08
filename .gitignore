@@ -24,3 +24,6 @@ test/*.txt
 # python
 __pycache__/
 *.pyc
+test/cloth_float
+test/cloth_fixed
+tools/__pycache__/

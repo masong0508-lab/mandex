@@ -43,7 +43,7 @@ EYES = {
     "tight":  {7: "..HHHHH...", 9: "....BB....", 10: ".....BBB.."},
     "sleep":  {7: "...HHHHH..", 10: "....BBBB..", 11: ".....rr..."},
     "sad":    {6: ".......HH.", 7: "...HHHH...", 8: "....BBBB..", 9: "....wiBw..", 10: "....wiiw..", 11: "....rwww..", 12: "....r....."},
-    "shades": {8: "..gGGGGGGG", 9: "..GBwBBBBG", 10: "..GBBwBBBG", 11: "..gGGGGGgg"},
+    "shades": {8: "..gGGGGGGG", 9: "..GBwBBBBG", 10: "..GBBwBBBG", 11: "..gBBBBBgg"},
     "dizzy":  {7: "...HHHHH..", 8: "....BBBB..", 9: "....wBiw..", 10: "....wiBw..", 11: "....ssss.."},
 }
 # mouths: rows 13-17.  Row 13/14 mustache is common; mouth sits under it.
@@ -127,6 +127,40 @@ def side_head(kind):
         for x, ch in enumerate(s):
             if ch != '.': rows[y][x] = ch
     return ["".join(r) for r in rows]
+
+# how much each character wins a tie when several source pixels are squeezed into one: eyes, mouths and rims must survive the shrink
+_PRI = {'B': 2.8, 'i': 1.7, 'w': 1.5, 'm': 1.9, 't': 1.7, 'T': 1.5, 'L': 1.5, 'G': 0.9, 'g': 0.8, 'H': 1.5, 'o': 1.35, 'r': 1.4, '.': 0.9}
+def shrink(rows, w, h):
+    """area-weighted resample of a character grid: every output pixel takes the character with the most (priority-weighted)
+    area under it, so a 3-pixel eye stays an eye instead of being dropped like nearest-neighbour would"""
+    H0, W0 = len(rows), len(rows[0])
+    out = []
+    for j in range(h):
+        y0, y1 = j * H0 / h, (j + 1) * H0 / h
+        line = []
+        for i in range(w):
+            x0, x1 = i * W0 / w, (i + 1) * W0 / w
+            acc = {}
+            for yy in range(int(y0), min(H0, int(y1 + 0.999))):
+                oy = min(y1, yy + 1) - max(y0, yy)
+                for xx in range(int(x0), min(W0, int(x1 + 0.999))):
+                    ox = min(x1, xx + 1) - max(x0, xx)
+                    if oy > 0 and ox > 0:
+                        ch = rows[yy][xx]
+                        acc[ch] = acc.get(ch, 0.0) + ox * oy * _PRI.get(ch, 1.0)
+            line.append(max(acc, key=acc.get) if acc else '.')
+        out.append("".join(line))
+    return despeckle(out)
+
+def despeckle(rows):
+    """drop pixels that lost all their neighbours in a shrink (a knot's tip left floating above the head)"""
+    H0, W0 = len(rows), len(rows[0]); out = [list(r) for r in rows]
+    for j in range(H0):
+        for i in range(W0):
+            if rows[j][i] == '.': continue
+            nb = [(j + dj, i + di) for dj, di in ((1, 0), (-1, 0), (0, 1), (0, -1)) if 0 <= j + dj < H0 and 0 <= i + di < W0]
+            if all(rows[a][b] == '.' for a, b in nb): out[j][i] = '.'
+    return ["".join(r) for r in out]
 
 def scaled(rows, w, h):
     """nearest-neighbour resample of a character grid (for the small stuck-man head)"""

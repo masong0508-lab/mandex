@@ -63,6 +63,26 @@ void gfx_line(u8 *b, int x0, int y0, int x1, int y1, u8 c){
   }
 }
 
+void gfx_tri(u8 *b, int x0, int y0, int x1, int y1, int x2, int y2, u8 c){
+  int t;
+  if(y1 < y0){ t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
+  if(y2 < y0){ t = y0; y0 = y2; y2 = t; t = x0; x0 = x2; x2 = t; }
+  if(y2 < y1){ t = y1; y1 = y2; y2 = t; t = x1; x1 = x2; x2 = t; }
+  if(y2 == y0){                                             /* flat: one row */
+    int a = x0 < x1 ? x0 : x1, e = x0 > x1 ? x0 : x1;
+    if(x2 < a) a = x2; if(x2 > e) e = x2;
+    gfx_rect(b, a, y0, e - a + 1, 1, c);
+    return;
+  }
+  for(int y = y0; y <= y2; y++){
+    int xa = x0 + (x2 - x0) * (y - y0) / (y2 - y0), xb;
+    if(y < y1) xb = x0 + (x1 - x0) * (y - y0) / (y1 - y0);
+    else xb = y2 == y1 ? x1 : x1 + (x2 - x1) * (y - y1) / (y2 - y1);
+    if(xa > xb){ t = xa; xa = xb; xb = t; }
+    gfx_rect(b, xa, y, xb - xa + 1, 1, c);
+  }
+}
+
 void gfx_tline(u8 *b, int x0, int y0, int x1, int y1, int th, u8 c){
   if(th <= 1){ gfx_line(b, x0, y0, x1, y1, c); return; }
   int dx = x1 > x0 ? x1 - x0 : x0 - x1, dy = y1 > y0 ? y0 - y1 : y1 - y0;
@@ -380,6 +400,30 @@ static void blit_frame(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, i
       u8 c = fr->px[sy * w + sx];
       if(c) d[px] = (u8)(C_MAN0 + c - 1);
     }
+  }
+}
+
+/* design units (20.12) -> pixels at this zoom: the sprites are drawn at 0.36 px per unit at 4 px per cell, so 0.09 px per unit per ppc */
+static int cpx(real v, int ppc){ return (int)((((int64_t)v * (ppc * 369)) + (1LL << 23)) >> 24); }
+
+const short *spr_man_hand(int frame){ return MS_HAND[frame]; }
+
+void gfx_cloth(u8 *b, const Cloth *c, int x, int y, int ppc, int f, int pass){
+  ClothQuad q[CL_NQ];
+  int n = cloth_quads(c, q);
+  const u8 ol = (u8)(C_MAN0 + MS_CL_OUT - 1);
+  for(int k = 0; k < n; k++){
+    const ClothQuad *o = &q[k];
+    if((o->z >= 0) != (pass != 0)) continue;
+    int sx[4], sy[4];
+    for(int m = 0; m < 4; m++){ int dx = cpx(o->x[m], ppc); sx[m] = x + (f >= 0 ? dx : -dx); sy[m] = y + cpx(o->y[m], ppc); }
+    u8 col = (u8)(C_MAN0 + MS_CL_COL[o->face][o->stripe][o->shade] - 1);
+    gfx_tri(b, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], col);
+    gfx_tri(b, sx[1], sy[1], sx[3], sy[3], sx[2], sy[2], col);
+    if(o->edge & 1) gfx_line(b, sx[0], sy[0], sx[2], sy[2], ol);
+    if(o->edge & 2) gfx_line(b, sx[1], sy[1], sx[3], sy[3], ol);
+    if(o->edge & 4) gfx_line(b, sx[0], sy[0], sx[1], sy[1], ol);
+    if(o->edge & 8) gfx_line(b, sx[2], sy[2], sx[3], sy[3], ol);
   }
 }
 

@@ -4,6 +4,7 @@ One shared C core, two front-ends.
 
 ```
 core/mx.h, mx.c            portable game + physics (no platform calls, no malloc)
+core/cloth.h, cloth.c      the towel: small cloth simulation shared by both consoles (docs/CLOTH.md)
 ds/source/main.c           DS game loop: dual-screen cameras, input, particles, HUD, title/pause/win/lose
 ds/source/gfx.c, gfx.h     DS software renderer toolkit: palette, material tiles, parallax sky, font, sprites
 ds/source/sfx.c, sfx.h     DS sound: glide/arpeggio effects on PSG + noise channels, small chiptune loop
@@ -58,6 +59,36 @@ fart A/B.  Each frame also carries belly and rear "blob" centres and radii for t
   horizontal run of the same colour (~300 quads per man).
 - Not done / caveats: frames are not rotated in flight (the HTML rotates the man; the consoles show him level); no walk/win/lose
   animations beyond the frames above; looked at in host screenshots only, not on a real DS screen or on a Dreamcast.
+
+## TOWEL CLOTH + STEP-TURN + SMALLER HEADS pass (HTML + DS + Dreamcast)
+- **The towel is a real cloth now** (it was a drawing). A 7x3 grid of particles with Verlet integration, sqrt-free distance
+  constraints, a wind gust that runs late along the cloth, and a normal-drag term so it flutters like cloth, not like a rope.
+  The exact recipe is `docs/CLOTH.md`; the browser (`class Cloth` in `web/index.html`) and the consoles (`core/cloth.c`,
+  float or 20.12 fixed, no platform calls) follow it step for step. `test/cloth_test.c` checks it stays finite, keeps its
+  length (gag motion < 25% stretch), moves, and gives the same picture in float and fixed.
+- It is drawn as 12 depth-sorted 3D quads (front pink, back darker pink, 3 shade steps, cross stripes, outline on the outer
+  edge only), so it turns edge-on and foreshortens with the body. Spin: he flies it like a flag; back view: he waves it like a towel.
+- **Consoles**: the sprites are generated WITHOUT a towel (`NOTOWEL = true` in the generator) and the HTML exports where the
+  raised fist is in every frame (`TOWEL_HAND` -> `MS_HAND` in `art/manspr.h`, quarter design units, 32767 = no towel).
+  `ClothActor` (core/cloth.c) follows that hand, so a frame change eases instead of kicking, and waves it a little inside the fist
+  because the sprite arm is baked. DS: `gfx_cloth` (scanline triangle fill into the 8-bit framebuffer; quads behind the body are
+  drawn before the sprite, the rest after). Dreamcast: `draw_cloth` (PVR strips + outline segments). Colours: `MS_CL_COL`, `MS_CL_OUT`.
+- **He now turns with his body and legs** (HTML `drawSpin`, applied by `tools/patch_turn.py`): the turn is 13 frames forward
+  (`SPIN_0..12`, every 15 degrees) and 11 back (`SPIN_R1..R11`), with the feet hopping round in two steps (the right foot first,
+  then the left; each stays planted between hops), two-bone leg IK, hips lagging the shoulders, the head leading them, a lean
+  toward the planted foot and a small crouch while a foot is in the air. The cape-taunt gag in `art/manidle.h` plays them
+  (`MI_MAXSTEPS 40`), then the butt-wiggle pair, then back. The live browser version blends the same keys (`spinLive`).
+- **Glitch fixes in the spin sprites**: the generator used to find the head by searching for the topmost pixels, which locked onto
+  the raised hand (a duplicated head, rectangular holes, loose top-knot specks). It now takes the head position from the model
+  (`spinSway`), wipes it with an ellipse (and the top-knot), paints one fixed back head, then despeckles.
+- **Smaller heads on all console sprites** (`tools/manhead.py shrink`; the browser head is unchanged on purpose).
+- Other changes: `core/mx.c` has a safety net found by CI (a Level 6 chunk that never settled: it now settles after 8 s and a
+  stuck chunk is dropped after 10 s); the robustness sweep is 560 sequences; the HTML no longer throws on the title screen
+  (`man` is not defined before the first level) or when a title-gag dust puff meets a missing grid.
+- Sprite sheet: 54 frames, 39 palette entries (`docs/man_sprites.png`). DS draws the cloth at runtime only while a frame with a hand is
+  on screen (about 430 constraint solves per tick in fixed point, `divf32` each).
+- NOT verified: no real DS / Dreamcast build or run (CI will be the first), DS speed with a towel on screen is unknown, the HTML look
+  was judged from screenshots only, the towel physics was never compared by eye on real hardware, sounds still never heard.
 
 ## WOBBLE + BLOCK KINDS pass (all ports share this: it lives in `core/mx.c`)
 **What you will see**

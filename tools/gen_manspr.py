@@ -38,15 +38,23 @@ POSES = [
 CX, CY = 480, 300
 
 # every frame the consoles know, in enum order.  Frames the HTML cannot draw yet fall back to an alias (see ALIAS).
+SPIN_NAMES = ["SPIN_%d" % k for k in range(13)] + ["SPIN_R%d" % k for k in range(1, 12)] + ["SPIN_BL", "SPIN_BR"]
 NEW_FRAMES = ["BELLY_A", "BELLY_B", "SCRATCH_A", "SCRATCH_B", "BURP_A", "BURP_B", "PICK_A", "PICK_B", "YAWN",
-              "SLEEP_A", "SLEEP_B", "SAD", "BACK_C", "BACK_L", "BACK_R", "FART_A", "FART_B", "CAPE_A", "SPIN_0", "SPIN_1", "SPIN_2", "SPIN_3", "SPIN_4", "SPIN_5", "SPIN_6", "SPIN_BL", "SPIN_BR"]
+              "SLEEP_A", "SLEEP_B", "SAD", "BACK_C", "BACK_L", "BACK_R", "FART_A", "FART_B", "CAPE_A"] + SPIN_NAMES
+def spin_th(name):
+    """turn angle (degrees) and head lead of a spin frame, the same numbers as spinKey() in the HTML"""
+    if name in ("SPIN_BL", "SPIN_BR"): return 180, 0
+    th = int(name[6:] if name.startswith("SPIN_R") else name[5:]) * 15
+    m = min(1.0, th / 20.0, (180 - th) / 20.0)
+    return th, (-12 if name.startswith("SPIN_R") else 12) * m
 ALIAS = {n: "IDLE_A" for n in NEW_FRAMES}
-ALIAS.update({"CAPE_A": "FLEX_A", "SPIN_0": "IDLE_A", "SPIN_1": "IDLE_A", "SPIN_2": "IDLE_B", "SPIN_3": "IDLE_B", "SPIN_4": "FLEX_B", "SPIN_5": "FLEX_B", "SPIN_6": "FLEX_B", "SPIN_BL": "FLEX_A", "SPIN_BR": "FLEX_B", "BACK_C": "FLEX_A", "BACK_L": "FLEX_A", "BACK_R": "FLEX_B", "FART_A": "FLEX_A", "FART_B": "FLEX_B"})
+ALIAS.update({"CAPE_A": "FLEX_A", "BACK_C": "FLEX_A", "BACK_L": "FLEX_A", "BACK_R": "FLEX_B", "FART_A": "FLEX_A", "FART_B": "FLEX_B"})
+ALIAS.update({n: ("IDLE_A" if spin_th(n)[0] < 90 else "FLEX_B") for n in SPIN_NAMES})
 # jiggle blobs in design units (centre x, y, radius): belly and rear, per body family
 BLOBS = {"front": ((0, -2, 21), (0, 10, 21)), "back": ((0, -6, 20), (0, 10, 21)),
          "fly": ((2, -2, 19), (-13, 6, 14)), "dive": ((3, -2, 17), (-13, 6, 14)), "star": ((0, -2, 21), (0, 12, 20))}
 def family(name):
-    if name.startswith("BACK") or name.startswith("FART") or name in ("SPIN_4", "SPIN_5", "SPIN_6", "SPIN_BL", "SPIN_BR"): return "back"
+    if name.startswith("BACK") or name.startswith("FART") or (name.startswith("SPIN_") and spin_th(name)[0] >= 120): return "back"
     if name.startswith("FLY"): return "fly"
     if name == "DIVE": return "dive"
     if name.startswith("STUCK"): return "star"
@@ -103,6 +111,29 @@ import manhead
 def put(idx, x, y, col):
     if 0 <= y < idx.shape[0] and 0 <= x < idx.shape[1]: idx[y, x] = col
 
+def wipe_head(idx, hx, hy, ppu):
+    """clear the generated head (skull + knot) with an ellipse, not a rectangle: a raised arm next to the head must keep its pixels"""
+    H, W = idx.shape
+    yy, xx = np.mgrid[0:H, 0:W]
+    skull = ((xx - hx) / (17.0 * ppu + 1.2)) ** 2 + ((yy - hy) / (15.0 * ppu + 1.2)) ** 2 <= 1
+    knot = ((xx - hx) / (6.5 * ppu + 1.6)) ** 2 + ((yy - (hy - 18.5 * ppu)) / (5.6 * ppu + 1.6)) ** 2 <= 1
+    idx[skull | knot] = 0
+
+HK = 0.82                   # his head is drawn this much smaller than the first hand-pixelled version (the user found it too big)
+def stamp(idx, rows, left, top, hk, k=None):
+    """paint a hand-pixelled head; it is shrunk by HK about the middle of its bottom edge so the chin stays on the shoulders"""
+    k = HK if k is None else k
+    h, w = len(rows), len(rows[0])
+    if k != 1:
+        nw, nh = max(4, int(round(w * k))), max(4, int(round(h * k)))
+        rows = manhead.shrink(rows, nw, nh)
+        left += (w - nw) // 2; top += h - nh
+        w, h = nw, nh
+    for j, r in enumerate(rows):
+        for i, ch in enumerate(r):
+            if ch != '.': put(idx, left + i, top + j, hk[ch])
+    return left, top, w, h
+
 def paint(idx, x0, y0, rows, key, PI):
     """rows: list of strings; '.' leaves the pixel alone, letters map through key"""
     for j, r in enumerate(rows):
@@ -157,60 +188,58 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
     """the generated heads are only ~10 px wide, so the face is pixelled by hand on top of the HTML shapes"""
     key = {'B': 'BLK', 'G': 'GOLD', 'g': 'GOLD2', 'w': 'WH', 'h': 'HAIR', 'H': 'HAIR2', 'o': 'RIM', 'm': 'MOUTH', 't': 'TONG', 's': 'SKD', 'k': 'SKM', 'S': 'SK'}
     hx, hy = (int(round(ax + head[0] * ppu)), int(round(ay + head[1] * ppu))) if head else (ax, ay - 16)   # head centre
-    if name.startswith("SPIN_") and name[5:] in ("0", "1", "2", "3"):   # the turn, facing us: front head narrowing to a profile
-        hk = {k: PI[v] for k, v in manhead.KEY.items()}
-        if name == "SPIN_0": rows, ox = manhead.head("open", "grin"), 9
-        elif name == "SPIN_1": rows = manhead.scaled(manhead.head("open", "grin"), 17, 19); ox = 8
-        else: rows = manhead.side_head("dive"); ox = 8
-        top = 11 if name in ("SPIN_0", "SPIN_1") else 7
-        idx[max(0, hy - 12):hy + 7, max(0, hx - 8):hx + 9] = 0
-        for j, r in enumerate(rows):
-            for i, ch in enumerate(r):
-                if ch != '.': put(idx, hx - ox + i, hy - top + j, hk[ch])
-        return
+    if name.startswith("SPIN_") and name not in ("SPIN_BL", "SPIN_BR"):   # the turn: the head has its own angle (th + lead); front, narrowing, profile, then the back
+        th, ld = spin_th(name); a = abs(th + ld)
+        if a < 125:
+            hk = {k: PI[v] for k, v in manhead.KEY.items()}
+            if a < 22: rows, ox = manhead.head("open", "grin"), 9
+            elif a < 40: rows = manhead.scaled(manhead.head("open", "grin"), 17, 19); ox = 8
+            elif a < 56: rows = manhead.scaled(manhead.head("open", "grin"), 14, 19); ox = 7
+            else: rows = manhead.side_head("dive"); ox = 8
+            top = 11 if a < 56 else 7
+            wipe_head(idx, hx, hy, ppu)
+            stamp(idx, rows, hx - ox, hy - top, hk)
+            return
     if name.startswith("BACK") or name.startswith("FART") or name.startswith("SPIN_"):          # the back of a proper head, replacing the muddy generated one
-        win = idx[:, max(0, ax - 8):ax + 9]
-        rows_ = np.nonzero(win.any(axis=1))[0]
-        yt = int(rows_[0]); xs_ = np.nonzero(win[yt])[0] + max(0, ax - 8); xc = int(round(xs_.mean()))
-        idx[yt:yt + 11, max(0, xc - 8):xc + 9] = 0
+        if name.startswith("SPIN_") and head:
+            # the spin frames have a raised hand / towel next to the head, so the top-row search below can lock onto the wrong thing:
+            # take the head position straight from the model instead
+            xc = hx; yt = int(round(ay + (head[1] - 24.0) * ppu))        # top of the top-knot
+        else:
+            win = idx[:, max(0, ax - 8):ax + 9]
+            rows_ = np.nonzero(win.any(axis=1))[0]
+            yt = int(rows_[0]); xs_ = np.nonzero(win[yt])[0] + max(0, ax - 8); xc = int(round(xs_.mean()))
+        if name.startswith("SPIN_") and head: wipe_head(idx, hx, hy, ppu)
+        else: idx[yt:yt + 11, max(0, xc - 8):xc + 9] = 0
         hk = {k: PI[v] for k, v in manhead.KEY.items()}
-        bw = {"SPIN_4": 13, "SPIN_5": 17}.get(name, 19)
-        bh = manhead.scaled(manhead.back_head(), bw, 17) if bw != 19 else manhead.back_head()
-        for j, r in enumerate(bh):
-            for i, ch in enumerate(r):
-                if ch != '.': put(idx, xc - len(bh[0]) // 2 + i, yt - 2 + j, hk[ch])
+        bh = manhead.back_head()                                   # a round head is about as wide from every side, so one width for every turn angle
+        l, t, w_, h_ = stamp(idx, bh, xc - len(bh[0]) // 2, yt - 1, hk)
         if name.startswith("FART"):                                # guilty glance over the shoulder
             for j, r in enumerate(manhead.PEEK):
                 for i, ch in enumerate(r):
-                    if ch != '.': put(idx, xc + 6 + i, yt + 6 + j, hk[ch])
+                    if ch != '.': put(idx, l + w_ - 3 + i, t + h_ // 2 - 1 + j, hk[ch])
         return
     if name in ("FLY_A", "FLY_B", "DIVE"):                         # side-view big head, facing right
         rows = manhead.side_head("fly" if name != "DIVE" else "dive")
         hk = {k: PI[v] for k, v in manhead.KEY.items()}
         idx[max(0, hy - 9):hy + 7, max(0, hx - 7):hx + 10] = 0
-        for j, r in enumerate(rows):
-            for i, ch in enumerate(r):
-                if ch != '.': put(idx, hx - 8 + i, hy - 7 + j, hk[ch])
+        stamp(idx, rows, hx - 8, hy - 7, hk)
         return
     if name in ("STUCK_A", "STUCK_B"):                             # small dizzy head
         hy = ay - 12
         rows = manhead.scaled(manhead.head("dizzy", "tongue"), 15, 15)
         hk = {k: PI[v] for k, v in manhead.KEY.items()}
         idx[max(0, hy - 9):hy + 7, max(0, hx - 8):hx + 9] = 0
-        for j, r in enumerate(rows):
-            for i, ch in enumerate(r):
-                if ch != '.': put(idx, hx - 7 + i, hy - 8 + j, hk[ch])
+        stamp(idx, rows, hx - 7, hy - 8, hk)
         return
     if name in manhead.FRAME_HEADS:                                # big hand-pixelled head replaces the tiny generated one
         eyes, mouth, extra = manhead.FRAME_HEADS[name]
         idx[max(0, hy - 12):hy + 5, max(0, hx - 7):hx + 8] = 0     # wipe the old head (arms are further out)
         hk = {k: PI[v] for k, v in manhead.KEY.items()}
-        for j, r in enumerate(manhead.head(eyes, mouth, extra)):
-            for i, ch in enumerate(r):
-                if ch != '.': put(idx, hx - 9 + i, hy - 11 + j, hk[ch])
+        stamp(idx, manhead.head(eyes, mouth, extra), hx - 9, hy - 11, hk)
         if name in ("SLEEP_A", "SLEEP_B"):                         # snot bubble at the right nostril: small, then big
             bub = [".oo.", "owwo", "owwo", ".oo."] if name == "SLEEP_A" else ["..oo..", ".owwo.", "owwwwo", "owwwwo", ".owwo.", "..oo.."]
-            paint(idx, hx + 2, hy + 1, bub, key, PI)
+            paint(idx, hx + 2, hy + 2, bub, key, PI)
         return
     if name in ("IDLE_A", "IDLE_B", "FLEX_A", "FLEX_B"):          # cool: gold-rimmed shades, handlebar, smug grin
         rows = ["gBBBBGGBBBBg",
@@ -258,6 +287,7 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
 
 
 def main():
+    hands = {}
     frames = []
     with sync_playwright() as p:
         b = p.chromium.launch()
@@ -269,11 +299,21 @@ def main():
         pg.wait_for_timeout(300)
         has_api = pg.evaluate("typeof drawManFrame === 'function' && typeof MAN_FRAMES === 'object'")
         meta = pg.evaluate("MAN_FRAMES") if has_api else {}
+        # the towel is a real cloth the consoles simulate at runtime, so the sprites are drawn WITHOUT it; the HTML says where the hand is
+        has_towel = bool(has_api and pg.evaluate("typeof TOWEL_HAND === 'object' && typeof NOTOWEL !== 'undefined'"))
+        if has_towel:
+            pg.evaluate("NOTOWEL = true")
+            hands = pg.evaluate("TOWEL_HAND")
+        else:
+            print("  (this HTML has no TOWEL_HAND / NOTOWEL: the old baked flag stays in the sprites and no cloth is drawn)")
         legacy = {n: (c, p) for n, c, p in POSES}
         for name in [p[0] for p in POSES] + NEW_FRAMES:
             src = name
             if has_api and name in meta:
                 call, ppu, head = f"drawManFrame('{name}')", meta[name]["ppu"], meta[name].get("head")
+                if name.startswith("SPIN_") and head and pg.evaluate("typeof spinSway === 'function'"):
+                    # the body sways and crouches over the planted feet, so the head is not at the same place in every frame
+                    head = pg.evaluate("(n) => { const q = SPIN_POSE[n], h = q.hip || 0, s = spinSway(q.th, q.psi || 0, h); return [s.shx - h * 0.35, -44 + s.bob]; }", name)
             elif name in legacy:
                 (call, ppu), head = legacy[name], None
             else:
@@ -293,6 +333,11 @@ def main():
                 (92, 16, 16), (255, 107, 138)]                                                    # mouth, tongue
     NBASE = len(pal_list)                                         # colours the body is matched against
     pal_list += [(120, 76, 44), (236, 140, 125), (100, 60, 34), (176, 48, 64), (222, 222, 236)]   # extras used only by the hand-painted faces: hair shine, blush, iris, lip, tooth
+    # the runtime towel's colours: front / back side x plain / stripe x (dark, mid, bright) = 12 more entries (only the cloth uses them)
+    CL_COL = {}
+    for (face, stripe), c in (((1, 0), (255, 126, 176)), ((0, 0), (234, 102, 156)), ((1, 1), (255, 84, 146)), ((0, 1), (208, 60, 122))):
+        for sh, m in enumerate((0.70, 0.86, 1.0)):
+            pal_list.append(tuple(int(v * m) for v in c)); CL_COL[(face, stripe, sh)] = len(pal_list)     # 1-based, like the pixels
     pal = np.array(pal_list[:NBASE], np.uint8)
     PI = {n: i + 1 for i, n in enumerate("RIM SK SKD SKH SKM BR BRD BRH WH GR HAIR HAIR2 BLK TOW TOW2 TOWD GOLD GOLD2 SHOE SHOED MOUTH TONG HAIRL BLUSH IRIS LIP TOOTH".split())}
 
@@ -334,6 +379,18 @@ def main():
     L.append("static const MsFrame MS_FRAMES[MSF_COUNT] = {")
     for name, w, h, ax, ay, idx, bl in out:
         L.append(f"  {{ MS_{name}, {w}, {h}, {ax}, {ay}, {bl[0]}, {bl[1]}, {bl[2]}, {bl[3]}, {bl[4]}, {bl[5]} }},")
+    L += ["};"]
+    L.append("/* the towel the front-ends simulate (core/cloth.c): palette values (1-based, like the pixels) by [face 1=front][stripe][shade 0 dark..2 bright], and its outline */")
+    L.append("static const unsigned char MS_CL_COL[2][2][3] = {")
+    for face in (0, 1):
+        L.append("  { " + ", ".join("{ %d, %d, %d }" % tuple(CL_COL[(face, st, sh)] for sh in (0, 1, 2)) for st in (0, 1)) + " },")
+    L.append("};")
+    L.append(f"#define MS_CL_OUT {PI['HAIR2']}")
+    L.append("/* where the raised hand is in each frame, in quarter design units {x, y, z} (centre of the man = 0,0,0; z toward the viewer); 32767 = no towel in this frame */")
+    L.append("static const short MS_HAND[MSF_COUNT][3] = {")
+    for name, w, h, ax, ay, idx, bl in out:
+        hd = hands.get(name)
+        L.append("  { %d, %d, %d }," % tuple(int(round(v * 4)) for v in hd) if hd else "  { 32767, 0, 0 },")
     L += ["};", "#endif /* MS_ENUM_ONLY */", "#endif", ""]
     os.makedirs(os.path.dirname(OUT_H), exist_ok=True)
     open(OUT_H, "w").write("\n".join(L))

@@ -66,6 +66,7 @@ static void popup(real wx, real wy, const char *s, int col){
 
 /* ------------------------------------------------------------------ idle gags */
 static MiState mi, mi_title;
+static ClothActor tow_play, tow_title, tow_win[2];     /* the towels (core/cloth.c): the man in the sling, on the title, the two end-panel dancers */
 /* sound + particles for one gag effect.  (wx,wy) = where he stands (cells), sc = 1 in the world, 2 on the title (8 px per cell art) */
 static void idle_fx(int fx, real wx, real wy, int face, int sc, int popups){
   real mxp = wx + face * R(1.3) * sc, myp = wy - R(3.6) * sc;                      /* mouth */
@@ -294,6 +295,14 @@ static ManJig man_jig(const View *v){
   return j;
 }
 
+/* a man frame with its towel: the part of the cloth that is behind him, the sprite, then the part in front */
+static void man_with_towel(u8 *b, ClothActor *ta, int x, int y, int ppc, int face, int fr, const ManJig *jg){
+  cloth_actor_frame(ta, frame, spr_man_hand(fr), face);
+  if(ta->live) gfx_cloth(b, &ta->c, x, y, ppc, face, 0);
+  spr_man_frame(b, x, y, ppc, face, fr, jg);
+  if(ta->live) gfx_cloth(b, &ta->c, x, y, ppc, face, 1);
+}
+
 static void draw_man(const View *v){
   const MxMan *m = &world.man;
   if(m->mode == MAN_NONE || m->mode == MAN_WAIT) return;
@@ -304,7 +313,7 @@ static void draw_man(const View *v){
   else if(m->mode == MAN_STUCK) pose = POSE_STUCK;
   else if(m->mode == MAN_AIM && dragging) pose = POSE_DRAG;
   if(m->mode == MAN_AIM) gfx_ell(v->buf, x, y + v->ppc, v->ppc * 2, v->ppc * 3 / 2, C_HAIR2);        /* sling pouch */
-  if(m->mode == MAN_AIM && !dragging) spr_man_frame(v->buf, x, y, v->ppc, face, mi_frame(&mi, frame), &jg);   /* idle gags */
+  if(m->mode == MAN_AIM && !dragging) man_with_towel(v->buf, &tow_play, x, y, v->ppc, face, mi_frame(&mi, frame), &jg);   /* idle gags */
   else spr_man_j(v->buf, x, y, v->ppc, face, pose, frame, &jg);
 }
 
@@ -428,8 +437,8 @@ static void end_panel(u8 *b){
   panel(b, 24, 34, 208, 124);
   gfx_text_c(b, 128, 42, win ? "EVICTION COMPLETE!" : "THE LANDLORDS LIVE...", win ? C_GOLD : C_RED, C_BLACK, 2);
   if(win){
-    spr_man_frame(b, 52, 98, 3, 1, mi_dance_frame(frame), 0);          /* victory butt-wiggle, one on each side */
-    spr_man_frame(b, 204, 98, 3, -1, mi_dance_frame(frame + 14), 0);
+    man_with_towel(b, &tow_win[0], 52, 98, 3, 1, mi_dance_frame(frame), 0);          /* victory butt-wiggle, one on each side */
+    man_with_towel(b, &tow_win[1], 204, 98, 3, -1, mi_dance_frame(frame + 14), 0);
     int stars = 1 + (world.men >= 1) + (world.men >= 2);
     for(int k = 0; k < 3; k++){
       int on = k < stars && end_t > 24 + k * 18;
@@ -493,7 +502,7 @@ static void title_top(View *v){
   if(!mi_title.base_a || mi_title.base_a != MSF_FLEX_A){ mi_title.base_a = MSF_FLEX_A; mi_title.base_b = MSF_FLEX_B; mi_reset(&mi_title); mi_title.wait = 90; }
   mi_update(&mi_title);
   if(mi_title.fx) idle_fx(mi_title.fx, RI(186 / 4), RI((112 + bob * 2) / 4), 1, 2, 0);
-  spr_man_frame(v->buf, 186, 112 + bob * 2, 8, 1, mi_frame(&mi_title, frame), 0);
+  man_with_towel(v->buf, &tow_title, 186, 112 + bob * 2, 8, 1, mi_frame(&mi_title, frame), 0);
   { View tv = { v->buf, 4, 0, 0 }; draw_parts(&tv); }
   gfx_text(v->buf, 13, 33, "MANDEX", C_BLACK, 6);
   gfx_text_o(v->buf, 10, 30, "MANDEX", C_GOLD, C_RED2, 6);

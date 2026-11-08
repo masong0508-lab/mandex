@@ -1078,9 +1078,13 @@ void mx_update(MxWorld *w, real dt){
         w->loseT += dt;
         if(w->loseT > R(1.8)){ w->state = MX_LOSE; ev(w, EV_LOSE, 0, 0, 0, 0, 0); }
       } else {
-        /* safety net: never let a stubborn chunk block the end of the level */
+        /* safety net: never let a stubborn chunk block the end of the level.  After 8 s put it back into the grid;
+           if it keeps coming loose again (settled mid-air, support check detaches it next frame: seen on Level 6
+           with the rubber blocks) throw it away after 10 s so the level can always end. */
         w->waitT += dt;
-        if(w->waitT > RI(8)) for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active) settle(w, &w->chunks[c], 0);
+        if(w->waitT > RI(8)) for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active){
+          if(w->waitT > RI(10)) w->chunks[c].active = 0; else settle(w, &w->chunks[c], 0);
+        }
       }
     }
   }

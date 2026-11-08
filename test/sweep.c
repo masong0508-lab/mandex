@@ -1,4 +1,4 @@
-/* Robustness sweep: 200 pseudo-random shot sequences (7 levels x 40) with random power/angle/belly-flops.
+/* Robustness sweep: 560 pseudo-random shot sequences (7 levels x 80) with random power/angle/belly-flops.
    Fails (exit 1) if any level can never end - the soft-lock class we hit with creeping chunks. */
 #ifdef MX_FIXED
 #define RS 4096.0
@@ -13,7 +13,7 @@
 static MxWorld w;
 int main(void){
   int hang=0, runs=0, wins=0, maxf=0;
-  for(int L=0; L<MX_NUM_LEVELS; L++) for(int seq=0; seq<40; seq++){
+  for(int L=0; L<MX_NUM_LEVELS; L++) for(int seq=0; seq<80; seq++){
     memset(&w,0,sizeof w); mx_load(&w,L);
 #ifdef SWEEP_NOWOB
     mx_set_wobble(&w,0);

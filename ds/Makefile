@@ -35,7 +35,7 @@ LDFLAGS := -specs=ds_arm9.specs -g -mthumb-interwork -Wl,-Map,$(TARGET).map
 LIBS    := -L$(DEVKITPRO)/libnds/lib -lnds9 -lm
 
 # ARM mode for the hot code (solver + pixel blitting), Thumb for the rest.
-ARM_OBJS   := source/gfx.o $(CORE)/mx.o
+ARM_OBJS   := source/gfx.o $(CORE)/mx.o $(CORE)/cloth.o
 THUMB_OBJS := source/main.o source/sfx.o
 OBJS       := $(THUMB_OBJS) $(ARM_OBJS)
 

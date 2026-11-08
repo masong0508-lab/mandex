@@ -16,7 +16,7 @@ enum { GAG_BELLY, GAG_WIGGLE, GAG_SCRATCH, GAG_BURP, GAG_FART, GAG_PICK, GAG_YAW
 typedef struct { unsigned char frame, ticks, fx; } MiStep;
 
 #define MI_STEPS(...) { __VA_ARGS__, { 0, 0, 0 } }          /* ticks == 0 ends a gag */
-#define MI_MAXSTEPS 30
+#define MI_MAXSTEPS 40
 static const MiStep MI_GAGS[GAG_COUNT][MI_MAXSTEPS] = {
   /* belly bounce: slap, jiggle, slap... */
   MI_STEPS({ MSF_IDLE_A, 10, 0 }, { MSF_BELLY_A, 6, FX_SLAP }, { MSF_BELLY_B, 6, 0 }, { MSF_BELLY_A, 6, FX_SLAP }, { MSF_BELLY_B, 6, 0 },
@@ -36,13 +36,15 @@ static const MiStep MI_GAGS[GAG_COUNT][MI_MAXSTEPS] = {
            { MSF_IDLE_A, 16, FX_FLICK }),
   /* big yawn and stretch */
   MI_STEPS({ MSF_IDLE_A, 12, 0 }, { MSF_YAWN, 64, FX_YAWN }, { MSF_IDLE_A, 12, 0 }),
-  /* cape taunt: grab the cape, spin round (a smooth 3D-style turn) with it whipped off, wag the butt at you, spin back and put it on again */
-  MI_STEPS({ MSF_CAPE_A, 21, FX_GRUNT }, { MSF_SPIN_0, 5, FX_WHOOSH }, { MSF_SPIN_1, 4, 0 }, { MSF_SPIN_2, 4, 0 }, { MSF_SPIN_3, 4, 0 },
-           { MSF_SPIN_4, 4, 0 }, { MSF_SPIN_5, 4, 0 }, { MSF_SPIN_6, 4, 0 },
-           { MSF_SPIN_BL, 9, FX_TAUNT }, { MSF_SPIN_BR, 9, FX_BOING }, { MSF_SPIN_BL, 9, FX_BOING }, { MSF_SPIN_BR, 9, FX_BOING },
+  /* cape taunt: grab the cape, then a real step-turn (feet hop round and stay planted, head leads, hips lag; 15 degrees a frame) with the cape
+     whipped off and flagging as cloth, wag the butt at you, turn back the same way and put it on again.  Same step list as the HTML. */
+  MI_STEPS({ MSF_CAPE_A, 21, FX_GRUNT }, { MSF_SPIN_0, 5, FX_WHOOSH }, { MSF_SPIN_1, 3, 0 }, { MSF_SPIN_2, 3, 0 }, { MSF_SPIN_3, 3, 0 },
+           { MSF_SPIN_4, 3, 0 }, { MSF_SPIN_5, 3, 0 }, { MSF_SPIN_6, 3, 0 }, { MSF_SPIN_7, 3, 0 }, { MSF_SPIN_8, 3, 0 }, { MSF_SPIN_9, 3, 0 },
+           { MSF_SPIN_10, 3, 0 }, { MSF_SPIN_11, 3, 0 }, { MSF_SPIN_12, 3, 0 }, { MSF_SPIN_BL, 9, FX_TAUNT }, { MSF_SPIN_BR, 9, FX_BOING },
            { MSF_SPIN_BL, 9, FX_BOING }, { MSF_SPIN_BR, 9, FX_BOING }, { MSF_SPIN_BL, 9, FX_BOING }, { MSF_SPIN_BR, 9, FX_BOING },
-           { MSF_SPIN_6, 4, FX_WHOOSH }, { MSF_SPIN_5, 4, 0 }, { MSF_SPIN_4, 4, 0 }, { MSF_SPIN_3, 4, 0 }, { MSF_SPIN_2, 4, 0 },
-           { MSF_SPIN_1, 4, 0 }, { MSF_SPIN_0, 4, 0 }, { MSF_CAPE_A, 18, 0 }, { MSF_IDLE_A, 12, 0 }),
+           { MSF_SPIN_BL, 9, FX_BOING }, { MSF_SPIN_BR, 9, FX_BOING }, { MSF_SPIN_R11, 3, FX_WHOOSH }, { MSF_SPIN_R10, 3, 0 }, { MSF_SPIN_R9, 3, 0 },
+           { MSF_SPIN_R8, 3, 0 }, { MSF_SPIN_R7, 3, 0 }, { MSF_SPIN_R6, 3, 0 }, { MSF_SPIN_R5, 3, 0 }, { MSF_SPIN_R4, 3, 0 }, { MSF_SPIN_R3, 3, 0 },
+           { MSF_SPIN_R2, 3, 0 }, { MSF_SPIN_R1, 3, 0 }, { MSF_SPIN_0, 4, 0 }, { MSF_CAPE_A, 18, 0 }, { MSF_IDLE_A, 12, 0 }),
 };
 static const MiStep MI_SLEEP[3] = { { MSF_SLEEP_A, 44, FX_SNORE }, { MSF_SLEEP_B, 44, 0 }, { 0, 0, 0 } };
 

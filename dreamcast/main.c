@@ -21,6 +21,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "mx.h"
+#include "cloth.h"
 
 KOS_INIT_FLAGS(INIT_DEFAULT);
 
@@ -47,6 +48,20 @@ static void quad(float x, float y, float w, float h, float z, uint32 c){
 }
 static void disc(float cx, float cy, float r, float z, uint32 c){
   for(float dy = -r; dy <= r; dy += 2.0f){ float hw = sqrtf(r * r - dy * dy); quad(cx - hw, cy + dy, hw * 2, 2.0f, z, c); }
+}
+/* a quad with four arbitrary corners (a b c d = a triangle strip), for the towel */
+static void quad4(const float *x, const float *y, float z, uint32 c){
+  pvr_vertex_t v;
+  v.flags = PVR_CMD_VERTEX; v.z = z; v.u = v.v = 0; v.argb = c; v.oargb = 0;
+  for(int k = 0; k < 3; k++){ v.x = x[k]; v.y = y[k]; pvr_prim(&v, sizeof v); }
+  v.flags = PVR_CMD_VERTEX_EOL; v.x = x[3]; v.y = y[3]; pvr_prim(&v, sizeof v);
+}
+static void seg(float x0, float y0, float x1, float y1, float w, float z, uint32 c){      /* a line w px wide */
+  float dx = x1 - x0, dy = y1 - y0, l = sqrtf(dx * dx + dy * dy);
+  if(l < 0.01f) return;
+  float nx = -dy / l * w * 0.5f, ny = dx / l * w * 0.5f;
+  float X4[4] = { x0 + nx, x1 + nx, x0 - nx, x1 - nx }, Y4[4] = { y0 + ny, y1 + ny, y0 - ny, y1 - ny };
+  quad4(X4, Y4, z, c);
 }
 static float X(float cell){ return OX + cell * PXC; }
 static float Y(float cell){ return OY + cell * PXC; }
@@ -124,9 +139,39 @@ static void draw_frame(const MsFrame *f, float cx, float cy, int face, float z, 
   }
 }
 
+/* the towel of the man whose centre is at cx,cy (core/cloth.c): pass 0 = the part behind him, 1 = the part in front.  The sprites are drawn at
+   0.36 px per design unit at 4 px per cell, so a design unit is 0.36 * PXC / 4 screen pixels. */
+static void draw_cloth(const Cloth *cl, float cx, float cy, int face, float z, int pass){
+  ClothQuad q[CL_NQ];
+  int n = cloth_quads(cl, q);
+  float s = 0.36f * PXC / 4.0f;
+  uint32 ol = argb(MS_PAL[MS_CL_OUT - 1][0], MS_PAL[MS_CL_OUT - 1][1], MS_PAL[MS_CL_OUT - 1][2], 255);
+  for(int k = 0; k < n; k++){
+    const ClothQuad *o = &q[k];
+    if((o->z >= 0) != (pass != 0)) continue;
+    float qx[4], qy[4];
+    for(int m = 0; m < 4; m++){ qx[m] = cx + face * o->x[m] * s; qy[m] = cy + o->y[m] * s; }
+    int v = MS_CL_COL[o->face][o->stripe][o->shade] - 1;
+    quad4(qx, qy, z, argb(MS_PAL[v][0], MS_PAL[v][1], MS_PAL[v][2], 255));
+    float w = s * 1.1f + 0.6f, zo = z + 0.05f;
+    if(o->edge & 1) seg(qx[0], qy[0], qx[2], qy[2], w, zo, ol);
+    if(o->edge & 2) seg(qx[1], qy[1], qx[3], qy[3], w, zo, ol);
+    if(o->edge & 4) seg(qx[0], qy[0], qx[1], qy[1], w, zo, ol);
+    if(o->edge & 8) seg(qx[2], qy[2], qx[3], qy[3], w, zo, ol);
+  }
+}
+
 /* ---- idle gags (art/manidle.h): sound is not implemented on the Dreamcast port yet, so the gags are visual only ---- */
 static MiState mi;
 static int fcount;
+static ClothActor tow_play, tow_win[2];          /* towels: the man in the sling, the two victory dancers */
+/* a man frame with his towel: the cloth behind him, the sprite, the cloth in front */
+static void man_with_towel(ClothActor *ta, int fr, float x, float y, int face, float z, const Jig *jg){
+  cloth_actor_frame(ta, fcount, MS_HAND[fr], face);
+  if(ta->live) draw_cloth(&ta->c, x, y, face, z - 0.5f, 0);
+  draw_frame(&MS_FRAMES[fr], x, y, face, z, jg);
+  if(ta->live) draw_cloth(&ta->c, x, y, face, z + 0.5f, 1);
+}
 static void idle_fx(int fx, float wx, float wy, int face){
   float mxp = wx + face * 1.3f, myp = wy - 3.6f;
   switch(fx){
@@ -222,7 +267,7 @@ static void draw_all(void){
     }
     else if(m->mode == MAN_STUCK){ disc(x, y + 6, 26, Z_MAN, argb(111, 227, 74, 255)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
     else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
-    draw_frame(&MS_FRAMES[fr], x, y, face, Z_MAN, &jg);
+    man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
   }
   for(int i = 0; i < 256; i++) if(parts[i].life > 0){
     const Part *p = &parts[i]; float age = 1.0f - p->life / p->max;
@@ -244,8 +289,8 @@ static void draw_all(void){
   for(int i = 0; i < world.ntargets; i++) quad(620 - i * 24, 6, 16, 16, Z_HUD + 1, world.targets[i].alive ? argb(255, 90, 90, 255) : argb(60, 70, 60, 255));
   if(world.state == MX_WIN){                                              /* victory: two men doing the butt-wiggle dance */
     quad(120, 200, 400, 80, Z_HUD + 1, argb(60, 220, 80, 230));
-    draw_frame(&MS_FRAMES[mi_dance_frame(fcount)], 180, 252, 1, Z_HUD + 2, 0);
-    draw_frame(&MS_FRAMES[mi_dance_frame(fcount + 14)], 460, 252, -1, Z_HUD + 2, 0);
+    man_with_towel(&tow_win[0], mi_dance_frame(fcount), 180, 252, 1, Z_HUD + 2, 0);
+    man_with_towel(&tow_win[1], mi_dance_frame(fcount + 14), 460, 252, -1, Z_HUD + 2, 0);
   }
   if(world.state == MX_LOSE){
     quad(120, 200, 400, 80, Z_HUD + 1, argb(220, 60, 60, 230));

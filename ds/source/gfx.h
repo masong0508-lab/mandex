@@ -10,6 +10,7 @@
 
 #include <nds.h>
 #include "mx.h"
+#include "cloth.h"
 
 #ifndef MX_FIXED
 #error "the DS front-end only supports the fixed-point core (build with -DMX_FIXED)"
@@ -49,6 +50,7 @@ void gfx_px(u8 *b, int x, int y, u8 c);
 void gfx_rect(u8 *b, int x, int y, int w, int h, u8 c);
 void gfx_ell(u8 *b, int cx, int cy, int rx, int ry, u8 c);
 void gfx_line(u8 *b, int x0, int y0, int x1, int y1, u8 c);
+void gfx_tri(u8 *b, int x0, int y0, int x1, int y1, int x2, int y2, u8 c);   /* flat filled triangle */
 void gfx_tline(u8 *b, int x0, int y0, int x1, int y1, int th, u8 c);
 void gfx_dither(u8 *b, int x, int y, int w, int h, u8 c);   /* checkerboard fill (translucency) */
 
@@ -70,6 +72,9 @@ enum { POSE_IDLE, POSE_FLY, POSE_DIVE, POSE_STUCK, POSE_DRAG, POSE_FLEX, POSE_SA
 /* the man's jiggle at the drawn zoom: belly (bx,by) and rear (rx,ry) offsets in pixels, squash sx/sy in 1/256 */
 typedef struct { int bx, by, rx, ry, sx, sy; } ManJig;
 void spr_man_frame(u8 *b, int x, int y, int ppc, int face, int frame, const ManJig *jg);   /* frame = MSF_* */
+/* the towel (core/cloth.c) of the man whose centre is at x,y: pass 0 = the part behind him (draw before his sprite), 1 = the part in front */
+const short *spr_man_hand(int frame);          /* where the raised hand is in this frame (quarter design units x,y,z; x == CL_NONE: no towel) */
+void gfx_cloth(u8 *b, const Cloth *c, int x, int y, int ppc, int face, int pass);
 void spr_man(u8 *b, int x, int y, int ppc, int face, int pose, int ph);
 void spr_man_j(u8 *b, int x, int y, int ppc, int face, int pose, int ph, const ManJig *jg);
 void spr_man_bust(u8 *b, int x, int y, int ppc);   /* x = centre, y = top */
