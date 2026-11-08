@@ -65,6 +65,10 @@ const SFX={
  boing(){if(!can('bo',90))return;tone(170,760,.2,.24,'sine');setTimeout(()=>tone(760,230,.22,.16,'sine'),110)},
  burp(){if(!can('bu',400))return;tone(150,62,.5,.3,'sawtooth');tone(300,120,.45,.1,'square');noise(.45,500,120,.2,'lowpass')},
  fart(){if(!can('fa',500))return;tone(112,52,.55,.26,'sawtooth');setTimeout(()=>tone(92,46,.3,.2,'square'),230);noise(.6,700,90,.22,'lowpass')},
+ slip(){if(!can('sp',200))return;tone(900,260,.22,.14,'square');noise(.16,2600,700,.1,'bandpass')},
+ flop(){if(!can('fp',200))return;tone(140,60,.14,.3,'sine');noise(.1,900,200,.2,'lowpass');setTimeout(()=>tone(190,80,.12,.2,'sine'),90)},
+ eek(){if(!can('ek',400))return;tone(1000,1700,.16,.2,'square');setTimeout(()=>tone(1700,1150,.24,.18,'square'),110)},
+ whew(){if(!can('wh',400))return;tone(560,300,.5,.14,'sine')},
  slap(){if(!can('sl',90))return;noise(.07,3200,700,.4,'bandpass');tone(220,90,.07,.22,'square')},
  wig(){if(!can('wg',110))return;tone(140,330,.1,.16,'sine');setTimeout(()=>tone(330,150,.1,.14,'sine'),60)},
  snore(){if(!can('sn',900))return;tone(78,52,.6,.2,'sawtooth');noise(.6,400,110,.12,'lowpass')},
@@ -473,6 +477,58 @@ const SK='#f4b78e',SKD='#d98f64',SKH='#ffd5b4',OUT='#5a2f1b',BR='#e0243a',BRD='#
 function limb(x,y,x1,y1,w,col,hi){ctx.lineCap='round';ctx.strokeStyle=OUT;ctx.lineWidth=w+2.4;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x1,y1);ctx.stroke();
   ctx.strokeStyle=col;ctx.lineWidth=w;ctx.stroke();if(hi){ctx.strokeStyle=hi;ctx.lineWidth=w*.26;ctx.beginPath();ctx.moveTo(x-w*.18,y-w*.22);ctx.lineTo(x1-w*.18,y1-w*.22);ctx.stroke()}}
 function ell(cx,cy,rx,ry,fill,stroke,rot){ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,rot||0,0,6.2832);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=OUT;ctx.lineWidth=stroke;ctx.stroke()}}
+// ---- merged body masses.  A limb or a torso is made from several shapes (ellipses, tapered capsules).  blob() outlines ALL of them first and then fills ALL of
+// them on top, so the overlaps leave no seams and the outline runs once round the whole mass.  Then a cel shade (a crescent on the lower right) and a rim
+// light (upper left) are cut from the union of the shapes, with the light always coming from the upper left of the SCREEN.
+function pEll(cx,cy,rx,ry,fill,rot){const p=new Path2D();rx=Math.max(.05,rx);ry=Math.max(.05,ry);p.ellipse(cx,cy,rx,ry,rot||0,0,6.2832);const m=Math.max(rx,ry);return{p,fill,bb:[cx-m,cy-m,cx+m,cy+m]}}
+// tapered capsule: the convex hull of two circles, so an arm runs from a thick shoulder to a slim wrist in one smooth shape
+function pTap(x0,y0,r0,x1,y1,r1,fill){const p=new Path2D(),dx=x1-x0,dy=y1-y0,d=Math.hypot(dx,dy),bb=[Math.min(x0-r0,x1-r1),Math.min(y0-r0,y1-r1),Math.max(x0+r0,x1+r1),Math.max(y0+r0,y1+r1)];
+  if(d<=Math.abs(r0-r1)+.01){const q=r0>=r1?[x0,y0,r0]:[x1,y1,r1];p.arc(q[0],q[1],q[2],0,6.2832);return{p,fill,bb}}
+  const a=Math.atan2(dy,dx),b=Math.acos((r0-r1)/d),c1=Math.cos(a-b),s1=Math.sin(a-b),c2=Math.cos(a+b),s2=Math.sin(a+b);
+  p.moveTo(x0+r0*c1,y0+r0*s1);p.lineTo(x1+r1*c1,y1+r1*s1);p.arc(x1,y1,r1,a-b,a+b,false);p.lineTo(x0+r0*c2,y0+r0*s2);p.arc(x0,y0,r0,a+b,a-b+6.2832,false);p.closePath();return{p,fill,bb}}
+function pPoly(pts,fill){const p=new Path2D();let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;pts.forEach((q,i)=>{i?p.lineTo(q[0],q[1]):p.moveTo(q[0],q[1]);x0=Math.min(x0,q[0]);y0=Math.min(y0,q[1]);x1=Math.max(x1,q[0]);y1=Math.max(y1,q[1])});p.closePath();return{p,fill,bb:[x0,y0,x1,y1]}}
+let SBA=null,SBB=null;
+function blobShade(parts,m,sc,o){
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for(const q of parts){const b=q.bb;for(const[X,Y]of[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]]){const u=m.a*X+m.c*Y+m.e,v=m.b*X+m.d*Y+m.f;x0=Math.min(x0,u);y0=Math.min(y0,v);x1=Math.max(x1,u);y1=Math.max(y1,v)}}
+  const pad=Math.ceil(5*sc)+2;x0=Math.floor(x0)-pad;y0=Math.floor(y0)-pad;const w=Math.ceil(x1-x0)+pad,h=Math.ceil(y1-y0)+pad;
+  if(!(w>1&&h>1)||w*h>4e6)return;
+  if(!SBA){SBA=mkCanvas(w,h);SBB=mkCanvas(w,h)}
+  if(SBA.width<w||SBA.height<h){const W=Math.max(SBA.width,w),H=Math.max(SBA.height,h);SBA.width=SBB.width=W;SBA.height=SBB.height=H}
+  const cut=(cv,dx,dy,col)=>{const c=cv.getContext('2d');c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-over';c.clearRect(0,0,cv.width,cv.height);
+    c.setTransform(m.a,m.b,m.c,m.d,m.e-x0,m.f-y0);c.fillStyle='#000';for(const q of parts)c.fill(q.p);
+    c.globalCompositeOperation='destination-out';c.setTransform(m.a,m.b,m.c,m.d,m.e-x0+dx*sc,m.f-y0+dy*sc);for(const q of parts)c.fill(q.p);
+    c.globalCompositeOperation='source-in';c.setTransform(1,0,0,1,0,0);c.fillStyle=col;c.fillRect(0,0,cv.width,cv.height)};
+  cut(SBA,-(o.sd==null?2.4:o.sd),-(o.sd==null?3:o.sd*1.25),o.shc||'rgba(168,84,48,.30)');
+  if(o.hl!==0)cut(SBB,1.2,1.5,o.hlc||'rgba(255,255,255,.34)');
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(SBA,0,0,w,h,x0,y0,w,h);if(o.hl!==0)ctx.drawImage(SBB,0,0,w,h,x0,y0,w,h);ctx.restore()}
+function blob(parts,o){o=o||{};const m=ctx.getTransform(),sc=Math.hypot(m.a,m.b)||1,ow=o.ow==null?1.7:o.ow;
+  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=OUT;ctx.fillStyle=OUT;ctx.lineWidth=ow*2;
+  if(o.clip)ctx.clip(o.clip);
+  if(ow>0)for(const q of parts){if(q.noout)continue;if(q.o)ctx.stroke(q.o);else{ctx.fill(q.p);ctx.stroke(q.p)}}
+  for(const q of parts){ctx.fillStyle=q.fill||o.fill||SK;ctx.fill(q.p)}
+  if(o.sh!==0)blobShade(parts,m,sc,o);
+  ctx.restore()}
+// soft cloth: a curved ribbon (waistband, cuff) along y=yc(x) from xa to xb, half-height hw (thinner toward both ends), with a slight ripple; stitched stripes on top
+function ribbonPoly(xa,xb,yc,hw,n,fill,rip){const T=[],B=[];for(let i=0;i<=n;i++){const x=xa+(xb-xa)*i/n,u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u),r=(rip||0)*Math.sin(x*.85+1);T.push([x,yc(x)-h+r]);B.push([x,yc(x)+h+r*.7])}return pPoly(T.concat(B.reverse()),fill)}
+function ribbonStripes(xa,xb,yc,hw,step,col){ctx.save();ctx.strokeStyle=col||'#e0243a';ctx.lineWidth=1.25;ctx.lineCap='round';
+  for(let x=xa+step/2;x<xb;x+=step){const u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u)*.82;ctx.beginPath();ctx.moveTo(x,yc(x)-h);ctx.quadraticCurveTo(x+.5,yc(x),x+.2,yc(x)+h);ctx.stroke()}ctx.restore()}
+// a soft cloth band that follows a quadratic curve P0 -> C -> P1 (a waistband seen from the side), with stitched stripes across it
+function bandAlong(P0,C,P1,hw,step){const N=22,T=[],B=[],M=[];
+  for(let i=0;i<=N;i++){const u=i/N,a=(1-u)*(1-u),b=2*u*(1-u),c=u*u,x=a*P0[0]+b*C[0]+c*P1[0],y=a*P0[1]+b*C[1]+c*P1[1],tx=2*(1-u)*(C[0]-P0[0])+2*u*(P1[0]-C[0]),ty=2*(1-u)*(C[1]-P0[1])+2*u*(P1[1]-C[1]),l=Math.hypot(tx,ty)||1,nx=-ty/l,ny=tx/l,h=hw*(1-.2*Math.pow(2*u-1,4))+.25*Math.sin(i*1.7);
+    T.push([x+nx*h,y+ny*h]);B.push([x-nx*h,y-ny*h]);M.push([x,y,nx,ny,h])}
+  blob([pPoly(T.concat(B.reverse()),'#fff8f2')],{ow:1.3,shc:'rgba(120,100,140,.38)',hl:0});
+  ctx.save();ctx.strokeStyle='rgba(224,36,58,.85)';ctx.lineWidth=1.25;ctx.lineCap='round';
+  for(let i=1;i<N;i+=step||2){const m=M[i];ctx.beginPath();ctx.moveTo(m[0]+m[2]*m[4]*.8,m[1]+m[3]*m[4]*.8);ctx.lineTo(m[0]-m[2]*m[4]*.8,m[1]-m[3]*m[4]*.8);ctx.stroke()}ctx.restore()}
+// the shoulder line: ONE smooth outline from the neck, sloping down to a rounded shoulder, mirrored.  Turned by an angle (C = cos, S = sin) it narrows to the body's depth like a real torso.
+const YOKE=[[0,-33.6],[5,-33.3],[10,-32],[15,-29.6],[20,-26.3],[24.4,-22.6],[27,-18.6],[26.6,-14.6],[23.4,-11.6]];
+function pYoke(C,S,ox,fill){const R=[],L=[],n=YOKE.length;
+  const cr=(a,b,c,d,t)=>.5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t*t+(-a+3*b-3*c+d)*t*t*t);
+  const pts=[];for(let i=0;i<n-1;i++){const P=[YOKE[Math.max(0,i-1)],YOKE[i],YOKE[i+1],YOKE[Math.min(n-1,i+2)]];for(let k=0;k<4;k++){const t=k/4;pts.push([cr(P[0][0],P[1][0],P[2][0],P[3][0],t),cr(P[0][1],P[1][1],P[2][1],P[3][1],t)])}}pts.push(YOKE[n-1]);
+  for(const[x,y]of pts){const d=2.5+x*.205,X=Math.hypot(x*C,d*S);R.push([ox+X,y]);L.push([ox-X,y])}
+  return pPoly(R.concat(L.reverse()),fill)}
+function curls(list){ctx.save();ctx.strokeStyle=HAIR;ctx.lineWidth=.8;ctx.lineCap='round';for(const[x,y,d]of list){ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+d*1.1,y+.6,x+d*.4,y+1.9);ctx.stroke()}ctx.restore()}   // tiny curly hairs
+function blobClip(parts){const u=new Path2D();for(const q of parts)u.addPath(q.p);ctx.clip(u)}
 function face(cx,cy,sc,kind,t,side,x){ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);newFace(kind,t,x||{});ctx.restore()}
 let JIG=null;   // belly/rear spring offsets for the current render (set by renderMan; null = off)
 function jigMerge(o){if(!JIG)return o;o=Object.assign({},o||{});o.bo=JIG.bo;o.ro=JIG.ro;o.belly=o.belly?[o.belly[0]*JIG.bs[0],o.belly[1]*JIG.bs[1]]:JIG.bs;return o}
@@ -484,42 +540,42 @@ function drawFront(pose,fk,t,o){
     for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(-34+sw*2,30+k*6);ctx.quadraticCurveTo(0,36+k*6,34-sw*2,30+k*6);ctx.stroke()}}
   const sp=pose==='star'?15:pose==='flex'?7:3;
   for(const s of[-1,1]){const kx=s*(11+sp*.4),ky=39,ax=s*(11+sp),ay=55;
-    limb(s*10,24,kx,ky,16,SK,SKH);limb(kx,ky,ax,ay,10.5,SK,SKH);
-    ctx.fillStyle=HAIR;for(let k=0;k<5;k++)ctx.fillRect(kx+(k%2)*3-3,ky+3+k*2.4,1.2,1.2);
-    const sx=ax+(kx-ax)*.32,sy=ay+(ky-ay)*.32;limb(sx,sy,ax,ay,12,'#fff');
-    ctx.strokeStyle='#e33';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(sx-6,sy+1);ctx.lineTo(sx+6,sy+1);ctx.moveTo(sx-6,sy+4);ctx.lineTo(sx+6,sy+4);ctx.stroke();
-    ell(ax+s*2,ay+5,11,4.2,'#8a5a2b',1.8);ctx.strokeStyle='#5a3515';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(ax-4,ay+2);ctx.lineTo(ax+4,ay+2);ctx.stroke()}
+    blob([pTap(s*10,24,8.8,kx,ky,6.6),pTap(kx,ky,6.4,ax,ay,4.9),pEll(kx,ky,6.7,6.5)]);                                     // thigh, shin and knee: one smooth leg
+    curls(Array.from({length:5},(_,k)=>[kx+(k%2)*3-3,ky+3+k*2.4,k%2?1:-1]));
+    const sx=ax+(kx-ax)*.32,sy=ay+(ky-ay)*.32;blob([pTap(sx,sy,6.1,ax,ay,5.5,'#fff')],{ow:1.5,shc:'rgba(110,110,165,.30)',hl:0});
+    ctx.strokeStyle='#e33';ctx.lineWidth=1.5;ctx.lineCap='round';for(const dy of[1,4]){ctx.beginPath();ctx.moveTo(sx-5.6,sy+dy);ctx.quadraticCurveTo(sx,sy+dy+1.6,sx+5.6,sy+dy);ctx.stroke()}
+    blob([pEll(ax+s*2,ay+5,11,4.2,'#8a5a2b')],{ow:1.8,shc:'rgba(60,30,10,.4)',hlc:'rgba(255,225,190,.25)'});ctx.strokeStyle='#5a3515';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(ax-4,ay+2);ctx.lineTo(ax+4,ay+2);ctx.stroke()}
   const AR=pose==='star'?[40,-28,57,-36]:pose==='flex'?[39,-21,34,-47]:[35,-12,33,-34];
-  for(const s of[-1,1]){const A=o&&(s<0?o.armL:o.armR)||[s*AR[0],AR[1],s*AR[2],AR[3]];limb(s*22,-22,A[0],A[1],13,SK,SKH);limb(A[0],A[1],A[2],A[3],10.5,SK,SKH);ell(A[2],A[3],6.8,6.8,SK,1.8)}
-  if(pose==='flex')for(const s of[-1,1])ell(s*36,-25,7,6,SKH,1.5);
-  if(o&&o.ro){ctx.save();ctx.translate(o.ro[0],o.ro[1])}if(o&&o.ro)ctx.restore();
-  ell(-21,-24,9,8,SK,1.8);ell(21,-24,9,8,SK,1.8);ell(0,-22,21,10,SK,2);
-  ctx.fillStyle=HAIR;for(let k=0;k<14;k++)ctx.fillRect(-5+(k*7)%11,-24+((k*5)%9),1.3,1.3);
-  ctx.strokeStyle=SKD;ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(-9,-18,7,.2,2.6);ctx.arc(9,-18,7,.5,2.9);ctx.stroke();
+  for(const s of[-1,1]){const A=o&&(s<0?o.armL:o.armR)||[s*AR[0],AR[1],s*AR[2],AR[3]];                                    // each arm is one mass: tapered upper arm and forearm, elbow, hand
+    const parts=[pTap(s*21.5,-20.5,6.9,A[0],A[1],6.3),pTap(A[0],A[1],6,A[2],A[3],4.9),pEll(A[0],A[1],6.2,6.1),pEll(A[2],A[3],6.8,6.8)];
+    if(pose==='flex')parts.push(pEll(s*31,-27,6.4,5.4));                                                                   // the bicep
+    blob(parts)}
   if(o&&o.ro){ctx.save();ctx.translate(o.ro[0],o.ro[1])}
-  ctx.beginPath();ctx.moveTo(-20,11);ctx.quadraticCurveTo(-28,22,-22,31);ctx.quadraticCurveTo(-12,28,-3,36);ctx.lineTo(3,36);ctx.quadraticCurveTo(12,28,22,31);ctx.quadraticCurveTo(28,22,20,11);ctx.closePath();
-  ctx.fillStyle=BR;ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.ellipse(-15,23,3.5,6,.3,0,6.3);ctx.ellipse(15,23,3.5,6,-.3,0,6.3);ctx.fill();
+  {const bp=new Path2D();bp.moveTo(-20,11);bp.quadraticCurveTo(-28,22,-22,31);bp.quadraticCurveTo(-12,28,-3,36);bp.lineTo(3,36);bp.quadraticCurveTo(12,28,22,31);bp.quadraticCurveTo(28,22,20,11);bp.closePath();
+   blob([{p:bp,fill:BR,bb:[-29,10,29,37]}],{ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});}
+  ctx.fillStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.ellipse(-15,23,2.8,6,.3,0,6.3);ctx.ellipse(15,23,2.8,6,-.3,0,6.3);ctx.fill();
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-5,29);ctx.lineTo(-5,21);ctx.lineTo(0,26);ctx.lineTo(5,21);ctx.lineTo(5,29);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(-20,10);ctx.quadraticCurveTo(0,19,20,10);ctx.lineTo(21,16);ctx.quadraticCurveTo(0,26,-21,16);ctx.closePath();ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.stroke();
-  ctx.fillStyle='#e0243a';for(let k=-3;k<=3;k++)ctx.fillRect(k*5.4-.8,k===0?15:15+Math.abs(k)*-.3+Math.abs(k)*1.3-1.5+1.5,1.6,2);
+  {const yc=x=>13+4.6*(1-(x/21)*(x/21));blob([ribbonPoly(-21,21,yc,3.1,24,'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(-21,21,yc,3.1,5.4,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
   if(o&&o.ro)ctx.restore();
-  const bgrp=o&&(o.belly||o.bo);if(bgrp){ctx.save();if(o.bo)ctx.translate(o.bo[0],o.bo[1]);if(o.belly){ctx.translate(0,-2+(o.bdy||0));ctx.scale(o.belly[0],o.belly[1]);ctx.translate(0,2)}}
-  ell(0,-2,22,17,SK,2);ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(-9,-9,8,4.5,-.4,0,6.3);ctx.fill();
-  ctx.strokeStyle='rgba(170,90,50,.45)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-2,19.5,.3*Math.PI,.7*Math.PI);ctx.stroke();
-  ctx.strokeStyle=SKD;ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(0,4,2.4,.1,3.1);ctx.stroke();
-  ctx.fillStyle=HAIR;for(let k=0;k<6;k++)ctx.fillRect(-.6+((k%2)?1.2:-.8),-13+k*2.6,1.2,1.2);
-  if(bgrp)ctx.restore();
-  {const wo=o&&o.bo&&o.ro?[(o.bo[0]+o.ro[0])/2,(o.bo[1]+o.ro[1])/2]:null;if(wo){ctx.save();ctx.translate(wo[0],wo[1])}   // love handles: soft rolls over the waistband, shadow under each
-   for(const q of[-1,1]){                                                     // wide soft roll that grows out of the flank and overhangs the waistband (no round shapes)
-     ctx.fillStyle='rgba(110,30,30,.30)';ctx.beginPath();ctx.moveTo(q*8,15.6);ctx.bezierCurveTo(q*16,19.6,q*26,18.4,q*28.4,11.4);ctx.bezierCurveTo(q*25,16.6,q*16,17.4,q*8,15.6);ctx.fill();   // shadow under it
-     ctx.beginPath();ctx.moveTo(q*7,4.4);ctx.bezierCurveTo(q*16,3,q*27,4.2,q*28,10.8);ctx.bezierCurveTo(q*27.4,16,q*17,17,q*7,15.2);ctx.closePath();ctx.fillStyle=SK;ctx.fill();
-     ctx.strokeStyle=OUT;ctx.lineWidth=1.8;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(q*10,3.6);ctx.bezierCurveTo(q*18,3.2,q*27,4.2,q*28,10.8);ctx.bezierCurveTo(q*27.4,16,q*19,16.8,q*12,15.8);ctx.stroke();   // outline only on the outside, no seam across the belly
-     ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(q*17.5,6.4,7.4,1.1,q*.08,0,6.3);ctx.fill();                                                                              // long soft sheen along the top
-     ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(q*10,12.2);ctx.quadraticCurveTo(q*19,14.6,q*26,11.4);ctx.stroke()}                                      // the fold
-   if(wo)ctx.restore()}
+  // torso: shoulders, chest, belly and love handles are ONE mass, drawn after the briefs so the belly overhangs the waistband
+  {const wo=o&&o.bo&&o.ro?[(o.bo[0]+o.ro[0])/2,(o.bo[1]+o.ro[1])/2]:[0,0],bM=new DOMMatrix();
+   if(o&&o.bo)bM.translateSelf(o.bo[0],o.bo[1]);if(o&&o.belly){bM.translateSelf(0,-2+(o.bdy||0));bM.scaleSelf(o.belly[0],o.belly[1]);bM.translateSelf(0,2)}
+   const xf=(q,M)=>{const p=new Path2D();p.addPath(q.p,M);const b=q.bb,pts=[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]].map(c=>[M.a*c[0]+M.c*c[1]+M.e,M.b*c[0]+M.d*c[1]+M.f]);
+     return{p,fill:q.fill,bb:[Math.min(...pts.map(c=>c[0])),Math.min(...pts.map(c=>c[1])),Math.max(...pts.map(c=>c[0])),Math.max(...pts.map(c=>c[1]))]}};
+   ctx.fillStyle='rgba(110,30,30,.30)';for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(q*17.5+wo[0],15.4+wo[1],10.6,3.2,0,0,6.3);ctx.fill()}                  // the shadow a love handle throws on the shorts
+   blob([pYoke(1,0,0),pEll(0,-22,21,10),xf(pEll(0,-2,22,17),bM),pEll(-17.5+wo[0],10.4+wo[1],11,6.4),pEll(17.5+wo[0],10.4+wo[1],11,6.4)]);
+   ctx.save();ctx.translate(0,-3);curls(Array.from({length:14},(_,k)=>[-5+(k*7)%11,-21+((k*5)%9),k%2?1:-1]));ctx.restore();
+   ctx.strokeStyle='rgba(176,92,52,.7)';ctx.lineWidth=1.3;ctx.lineCap='round';ctx.beginPath();ctx.arc(-9,-18,7,.2,2.6);ctx.stroke();ctx.beginPath();ctx.arc(9,-18,7,.5,2.9);ctx.stroke();       // under each pec
+   ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.ellipse(-8,-28,6,2.8,-.3,0,6.3);ctx.fill();
+   const bgrp=o&&(o.belly||o.bo);if(bgrp){ctx.save();if(o.bo)ctx.translate(o.bo[0],o.bo[1]);if(o.belly){ctx.translate(0,-2+(o.bdy||0));ctx.scale(o.belly[0],o.belly[1]);ctx.translate(0,2)}}
+   ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(-9,-9,8,4.5,-.4,0,6.3);ctx.fill();
+   ctx.strokeStyle='rgba(176,92,52,.8)';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(0,4,2.4,.1,3.1);ctx.stroke();                                                      // navel
+   curls(Array.from({length:6},(_,k)=>[k%2?.9:-.9,-13+k*2.6,k%2?1:-1]));
+   if(bgrp)ctx.restore();
+   for(const q of[-1,1]){ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(q*10+wo[0],12.4+wo[1]);ctx.quadraticCurveTo(q*19+wo[0],15+wo[1],q*26+wo[0],11.6+wo[1]);ctx.stroke()}}   // the fold under each roll
   if(o&&o.head){ctx.save();ctx.translate(o.head[0],o.head[1]);ctx.translate(0,-30);ctx.rotate(o.head[2]||0);ctx.translate(0,30)}
-  ell(0,-31,10,6,SKD);ell(-14,-44,4,5,SK,1.6);ell(14,-44,4,5,SK,1.6);ell(-10.8,-38,5.4,5.8,SK,1.6);ell(10.8,-38,5.4,5.8,SK,1.6);ell(0,-34,11.2,8.2,SK,1.6);ell(0,-44,14.3,13.3,SK,2);
+  ell(0,-31,10,6,SKD);blob([pEll(-14,-44,4,5)],{ow:1.5,sd:1.2,hl:0});blob([pEll(14,-44,4,5)],{ow:1.5,sd:1.2,hl:0});
+  blob([pEll(-10.8,-38,5.4,5.8),pEll(10.8,-38,5.4,5.8),pEll(0,-34,11.2,8.2),pEll(0,-44,14.3,13.3)],{ow:1.8});               // cheeks, jaw and skull: one head, no seams
   ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(-6,-52,5,2.8,-.4,0,6.3);ctx.fill();
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(-14,-46);ctx.quadraticCurveTo(-17,-62,-5,-58);ctx.quadraticCurveTo(0,-68,6,-58);ctx.quadraticCurveTo(17,-62,14,-46);ctx.quadraticCurveTo(8,-53,0,-51);ctx.quadraticCurveTo(-8,-53,-14,-46);ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.6;ctx.stroke();
   ctx.fillStyle='rgba(74,45,26,.35)';for(let k=0;k<12;k++)ctx.fillRect(-8+k*1.4,-33+(k%3)*1.2,1,1);
@@ -529,20 +585,20 @@ function drawSide(t,fk){
   ctx.beginPath();ctx.moveTo(10,-16);ctx.bezierCurveTo(-8,-30+fl*3,-30,-24+fl*5,-54,-32+fl*6);ctx.lineTo(-52,-8+fl*5);ctx.bezierCurveTo(-30,-6+fl*3,-8,0,6,-4);ctx.closePath();
   ctx.fillStyle=TOW;ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.stroke();ctx.strokeStyle='#ff4f8f';ctx.lineWidth=3;
   for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(-6-k*10,-22+k*2+fl*2);ctx.lineTo(-8-k*10,-6+k*1.5+fl*2);ctx.stroke()}
-  const leg=(hx,hy,kx,ky,ax,ay,col,hi)=>{limb(hx,hy,kx,ky,13,col,hi);limb(kx,ky,ax,ay,9,col,hi);const sx=ax+(kx-ax)*.4,sy=ay+(ky-ay)*.4;limb(sx,sy,ax,ay,10,'#fff');
-    ctx.strokeStyle='#e33';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(sx,sy-4);ctx.lineTo(sx,sy+4);ctx.stroke();ell(ax-4,ay+1,6.5,3.2,'#8a5a2b',1.5,.5+fl*.3)};
-  leg(-12,8,-27,12+fl*2,-44,4+fl*4,SKD);leg(-10,6,-24,16-fl*2,-42,13-fl*3,SK,SKH);
-  T(bo,()=>{ell(2,-2,21,14.5,SK,2);ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(6,-9,10,4,-.2,0,6.3);ctx.fill()});
-  T(ro,()=>{ell(-13,6,13.5,11.5,BR,2);ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.ellipse(-16,2,5,3.2,-.5,0,6.3);ctx.fill();
-  ctx.strokeStyle=BRD;ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(-6,9,8,2.1,3.7);ctx.stroke();
-  ell(3,10,14,6.5,BR,1.8);
-  ctx.strokeStyle=OUT;ctx.lineWidth=8;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-22,-3);ctx.quadraticCurveTo(-2,1,15,13);ctx.stroke();ctx.strokeStyle='#fff';ctx.lineWidth=5;ctx.stroke();
-  ctx.strokeStyle='#e0243a';ctx.lineWidth=2;ctx.setLineDash([2,4]);ctx.stroke();ctx.setLineDash([])});
-  ell(14,-9,12,10,SK,2);ctx.fillStyle=HAIR;for(let k=0;k<5;k++)ctx.fillRect(16+(k%2)*2,-12+k*2,1.2,1.2);
-  limb(18,-9,30,-12,10,SKD);ell(42,-12,6.5,6,SKD,1.8);limb(19,-12,31,-17,10,SK,SKH);ell(43,-17,6.8,6.2,SK,1.8);
-  limb(22,-12,27,-16,11,SKD);
+  const leg=(hx,hy,kx,ky,ax,ay,col)=>{blob([pTap(hx,hy,6.8,kx,ky,5.6,col),pTap(kx,ky,5.4,ax,ay,4.3,col),pEll(kx,ky,5.7,5.6,col)]);                  // one smooth leg
+    const sx=ax+(kx-ax)*.4,sy=ay+(ky-ay)*.4;blob([pTap(sx,sy,5.2,ax,ay,4.8,'#fff')],{ow:1.4,shc:'rgba(110,110,165,.30)',hl:0});
+    ctx.strokeStyle='#e33';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx,sy-4);ctx.quadraticCurveTo(sx+1.2,sy,sx,sy+4);ctx.stroke();
+    blob([pEll(ax-4,ay+1,6.5,3.2,'#8a5a2b',.5+fl*.3)],{ow:1.5,shc:'rgba(60,30,10,.4)',hl:0})};
+  leg(-12,8,-27,12+fl*2,-44,4+fl*4,SKD);leg(-10,6,-24,16-fl*2,-42,13-fl*3,SK);
+  blob([pEll(2+(bo?bo[0]:0),-2+(bo?bo[1]:0),21,14.5),pEll(14,-9,12,10)],{ow:1.9});                                                             // belly and chest: one body
+  curls(Array.from({length:5},(_,k)=>[16+(k%2)*2,-12+k*2,k%2?1:-1]));
+  T(ro,()=>{blob([pEll(-13,6,13.5,11.5,BR),pEll(3,10,14,6.5,BR)],{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
+    ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-16,2,3.6,2.6,-.5,0,6.3);ctx.fill();
+    ctx.strokeStyle='rgba(110,10,32,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(-6,9,8,2.1,3.7);ctx.stroke();
+    bandAlong([-22,-3],[-2,1],[15,13],2.7,2)});                                                                                         // the waistband: a soft striped strip that follows the body
+  blob([pTap(18,-9,5.2,42,-12,4.4,SKD),pEll(42,-12,6.5,6,SKD)]);blob([pTap(19,-12,5.2,43,-17,4.6),pEll(43,-17,6.8,6.2)]);blob([pTap(22,-12,5.5,27,-16,5.5,SKD)],{ow:1.4,hl:0});
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(24,-24);ctx.quadraticCurveTo(15,-26+fl*2,6,-29+fl*3);ctx.quadraticCurveTo(15,-22,20,-21);ctx.quadraticCurveTo(14,-17,8,-15+fl*2);ctx.quadraticCurveTo(22,-16,26,-19);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.3;ctx.stroke();
-  ell(31,-17,11.2,11,SK,2);ell(25.5,-16,3,4,SK,1.4);ell(35,-9.5,5,4,SKH,0);
+  blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});blob([pEll(25.5,-16,3,4)],{ow:1.3,sd:1,hl:0});
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(30,-21,11,3.45,5.75);ctx.fill();
   ell(36.2,-20.5,4.3,4.9,'#fff',1.2);ell(37.8,-20.2,2.3,2.7,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(37,-21.4,.95,0,6.3);ctx.fill();ctx.fillStyle='rgba(255,105,110,.3)';ctx.beginPath();ctx.ellipse(35,-12,3.2,2,0,0,6.3);ctx.fill();ctx.strokeStyle=HAIR;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(32,-27);ctx.lineTo(40,-25.5);ctx.stroke();
   ell(42,-16,3.4,3,SKD,1.3);
@@ -551,12 +607,14 @@ function drawSide(t,fk){
   ctx.globalAlpha=.3;ell(-1,-10,15,5,'#7dff5a');ell(30,-24,7,3,'#7dff5a');ctx.globalAlpha=1}
 function drawBall(t,fk){
   const bo=JIG?JIG.bo:null,ro=JIG?JIG.ro:null,T=(q,f)=>{if(q){ctx.save();ctx.translate(q[0],q[1])}f();if(q)ctx.restore()};
-  T(ro,()=>ell(-13,6,12.5,11.5,BR,2));T(bo,()=>{ell(3,-2,19,15,SK,2);ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(6,-9,9,4,-.2,0,6.3);ctx.fill()});
-  T(ro,()=>ell(-4,8,13,7,BR,1.8));
-  limb(-12,14,-24,6,9,SKD);ell(-28,4,6,3,'#8a5a2b',1.4,.6);
-  limb(8,4,18,14,12,SK,SKH);limb(18,14,8,22,9,SK,SKH);ell(7,24,6.5,3.2,'#8a5a2b',1.4);
-  limb(14,-8,26,4,9,SKD);ell(24,6,6,6,SKD,1.6);
-  ell(18,-14,11,10.5,SK,2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(18,-18,10.5,3.4,5.9);ctx.fill();
+  const RB={ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'};
+  T(ro,()=>blob([pEll(-13,6,12.5,11.5,BR)],RB));T(bo,()=>blob([pEll(3,-2,19,15)],{ow:1.9}));
+  T(ro,()=>blob([pEll(-4,8,13,7,BR)],RB));
+  blob([pTap(-12,14,4.8,-24,6,4,SKD)]);blob([pEll(-28,4,6,3,'#8a5a2b',.6)],{ow:1.4,hl:0});
+  blob([pTap(8,4,6.2,18,14,5),pTap(18,14,4.8,8,22,4),pEll(18,14,5.2,5.2)]);blob([pEll(7,24,6.5,3.2,'#8a5a2b')],{ow:1.4,hl:0});
+  blob([pTap(14,-8,4.8,26,4,4,SKD),pEll(24,6,6,6,SKD)],{ow:1.6});
+  blob([pEll(18,-14,11,10.5)],{ow:1.9});
+  ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(18,-18,10.5,3.4,5.9);ctx.fill();
   ell(22.4,-15,4.1,4.6,'#fff',1.2);ell(23.8,-14.8,2.1,2.5,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(23,-15.8,.9,0,6.3);ctx.fill();ctx.strokeStyle=HAIR;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(18,-21);ctx.lineTo(26,-19.5);ctx.stroke();
   ell(27,-9,4.5,5,'#5a1010',1.3);ctx.fillStyle=HAIR;ctx.fillRect(20,-11.5,11,3);
   ctx.globalAlpha=.32;ell(0,-8,14,5,'#7dff5a');ctx.globalAlpha=1}
@@ -685,10 +743,10 @@ class Cloth{
 // If nobody drew it for a quarter second (gag over, man dragged) it starts again, hanging from the hand.
 const TW_SPIN={c:null,seen:-9,T:0,acc:0},TW_BACK={c:null,seen:-9,T:0,acc:0};
 function towelFor(tw,H,pre,mode){
-  if(!tw.c||time-tw.seen>.25){tw.c=new Cloth(H,mode);tw.T=0;tw.acc=0;if(pre)for(let n=0;n<120;n++){tw.c.step(H,tw.T);tw.T+=CL_DT}}
+  if(!tw.c||tw.c.mode!==(mode|0)||time-tw.seen>.25){tw.c=new Cloth(H,mode);tw.T=0;tw.acc=0;if(pre)for(let n=0;n<120;n++){tw.c.step(H,tw.T);tw.T+=CL_DT}}
   else{tw.acc+=Math.min(.1,time-tw.seen);let n=0;while(tw.acc>=CL_DT&&n<5){tw.c.step(H,tw.T);tw.T+=CL_DT;tw.acc-=CL_DT;n++}if(tw.acc>=CL_DT)tw.acc=0}
   tw.seen=time;return tw.c}
-function towelStatic(H){const c=new Cloth(H,1);for(let n=0;n<150;n++)c.step(H,n*CL_DT);return c}   // a settled flag, for poses drawn with no live clock
+function towelStatic(H,mode){const c=new Cloth(H,mode||1);for(let n=0;n<150;n++)c.step(H,n*CL_DT);return c}   // a settled flag, for poses drawn with no live clock
 function armWave(a){const p=6.2832*2.3*time;return[a*5*Math.sin(p),a*2.5*Math.cos(p),a*3*Math.cos(p+1.3)]}   // small circular wave of the raised hand
 // the cloth as draw jobs {d,fn}.  d = mean z of the quad (bigger = nearer); the quads on the held edge never get in front of the fist (fz = the fist's z).
 // Front face (the way it hangs at rest) = towel pink, back face = darker pink; both brighter the more squarely they face the light (upper left, front).
@@ -721,59 +779,46 @@ function drawBack(pose,t,o){o=jigMerge(o)||{};const bo=o.bo||[0,0],ro=o.ro||[0,0
   const hip=o.hip||0,cl=o.cl||0,cr=o.cr||0,lean=o.lean||0,puff=o.puff||0,sh=-hip*.35,fl=Math.sin(t*9);
   // legs (planted)
   for(const s of[-1,1]){const kx=s*13,ky=39,ax=s*14,ay=55;
-    limb(s*10+hip*.3,24,kx,ky,16,SK,SKH);limb(kx,ky,ax,ay,10.5,SK,SKH);
-    const sx=ax+(kx-ax)*.32,sy=ay+(ky-ay)*.32;limb(sx,sy,ax,ay,12,'#fff');
-    ctx.strokeStyle='#e33';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(sx-6,sy+1);ctx.lineTo(sx+6,sy+1);ctx.moveTo(sx-6,sy+4);ctx.lineTo(sx+6,sy+4);ctx.stroke();
-    ell(ax+s*1,ay+5,10,4.4,'#8a5a2b',1.8);ctx.strokeStyle='#5a3515';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(ax-4,ay+7);ctx.lineTo(ax+4,ay+7);ctx.stroke()}
+    blob([pTap(s*10+hip*.3,24,8.8,kx,ky,6.6),pTap(kx,ky,6.4,ax,ay,4.9),pEll(kx,ky,6.7,6.5)]);
+    const sx=ax+(kx-ax)*.32,sy=ay+(ky-ay)*.32;blob([pTap(sx,sy,6.1,ax,ay,5.5,'#fff')],{ow:1.5,shc:'rgba(110,110,165,.30)',hl:0});
+    ctx.strokeStyle='#e33';ctx.lineWidth=1.5;ctx.lineCap='round';for(const dy of[1,4]){ctx.beginPath();ctx.moveTo(sx-5.6,sy+dy);ctx.quadraticCurveTo(sx,sy+dy+1.6,sx+5.6,sy+dy);ctx.stroke()}
+    blob([pEll(ax+s*1,ay+5,10,4.4,'#8a5a2b')],{ow:1.8,shc:'rgba(60,30,10,.4)',hlc:'rgba(255,225,190,.25)'});ctx.strokeStyle='#5a3515';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(ax-4,ay+7);ctx.lineTo(ax+4,ay+7);ctx.stroke()}
   // right arm up, waving a towel flag: a real cloth (see TOWEL CLOTH).  The held edge is painted now (the fist covers it), the rest hangs in front of the arm and is painted after the body.
   const tow=!(o.noflag||NOTOWEL),wv=tow?armWave(.8):[0,0,0],hx=38+sh+wv[0],hy=-58+wv[1],ex=40+sh+wv[0]*.5,ey=-32+wv[1]*.5;let towFront=null;
   if(tow){const jobs=towelJobs(towelFor(TW_BACK,[hx,hy,wv[2]],1,2),0).sort((a,b)=>a.d-b.d);towFront=jobs.filter(q=>q.i>0);for(const q of jobs)if(q.i===0)q.fn()}
-  limb(22+sh,-22,ex,ey,13,SK,SKH);limb(ex,ey,hx,hy,10.5,SK,SKH);ell(hx,hy,6.8,6.8,SK,1.8);
+  blob([pTap(21.5+sh,-21,6.9,ex,ey,6.3),pTap(ex,ey,6,hx,hy,4.9),pEll(ex,ey,6.2,6.1),pEll(hx,hy,6.8,6.8)]);
   // left arm on hip
-  limb(-22+sh,-22,-40+sh,-8,13,SK,SKH);limb(-40+sh,-8,-24+hip*.5,9,10.5,SK,SKH);ell(-24+hip*.5,9,6.8,6.8,SK,1.8);
+  blob([pTap(-21.5+sh,-21,6.9,-40+sh,-8,6.3),pTap(-40+sh,-8,6,-24+hip*.5,9,4.9),pEll(-40+sh,-8,6.2,6.1),pEll(-24+hip*.5,9,6.8,6.8)]);
   // love handles + back
-  ell(sh,-24,21,10,SK,2);ell(-21+sh,-24,9,8,SK,1.8);ell(21+sh,-24,9,8,SK,1.8);
-  ctx.save();ctx.translate(bo[0],bo[1]);ell(hip*.15,-6,23,24,SK,2);
-  ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(-9+sh*.5,-14,7,10,.2,0,6.3);ctx.fill();
-  ctx.fillStyle='rgba(176,92,52,.32)';ctx.beginPath();ctx.ellipse(hip*.1,-14,12,9,0,0,6.3);ctx.ellipse(hip*.15,-1,8,5.5,0,0,6.3);ctx.fill();      // sweat stain
-  ctx.strokeStyle=SKD;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(sh*.5,-30);ctx.quadraticCurveTo(hip*.1,-12,hip*.3,10);ctx.stroke();
+  blob([pYoke(1,0,sh),pEll(sh,-24,21,10),pEll(hip*.15+bo[0],-6+bo[1],23,24)]);                  // shoulders, upper back and belly: one mass
+  ctx.save();ctx.translate(bo[0],bo[1]);
+  for(const q of[-1,1]){ctx.fillStyle='rgba(176,92,52,.15)';ctx.beginPath();ctx.ellipse(q*7+sh*.5,-18,6.5,8.5,-q*.35,0,6.3);ctx.fill()}   // shoulder blades
+  ctx.fillStyle='rgba(255,255,255,.26)';ctx.beginPath();ctx.ellipse(-9+sh*.5,-14,7,10,.2,0,6.3);ctx.fill();
+  ctx.fillStyle='rgba(176,92,52,.26)';ctx.beginPath();ctx.ellipse(hip*.1+sh*.4,-12,1.7,16,0,0,6.3);ctx.fill();ctx.fillStyle='rgba(176,92,52,.16)';for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(hip*.2+q*5.6,10,1.8,2.2,0,0,6.3);ctx.fill()}   // the spine: a soft groove, and two dimples above the butt
   ctx.restore();
-  ctx.strokeStyle=HAIR;ctx.lineWidth=1.3;ctx.lineCap='round';for(const[q,w]of[[-14,-26],[-11,-22],[-16,-21],[13,-27],[10,-23],[15,-22],[-5,-30],[4,-31]]){ctx.beginPath();ctx.moveTo(q+sh*.5,w);ctx.lineTo(q+sh*.5+(q<0?-1.6:1.6),w+3.2);ctx.stroke()}
+  curls([[-14,-26,-1],[-11,-22,-1],[-16,-21,-1],[13,-27,1],[10,-23,1],[15,-22,1],[-5,-30,-1],[4,-31,1]].map(([q,w,d])=>[q+sh*.5,w,d]));
   // briefs hugging two round cheeks (crease, highlight, soft shading, a pinch of fabric at the top), then waistband + tag, then love handles on top
   const bx=hip*.6,cy0=23;ctx.save();ctx.translate(ro[0],ro[1]);
-  ell(bx,cy0+2,25+puff*2.5,11,BR,2);
-  for(const q of[-1,1]){const dy=q<0?cl:cr,sc=1+puff*.12+lean*.08,cx=bx+q*11.6*sc,cy=cy0+dy-lean*2,rx=14.2*sc,ry=13.8*sc;
-    ell(cx,cy,rx,ry,BR,1.9);
-    ctx.save();ctx.beginPath();ctx.ellipse(cx,cy,rx-1,ry-1,0,0,6.3);ctx.clip();                      // soft shading: darker toward the crease and underneath
-    ctx.fillStyle='rgba(120,10,32,.13)';ctx.beginPath();ctx.ellipse(cx-q*9.5,cy+4,5,11,0,0,6.3);ctx.fill();
-    ctx.fillStyle='rgba(120,10,32,.12)';ctx.beginPath();ctx.ellipse(cx+q*1,cy+ry*.95,rx*.9,3.6,0,0,6.3);ctx.fill();ctx.restore();
-    ctx.fillStyle='rgba(255,255,255,.4)';ctx.beginPath();ctx.ellipse(cx+q*4.6,cy-3.6,3.8,6.4,q*.3,0,6.3);ctx.fill();   // highlight
-    ctx.fillStyle='rgba(255,255,255,.6)';ctx.beginPath();ctx.ellipse(cx+q*6.4,cy-9.2,1.5,1,q*.3,0,6.3);ctx.fill()}
-  ctx.strokeStyle=BRD;ctx.lineWidth=2.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bx,17);ctx.quadraticCurveTo(bx+(cl-cr)*.25,cy0+5,bx,cy0+12.5);ctx.stroke();      // the crease
-  ctx.lineWidth=1.3;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*1.4,20);ctx.quadraticCurveTo(bx+q*6,20.4,bx+q*8.6,26.5);ctx.stroke();ctx.beginPath();ctx.moveTo(bx+q*1.4,22.5);ctx.quadraticCurveTo(bx+q*4.6,23.6,bx+q*6.2,28.6);ctx.stroke()}   // small wedgie-ish pinch
-  ctx.beginPath();ctx.moveTo(-24+bx,10);ctx.quadraticCurveTo(bx,13,24+bx,10);ctx.lineTo(25+bx,18);ctx.quadraticCurveTo(bx,21,-25+bx,18);ctx.closePath();ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.stroke();
-  ctx.fillStyle='#e0243a';for(let k=-3;k<=3;k++)ctx.fillRect(bx+k*6.6-.8,k%2?11:12,1.6,6);
+  const chk=[-1,1].map(q=>{const dy=q<0?cl:cr,sc=1+puff*.12+lean*.08;return{q,cx:bx+q*11.6*sc,cy:cy0+dy-lean*2,rx:14.2*sc,ry:13.8*sc}});
+  blob([pEll(bx,cy0+2,25+puff*2.5,11,BR)].concat(chk.map(c=>pEll(c.cx,c.cy,c.rx,c.ry,BR))),{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});         // the shorts: one soft mass of cloth
+  for(const c of chk){ctx.fillStyle='rgba(255,255,255,.26)';ctx.beginPath();ctx.ellipse(c.cx+c.q*4.6,c.cy-3.6,2.8,6,c.q*.3,0,6.3);ctx.fill()}
+  ctx.strokeStyle='rgba(100,8,30,.28)';ctx.lineWidth=2.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bx,17);ctx.quadraticCurveTo(bx+(cl-cr)*.25,cy0+5,bx,cy0+12.5);ctx.stroke();      // the crease: a soft line
+  ctx.strokeStyle='rgba(100,8,30,.8)';ctx.lineWidth=1.2;ctx.stroke();
+  ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*1.4,20);ctx.quadraticCurveTo(bx+q*6,20.4,bx+q*8.6,26.5);ctx.stroke()}   // a pinch of fabric
+  {const yc=x=>14+1.5*(1-Math.pow((x-bx)/24.5,2)),xa=bx-24.5,xb=bx+24.5;blob([ribbonPoly(xa,xb,yc,3.9,26,'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(xa,xb,yc,3.9,6.2,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
   ctx.fillStyle='#f2f2f2';ctx.strokeStyle='#aaa';ctx.lineWidth=.8;ctx.fillRect(bx-4,19,8,5);ctx.strokeRect(bx-4,19,8,5);ctx.fillStyle=BR;ctx.fillRect(bx-2,21,4,1.3);
   if(puff){ctx.strokeStyle=BRD;ctx.lineWidth=1.4;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*21,22);ctx.quadraticCurveTo(bx+q*25,28,bx+q*22,36);ctx.stroke()}
     ctx.fillStyle='rgba(150,210,70,.55)';for(const[q,w,r]of[[-14,45,5],[0,48,6],[15,45,4.5],[-5,53,3.5],[9,52,3]]){ctx.beginPath();ctx.arc(bx+q,w+Math.sin(t*10+q)*1.5,r,0,6.3);ctx.fill()}}
   ctx.restore();
-  {const wo=[(bo[0]+ro[0])/2,(bo[1]+ro[1])/2];ctx.save();ctx.translate(wo[0],wo[1]);
-   // back view: only the side away from the hand on the hip gets a roll, drawn flat with no outline so it reads as flesh, not another hand
-   for(const q of[1]){const hx=q*17+hip*.6;ctx.fillStyle='rgba(110,30,30,.28)';ctx.beginPath();ctx.ellipse(hx-q*.6,15.4,8,2.4,0,0,6.3);ctx.fill();
-     ctx.fillStyle=SK;ctx.beginPath();ctx.ellipse(hx,11.6,8,3.2,q*.08,0,6.3);ctx.fill();
-     ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(hx+q*1.5,9.6,4.4,1.1,0,0,6.3);ctx.fill();
-     ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(hx-7,14.2);ctx.quadraticCurveTo(hx,16,hx+7,14);ctx.stroke()}
-   ctx.restore()}
   if(towFront)for(const q of towFront)q.fn();
   // head from behind: fat neck rolls, ears, bald patch with comb-over, cheek + mustache tip peeking round the side
   ctx.save();ctx.translate(sh*.4,lean*9);ctx.scale(1-.05*lean,1-.05*lean);
-  ell(0,-32,11.5,5.5,SK,1.6);ctx.strokeStyle=SKD;ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(0,-34,8,.3,2.85);ctx.stroke();
-  ell(-14.2,-44,4,5,SK,1.6);ell(14.2,-44,4,5,SK,1.6);
-  ell(0,-44,14.3,13.3,SK,2);
+  blob([pEll(-14.2,-44,4,5)],{ow:1.5,sd:1.2,hl:0});blob([pEll(14.2,-44,4,5)],{ow:1.5,sd:1.2,hl:0});
+  blob([pEll(0,-32,11.5,5.5),pEll(0,-44,14.3,13.3)],{ow:1.8});ctx.strokeStyle='rgba(176,92,52,.7)';ctx.lineWidth=1.3;ctx.lineCap='round';ctx.beginPath();ctx.arc(0,-34,8,.3,2.85);ctx.stroke();       // fat neck, one head
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.ellipse(0,-39,13.8,9.2,0,0,6.3);ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.4;ctx.stroke();
   ell(0,-50,8.6,6.4,SK,0);ctx.fillStyle='rgba(255,255,255,.5)';ctx.beginPath();ctx.ellipse(-2.5,-52,3.4,1.8,-.4,0,6.3);ctx.fill();
   ctx.strokeStyle=HAIR;ctx.lineWidth=1.2;for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(-8,-48+k*2.4);ctx.quadraticCurveTo(0,-53+k*2.4,8,-48+k*2.4);ctx.stroke()}
-  ell(12.5,-42.5,5.4,6.6,SK,1.6);ctx.fillStyle='rgba(255,140,120,.35)';ctx.beginPath();ctx.ellipse(13,-40,3,2.4,0,0,6.3);ctx.fill();
+  blob([pEll(12.5,-42.5,5.4,6.6)],{ow:1.5,sd:1.2,hl:0});ctx.fillStyle='rgba(255,140,120,.35)';ctx.beginPath();ctx.ellipse(13,-40,3,2.4,0,0,6.3);ctx.fill();
   ctx.strokeStyle=HAIR;ctx.lineWidth=2.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(10.5,-49.5);ctx.lineTo(16,lean?-47:-51);ctx.stroke();
   if(lean){ell(14,-45,2.2,2.6,'#fff',1);ell(14.7,-45,1,1.3,'#111')}               // guilty sideways glance
   else{ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.beginPath();ctx.arc(13.5,-45.5,2.4,Math.PI*1.1,Math.PI*1.9);ctx.stroke()}   // smug wink
@@ -811,6 +856,29 @@ const SPIN_POSE={};
 for(let k=0;k<=12;k++)SPIN_POSE['SPIN_'+k]=spinKey(k*15,1);
 for(let k=1;k<=11;k++)SPIN_POSE['SPIN_R'+k]=spinKey(k*15,-1);
 SPIN_POSE.SPIN_BL={th:180,dir:1,hip:-6,psi:-10,cl:-2.5,cr:2.5};SPIN_POSE.SPIN_BR={th:180,dir:1,hip:6,psi:10,cl:2.5,cr:-2.5};
+// ---- the rare "oops" gag (back view only): the boxers slip off, he wobbles, notices, covers up and pulls them back on.
+// oops fields (all of them blend smoothly in the live version): drop 0 = boxers on .. 1 = round the knees; cover 0..1 = hands / towel go to the butt;
+// pull 0..1 = one hand hauls the boxers up; wl / wr = wobble of the left / right cheek as seen from behind (-1..1); tilt = slanted waistband;
+// sweat 0..1; bang 0..1 = a red '!'; sq 0/1 = squirm; face = '' | eek | blush | squeeze | sheepish.  ld = head turned over the shoulder (degrees).
+const OOPS_DEF={drop:0,cover:0,pull:0,wl:0,wr:0,tilt:0,sweat:0,bang:0,sq:0,face:''};
+const OOPS_POSE={
+  OOPS_A:{th:180,hip:-6,cl:-2.5,cr:2.5,oops:{drop:.5,tilt:2.5}},
+  OOPS_B:{th:180,hip:-7,oops:{drop:1,wl:1,wr:-.7}},
+  OOPS_C:{th:180,hip:7,oops:{drop:1,wl:-.7,wr:1}},
+  OOPS_D:{th:180,ld:-112,hip:0,oops:{drop:1,wl:.35,wr:.35,cover:.45,face:'eek',sweat:.5,bang:1}},
+  OOPS_E:{th:180,ld:-122,hip:1.5,oops:{drop:1,cover:1,face:'blush',sweat:1}},
+  OOPS_F:{th:180,ld:-118,hip:-1.5,oops:{drop:1,cover:1,face:'squeeze',sweat:1,sq:1}},
+  OOPS_G:{th:180,ld:-120,hip:0,oops:{drop:.58,cover:1,pull:1,tilt:3,face:'squeeze',sweat:1}},
+  OOPS_H:{th:180,ld:-104,hip:0,oops:{drop:0,face:'sheepish',sweat:.6}}};
+Object.assign(SPIN_POSE,OOPS_POSE);
+const mixA=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+// the arm end points (body frame: x right of the body, y down, z toward its front; a back view is the same turned by th)
+function oopsArms(OP){const cv=OP?OP.cover:0,pl=OP?OP.pull:0,sq=OP?OP.sq:0;
+  const lc=mixA([-26,8,3],[-17,27,-23],cv);
+  return{rF:mixA([30,-69,0],[7+sq*1.2,23+sq*1,-23.5],cv),rE:mixA([41,-43,0],[31,4,-8],cv),lF:mixA(lc,[-29,22,-21],pl),lE:mixA([-41,-6,-1],[-31,4,-9],cv)}}
+function oopsBlend(a,b,k){const A=Object.assign({},OOPS_DEF,a||{}),B=Object.assign({},OOPS_DEF,b||{}),r={};
+  for(const key in OOPS_DEF)r[key]=typeof OOPS_DEF[key]==='number'?A[key]+(B[key]-A[key])*k:(k<.5?A:B)[key];return r}
+
 // ---- the footwork.  Each foot sits on the floor at an angle (degrees) round the body centre and only moves in a quick hop:
 // right foot 0->90 while the turn is at 15..45 deg and 90->180 at 105..135, left foot 0->90 at 45..75 and 90->180 at 135..165.
 const hopP=(th,a,b)=>Math.max(0,Math.min(1,(th-a)/(b-a))),smo=u=>u*u*(3-2*u);
@@ -839,7 +907,7 @@ function legIK(H,A,pole,l1,l2){
 // the baked hand anchor (design units, no arm wave) of every frame that carries a towel: the consoles pin their cloth to it.
 // For the spin it is where drawSpin puts the raised fist: 30 out from the body centre, turned by th, plus the sway (shx) and crouch (bob) of the step-turn.
 const TOWEL_HAND=(()=>{const r=v=>Math.round(v*1000)/1000+0,H={};
-  for(const n in SPIN_POSE){const q=SPIN_POSE[n],th=q.th*Math.PI/180,oU=-(q.hip||0)*.35,sw=spinSway(q.th,q.psi||0,q.hip||0);H[n]=[r(30*Math.cos(th)+oU+sw.shx),r(-69+sw.bob),r(-30*Math.sin(th))]}
+  for(const n in SPIN_POSE){const q=SPIN_POSE[n],th=q.th*Math.PI/180,oU=-(q.hip||0)*.35,sw=spinSway(q.th,q.psi||0,q.hip||0),b=oopsArms(q.oops?Object.assign({},OOPS_DEF,q.oops):null).rF,C=Math.cos(th),S=Math.sin(th);H[n]=[r(b[0]*C+b[2]*S+oU+sw.shx),r(b[1]+sw.bob),r(-b[0]*S+b[2]*C)]}
   for(const[n,hip]of[['BACK_C',0],['BACK_L',-6],['BACK_R',6],['FART_A',-1.5],['FART_B',1.5]])H[n]=[r(38-hip*.35),-58,0];
   return H})();
 function drawSpin(th,o){
@@ -852,6 +920,51 @@ function drawSpin(th,o){
   let list=[],seq=0;
   const add=(d,f)=>{list.push({d,f,n:seq++})},addLeg=(d,f)=>{list.push({d,f,n:seq++,leg:1})};   // legs are not shifted by the sway/crouch (their hips already are)
   const SW=spinSway(th*180/Math.PI,(o.psi||0),hip),bob=SW.bob,shx=SW.shx;
+  const OP=o.oops?Object.assign({},OOPS_DEF,o.oops):null;                                                            // the "oops" gag: boxers down, bare butt, covering up
+  // the bare butt, seen from behind: curvy, full and heavy (a little muscle under the curves), a paler 'tan line' skin, a deep soft cleft, a fold under each cheek, sparse hair, a heavy wobble
+  // little curly wisps, deterministic: [x, y, dx, dy] on a cheek (x counted from the cleft)
+  const WISP=(()=>{const w=[];let r=7;const rn=()=>(r=(r*1103515245+12345)&0x7fffffff)/0x7fffffff;for(let k=0;k<26;k++){const edge=rn();w.push([2+rn()*22,17+rn()*21+(edge<.35?0:0),(rn()-.5)*2.6,1.2+rn()*1.8])}return w})();
+  const addButt=()=>add(12,()=>{
+    const dr=OP.drop,SHD='rgba(165,88,56,',tl=OP.tilt||0;
+    ctx.save();ctx.translate(oL+ro[0],ro[1]);ctx.translate(0,11);ctx.scale(1.07,1.1);ctx.translate(0,-11);ctx.lineJoin='round';ctx.lineCap='round';      // a little bigger: full and heavy
+    const wm=s=>{const w=s<0?OP.wl:OP.wr;return new DOMMatrix().translate(s*14,25).translate(s*2.4*w,-3.2*w).rotate(s*.055*w*57.29578).scale(1+.08*w,1-.06*w).translate(-s*14,-25)};
+    const CHEEK=s=>{const c=new Path2D(),o=new Path2D();c.moveTo(s*.6,12.5);c.bezierCurveTo(s*.3,20,s*.7,28,s*3,33.4);c.bezierCurveTo(s*6.5,38.6,s*15.5,39.2,s*21.6,35.2);c.bezierCurveTo(s*26.4,32,s*27.8,22.5,s*24.4,15.4);
+      o.addPath(c);c.bezierCurveTo(s*20.5,10,s*7.5,10.4,s*.6,12.5);c.closePath();return{c,o}};
+    const skin=ctx.createLinearGradient(0,9,0,27);skin.addColorStop(0,SK);skin.addColorStop(1,'#f7c29c');                                      // the tan fades into the paler skin the boxers cover
+    const cp={};for(const s of[-1,1]){const ch=CHEEK(s),M=wm(s),pc=new Path2D(),po=new Path2D();pc.addPath(ch.c,M);po.addPath(ch.o,M);cp[s]={p:pc,o:po,fill:skin,bb:[-32,6,32,44],M,raw:ch.c}}
+    // the bare butt: two cheeks filled as ONE mass, outline only down the cleft, under the cheeks and up the outer sides (the top blends into the back)
+    blob([cp[-1],cp[1]],{ow:1.9,shc:SHD+'.36)',hl:0});
+    for(const s of[-1,1]){const M=cp[s].M;ctx.save();ctx.transform(M.a,M.b,M.c,M.d,M.e,M.f);ctx.clip(cp[s].raw);
+      ctx.fillStyle=SHD+'.24)';ctx.beginPath();ctx.ellipse(s*1.6,25,3.2,12,0,0,6.3);ctx.fill();                                    // toward the cleft
+      ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(s*14.4,26.6,5.8,7.6,s*.35,0,6.3);ctx.fill();               // one big soft highlight
+      ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.ellipse(s*20.6,20.8,6,3.2,-s*.4,0,6.3);ctx.fill();                // a firm shelf on the upper outer curve: some muscle under the curves
+      ctx.fillStyle='rgba(255,255,255,.6)';ctx.beginPath();ctx.ellipse(s*17.8,19.4,1.8,1.1,s*.35,0,6.3);ctx.fill();
+      ctx.strokeStyle=SHD+'.34)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(s*24.2,16);ctx.quadraticCurveTo(s*20.4,20.6,s*18.8,26);ctx.stroke();      // the dip where the glute meets the hip
+      ctx.strokeStyle=SHD+'.5)';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(s*3.4,35.2);ctx.bezierCurveTo(s*8,41,s*17,41.6,s*23.4,36.2);ctx.stroke();       // the fold under the cheek
+            ctx.strokeStyle=HAIR;ctx.lineWidth=.6;ctx.globalAlpha=.8;for(const[wx,wy,wdx,wdy]of WISP){ctx.beginPath();ctx.moveTo(s*wx,wy);ctx.quadraticCurveTo(s*(wx+wdx*.5),wy+wdy*.3,s*(wx+wdx),wy+wdy);ctx.stroke()}ctx.globalAlpha=1;
+      ctx.restore()}
+    // boxers still on (or half way down): red cloth tubes hanging from a curved, rippled waistband
+    if(dr<.985){
+      const yw=14+dr*28,bd=x=>yw-tl*x/30+2.3*(1-(x/31)*(x/31)),sm=u=>{u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)},hem=yw+(22.5-dr*7)*(1-sm((dr-.62)/.36));      // as the waistband sinks to the knees the shorts bunch up under it
+      const hemY=x=>{const s=x<0?-1:1,u=Math.min(1,Math.abs(x-s*13)/12.6);return hem-2.2+2.6*(1-u*u)};                       // each leg's hem is a shallow smile; the two legs part at the middle
+      const clip=new Path2D();clip.moveTo(-36,bd(-36));for(let x=-36;x<=36;x+=2)clip.lineTo(x,bd(x));for(let x=36;x>=-36;x-=2)clip.lineTo(x,hemY(x));clip.closePath();
+      ctx.save();
+      const tube=s=>[pTap(s*13.2,bd(s*13.2)-2,12.8,s*13,hem+6,12.4,BR)];
+      blob(tube(-1).concat(tube(1)),{ow:1.8,clip,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,200,205,.30)'});
+      ctx.strokeStyle=OUT;ctx.lineWidth=1.8;ctx.lineCap='round';ctx.lineJoin='round';for(const s of[-1,1]){ctx.beginPath();for(let x=.3;x<=26.6;x+=1.4){const X=s*x;x<.4?ctx.moveTo(X,hemY(X)):ctx.lineTo(X,hemY(X))}ctx.stroke()}     // the hem outline
+      ctx.save();ctx.clip(clip);                                                                                                   // folds in the cloth: short curved creases running down from the waistband, a sheen on each cheek
+      ctx.strokeStyle='rgba(110,10,32,.5)';ctx.lineWidth=1.1;ctx.lineCap='round';
+      for(const s of[-1,1])for(let k=0;k<3;k++){const x0=s*(5.5+k*5.4),y0=bd(x0)+3;ctx.beginPath();ctx.moveTo(x0,y0);ctx.quadraticCurveTo(x0+s*(2.2-k*.5),y0+5+k,x0+s*(1+k*.8),y0+9+k*2);ctx.stroke()}
+      ctx.beginPath();ctx.moveTo(0,bd(0)+3);ctx.bezierCurveTo(-1.4,bd(0)+10,1.6,bd(0)+16,0,hemY(0)-1);ctx.stroke();                         // the centre seam, a soft wavy line, not a bar
+      ctx.fillStyle='rgba(255,255,255,.2)';for(const s of[-1,1]){ctx.beginPath();ctx.ellipse(s*17,bd(s*17)+8,2.6,5.6,s*.5,0,6.3);ctx.fill()}
+      ctx.strokeStyle='rgba(255,230,230,.42)';ctx.lineWidth=.9;ctx.setLineDash([2.4,2]);for(const s of[-1,1]){ctx.beginPath();for(let x=1.4;x<=25;x+=1.4){const X=s*x;x<1.5?ctx.moveTo(X,hemY(X)-2.4):ctx.lineTo(X,hemY(X)-2.4)}ctx.stroke()}ctx.setLineDash([]);     // hem stitching
+      ctx.restore();
+      ctx.globalAlpha=Math.min(1,(.985-dr)/.12);
+      const yc=x=>bd(x)+3.2*Math.pow(Math.abs(x)/30,5),rp=ribbonPoly(-30,30,yc,2.6,30,'#fff8f2',.4);
+      blob([rp],{ow:1.3,shc:'rgba(120,100,140,.38)',hl:0});
+      ribbonStripes(-30,30,yc,2.6,6.2,'rgba(224,36,58,.85)');
+      ctx.restore()}
+    ctx.restore()});
   const group=(d,build)=>{const keep=list;list=[];build();const sub=list.sort(cmp);list=keep;add(d,()=>{for(const p of sub)p.f()})};
   const P3=(x,y,z,ox)=>[x*C+z*S+(ox||0),y,-x*S+z*C];
   // soft shade on the lower right + a sheen on the upper left, so each ellipsoid reads as round
@@ -883,69 +996,82 @@ function drawSpin(th,o){
     const sx=A[0]+(K[0]-A[0])*.32,sy=A[1]+(K[1]-A[1])*.32,sPx=s*15.5*Cf+3*Sf,sPz=-s*15.5*Sf+3*Cf,sRx=Math.hypot(10.5*Cf,10*Sf),sy0=60-F.lift;
     const shoe={x:s*15.5,y:sy0,z:3,a:10.5,b:4.4,c:10,cc:Cf,ss:Sf,ox:0,oy:0};
     addLeg(-50+.02*(Hh[2]+sPz),()=>{
-      limb(Hh[0],Hh[1],K[0],K[1],16,SK,SKH);limb(K[0],K[1],A[0],A[1],10.5,SK,SKH);
+      blob([pTap(Hh[0],Hh[1],8.8,K[0],K[1],6.6),pTap(K[0],K[1],6.4,A[0],A[1],4.9),pEll(K[0],K[1],6.7,6.5)]);                                    // thigh, shin and knee: one smooth leg
+      if(OP&&OP.drop>.7){const k=Math.min(1,(OP.drop-.7)/.3),bx=K[0],by=K[1]+4.6,rx=5+8*k,ry=2.8+5.2*k;                                  // boxers round the knees: puffs of red cloth with a curved striped cuff on top
+        blob([pEll(bx,by,rx,ry,BR),pEll(bx-4.2*k,by+2.4*k,4+4*k,2.4+3.2*k,BR),pEll(bx+4.2*k,by+2.2*k,4+4*k,2.4+3*k,BR)],{ow:1.7,shc:'rgba(100,8,30,.4)',hlc:'rgba(255,190,200,.3)'});
+        ctx.strokeStyle='rgba(110,10,32,.6)';ctx.lineWidth=1.1;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bx-rx*.5,by);ctx.quadraticCurveTo(bx-rx*.3,by+ry*.7,bx-rx*.1,by+ry*.9);ctx.moveTo(bx+rx*.3,by-ry*.1);ctx.quadraticCurveTo(bx+rx*.5,by+ry*.5,bx+rx*.45,by+ry*.9);ctx.stroke();
+        const cy=x=>by-ry*.5+1.6*k*(1-Math.pow((x-bx)/(rx*.9),2)),xa=bx-rx*.9,xb=bx+rx*.9;
+        blob([ribbonPoly(xa,xb,cy,1.5+1.1*k,12,'#fff8f2',.2)],{ow:1.2,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(xa,xb,cy,1.5+1.1*k,4.6,'rgba(224,36,58,.85)')}
       ctx.fillStyle=HAIR;for(let k=0;k<5;k++){const xo=(k%2)*3-3,zo=Math.sqrt(64-xo*xo),fc=(-xo*S2+zo*C2)/8,yy=42+k*2.4,t=(yy-K[1])/((A[1]-K[1])||1);if(fc>.15&&t>0&&t<1)ctx.fillRect(K[0]+(A[0]-K[0])*t+xo*C2+zo*S2-.6,yy,1.2,1.2)}
-      limb(sx,sy,A[0],A[1],12,'#fff');
-      ctx.strokeStyle='#e33';ctx.lineWidth=1.6;ctx.lineCap='butt';ctx.beginPath();ctx.moveTo(sx-6,sy+1);ctx.lineTo(sx+6,sy+1);ctx.moveTo(sx-6,sy+4);ctx.lineTo(sx+6,sy+4);ctx.stroke();ctx.lineCap='round';
+      blob([pTap(sx,sy,6.1,A[0],A[1],5.5,'#fff')],{ow:1.5,shc:'rgba(110,110,165,.30)',hl:0});
+      ctx.strokeStyle='#e33';ctx.lineWidth=1.5;ctx.lineCap='round';for(const dy of[1,4]){ctx.beginPath();ctx.moveTo(sx-5.6,sy+dy);ctx.quadraticCurveTo(sx,sy+dy+1.6,sx+5.6,sy+dy);ctx.stroke()}
       ell(sPx,sy0,sRx,4.4,'#8a5a2b',1.8);shade(sPx,sy0,sRx,4.4,.16,.18,'rgba(60,30,10,');
       dec([shoe],s*15.5,sy0-2.6,()=>{ctx.strokeStyle='#5a3515';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(-4,0);ctx.lineTo(4,0);ctx.stroke()})})}
 
   // ---------------- arms: left fist on the hip, right hand held up high with the towel
-  const lS=P3(-22,-22,0,oU),lE=P3(-41,-6,-1,oU),lF=P3(-26,8,3,oU),rS=P3(22,-22,0,oU),rE=P3(41,-43,0,oU),rF=P3(30,-69,0,oU);
-  const live=!NOTOWEL&&o.t!=null,wv=live?armWave(1):[0,0,0];                                                          // browser only: he waves the raised hand (the exported baked hand has no wave)
+  const AR=oopsArms(OP),lS=P3(-21.5,-20.5,0,oU),lE=P3(AR.lE[0],AR.lE[1],AR.lE[2],oU),lF=P3(AR.lF[0],AR.lF[1],AR.lF[2],oU),rS=P3(21.5,-20.5,0,oU),rE=P3(AR.rE[0],AR.rE[1],AR.rE[2],oU),rF=P3(AR.rF[0],AR.rF[1],AR.rF[2],oU);
+  const live=!NOTOWEL&&o.t!=null,wv=live?armWave(OP?1-.85*OP.cover:1):[0,0,0];                                                          // browser only: he waves the raised hand (the exported baked hand has no wave)
   for(let n=0;n<3;n++){rF[n]+=wv[n];rE[n]+=wv[n]*.5}
-  add(lS[2]-.3,()=>{limb(lS[0],lS[1],lE[0],lE[1],13,SK,SKH);limb(lE[0],lE[1],lF[0],lF[1],10.5,SK,SKH)});
-  add(rS[2]-.3,()=>{limb(rS[0],rS[1],rE[0],rE[1],13,SK,SKH);limb(rE[0],rE[1],rF[0],rF[1],10.5,SK,SKH)});
+  const covering=OP&&OP.cover>.05,kc=OP?OP.cover:0,hRx=6.8+3*kc,hRy=6.8+1.8*kc;
+  // each arm is ONE mass: a tapered upper arm, a tapered forearm, a soft elbow and the hand, so there are no ball-and-stick joints
+  const armParts=(S,E,F)=>[pTap(S[0],S[1],6.9,E[0],E[1],6.3),pTap(E[0],E[1],6.0,F[0],F[1],4.9),pEll(E[0],E[1],6.2,6.1),pEll(F[0],F[1],hRx,hRy)];
+  const knuckles=(F)=>{ctx.save();ctx.strokeStyle='rgba(140,72,44,.55)';ctx.lineWidth=1;ctx.lineCap='round';for(let n=-1;n<=1;n++){ctx.beginPath();ctx.arc(F[0]+n*2.7,F[1]+.4,1.5,.3,2.8);ctx.stroke()}ctx.restore()};
+  add(covering?Math.max(lE[2],lF[2])-.5:lF[2]+6,()=>{blob(armParts(lS,lE,lF));if(!covering)knuckles(lF)});                       // left arm (hand on the hip, or reaching back)
+  add(covering?Math.max(rE[2],rF[2])-.5:rS[2]-.3,()=>blob(armParts(rS,rE,rF)));                                                  // right arm (raised with the towel)
+  const palm=F=>{blob([pEll(F[0],F[1],hRx,hRy)],{ow:0});                                                                          // the hand again on top: a big flat palm, fingers pressed over the butt
+    if(kc>.5){ctx.strokeStyle='rgba(140,72,44,.6)';ctx.lineWidth=1.1;ctx.lineCap='round';for(let n=-1;n<=1;n++){ctx.beginPath();ctx.moveTo(F[0]+n*3.6,F[1]+3.2);ctx.lineTo(F[0]+n*3.9,F[1]+7);ctx.stroke()}}};
 
   // ---------------- lower body (turns by theta + psi): briefs, waistband, two cheeks and the crease between them
-  const lo={low:1,ox:oL+ro[0],oy:ro[1],sc:'rgba(110,10,30,'};
-  E(0,21,-2,23.5,12.5,16,BR,2,Object.assign({},lo,{then(r){
-    dec([r],0,25,()=>{ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-5,4);ctx.lineTo(-5,-4);ctx.lineTo(0,1);ctx.lineTo(5,-4);ctx.lineTo(5,4);ctx.stroke()});
-    }}));
-  E(0,15.5,-1,23.8,3.6,17.5,'#fff',2,Object.assign({},lo,{bias:3+14*Math.max(0,-C2),sc:'rgba(110,110,140,',sh:.12,hl:.2,then(r){
-    dec([r],0,18,()=>{ctx.fillStyle='#f2f2f2';ctx.strokeStyle='#aaa';ctx.lineWidth=.8;ctx.fillRect(-4,-2.5,8,5);ctx.strokeRect(-4,-2.5,8,5);ctx.fillStyle=BR;ctx.fillRect(-2,-.5,4,1.3)},{back:1});                       // waistband with its red ticks round the rim
-    ctx.fillStyle='#e0243a';
-    for(let k=0;k<16;k++){const f=k/16*6.2832,sn=Math.sin(f),cs=Math.cos(f),fc=(-sn*S2/r.a+cs*C2/r.c)/Math.hypot(sn/r.a,cs/r.c);
-      if(fc>.12)ctx.fillRect(r.ox+r.a*sn*C2+(r.z+r.c*cs)*S2-.8,r.py-1.6,1.6,3.6)}}}));
-  for(const q of[-1,1])E(q*11,23.5,-7,13,12.5,11,BR,1.9,Object.assign({},lo,{hl:.22,oy:ro[1]+((q*C2<0)?cl:cr),then(r){                                      // little fabric pinch on each cheek
-    dec([r],q*5.2,23.5,()=>{ctx.strokeStyle=BRD;ctx.lineWidth=1.3;ctx.lineCap='round';
-      ctx.globalAlpha=.55;ctx.beginPath();ctx.moveTo(-q*3.8,-3.5);ctx.quadraticCurveTo(q*.8,-3.1,q*3.4,3);ctx.stroke()},{back:1})}}));
-  add(-12.9*C2+.02,()=>{if(C2>-.12)return;                                                                          // the crease, only when the cheeks face us
-    ctx.strokeStyle=BRD;ctx.lineWidth=2.6;ctx.lineCap='round';ctx.beginPath();
-    for(let y=17;y<=32;y+=1.5){const dd=(y-23.5)/12.5,z=-7-11*Math.sqrt(Math.max(0,.284-dd*dd)),px=z*S2+oL+ro[0],py=y+ro[1];y===17?ctx.moveTo(px,py):ctx.lineTo(px,py)}ctx.stroke()});
+  if(OP)addButt();else{
+  const lo={low:1,ox:oL+ro[0],oy:ro[1]};
+  const hipsR=G3(0,21,-2,23.5,12.5,16,lo),chk=[-1,1].map(q=>G3(q*11,23.5,-7,13,12.5,11,Object.assign({},lo,{oy:ro[1]+((q*C2<0)?cl:cr)})));
+  const RED={ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'},pe=r=>pEll(r.px,r.py,r.rx,r.b,BR);
+  const logo=()=>dec([hipsR],0,25,()=>{ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-5,4);ctx.lineTo(-5,-4);ctx.lineTo(0,1);ctx.lineTo(5,-4);ctx.lineTo(5,4);ctx.stroke()});
+  const deco=(r,q)=>{dec([r],q*5.2,23.5,()=>{ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-q*3.8,-3.5);ctx.quadraticCurveTo(q*.8,-3.1,q*3.4,3);ctx.stroke()},{back:1});   // a pinch of fabric
+    dec([r],q*7,19,()=>{ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(0,0,2.6,5.4,q*.4,0,6.3);ctx.fill()})};
+  if(Math.abs(S2)<.45)add(hipsR.d,()=>{blob([pe(hipsR),pe(chk[0]),pe(chk[1])],RED);logo();deco(chk[0],-1);deco(chk[1],1)});        // front or back: one soft mass of cloth
+  else{add(hipsR.d,()=>{blob([pe(hipsR)],RED);logo()});chk.forEach((r,n)=>add(r.d,()=>{blob([pe(r)],RED);deco(r,n?1:-1)}))}     // from the side the near cheek keeps its outline over the far one
+  const bandR=G3(0,15.5,-1,23.8,3.6,17.5,Object.assign({},lo,{bias:3+14*Math.max(0,-C2)}));
+  add(bandR.d,()=>{                                                                                                         // the waistband: the visible half of a ring, a rippled ribbon that is lower where it comes toward us
+    const pts=[];for(let i=0;i<48;i++){const f=i/48*6.2832,sn=Math.sin(f),cs=Math.cos(f),X=bandR.a*sn*C2+(bandR.z+bandR.c*cs)*S2,Z=-bandR.a*sn*S2+(bandR.z+bandR.c*cs)*C2;if(Z>-1.5)pts.push([X,Z])}
+    pts.sort((u,v)=>u[0]-v[0]);if(pts.length>3){const hw=2.7,T=[],B=[];
+      pts.forEach(([X,Z],k)=>{const u=k/(pts.length-1),h=hw*(1-.2*Math.pow(2*u-1,4)),y=bandR.py+2.6*Z/bandR.c+.35*Math.sin(X*.85+1);T.push([bandR.ox+X,y-h]);B.push([bandR.ox+X,y+h*.9])});
+      blob([pPoly(T.concat(B.reverse()),'#fff8f2')],{ow:1.3,shc:'rgba(120,100,140,.38)',hl:0});
+      ctx.save();ctx.strokeStyle='rgba(224,36,58,.85)';ctx.lineWidth=1.25;ctx.lineCap='round';
+      for(let k=1;k<T.length-1;k+=2){const a=T[k],b=B[B.length-1-k];ctx.beginPath();ctx.moveTo(a[0],a[1]+.5);ctx.quadraticCurveTo((a[0]+b[0])/2+.4,(a[1]+b[1])/2,b[0],b[1]-.4);ctx.stroke()}ctx.restore()}
+    dec([bandR],0,18,()=>{ctx.fillStyle='#f2f2f2';ctx.strokeStyle='#aaa';ctx.lineWidth=.8;ctx.fillRect(-4,-2.5,8,5);ctx.strokeRect(-4,-2.5,8,5);ctx.fillStyle=BR;ctx.fillRect(-2,-.5,4,1.3)},{back:1})});          // the little tag
+  add(-12.9*C2+.02,()=>{if(C2>-.12)return;                                                                          // the crease between the cheeks, only when they face us: a soft line, lighter at the ends
+    for(const[w,a]of[[2.4,'rgba(100,8,30,.28)'],[1.2,'rgba(100,8,30,.8)']]){ctx.strokeStyle=a;ctx.lineWidth=w;ctx.lineCap='round';ctx.beginPath();
+      for(let y=17;y<=32;y+=1.5){const dd=(y-23.5)/12.5,z=-7-11*Math.sqrt(Math.max(0,.284-dd*dd)),px=z*S2+oL+ro[0],py=y+ro[1];y===17?ctx.moveTo(px,py):ctx.lineTo(px,py)}ctx.stroke()}});
+  }
 
-  // ---------------- upper body
-  E(-21,-24,0,9,8,8,SK,1.8,{ox:oU});E(21,-24,0,9,8,8,SK,1.8,{ox:oU});                                              // shoulders
-  E(0,-21,0,21,11.5,11,SK,2,{ox:oU,then(r){
-    dec([r],0,-21,()=>{ctx.fillStyle=HAIR;for(let k=0;k<14;k++)ctx.fillRect(-5+(k*7)%11,-3+((k*5)%9),1.3,1.3);
-      ctx.strokeStyle=SKD;ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(-9,3,7,.2,2.6);ctx.arc(9,3,7,.5,2.9);ctx.stroke()});
-    dec([r],0,-16,()=>{ctx.fillStyle='rgba(176,92,52,.32)';ctx.beginPath();ctx.ellipse(0,0,12,8,0,0,6.3);ctx.fill()},{back:1});                      // sweat stain
-    dec([r],0,-22,()=>{ctx.strokeStyle=SKD;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(0,-10);ctx.quadraticCurveTo(0,0,0,11);ctx.stroke()},{back:1})}});    // spine
-  E(0,-2,6,22*bs[0],17*bs[1],17,SK,2,{ox:oM+bo[0],oy:bo[1],bias:3,then(r){
-    dec([r],0,-6,()=>{ctx.fillStyle=HAIR;for(let k=0;k<6;k++)ctx.fillRect(-.6+((k%2)?1.2:-.8),-7+k*2.6,1.2,1.2)});
-    dec([r],0,5.5,()=>{ctx.strokeStyle=SKD;ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(0,-1.5,2.4,.1,3.1);ctx.stroke()});                               // navel
-    dec([r],0,1,()=>{ctx.fillStyle='rgba(176,92,52,.32)';ctx.beginPath();ctx.ellipse(0,0,9,5.5,0,0,6.3);ctx.fill()},{back:1});
-    dec([r],0,-4,()=>{ctx.strokeStyle=SKD;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(0,-8);ctx.quadraticCurveTo(0,6,0,22);ctx.stroke()},{back:1})}});
-  for(const q of[-1,1]){                                                                                             // love handles: wide flat rolls at the waist, shadow underneath
-    const hxx=q*18,hz=4,a=10.5,b=6,c=13,hy=10,px=hxx*C+hz*S+oM+wo[0],py=hy+wo[1],rx=Math.hypot(a*C,c*S),out=(q*C)>=0?0:Math.PI;
-    add(-hxx*S+hz*C+3.5,()=>{
-      ctx.fillStyle='rgba(110,30,30,.30)';ctx.beginPath();ctx.ellipse(px,py+5,rx*.98,b*.82,0,0,6.2832);ctx.fill();
-      ctx.fillStyle=SK;ctx.beginPath();ctx.ellipse(px,py,rx,b,0,0,6.2832);ctx.fill();
-      ctx.strokeStyle=OUT;ctx.lineWidth=1.8;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(px,py,rx,b,0,out-2,out+2);ctx.stroke();              // outline only on the outside
-      ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(px+q*C*1.5,py-b*.5,rx*.55,1.1,0,0,6.2832);ctx.fill();
-      ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(px,py,rx*.8,b*.7,0,.35,Math.PI-.35);ctx.stroke()})}
-  // fists
-  add(lF[2]+6,()=>{ell(lF[0],lF[1],6.8,6.8,SK,1.8);shade(lF[0],lF[1],6.8,6.8,.14,.3)});
+  // ---------------- upper body: shoulders, chest, belly and love handles are ONE mass (see blob); the chest and belly marks sit on top of it
+  const shL=G3(-20.5,-21.5,0,7.4,6.8,7,{ox:oU}),shR=G3(20.5,-21.5,0,7.4,6.8,7,{ox:oU}),trL=G3(-9,-28.5,0,9.5,5.2,8,{ox:oU}),trR=G3(9,-28.5,0,9.5,5.2,8,{ox:oU}),chest=G3(0,-21,0,21,11.5,11,{ox:oU}),belly=G3(0,-2,6,22*bs[0],17*bs[1],17,{ox:oM+bo[0],oy:bo[1],bias:3});
+  const hnd=[-1,1].map(q=>{const hxx=q*18,hz=4,a=10.5,b=6,c=13,hy=10;return{q,px:hxx*C+hz*S+oM+wo[0],py:hy+wo[1],rx:Math.hypot(a*C,c*S),b}});
+  add(belly.d,()=>{
+    ctx.fillStyle='rgba(110,30,30,.30)';for(const h of hnd){ctx.beginPath();ctx.ellipse(h.px,h.py+5.4,h.rx*.98,h.b*.85,0,0,6.2832);ctx.fill()}                  // the shadow a love handle throws on the shorts
+    blob([pYoke(C,S,oU)].concat([chest,belly].map(r=>pEll(r.px,r.py,r.rx,r.b))).concat(hnd.map(h=>pEll(h.px,h.py,h.rx,h.b))));
+    dec([chest],0,-21,()=>{curls(Array.from({length:14},(_,k)=>[-5+(k*7)%11,-3+((k*5)%9),k%2?1:-1]));
+      ctx.strokeStyle='rgba(176,92,52,.7)';ctx.lineWidth=1.3;ctx.lineCap='round';ctx.beginPath();ctx.arc(-9,3,7,.2,2.6);ctx.stroke();ctx.beginPath();ctx.arc(9,3,7,.5,2.9);ctx.stroke()});   // under each pec
+    dec([chest],-8,-27,()=>{ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(0,0,6,2.8,-.3,0,6.3);ctx.fill()});
+    dec([chest],-7,-18,()=>{ctx.fillStyle='rgba(176,92,52,.15)';ctx.beginPath();ctx.ellipse(0,0,6.5,8.5,-.35,0,6.3);ctx.fill()},{back:1});dec([chest],7,-18,()=>{ctx.fillStyle='rgba(176,92,52,.15)';ctx.beginPath();ctx.ellipse(0,0,6.5,8.5,.35,0,6.3);ctx.fill()},{back:1});      // the shoulder blades
+    dec([chest],0,-21,()=>{ctx.fillStyle='rgba(176,92,52,.26)';ctx.beginPath();ctx.ellipse(0,0,1.7,11,0,0,6.3);ctx.fill();ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.ellipse(2.6,0,.9,9,0,0,6.3);ctx.fill()},{back:1});    // the spine: a soft groove
+    dec([chest],-9,-26,()=>{ctx.fillStyle='rgba(255,255,255,.26)';ctx.beginPath();ctx.ellipse(0,0,7,3.4,-.4,0,6.3);ctx.fill()},{back:1});
+    dec([belly],0,-6,()=>curls(Array.from({length:6},(_,k)=>[k%2?.9:-.9,-7+k*2.6,k%2?1:-1])));
+    dec([belly],-7,-10,()=>{ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(0,0,8,5,-.4,0,6.3);ctx.fill()});
+    dec([belly],0,5.5,()=>{ctx.strokeStyle='rgba(176,92,52,.85)';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.arc(0,-1.5,2.4,.1,3.1);ctx.stroke()});               // navel
+    dec([belly],0,0,()=>{ctx.fillStyle='rgba(176,92,52,.24)';ctx.beginPath();ctx.ellipse(0,0,1.6,10,0,0,6.3);ctx.fill();ctx.fillStyle='rgba(176,92,52,.16)';for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(q*5.6,9,1.8,2.2,0,0,6.3);ctx.fill()}},{back:1});      // spine and the two dimples above the butt
+    for(const h of hnd){ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(h.px,h.py,h.rx*.8,h.b*.7,0,.35,Math.PI-.35);ctx.stroke()}});            // the fold under each roll
 
   // ---------------- head: neck, jaw, skull, ears, hair shell (painted as small quads over a wavy hairline), top knot, nose and face
   group(1,()=>{
     const U={ox:oU,head:1},A=15,B=14.2,Cc=14.5,hcy=-44.5,C=Ch,S=Sh;                 // the head has its own turn angle (C,S here are the head's)
     E(0,-31.5,0,10,6,9,SKD,0,{ox:oU,head:1,sh:.08,hl:0,d:-900});
-    const jaw=E(0,-34,2,11.2,8.2,11,SK,1.6,{ox:oU,head:1,hl:.15,d:-800});
-    const hd=E(0,-44,0,14.3,13.3,13.5,SK,2,{ox:oU,head:1,d:0});
+    const jaw=G3(0,-34,2,11.2,8.2,11,U),hd=G3(0,-44,0,14.3,13.3,13.5,U);
+    add(0,()=>blob([pEll(jaw.px,jaw.py,jaw.rx,jaw.b),pEll(hd.px,hd.py,hd.rx,hd.b)],{ow:1.8}));                              // jaw and skull: one head, no chin seam
     const shell={x:0,y:hcy,z:0,a:A,b:B,c:Cc,cc:C,ss:S,ox:oU,oy:0};
     for(const s of[-1,1]){const r=G3(s*14.2,-44,-1,4,5,4,U),near=r.d>=0;
-      add(near?20:-700+r.d,()=>{ell(r.px,r.py,r.rx,5,SK,1.6);shade(r.px,r.py,r.rx,5,.1,.2)})}
+      add(near?20:-700+r.d,()=>blob([pEll(r.px,r.py,r.rx,5)],{ow:1.5,sd:1.4}))}
     const nz=G3(0,-39.7,13.2,3.4,2.9,3.6,U);
     add(nz.d>=0?21:-650,()=>{ell(nz.px,nz.py,nz.rx,2.9,'#f3a784',1.2);shade(nz.px,nz.py,nz.rx,2.9,.1,.7)});
     const yh=f=>{const a=Math.abs(Math.atan2(Math.sin(f),Math.cos(f)));if(a<=1.5708)return -51+5*Math.sin(a)*Math.sin(a);const s=(a-1.5708)/1.5708;return -46+10*s*s*(3-2*s)};
@@ -975,28 +1101,40 @@ function drawSpin(th,o){
     add(40,()=>{
       ctx.save();ctx.beginPath();ctx.ellipse(hd.px,hd.py,Math.max(.1,hd.rx-.9),hd.b-.9,0,0,6.2832);ctx.moveTo(jaw.px+Math.max(.1,jaw.rx-.9),jaw.py);ctx.ellipse(jaw.px,jaw.py,Math.max(.1,jaw.rx-.9),jaw.b-.9,0,0,6.2832);ctx.clip();
       for(const s of[-1,1]){
-        fd(s*6.15,-8.3,()=>brow(s,9.5,-7.8,2.8,-8.8),[hd]);
-        fd(s*6,-1,()=>eye(s,-1,4.6,5.4,.5,.1,2.4),[hd]);
-        fd(s*10.4,6,()=>{ctx.fillStyle='rgba(255,105,110,.34)';ctx.beginPath();ctx.ellipse(s*10.4,6,3.3,2.2,0,0,6.3);ctx.fill()});
+        fd(s*6.15,-8.3,()=>OP&&OP.face?brow(s,9.5,-8.4,2.8,-13.8,2.4):brow(s,9.5,-7.8,2.8,-8.8),[hd]);
+        fd(s*6,-1,()=>{const f=OP&&OP.face;
+          if(f==='squeeze'){ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(s*6-s*3.6,-4.2);ctx.lineTo(s*6+s*2.2,-1.2);ctx.lineTo(s*6-s*3.6,1.8);ctx.stroke()}
+          else if(f==='sheepish'){eye(s,-1,4.6,5.2,-s*1.4,.8,2.3);ctx.fillStyle=SK;ctx.fillRect(s*6-6,-7,12,5.6);ctx.strokeStyle=OUT;ctx.lineWidth=1.7;ctx.beginPath();ctx.moveTo(s*6-5,-1.5);ctx.lineTo(s*6+5,-1.5);ctx.stroke()}
+          else if(f)eye(s,-1,5.5,6.5,.3,.3,1.6);
+          else eye(s,-1,4.6,5.4,.5,.1,2.4)},[hd]);
+        fd(s*10.4,6,()=>{const f=OP&&OP.face;ctx.fillStyle=f?'rgba(255,55,75,.62)':'rgba(255,105,110,.34)';ctx.beginPath();ctx.ellipse(s*10.4,6,f?4.9:3.3,f?3.3:2.2,0,0,6.3);ctx.fill()});
         fd(s*5.3,5.7,()=>stacheLobe(s))}
       mouthWrap();ctx.restore()});
     // grin, wrapped round the jaw so it bends away as the head turns (points on the far side are pinned to the edge)
+    const mouthSpec=()=>{const f=OP&&OP.face;
+      return f==='eek'?{w:3.6,d:6.4,y:9.6,lift:2.6,teeth:0,tongue:1}:f==='blush'?{w:4.6,d:1.7,y:11.6,lift:-1.1,teeth:0,tongue:0}:f==='squeeze'?{w:5.2,d:2.8,y:11.2,lift:-1.5,teeth:1,tongue:0}:f==='sheepish'?{w:4.8,d:2.4,y:10.9,lift:1,teeth:1,tongue:0}:{w:5.4,d:4.9,y:10.6,lift:.6,teeth:1,tongue:1}};
     function mouthWrap(){
-      const w=5.4,d=4.9,y=10.6,sg=S>=0?1:-1,pts=[],P=(lx,ly)=>{let b=null;for(const h of FH){const s=onS(h,lx,fy(ly),0);if(s&&(!b||s.gz>b.gz))b=s}
+      const MM=mouthSpec(),w=MM.w,d=MM.d,y=MM.y,sg=S>=0?1:-1,pts=[],P=(lx,ly)=>{let b=null;for(const h of FH){const s=onS(h,lx,fy(ly),0);if(s&&(!b||s.gz>b.gz))b=s}
         if(!b)return[0,0,-1];let px=b.px;if(b.f<0){const h=b.h,dy=(fy(ly)-h.y)/h.b;px=h.px+sg*h.rx*Math.sqrt(Math.max(0,1-dy*dy))}return[px,b.py,b.f]};
-      const top=[],bot=[];for(let i=0;i<=8;i++){const t=i/8,u=1-t;top.push([-w+2*w*t,u*u*y+2*u*t*(y-.6)+t*t*y])}
+      const top=[],bot=[];for(let i=0;i<=8;i++){const t=i/8,u=1-t;top.push([-w+2*w*t,u*u*y+2*u*t*(y-MM.lift)+t*t*y])}
       for(let i=0;i<=10;i++){const t=i/10,u=1-t;bot.push([u*u*u*w+3*u*u*t*w*.9+3*u*t*t*-w*.9+t*t*t*-w,u*u*u*y+3*u*u*t*(y+d)+3*u*t*t*(y+d)+t*t*t*y])}
       const poly=top.concat(bot.slice(1)).map(p=>P(p[0],p[1]));let fm=-1;for(const p of poly)fm=Math.max(fm,p[2]);if(fm<.05)return;
       const path=pp=>{ctx.beginPath();pp.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath()};
       ctx.save();path(poly);ctx.fillStyle='#6a1a1a';ctx.fill();ctx.clip();
-      path(top.map(p=>P(p[0],p[1]-.3)).concat(top.slice().reverse().map(p=>P(p[0],p[1]+2.2))));ctx.fillStyle='#fff';ctx.fill();
-      const tg=[];for(let i=0;i<14;i++){const a=i/14*6.2832;tg.push(P(Math.cos(a)*w*.5,y+d*.85+Math.sin(a)*d*.36))}path(tg);ctx.fillStyle='#ff7b97';ctx.fill();ctx.restore();
+      if(MM.teeth){path(top.map(p=>P(p[0],p[1]-.3)).concat(top.slice().reverse().map(p=>P(p[0],p[1]+2.2))));ctx.fillStyle='#fff';ctx.fill()}
+      const tg=[];for(let i=0;i<14;i++){const a=i/14*6.2832;tg.push(P(Math.cos(a)*w*.5,y+d*.85+Math.sin(a)*d*.36))}if(MM.tongue){path(tg);ctx.fillStyle='#ff7b97';ctx.fill()}ctx.restore();
       path(poly);ctx.strokeStyle=OUT;ctx.lineWidth=1.4;ctx.lineJoin='round';ctx.stroke()}
   });
 
+  if(OP&&(OP.sweat>0||OP.bang>0))add(60,()=>{
+    const hx0=oU,drop=(x,y,k)=>{ctx.save();ctx.translate(x,y);ctx.scale(k,k);ctx.beginPath();ctx.moveTo(0,-4);ctx.quadraticCurveTo(3.4,1,0,3);ctx.quadraticCurveTo(-3.4,1,0,-4);
+      ctx.fillStyle='#bfe8ff';ctx.fill();ctx.strokeStyle='#4a8fb8';ctx.lineWidth=1;ctx.stroke();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-.8,.4,.7,0,6.3);ctx.fill();ctx.restore()};
+    if(OP.sweat>0){drop(hx0+19,-61,OP.sweat);if(OP.sweat>.45)drop(hx0+25,-51,OP.sweat*.9);if(OP.sweat>.8)drop(hx0-18,-58,.9)}
+    if(OP.bang>0){const k=OP.bang;ctx.save();ctx.translate(hx0+27,-66);ctx.scale(k,k);ctx.lineJoin='round';ctx.fillStyle='#ff3b30';ctx.strokeStyle=OUT;ctx.lineWidth=1.4;
+      ctx.beginPath();ctx.moveTo(-2.2,-5);ctx.lineTo(2.2,-5);ctx.lineTo(1.2,3);ctx.lineTo(-1.2,3);ctx.closePath();ctx.fill();ctx.stroke();ctx.beginPath();ctx.arc(0,6.2,1.5,0,6.3);ctx.fill();ctx.stroke();ctx.restore()}});
   // ---------------- the towel: a real cloth pinned to the raised hand (see TOWEL CLOTH), drawn as depth sorted 3D quads
-  if(!NOTOWEL){const Hh=[rF[0],rF[1],rF[2]],cl=live?towelFor(TW_SPIN,Hh,0,1):towelStatic(Hh);for(const q of towelJobs(cl,rF[2]))add(q.d,q.fn)}
-  add(rF[2]+.2,()=>{ell(rF[0],rF[1],6.8,6.8,SK,1.8);shade(rF[0],rF[1],6.8,6.8,.14,.3)});
+  if(!NOTOWEL){const Hh=[rF[0],rF[1],rF[2]],tm=rF[1]>-62.5?2:1,cl=live?towelFor(TW_SPIN,Hh,0,tm):towelStatic(Hh,tm);for(const q of towelJobs(cl,rF[2]))add(q.d,q.fn)}
+  add(rF[2]+.2,()=>{if(covering)palm(rF);else{blob([pEll(rF[0],rF[1],6.8,6.8)],{ow:0});knuckles(rF)}});                // the raised hand over the towel's held edge
 
   list.sort(cmp);for(const p of list){if(p.leg)p.f();else{ctx.save();ctx.translate(shx,bob);p.f();ctx.restore()}}
   ctx.restore()}
@@ -1006,7 +1144,7 @@ function spinLive(Q){
   const st=Q.gag.steps,i=Q.step,a=SPIN_POSE[st[i][0]];if(!a)return null;
   const nx=st[i+1],b=(nx&&SPIN_POSE[nx[0]])||a,k=Math.min(1,Math.max(0,Q.st/st[i][1])),ks=k*k*(3-2*k);
   const th=a.th+(b.th-a.th)*k,L=(key)=>(a[key]||0)+((b[key]||0)-(a[key]||0))*ks;     // the feet, hips and head follow th itself (spinSway), the rest is blended between the two frames
-  return{th:th*Math.PI/180,hip:L('hip'),psi:L('psi'),ld:L('ld'),cl:L('cl'),cr:L('cr'),dir:b.th<a.th?-1:1,t:time}}
+  return{th:th*Math.PI/180,hip:L('hip'),psi:L('psi'),ld:L('ld'),cl:L('cl'),cr:L('cr'),dir:b.th<a.th?-1:1,t:time,oops:(a.oops||b.oops)?oopsBlend(a.oops,b.oops,ks):null}}
 function drawManFrame(n){
   const hang=(j)=>({armL:[-33,-6,-31+(j||0),16],armR:[33,-6,31-(j||0),16]});
   switch(n){
@@ -1021,17 +1159,17 @@ function drawManFrame(n){
   case 'STUCK_A':drawFront('star','dizzy',.3927);break;
   case 'STUCK_B':drawFront('star','dizzy',1.1781);break;
   case 'BELLY_A':drawFront('up','bliss',.3,{belly:[1.1,.9],bdy:1,armL:[-33,-8,-17,3],armR:[33,-8,17,3],
-      after(){ell(-15,2,6.6,6,SK,1.8);ell(15,2,6.6,6,SK,1.8);ctx.strokeStyle='rgba(90,47,27,.6)';ctx.lineWidth=1.6;ctx.lineCap='round';for(const s of[-1,1]){ctx.beginPath();ctx.moveTo(s*24,-6);ctx.lineTo(s*28,-9);ctx.moveTo(s*25,0);ctx.lineTo(s*30,0);ctx.stroke()}}});break;
+      after(){blob([pEll(-15,2,6.6,6)]);blob([pEll(15,2,6.6,6)]);ctx.strokeStyle='rgba(90,47,27,.6)';ctx.lineWidth=1.6;ctx.lineCap='round';for(const s of[-1,1]){ctx.beginPath();ctx.moveTo(s*24,-6);ctx.lineTo(s*28,-9);ctx.moveTo(s*25,0);ctx.lineTo(s*30,0);ctx.stroke()}}});break;
   case 'BELLY_B':drawFront('up','bliss',.3,{belly:[.93,1.1],bdy:-2,armL:[-38,-16,-44,-36],armR:[38,-16,44,-36]});break;
   case 'SCRATCH_A':case 'SCRATCH_B':{const a=n==='SCRATCH_A';
     drawFront('up','bliss',.3,Object.assign(hang(),{belly:a?[1.03,.98]:[.99,1.01],after(){
-      const hx=a?5:12,hy=a?-3:3;limb(22,-22,31,-7,12,SK,SKH);limb(31,-7,hx,hy,10,SK,SKH);ell(hx,hy,6.6,6.4,SK,1.8);
+      const hx=a?5:12,hy=a?-3:3;blob([pTap(21.5,-20.5,6.8,31,-7,6),pTap(31,-7,5.8,hx,hy,4.8),pEll(31,-7,5.8,5.8),pEll(hx,hy,6.6,6.4)]);
       ctx.strokeStyle=SKD;ctx.lineWidth=1.3;ctx.lineCap='round';for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(hx-9+k*2,hy+8);ctx.lineTo(hx-6+k*2,hy+11);ctx.stroke()}}}));break}
   case 'BURP_A':drawFront('up','burp',.3,Object.assign(hang(),{belly:[1.04,1.04]}));break;
   case 'BURP_B':drawFront('up','burpo',.3,Object.assign(hang(),{belly:[.98,.97]}));break;
   case 'PICK_A':case 'PICK_B':{const a=n==='PICK_A';
     drawFront('up','pick',.3,Object.assign(hang(),{after(){
-      const hx=a?8:6.5,hy=a?-41:-38.5;limb(22,-22,37,-24,12,SK,SKH);limb(37,-24,hx,hy,10,SK,SKH);ell(hx,hy,6.4,6,SK,1.8);limb(hx-2,hy-1,1.6,a?-41.5:-40,3.2,SK,SKH)}}));break}
+      const hx=a?8:6.5,hy=a?-41:-38.5;blob([pTap(21.5,-20.5,6.8,37,-24,6),pTap(37,-24,5.8,hx,hy,4.8),pEll(37,-24,5.8,5.8),pEll(hx,hy,6.4,6),pTap(hx-2,hy-1,1.9,1.6,a?-41.5:-40,1.5)])}}));break}
   case 'YAWN':drawFront('up','yawn',.3,{belly:[1.04,1.06],bdy:-1,armL:[-40,-34,-45,-56],armR:[40,-34,45,-56]});break;
   case 'SLEEP_A':drawFront('up','sleep',.3,Object.assign(hang(),{belly:[1.04,1.04],head:[0,3,.12],fx:{bub:3}}));break;
   case 'SLEEP_B':drawFront('up','sleep',.3,Object.assign(hang(),{belly:[.98,.98],head:[0,4,.14],fx:{bub:8}}));break;
@@ -1043,8 +1181,8 @@ function drawManFrame(n){
   case 'FART_B':drawBack(null,.3,{lean:1,puff:1,hip:1.5});break;
   case 'CAPE_A':drawFront('up','smirk',.3,{armL:[-40,-6,-23,7],armR:[34,-32,9,-29],after(){
       ell(0,-28,3.6,3.2,'#e2b53c',1.4);ctx.fillStyle='rgba(255,255,255,.65)';ctx.fillRect(-1.8,-29.4,1.6,1.2);                      // gold clasp at the neck
-      limb(-40,-6,-23,7,10.5,SK,SKH);ell(-23,7,6.8,6.6,SK,1.8);ctx.strokeStyle=SKD;ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-26,5);ctx.lineTo(-20,9);ctx.stroke();   // fist on hip
-      limb(22,-22,34,-32,12,SK,SKH);limb(34,-32,9,-29,10,SK,SKH);ell(9,-29,6.4,6,SK,1.8)}});break;     // other hand grabbing the clasp
+      blob([pTap(-40,-6,5.8,-23,7,4.9),pEll(-23,7,6.8,6.6)]);ctx.strokeStyle=SKD;ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-26,5);ctx.lineTo(-20,9);ctx.stroke();   // fist on hip
+      blob([pTap(21.5,-20.5,6.8,34,-32,6),pTap(34,-32,5.8,9,-29,4.8),pEll(34,-32,5.8,5.8),pEll(9,-29,6.4,6)])}});break;     // other hand grabbing the clasp
   default:{const q=SPIN_POSE[n];if(q)drawSpin(q.th*Math.PI/180,q)}
   }}
 const _F=(ppu,head)=>({ppu,head});
@@ -1054,7 +1192,7 @@ const MAN_FRAMES={
   BELLY_A:_F(.36,[0,-44]),BELLY_B:_F(.36,[0,-44]),SCRATCH_A:_F(.36,[0,-44]),SCRATCH_B:_F(.36,[0,-44]),
   BURP_A:_F(.36,[0,-44]),BURP_B:_F(.36,[0,-44]),PICK_A:_F(.36,[0,-44]),PICK_B:_F(.36,[0,-44]),YAWN:_F(.36,[0,-44]),
   SLEEP_A:_F(.36,[1.7,-40.9]),SLEEP_B:_F(.36,[2,-39.9]),SAD:_F(.36,[0,-39]),
-  CAPE_A:_F(.36,[0,-44]),SPIN_0:_F(.36,[0,-44]),SPIN_1:_F(.36,[0,-44]),SPIN_2:_F(.36,[0,-44]),SPIN_3:_F(.36,[0,-44]),SPIN_4:_F(.36,[0,-44]),SPIN_5:_F(.36,[0,-44]),SPIN_6:_F(.36,[0,-44]),SPIN_7:_F(.36,[0,-44]),SPIN_8:_F(.36,[0,-44]),SPIN_9:_F(.36,[0,-44]),SPIN_10:_F(.36,[0,-44]),SPIN_11:_F(.36,[0,-44]),SPIN_12:_F(.36,[0,-44]),SPIN_R1:_F(.36,[0,-44]),SPIN_R2:_F(.36,[0,-44]),SPIN_R3:_F(.36,[0,-44]),SPIN_R4:_F(.36,[0,-44]),SPIN_R5:_F(.36,[0,-44]),SPIN_R6:_F(.36,[0,-44]),SPIN_R7:_F(.36,[0,-44]),SPIN_R8:_F(.36,[0,-44]),SPIN_R9:_F(.36,[0,-44]),SPIN_R10:_F(.36,[0,-44]),SPIN_R11:_F(.36,[0,-44]),SPIN_BL:_F(.36,[0,-44]),SPIN_BR:_F(.36,[0,-44]),BACK_C:_F(.36,null),BACK_L:_F(.36,null),BACK_R:_F(.36,null),FART_A:_F(.36,null),FART_B:_F(.36,null)};
+  CAPE_A:_F(.36,[0,-44]),SPIN_0:_F(.36,[0,-44]),SPIN_1:_F(.36,[0,-44]),SPIN_2:_F(.36,[0,-44]),SPIN_3:_F(.36,[0,-44]),SPIN_4:_F(.36,[0,-44]),SPIN_5:_F(.36,[0,-44]),SPIN_6:_F(.36,[0,-44]),SPIN_7:_F(.36,[0,-44]),SPIN_8:_F(.36,[0,-44]),SPIN_9:_F(.36,[0,-44]),SPIN_10:_F(.36,[0,-44]),SPIN_11:_F(.36,[0,-44]),SPIN_12:_F(.36,[0,-44]),SPIN_R1:_F(.36,[0,-44]),SPIN_R2:_F(.36,[0,-44]),SPIN_R3:_F(.36,[0,-44]),SPIN_R4:_F(.36,[0,-44]),SPIN_R5:_F(.36,[0,-44]),SPIN_R6:_F(.36,[0,-44]),SPIN_R7:_F(.36,[0,-44]),SPIN_R8:_F(.36,[0,-44]),SPIN_R9:_F(.36,[0,-44]),SPIN_R10:_F(.36,[0,-44]),SPIN_R11:_F(.36,[0,-44]),SPIN_BL:_F(.36,[0,-44]),SPIN_BR:_F(.36,[0,-44]),OOPS_A:_F(.36,[0,-44]),OOPS_B:_F(.36,[0,-44]),OOPS_C:_F(.36,[0,-44]),OOPS_D:_F(.36,[0,-44]),OOPS_E:_F(.36,[0,-44]),OOPS_F:_F(.36,[0,-44]),OOPS_G:_F(.36,[0,-44]),OOPS_H:_F(.36,[0,-44]),BACK_C:_F(.36,null),BACK_L:_F(.36,null),BACK_R:_F(.36,null),FART_A:_F(.36,null),FART_B:_F(.36,null)};
 function P(o){if(parts.length<1400)parts.push(o)}
 function sweat(x,y){for(let i=0;i<2;i++)P({k:7,x:x+(rnd()-.5)*14,y,vx:(rnd()<.5?-1:1)*(40+rnd()*60),vy:-90-rnd()*90,l:.9,l0:.9,s:2.4+rnd()*1.4,c:'#bfe8ff'})}
 function updParts(dt){
@@ -1142,10 +1280,18 @@ const MAN_GAGS=[
  {name:'flex_show',steps:[['FLEX_A',.3,'grunt'],['FLEX_B',.3,''],['FLEX_A',.3,''],['FLEX_B',.3,''],['IDLE_A',.2,'']]},
  {name:'cape_taunt',steps:[['CAPE_A',.35,'grunt'],['SPIN_0',.08,'whoosh'],['SPIN_1',.05,''],['SPIN_2',.05,''],['SPIN_3',.05,''],['SPIN_4',.05,''],['SPIN_5',.05,''],['SPIN_6',.05,''],['SPIN_7',.05,''],['SPIN_8',.05,''],['SPIN_9',.05,''],['SPIN_10',.05,''],['SPIN_11',.05,''],['SPIN_12',.05,''],['SPIN_BL',.15,'taunt'],['SPIN_BR',.15,'boing'],['SPIN_BL',.15,'boing'],['SPIN_BR',.15,'boing'],['SPIN_BL',.15,'boing'],['SPIN_BR',.15,'boing'],['SPIN_BL',.15,'boing'],['SPIN_BR',.15,'boing'],['SPIN_R11',.05,'whoosh'],['SPIN_R10',.05,''],['SPIN_R9',.05,''],['SPIN_R8',.05,''],['SPIN_R7',.05,''],['SPIN_R6',.05,''],['SPIN_R5',.05,''],['SPIN_R4',.05,''],['SPIN_R3',.05,''],['SPIN_R2',.05,''],['SPIN_R1',.05,''],['SPIN_0',.06,''],['CAPE_A',.3,''],['IDLE_A',.2,'']]}];
 
+// the rare version of the cape taunt: the same turn and butt wag, then the boxers slip, he wobbles, notices, covers up, hauls them back on, turns back
+(()=>{const ct=MAN_GAGS.find(g=>g.name==='cape_taunt').steps,i0=ct.findIndex(s=>s[0]==='SPIN_BL'),i1=ct.findIndex(s=>s[0]==='SPIN_R11');
+  const mid=[['OOPS_A',.16,'slip'],['OOPS_B',.13,'drop'],['OOPS_C',.13,'boing'],['OOPS_B',.13,'boing'],['OOPS_C',.13,'boing'],['OOPS_B',.13,'boing'],['OOPS_C',.13,'boing'],
+    ['OOPS_D',.4,'eek'],['OOPS_E',.13,''],['OOPS_F',.13,''],['OOPS_E',.13,''],['OOPS_F',.13,''],['OOPS_E',.13,''],['OOPS_F',.13,''],['OOPS_G',.4,'snap'],['OOPS_H',.5,'whew']];
+  MAN_GAGS.push({name:'cape_oops',rare:1,steps:[...ct.slice(0,i0+4),...mid,...ct.slice(i1)]})})();
 // ---- gag engine.  One state object per man (Q); the host sets Q.ox/oy (body centre in world px), Q.sc (draw scale) and Q.jg (jiggle springs or null)
 function gagNew(gmin,gmax,first){return{gag:null,gi:-1,step:0,st:0,idleT:0,quiet:0,gap:first,gmin,gmax,last:-1,asleep:false,sleepT:0,sph:0,done:0,ws:1,ox:0,oy:0,sc:1,jg:null}}
 function gagReset(Q){if(!Q)return;Q.gag=null;Q.idleT=0;Q.quiet=0;Q.gap=MAN_IDLE.delay;Q.asleep=false;Q.sleepT=0}     // any touch: he snaps back to attention
-function gagStart(Q,i){Q.gag=MAN_GAGS[i];Q.gi=i;Q.last=i;Q.step=0;Q.st=0;gagFx(Q,Q.gag.steps[0][2])}
+const OOPS_CHANCE=.2;     // 1 in 5 cape taunts ends up as the boxers-fall-off version
+function gagStart(Q,i){
+  Q.last=i;if(MAN_GAGS[i].name==='cape_taunt'&&rnd()<OOPS_CHANCE){const j=MAN_GAGS.findIndex(g=>g.name==='cape_oops');if(j>=0)i=j}
+  Q.gag=MAN_GAGS[i];Q.gi=i;Q.step=0;Q.st=0;gagFx(Q,Q.gag.steps[0][2])}
 function gagTick(Q,dt,canSleep){
   Q.idleT+=dt;
   if(Q.gag){Q.st+=dt;
@@ -1159,7 +1305,7 @@ function gagTick(Q,dt,canSleep){
     if(ph!==Q.sph){Q.sph=ph;if(ph===1)gagFx(Q,'snore')}
     return}
   Q.quiet+=dt;
-  if(Q.quiet>=Q.gap){let i;do{i=(rnd()*MAN_GAGS.length)|0}while(i===Q.last&&MAN_GAGS.length>1);gagStart(Q,i)}}
+  if(Q.quiet>=Q.gap){let i;do{i=(rnd()*MAN_GAGS.length)|0}while((i===Q.last&&MAN_GAGS.length>1)||MAN_GAGS[i].rare);gagStart(Q,i)}}
 function gagFrame(Q){if(!Q)return null;if(Q.gag)return Q.gag.steps[Q.step][0];if(Q.asleep)return MAN_IDLE.sleepFrames[Q.sph];return null}
 // fx: sound + particles + a kick on the belly/rear springs.  Positions are given in the figure's drawing units and mapped to the screen.
 const gw=(Q,ux,uy)=>[Q.ox+ux*Q.sc,Q.oy+uy*Q.sc];
@@ -1180,6 +1326,11 @@ const GAGFX={
  taunt(Q){SFX.taunt();SFX.boing();Q.ws=-Q.ws;gagKick(Q,0,0,Q.ws*34,16);const[x,y]=gw(Q,22,-30);popText(x+14,y-14,'NYAH!','#ffd23f',22)},
  grunt(Q){SFX.grunt();const[x,y]=gw(Q,-8,-52);P({k:7,x,y,vx:-30,vy:-60,l:.8,l0:.8,s:2.6,c:'#bfe8ff'})},
  sniff(Q){SFX.sniff()},
+ slip(Q){SFX.slip();gagKick(Q,0,6,0,6)},
+ drop(Q){SFX.flop();gagKick(Q,0,22,0,10);const[x,y]=gw(Q,0,30);dust(x,y+20,3,4)},
+ eek(Q){SFX.eek();gagKick(Q,0,-12,0,0);const[x,y]=gw(Q,24,-58);popText(x+12,y-18,'EEEK!','#ff7eb0',26);for(let i=0;i<4;i++)P({k:7,x:x+(rnd()-.5)*16,y,vx:(rnd()-.2)*80,vy:-60-rnd()*70,l:.8,l0:.8,s:2.6,c:'#bfe8ff'})},
+ snap(Q){SFX.slap();SFX.boing();gagKick(Q,0,10,0,6);const[x,y]=gw(Q,-24,26);popText(x-16,y-10,'SNAP!','#ffd23f',20)},
+ whew(Q){SFX.whew();const[x,y]=gw(Q,22,-52);P({k:7,x,y,vx:30,vy:-50,l:.8,l0:.8,s:2.6,c:'#bfe8ff'})},
  snore(Q){SFX.snore();const[x,y]=gw(Q,8,-40);P({k:10,x,y,vx:16,vy:-26,l:2.1,l0:2.1,s:16,ph:rnd()*6})}};
 function gagFx(Q,name){if(!name)return;const f=GAGFX[name];if(f)f(Q)}
 const titleG=gagNew(1,2,.8);
