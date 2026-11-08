@@ -66,6 +66,15 @@ jobs:
           build mandex_v2 ""
           build mandex_v2_nosound "-DMX_NOSOUND"
           build stage1_v2 "-DMX_NOSOUND -DMX_STAGE=1"
+      - name: Bare-metal ROMs (no libnds / calico start-up)
+        run: |
+          export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
+          for v in "bare_stage1|-DMX_NOSOUND -DMX_STAGE=1" "bare_stage2|-DMX_NOSOUND -DMX_STAGE=2" "bare_stage4|-DMX_NOSOUND -DMX_STAGE=4" "bare_nosound|-DMX_NOSOUND" "bare|"; do
+            n=${v%%|*}; d=${v#*|}
+            sh tools/build_ds_bare.sh ds/$n.nds $d
+            python3 tools/ntr_patch.py ds/$n.nds out/mandex_$n.nds
+            ndstool -i out/mandex_$n.nds | grep -iE "unit|ARM9 (entry|RAM|code)|ARM7 (entry|RAM|code)"
+          done
       - name: Diagnostics (full headers, installed libnds flavours)
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
@@ -146,6 +155,6 @@ jobs:
         run: |
           cd pack && ls -la
           printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - plain DS header; melonDS / DeSmuME / DraStic / flashcart\n  mandex_nosound_calico.nds  Nintendo DS - same game with sound start-up disabled; try it if mandex.nds will not boot\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
-          zip -9 ../mandex-roms.zip mandex_v2.nds mandex_v2_nosound.nds stage1_v2.nds mandex.nds mandex_nosound_calico.nds stage1.nds stage2.nds stage3.nds stage4.nds hello_raw.nds hello_patched.nds mandex.cdi mandex.elf README.txt
+          zip -9 ../mandex-roms.zip mandex_bare.nds mandex_bare_nosound.nds mandex_bare_stage1.nds mandex_bare_stage2.nds mandex_bare_stage4.nds mandex_v2.nds mandex_v2_nosound.nds stage1_v2.nds mandex.nds mandex_nosound_calico.nds stage1.nds stage2.nds stage3.nds stage4.nds hello_raw.nds hello_patched.nds mandex.cdi mandex.elf README.txt
       - uses: actions/upload-artifact@v4
         with: { name: mandex-roms, path: mandex-roms.zip }
