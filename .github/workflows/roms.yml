@@ -82,6 +82,7 @@ jobs:
           for o in list(range(0, 0x200, 16)) + list(range(0x4000, 0x4010, 16)) + list(range(0x4800, 0x4840, 16)):
               print("%08x: %s" % (o, " ".join("%02x" % x for x in d[o:o + 16])))
           print("size", len(d))
+          import subprocess; print(subprocess.run(["ndstool","-i","out/mandex_bare_stage1.nds"],capture_output=True,text=True).stdout)
           PY
       - name: Diagnostics (full headers, installed libnds flavours)
         run: |

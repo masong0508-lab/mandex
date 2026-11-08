@@ -19,5 +19,5 @@ $CC -march=armv4t -mcpu=arm7tdmi -marm -c $B/crt0_7.S -o $W/crt0_7.o
 $CC -nostartfiles -nostdlib -T $B/arm7.ld $W/crt0_7.o $W/arm7.o -o $W/arm7.elf -lgcc
 arm-none-eabi-objcopy -O binary $W/arm7.elf $W/arm7.bin
 ls -l $W/arm9.bin $W/arm7.bin
-ndstool -c "$OUT" -9 $W/arm9.bin -7 $W/arm7.bin -r9 0x02000000 -e9 0x02000800 -r7 0x02380000 -e7 0x02380000 \
+ndstool -c "$OUT" -h 0x4000 -9 $W/arm9.bin -7 $W/arm7.bin -r9 0x02000000 -e9 0x02000800 -r7 0x02380000 -e7 0x02380000 \
   -b $DEVKITPRO/calico/share/nds-icon.bmp "MANDEX;a sticky dad-bod game;masong0508"
