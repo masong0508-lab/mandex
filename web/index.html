@@ -1723,6 +1723,7 @@ const OUTFITS=[
  {id:'ghost',   n:'Ghost Boxers',  br:'#f4f4ff',brd:'#b9bdd6',tow:'#c7d7ff',tows:'#8fa5e6', h:'win a level with one man',     t:()=>ST().oneShots>=1},
  {id:'hotpink', n:'Hot Pink',      br:'#ff4fa3',brd:'#c92a78',tow:'#5ad6ff',tows:'#2bb0e0', h:'beat 10 story levels',         t:()=>storyDone()>=10},
  {id:'gold',    n:'Golden Boy',    br:'#f0b92a',brd:'#b8851a',tow:'#fff0a8',tows:'#e6c34a', h:'three stars on 8 levels',      t:()=>threeStarCount()>=8},
+ {id:'bare',    n:'Birthday Suit', br:'#f4b78e',brd:'#e2a077',tow:'#ffffff',tows:'#d8d8e0', h:'unlock 10 achievements',       t:()=>achCount()>=10},
  {id:'rainbow', n:'Rainbow Rump',  br:'#e0243a',brd:'#a8162a',tow:'#ff7eb0',tows:'#ff4f8f', h:'beat every story level',       t:()=>storyDone()>=LEVELS.length, rainbow:true}
 ];
 const ownedCount=()=>OUTFITS.reduce((n,o)=>n+(PD.own[o.id]?1:0),0);
@@ -1818,13 +1819,13 @@ function drawOutfits(){
   panel(30,70,330,430);
   ctx.save();ctx.translate(195,370);ctx.scale(1.4,1.4);if(outfitCur.rainbow)applyOutfit(outfitCur,time);const sw=Math.sin(time*5);drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');ctx.restore();
   txt(outfitCur.n,195,110,24,'#fff','center');
-  const cols=2,cw=268,ch=76,x0=384,y0=76;
-  OUTFITS.forEach((o,i)=>{const c=i%cols,r=(i/cols)|0,x=x0+c*(cw+10),y=y0+r*(ch+8),own=PD.own[o.id],sel=outfitCur===o;
+  const cols=2,cw=268,ch=64,x0=384,y0=72;
+  OUTFITS.forEach((o,i)=>{const c=i%cols,r=(i/cols)|0,x=x0+c*(cw+10),y=y0+r*(ch+6),own=PD.own[o.id],sel=outfitCur===o;
     hits.push({x,y,w:cw,h:ch,fn:()=>{if(own){equip(o);SFX.ding()}else SFX.pop()}});const hov=mouseX>=x&&mouseX<x+cw&&mouseY>=y&&mouseY<y+ch;
     ctx.save();rrect(x,y,cw,ch,10);ctx.fillStyle=sel?'rgba(60,90,40,.9)':hov&&own?'rgba(255,255,255,.28)':'rgba(15,18,30,.78)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=sel?'#7dff5a':'rgba(255,255,255,.3)';ctx.stroke();
     let c1=o.br,c2=o.tow;if(o.rainbow){c1=`hsl(${(time*60)%360},85%,52%)`;c2=`hsl(${(time*60+180)%360},85%,70%)`}
-    ctx.globalAlpha=own?1:.35;ctx.fillStyle=c1;rrect(x+10,y+14,46,46,8);ctx.fill();ctx.fillStyle=c2;rrect(x+36,y+34,26,26,6);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;rrect(x+10,y+14,46,46,8);ctx.stroke();ctx.globalAlpha=1;
-    txt(o.n,x+74,y+30,17,own?'#fff':'#889','left');txt(own?(sel?'WEARING':'tap to wear'):'locked: '+o.h,x+74,y+54,12,own?'#cfd':'#aab','left');ctx.restore()})}
+    ctx.globalAlpha=own?1:.35;ctx.fillStyle=c1;rrect(x+10,y+9,46,46,8);ctx.fill();ctx.fillStyle=c2;rrect(x+36,y+29,26,26,6);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;rrect(x+10,y+9,46,46,8);ctx.stroke();ctx.globalAlpha=1;
+    txt(o.n,x+74,y+26,17,own?'#fff':'#889','left');txt(own?(sel?'WEARING':'tap to wear'):'locked: '+o.h,x+74,y+48,12,own?'#cfd':'#aab','left');ctx.restore()})}
 
 // ---------- custom levels ----------
 let CL=LEVELS[0],testing=false;
