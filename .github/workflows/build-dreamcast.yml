@@ -34,6 +34,10 @@ jobs:
           echo "KOS_BASE=$KOS_BASE KOS_CC_BASE=$KOS_CC_BASE"
           make -C dreamcast
           ls -la dreamcast/mandex.elf
+          echo "--- tools available for making a bootable disc"
+          for t in mkdcdisc mkisofs genisoimage xorriso scramble makeip elf2bin cdi4dc kos-objcopy sh-elf-objcopy; do echo "$t: $(command -v $t || echo -)"; done
+          ls $KOS_BASE/utils 2>&1 | head -40
+          ls $KOS_BASE/utils/scramble $KOS_BASE/utils/makeip $KOS_BASE/utils/bin2c 2>&1 | head -20
       - uses: actions/upload-artifact@v4
         with:
           name: mandex-elf
