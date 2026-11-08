@@ -40,7 +40,7 @@ else
 SPECS   := -specs=ds_arm9.specs
 endif
 LDFLAGS := $(SPECS) -g -mthumb-interwork -Wl,-Map,$(TARGET).map
-LIBS    := -L$(DEVKITPRO)/libnds/lib -L$(CALICO)/lib -lnds9 -lm
+LIBS    := -L$(DEVKITPRO)/libnds/lib -L$(CALICO)/lib -Wl,--start-group -lnds9 $(if $(wildcard $(CALICO)/lib/libcalico_ds9.a),-lcalico_ds9) -Wl,--end-group -lm
 
 # ARM mode for the hot code (solver + pixel blitting), Thumb for the rest.
 ARM_OBJS   := source/gfx.o $(CORE)/mx.o $(CORE)/cloth.o
