@@ -70,7 +70,8 @@ void gfx_tri(u8 *b, int x0, int y0, int x1, int y1, int x2, int y2, u8 c){
   if(y2 < y1){ t = y1; y1 = y2; y2 = t; t = x1; x1 = x2; x2 = t; }
   if(y2 == y0){                                             /* flat: one row */
     int a = x0 < x1 ? x0 : x1, e = x0 > x1 ? x0 : x1;
-    if(x2 < a) a = x2; if(x2 > e) e = x2;
+    if(x2 < a) a = x2;
+    if(x2 > e) e = x2;
     gfx_rect(b, a, y0, e - a + 1, 1, c);
     return;
   }

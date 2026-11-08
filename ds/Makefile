@@ -33,8 +33,14 @@ DEFS    := -D__NDS__ -DARM9 -DMX_FIXED -DMX_LIBNDS_MATH -DMX_HOT_ITCM -DSUBSTEPS
 
 CFLAGS  := -std=gnu99 -g -Wall -O2 -march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
            -ffast-math -mthumb-interwork $(INCLUDE) $(DEFS)
-LDFLAGS := -specs=ds_arm9.specs -g -mthumb-interwork -Wl,-Map,$(TARGET).map
-LIBS    := -L$(DEVKITPRO)/libnds/lib -L$(CALICO)/lib -lnds9 -lcalico_ds9 -lm
+# libnds 2.x (calico) has its own specs file (crt0, linker script, calico runtime); devkitARM's ds_arm9.specs is the one for the old libnds 1.x
+ifneq ($(wildcard $(CALICO)/share/ds9.specs),)
+SPECS   := -specs=$(CALICO)/share/ds9.specs
+else
+SPECS   := -specs=ds_arm9.specs
+endif
+LDFLAGS := $(SPECS) -g -mthumb-interwork -Wl,-Map,$(TARGET).map
+LIBS    := -L$(DEVKITPRO)/libnds/lib -L$(CALICO)/lib -lnds9 -lm
 
 # ARM mode for the hot code (solver + pixel blitting), Thumb for the rest.
 ARM_OBJS   := source/gfx.o $(CORE)/mx.o $(CORE)/cloth.o
