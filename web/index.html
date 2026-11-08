@@ -605,6 +605,126 @@ function drawSide(t,fk){
   ell(38.5,-7,5,5.4,'#5a1010',1.3);ell(37,-4.8,3,2,'#ff6b8a');
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(33,-12.5);ctx.quadraticCurveTo(40,-14.5,46,-10.5);ctx.quadraticCurveTo(48,-12.5,47,-15);ctx.quadraticCurveTo(50,-8,41,-9);ctx.quadraticCurveTo(36,-9,33,-10);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1;ctx.stroke();
   ctx.globalAlpha=.3;ell(-1,-10,15,5,'#7dff5a');ell(30,-24,7,3,'#7dff5a');ctx.globalAlpha=1}
+// =====================================================================
+//  TITLE ART: the butt-stomp.  He drops butt first, legs straight up in a V, hands holding his own feet, the towel streaming up behind him, a very
+//  surprised landlord underneath.  drawSlam: local origin = the lowest point of his rear, he faces right.
+// =====================================================================
+function drawSlam(t){
+  const f1=Math.sin(t*9),f2=Math.sin(t*7+1.3),f3=Math.sin(t*11+.4);
+  // A real little 3D pose: joints in his own space (X forward, Y up, Z = his left/right), turned YAW to the camera so we see his back and rear from the right,
+  // then projected with a mild perspective (near things a bit bigger).  Every shape below is a projected ellipsoid or tapered limb.
+  const YAW=.5,c=Math.cos(YAW),s=Math.sin(YAW),D=230;
+  const P=(X,Y,Z)=>{const z=-s*X+c*Z,f=D/(D-z);return[(c*X+s*Z)*f,-Y*f,z,f]};
+  const E=(X,Y,Z,rx,ry,rz,fill)=>{const p=P(X,Y,Z);return pEll(p[0],p[1],Math.hypot(rx*c,rz*s)*p[3],ry*p[3],fill)};
+  const C=(a,ra,b,rb,fill)=>{const p=P(a[0],a[1],a[2]),q=P(b[0],b[1],b[2]);return pTap(p[0],p[1],ra*p[3],q[0],q[1],rb*q[3],fill)};
+  const R=Math.PI/180,L1=34,L2=34,TH1=26*R,TH2=20*R;
+  const leg=g=>{const h=[0,19,7*g],k=[h[0]+L1*Math.sin(TH1),h[1]+L1*Math.cos(TH1),17*g];return{h,k,a:[k[0]+L2*Math.sin(TH2),k[1]+L2*Math.cos(TH2),28*g]}};   // legs splay a little, so both read from behind
+  const LN=leg(1),LF=leg(-1);
+  const NECK=[-14.5,52,0],HEAD=[-18,65.5,0];
+  // the towel, tied at his neck and blown straight up by the fall: one wavy strip, its stripes cut to its shape
+  {const q=P(NECK[0],NECK[1],NECK[2]),B=[q[0]-1,q[1]+2],T=[B[0]-24,B[1]-62],dx=T[0]-B[0],dy=T[1]-B[1],L=Math.hypot(dx,dy),px=-dy/L,py=dx/L,N=14,Lp=[],Rp=[];
+   for(let i=0;i<=N;i++){const u=i/N,w=5+8.5*u*(1-.12*u),wob=(Math.sin(u*7+t*9)*3.4+Math.sin(u*3+t*5)*2)*u,cx=B[0]+dx*u+wob*px,cy=B[1]+dy*u+wob*py;Lp.push([cx-px*w,cy-py*w]);Rp.push([cx+px*w,cy+py*w])}
+   const tp=pPoly(Lp.concat(Rp.slice().reverse()),TOW);
+   blob([tp],{ow:1.7,shc:'rgba(190,40,110,.30)',hlc:'rgba(255,255,255,.22)'});
+   ctx.save();ctx.clip(tp.p);ctx.strokeStyle='#ff4f8f';ctx.lineWidth=2.6;ctx.lineCap='round';
+   for(const i of[3,6,9,12]){ctx.beginPath();ctx.moveTo(Lp[i][0],Lp[i][1]);ctx.quadraticCurveTo((Lp[i][0]+Rp[i][0])/2,(Lp[i][1]+Rp[i][1])/2+3,Rp[i][0],Rp[i][1]);ctx.stroke()}
+   ctx.restore()}
+  // arms: shoulder, elbow, a hand on his own shin.  The far one first (the torso hides its root).
+  const arm=(g,col)=>{const Lg=g>0?LN:LF,u=.1,sh=[-12,47,16.5*g],el=[2,48,27*g],hd=[Lg.k[0]+(Lg.a[0]-Lg.k[0])*u,Lg.k[1]+(Lg.a[1]-Lg.k[1])*u,(Lg.k[2]+(Lg.a[2]-Lg.k[2])*u)+6*g];
+    return{parts:[C(sh,6.5,el,5.6,col),C(el,5.4,hd,4.6,col),E(el[0],el[1],el[2],5.8,5.8,5.8,col),E(hd[0],hd[1],hd[2],6.2,6.2,6.2,col)],hd:P(hd[0],hd[1],hd[2])}};
+  const AF=arm(-1,SKD),AN=arm(1,SK);
+  blob(AF.parts);
+  // legs: far one first.  Thigh in a red boxer leg, hairy knee and shin, striped sock, shoe with its sole to the sky.
+  const drawLeg=(Lg,col,tube)=>{const{h,k,a}=Lg,pk=P(k[0],k[1],k[2]),pa=P(a[0],a[1],a[2]);
+    blob([C(h,9.4,k,7.2,col),C(k,7,a,5.1,col),E(k[0],k[1],k[2],7.4,7.4,7.4,col)]);
+    const ax=pa[0]-pk[0],ay=pa[1]-pk[1],l=Math.hypot(ax,ay),ux=ax/l,uy=ay/l,qx=-uy,qy=ux;
+    curls([[pk[0]+qx*2-ux*3,pk[1]+qy*2-uy*3,1],[pk[0]-qx*3+ux*3,pk[1]-qy*3+uy*3,-1],[pk[0]+ux*9+qx,pk[1]+uy*9+qy,1],[pk[0]+ux*13-qx*2,pk[1]+uy*13-qy*2,-1]]);
+    const sx=pa[0]-ux*l*.38,sy=pa[1]-uy*l*.38;
+    blob([pTap(sx,sy,6.6*pa[3],pa[0],pa[1],5.9*pa[3],'#fff')],{ow:1.5,shc:'rgba(110,110,165,.30)',hl:0});
+    ctx.strokeStyle='#e33';ctx.lineWidth=1.5;ctx.lineCap='round';
+    for(const u of[.28,.62]){const cx=sx+(pa[0]-sx)*u,cy=sy+(pa[1]-sy)*u;ctx.beginPath();ctx.moveTo(cx-qx*6,cy-qy*6);ctx.quadraticCurveTo(cx+ux*2,cy+uy*2,cx+qx*6,cy+qy*6);ctx.stroke()}
+    blob([E(a[0]+5,a[1]-.5,a[2],9,4.6,5,'#8a5a2b'),E(a[0]+4,a[1]+3.8,a[2],7.4,2.1,4.3,'#e6d2ae')],{ow:1.6,shc:'rgba(60,30,10,.42)',hlc:'rgba(255,225,190,.25)'});
+    const e=[h[0]+(k[0]-h[0])*.4,h[1]+(k[1]-h[1])*.4,h[2]];blob([C(h,10.8,e,9.4,tube)],{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'})};
+  drawLeg(LF,SKD,BRD);drawLeg(LN,SK,BR);
+  // torso: neck, shoulders, back and the belly bulging out in front are ONE mass
+  {const pn=P(NECK[0],NECK[1],NECK[2]);
+   blob([C(NECK,6.8,[-17,59,0],5.9,SK),E(-10,41.5,0,12.5,11.5,16,SK),E(-12.5,48,0,8,6.5,16.5,SK),E(1.8,35,0,14,12.5,14.5,SK),E(-9,30,0,11,9,15,SK)]);
+   const b0=P(-15.5,51,0),b1=P(-14,40,0),b2=P(-10.5,29,0);                                                                    // the spine, a soft groove down his back
+   ctx.strokeStyle='rgba(176,92,52,.6)';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(b0[0],b0[1]);ctx.quadraticCurveTo(b1[0]+1.5,b1[1],b2[0],b2[1]);ctx.stroke();
+   for(const g of[-1,1]){const w0=P(-15,47,g*7),w1=P(-15.5,40,g*11),w2=P(-14,34,g*7);                                          // shoulder blades
+     ctx.beginPath();ctx.moveTo(w0[0],w0[1]);ctx.quadraticCurveTo(w1[0]+g*2,w1[1],w2[0],w2[1]);ctx.stroke()}
+   const h0=P(-14,45,3);curls(Array.from({length:6},(_,k)=>[h0[0]-3+(k*5)%9,h0[1]+((k*7)%12)-2,k%2?1:-1]));
+   const fl=P(-9,45,11);ctx.fillStyle='rgba(255,255,255,.26)';ctx.beginPath();ctx.ellipse(fl[0],fl[1],5,2.8,-.4,0,6.3);ctx.fill();
+   const bl=P(9,34,5);ctx.strokeStyle='rgba(170,90,50,.55)';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(bl[0]+2,bl[1]+5,8,3.4,5.1);ctx.stroke();}   // a fold on the belly
+  // the rear: pelvis + far cheek, then the near cheek on top of it (that outline is the cleft), both in red boxers
+  blob([E(-2,21.5,0,12.5,9,16,BR),E(-6,12,-8.5,11.6,11.6,9.6,BRD)],{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
+  blob([E(-6,12,8.5,11.6,11.6,9.6,BR)],{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
+  {const n=P(-6,16,8.5),f=P(-6,16,-8.5);
+   ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(n[0]-3,n[1]-2,2.8,5.6,.35,0,6.3);ctx.fill();ctx.fillStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.ellipse(f[0]-3.5,f[1]-1,2.2,4,.3,0,6.3);ctx.fill();
+   const q0=P(-12,6,6),q1=P(-14,3,0),q2=P(-12,6,-6);ctx.strokeStyle='rgba(110,10,32,.5)';ctx.lineWidth=1.3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(q0[0],q0[1]);ctx.quadraticCurveTo(q1[0],q1[1]+2,q2[0],q2[1]);ctx.stroke()}   // the seat seam
+  // the waistband: the half of a ring round his waist that faces us
+  {const RC=[-3.5,27.5],fx=.927,fy=.375,pts=[];let bi=0,bz=-1e9;
+   for(let i=0;i<24;i++){const a=i/24*6.2832,p=P(RC[0]+12*Math.cos(a)*fx,RC[1]+12*Math.cos(a)*fy,15.5*Math.sin(a));pts.push(p);if(p[2]>bz){bz=p[2];bi=i}}
+   const A=pts[(bi+18)%24],M=pts[bi],B=pts[(bi+6)%24],Cc=[2*M[0]-(A[0]+B[0])/2,2*M[1]-(A[1]+B[1])/2];
+   const ordered=A[0]<B[0]?[A,Cc,B]:[B,Cc,A];bandAlong([ordered[0][0],ordered[0][1]],[ordered[1][0],ordered[1][1]],[ordered[2][0],ordered[2][1]],2.8*M[3],2)}
+  // the head: the side-view face, chin tipped down at his victim, grinning
+  {const ph=P(HEAD[0],HEAD[1],HEAD[2]);
+   ctx.save();ctx.translate(ph[0],ph[1]);ctx.scale(ph[3]*.97,ph[3]*.97);ctx.rotate(.3);ctx.translate(-31,17);
+   blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});
+   blob([pEll(24.4,-14,2.4,3.3,SKD)],{ow:0,sd:1,hl:0});ctx.strokeStyle=OUT;ctx.lineWidth=1.1;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(24.4,-14,2.4,3.3,0,1.9,4.4);ctx.stroke();
+   ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(30,-21,11,3.3,5.8);ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.2;ctx.stroke();
+   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(22,-27);ctx.quadraticCurveTo(21+f1*.6,-34,29,-33);ctx.quadraticCurveTo(25,-30,26,-26);ctx.closePath();ctx.fill();   // a little top knot
+   ell(36.2,-20,4.4,5,'#fff',1.2);ell(37.6,-19,2.4,2.8,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(37,-20,.95,0,6.3);ctx.fill();
+   ctx.fillStyle='rgba(255,105,110,.34)';ctx.beginPath();ctx.ellipse(35,-12,3.4,2.1,0,0,6.3);ctx.fill();
+   ctx.strokeStyle=HAIR;ctx.lineWidth=2.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(31.5,-27.8);ctx.lineTo(40.5,-24.4);ctx.stroke();                 // brow, slanted: this is going to hurt, and he knows it
+   ell(42,-16,3.4,3,SKD,1.3);
+   ell(38.5,-7,5.4,5.8,'#5a1010',1.3);ell(37.4,-4.4,3.3,2.2,'#ff6b8a');ctx.fillStyle='#fff';ctx.fillRect(34,-11.5,8.6,2.2);ctx.strokeStyle=OUT;ctx.lineWidth=.7;ctx.strokeRect(34,-11.5,8.6,2.2);
+   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(33,-12.5);ctx.quadraticCurveTo(40,-14.5,46,-10.5);ctx.quadraticCurveTo(48,-12.5,47,-15);ctx.quadraticCurveTo(50,-8,41,-9);ctx.quadraticCurveTo(36,-9,33,-10);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1;ctx.stroke();
+   ctx.restore()}
+  // near arm last, a hand locked on his own shin
+  blob(AN.parts);
+  {const hp=AN.hd;ctx.strokeStyle='rgba(120,60,30,.75)';ctx.lineWidth=1.2;ctx.lineCap='round';for(const a of[-.9,-.1,.7]){ctx.beginPath();ctx.arc(hp[0],hp[1],5.6*hp[3],a+.3,a+1.1);ctx.stroke()}}
+}
+// the landlord, caught looking up.  Origin = between his feet on the ground.
+function drawLandlordScared(t){
+  const f=Math.sin(t*23),g=Math.sin(t*13+2),SU='#4a5568',SH='#f2c7a1',DK='#2d3340';
+  ctx.save();ctx.translate(f*.45,0);
+  blob([pTap(-4.2,-15,3.7,-5,-4,3.3,DK),pTap(4.2,-15,3.7,5,-4,3.3,DK)],{ow:1.5,hl:0,shc:'rgba(0,0,0,.28)'});
+  blob([pEll(-6.6,-1.8,5.4,2.9,'#1c1c24'),pEll(6.6,-1.8,5.4,2.9,'#1c1c24')],{ow:1.5,hl:0,shc:'rgba(0,0,0,.3)'});
+  for(const s of[-1,1]){const w=g*s*1.3;                                                             // both arms thrown up in panic
+    blob([pTap(s*8.5,-28,3.9,s*16+w,-44,3.3,SU),pEll(s*17+w,-47,3.6,3.7,SH)],{ow:1.5,sd:1.2,hl:0});
+    ctx.fillStyle='#fff';ctx.save();ctx.translate(s*16.2+w,-45);ctx.rotate(s*.35);ctx.fillRect(-3.1,-.4,6.2,1.7);ctx.restore()}
+  blob([pEll(0,-22,10.8,12.6,SU),pEll(0,-30,8.8,6.2,SU)],{ow:1.7});
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(-3.3,-33);ctx.lineTo(3.3,-33);ctx.lineTo(0,-23);ctx.closePath();ctx.fill();   // shirt
+  ctx.strokeStyle=OUT;ctx.lineWidth=.9;ctx.lineJoin='round';ctx.stroke();
+  ctx.fillStyle='#d12b2b';ctx.beginPath();ctx.moveTo(-1.5,-32);ctx.lineTo(1.5,-32);ctx.lineTo(2.1,-21);ctx.lineTo(0,-18.5);ctx.lineTo(-2.1,-21);ctx.closePath();ctx.fill();ctx.stroke();
+  blob([pEll(0,-41,8.4,8.8,SH),pEll(-8.2,-41,1.9,2.7,SH),pEll(8.2,-41,1.9,2.7,SH)],{ow:1.6,sd:1.4});
+  ctx.fillStyle='#b9bcc4';ctx.beginPath();ctx.ellipse(-7.8,-46,2.4,1.6,.6,0,6.3);ctx.ellipse(7.8,-46,2.4,1.6,-.6,0,6.3);ctx.fill();   // gray tufts, standing on end
+  ell(-3.3,-42,3,3.5,'#fff',1.1);ell(3.3,-42,3,3.5,'#fff',1.1);ell(-3.2,-43.4,.95,1.1,'#111');ell(3.2,-43.4,.95,1.1,'#111');      // huge eyes, staring up at the thing coming down
+  ctx.strokeStyle='#222';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-6.5,-47.2);ctx.quadraticCurveTo(-4,-49.6,-1.2,-47.6);ctx.moveTo(6.5,-47.2);ctx.quadraticCurveTo(4,-49.6,1.2,-47.6);ctx.stroke();
+  ell(0,-35.2,2.7,3.5,'#5a1010',1.1);ell(0,-33.6,1.5,1.1,'#ff6b8a');
+  // sweat flying off him
+  ctx.fillStyle='#9fe0ff';ctx.strokeStyle='#3b88b5';ctx.lineWidth=.7;
+  for(const[x,y,s]of[[-12,-50+g,1],[12.5,-52-g,-1],[-14.5,-39,1]]){ctx.beginPath();ctx.moveTo(x,y-2.6);ctx.quadraticCurveTo(x+s*2.4,y+.6,x,y+1.6);ctx.quadraticCurveTo(x-s*2.4,y+.6,x,y-2.6);ctx.fill();ctx.stroke()}
+  // his top hat, knocked straight up by fright
+  ctx.save();ctx.translate(-2+f*.5,-68+g*.8);ctx.rotate(-.28);
+  blob([pEll(0,4.5,10.6,2.8,'#1b1b22'),pPoly([[-6.7,4.5],[-6.1,-7],[6.1,-7],[6.7,4.5]],'#1b1b22'),pEll(0,-7,6.1,1.9,'#1b1b22')],{ow:1.4,hl:0,shc:'rgba(255,255,255,.10)'});
+  ctx.fillStyle='#d12b2b';ctx.beginPath();ctx.moveTo(-6.55,-.5);ctx.lineTo(6.55,-.5);ctx.lineTo(6.65,2.9);ctx.lineTo(-6.65,2.9);ctx.closePath();ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=1.3;ctx.lineCap='round';for(const x of[-5,0,5]){ctx.beginPath();ctx.moveTo(x-2,-57);ctx.lineTo(x-2,-52+g)  ;ctx.stroke()}
+  // the clipboard and its papers, scattering
+  for(let i=0;i<3;i++){const a=t*3+i*2.1,x=26+i*7+Math.sin(a)*4,y=-52-i*9+Math.cos(a*1.3)*3;ctx.save();ctx.translate(x,y);ctx.rotate(Math.sin(a)*.9);ctx.fillStyle='#fff';ctx.strokeStyle='#8a8f9c';ctx.lineWidth=.8;ctx.fillRect(-4,-5,8,10);ctx.strokeRect(-4,-5,8,10);ctx.fillStyle='#9aa0ad';ctx.fillRect(-2.6,-3,5.2,.8);ctx.fillRect(-2.6,-.8,5.2,.8);ctx.restore()}
+  ctx.restore()}
+// the whole picture; origin = the ground under the landlord, 1 unit = 1 unit of man
+function drawSlamScene(t){
+  const bob=Math.sin(t*3.2)*2.5;
+  ctx.fillStyle='rgba(0,0,0,.27)';ctx.beginPath();ctx.ellipse(5,1.5,44+bob*.6,6,0,0,6.3);ctx.fill();      // his shadow is already on the ground
+  drawLandlordScared(t);
+  ctx.save();ctx.strokeStyle='rgba(255,255,255,.62)';ctx.lineCap='round';                                      // speed lines: he is coming down FAST
+  for(let i=0;i<9;i++){const x=-58+i*15+(i%3)*3,len=24+(i*7)%22,y=((t*190+i*53)%150)-232;ctx.lineWidth=1.6+(i%2)*.8;ctx.beginPath();ctx.moveTo(x+bob*.15,y);ctx.lineTo(x+bob*.15,y+len);ctx.stroke()}
+  ctx.restore();
+  ctx.save();ctx.translate(6,-90+bob);drawSlam(t);ctx.restore()}
+
 function drawBall(t,fk){
   const bo=JIG?JIG.bo:null,ro=JIG?JIG.ro:null,T=(q,f)=>{if(q){ctx.save();ctx.translate(q[0],q[1])}f();if(q)ctx.restore()};
   const RB={ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'};
@@ -1333,8 +1453,7 @@ const GAGFX={
  whew(Q){SFX.whew();const[x,y]=gw(Q,22,-52);P({k:7,x,y,vx:30,vy:-50,l:.8,l0:.8,s:2.6,c:'#bfe8ff'})},
  snore(Q){SFX.snore();const[x,y]=gw(Q,8,-40);P({k:10,x,y,vx:16,vy:-26,l:2.1,l0:2.1,s:16,ph:rnd()*6})}};
 function gagFx(Q,name){if(!name)return;const f=GAGFX[name];if(f)f(Q)}
-const titleG=gagNew(1,2,.8);
-function titleTick(dt){const Q=titleG;Q.ox=W/2;Q.oy=H/2+60;Q.sc=2.1;Q.jg=null;gagTick(Q,dt,false);updParts(dt);updTexts(dt)}
+function titleTick(dt){updParts(dt);updTexts(dt)}
 
 function renderMan(){
   const m=man;if(m.mode==='none'||m.mode==='wait'||m.mode==='done')return;
@@ -1426,14 +1545,19 @@ function drawEnd(){
   if(win){const st=men>=2?3:men>=1?2:1;for(let i=0;i<3;i++)star(W/2-10+i*70,260,28,i<st)}
   txt('SCORE  '+Math.round(score),W/2+80,330,28,'#fff','center');
   ctx.globalAlpha=.7+.3*Math.sin(time*4);txt(win?'click / tap for next level':'click / tap to retry',W/2+80,380,20,'#ffd23f','center');ctx.globalAlpha=1}
+// the same picture cropped to 4:3 for the consoles (tools/gen_title.py draws it into a w x h canvas); words = also bake the logo in (the Dreamcast has no font)
+function drawTitlePicture(w,h,t,words){
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);const k=h/H;ctx.save();ctx.scale(k,k);ctx.translate(-150,0);
+  ctx.drawImage(bgA,0,0);for(const c of clouds)drawCloud(c);ctx.drawImage(bgB,0,0);ctx.fillStyle='rgba(10,14,30,.35)';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.translate(690,GY-4);ctx.scale(2.35,2.35);drawSlamScene(t);ctx.restore();
+  if(words){ctx.save();ctx.translate(345,150);ctx.rotate(-.03);txt('MANDEX',0,0,84,'#ffd23f','center','#7a1a1a');ctx.restore()}
+  ctx.restore()}
 function drawTitle(){
   ctx.fillStyle='rgba(10,14,30,.35)';ctx.fillRect(0,0,W,H);
-  ctx.save();ctx.translate(W/2,H/2+60+Math.sin(time*2)*4);ctx.scale(2.1,2.1);
-  const tf=gagFrame(titleG),tsp=tf&&spinLive(titleG);if(tsp)drawSpin(tsp.th,tsp);else if(tf)drawManFrame(tf);else drawFront('flex','cool',time);ctx.restore();
+  ctx.save();ctx.translate(700,GY-4);ctx.scale(2.2,2.2);drawSlamScene(time);ctx.restore();
   drawParts();drawTexts();
-  ctx.save();ctx.translate(W/2,110);ctx.rotate(-.03);txt('MANDEX',0,0,96,'#ffd23f','center','#7a1a1a');ctx.restore();
-  txt('the sticky dad-bod demolition derby',W/2,150,22,'#fff','center');
-  ctx.globalAlpha=.65+.35*Math.sin(time*4);txt('CLICK / TAP TO START',W/2,H-40,26,'#fff','center');ctx.globalAlpha=1}
+  ctx.save();ctx.translate(270,170);ctx.rotate(-.03);txt('MANDEX',0,0,96,'#ffd23f','center','#7a1a1a');ctx.restore();
+  ctx.globalAlpha=.65+.35*Math.sin(time*4);txt('CLICK / TAP TO START',270,H-40,26,'#fff','center');ctx.globalAlpha=1}
 
 // =====================================================================
 //  INPUT / LOOP

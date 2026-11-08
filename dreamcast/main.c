@@ -9,7 +9,7 @@
  *   analog stick : pull the man back in the sling (push the direction you
  *                  want to pull him: left/down fires up and to the right)
  *   A            : release the sling / belly flop in mid-air
- *   START        : next level after a win, retry after a loss
+ *   START        : start from the title screen; next level after a win, retry after a loss
  *   Y            : restart the level
  *
  * Not done yet (all slated for the next pass): text/score font, sound via
@@ -18,6 +18,8 @@
 #include <kos.h>
 #include "manspr.h"
 #include "manidle.h"
+#define MX_TITLE_DC
+#include "title.h"
 #include <math.h>
 #include <stdlib.h>
 #include "mx.h"
@@ -210,6 +212,21 @@ static void fx_step(int calm, int strain){
   }
 }
 
+/* The title: the man dropping butt-first on a landlord (art/title.h, made by tools/gen_title.py from the HTML title, logo included).  Flat quads at 2x, like
+   everything else here; PRESS START is a second small set of quads that blinks. */
+static int on_title = 1, title_t;
+static void draw_title(void){
+  for(int i = 0; i < TITLE_DC_NRECT; i++){
+    const unsigned short *r = TITLE_DC_RECT[i]; const unsigned char *c = &TITLE_DC_PAL[r[4] * 3];
+    quad(r[0] * 2.0f, r[1] * 2.0f, r[2] * 2.0f, r[3] * 2.0f, Z_BG, argb(c[0], c[1], c[2], 255));
+  }
+  if((title_t >> 5) & 1) return;
+  for(int i = 0; i < TITLE_START_NRECT; i++){
+    const unsigned short *r = TITLE_START_RECT[i];
+    quad(TITLE_START_X + (float)r[0], TITLE_START_Y + (float)r[1], r[2], r[3], Z_HUD, r[4] == 1 ? argb(0, 0, 0, 255) : argb(255, 255, 255, 255));
+  }
+}
+
 static void draw_all(void){
   /* sky + ground */
   quad(0, 0, 640, 140, Z_BG, argb(70, 140, 225, 255));
@@ -315,7 +332,9 @@ int main(int argc, char **argv){
     cont_state_t *st = dev ? (cont_state_t *)maple_dev_status(dev) : NULL;
     if(st){
       uint32 pressed = st->buttons & ~prev; prev = st->buttons;
-      if(world.state != MX_PLAY){
+      if(on_title){
+        if(pressed & (CONT_START | CONT_A)) on_title = 0;
+      } else if(world.state != MX_PLAY){
         if(pressed & CONT_START) mx_load(&world, world.state == MX_WIN ? world.level + 1 : world.level);
       } else {
         if(pressed & CONT_Y) mx_load(&world, world.level);
@@ -328,6 +347,8 @@ int main(int argc, char **argv){
         } else if(pressed & CONT_A) mx_dive(&world);
       }
     }
+    if(on_title){ title_t++; }
+    else {
     mx_update(&world, DT);
     handle_events();
     {
@@ -335,11 +356,12 @@ int main(int argc, char **argv){
       int strain = st && world.man.mode == MAN_AIM && (abs(st->joyx) > 90 || abs(st->joyy) > 90);
       fx_step(calm, strain);
     }
+    }
     pvr_wait_ready();
     pvr_scene_begin();
     pvr_list_begin(PVR_LIST_TR_POLY);
     pvr_prim(&hdr, sizeof hdr);
-    draw_all();
+    if(on_title) draw_title(); else draw_all();
     pvr_list_finish();
     pvr_scene_finish();
   }

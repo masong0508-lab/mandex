@@ -57,15 +57,15 @@ void cpuStartTiming(int t){(void)t;} u32 cpuEndTiming(void){ return 100000; }
 #include "../ds/source/main.c"
 #undef main
 
-static void dump(const u8 *buf, const char *fn){
+static void dump(const u8 *buf, const u16 *pal, const char *fn){
   FILE *f = fopen(fn, "wb"); fprintf(f, "P6\n256 192\n255\n");
-  for(int i = 0; i < 256 * 192; i++){ u16 c = BG_PALETTE[buf[i]]; unsigned char rgb[3] = { (c & 31) << 3, ((c >> 5) & 31) << 3, ((c >> 10) & 31) << 3 }; fwrite(rgb, 1, 3, f); }
+  for(int i = 0; i < 256 * 192; i++){ u16 c = pal[buf[i]]; unsigned char rgb[3] = { (c & 31) << 3, ((c >> 5) & 31) << 3, ((c >> 10) & 31) << 3 }; fwrite(rgb, 1, 3, f); }
   fclose(f);
 }
 static const char *OUT = "/tmp/dsr";
 static void shot(const char *name){
-  char p[256]; snprintf(p, sizeof p, "%s_%s_top.ppm", OUT, name); dump(BG_GFX_SUB, p);
-  snprintf(p, sizeof p, "%s_%s_bot.ppm", OUT, name); dump(BG_GFX, p);
+  char p[256]; snprintf(p, sizeof p, "%s_%s_top.ppm", OUT, name); dump(BG_GFX_SUB, BG_PALETTE_SUB, p);
+  snprintf(p, sizeof p, "%s_%s_bot.ppm", OUT, name); dump(BG_GFX, BG_PALETTE, p);
 }
 
 /* ---- scripted player ---- */

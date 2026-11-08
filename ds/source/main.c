@@ -24,6 +24,8 @@
 #define MS_ENUM_ONLY
 #include "manspr.h"
 #include "manidle.h"
+#define MX_TITLE_DS
+#include "title.h"
 
 #ifndef MX_DS_MAX_SUBSTEPS
 #define MX_DS_MAX_SUBSTEPS 3
@@ -65,8 +67,8 @@ static void popup(real wx, real wy, const char *s, int col){
 }
 
 /* ------------------------------------------------------------------ idle gags */
-static MiState mi, mi_title;
-static ClothActor tow_play, tow_title, tow_win[2];     /* the towels (core/cloth.c): the man in the sling, on the title, the two end-panel dancers */
+static MiState mi;
+static ClothActor tow_play, tow_win[2];     /* the towels (core/cloth.c): the man in the sling, the two end-panel dancers */
 /* sound + particles for one gag effect.  (wx,wy) = where he stands (cells), sc = 1 in the world, 2 on the title (8 px per cell art) */
 static void idle_fx(int fx, real wx, real wy, int face, int sc, int popups){
   real mxp = wx + face * R(1.3) * sc, myp = wy - R(3.6) * sc;                      /* mouth */
@@ -495,22 +497,24 @@ static void load_level(int l){
   ev_ft = 0; fx = RI(88); fy = RI(38);
 }
 
+/* The title picture (art/title.h, made by tools/gen_title.py from the HTML title): the man dropping butt-first on a landlord.  It is stored run-length coded
+   and unpacked once.  Its colours live in sub-engine palette slots TITLE_DS_BASE.. (the text colours below them are untouched), so the picture is swapped in
+   only while the title is up (see present()). */
+static u8 title_img[TITLE_DS_W * TITLE_DS_H];
+static int title_ready, title_pal_on;
+static void title_unpack(void){
+  int n = 0;
+  for(int i = 0; i + 1 < TITLE_DS_RLE_LEN && n < TITLE_DS_W * TITLE_DS_H; i += 2)
+    for(int r = TITLE_DS_RLE[i]; r > 0 && n < TITLE_DS_W * TITLE_DS_H; r--) title_img[n++] = (u8)(TITLE_DS_RLE[i + 1] + TITLE_DS_BASE);
+  title_ready = 1;
+}
+
 static void title_top(View *v){
-  gfx_bg(v, 1);
-  gfx_ground(v);
-  int bob = (frame >> 3) & 1;
-  if(!mi_title.base_a || mi_title.base_a != MSF_FLEX_A){ mi_title.base_a = MSF_FLEX_A; mi_title.base_b = MSF_FLEX_B; mi_reset(&mi_title); mi_title.wait = 90; }
-  mi_update(&mi_title);
-  if(mi_title.fx) idle_fx(mi_title.fx, RI(186 / 4), RI((112 + bob * 2) / 4), 1, 2, 0);
-  man_with_towel(v->buf, &tow_title, 186, 112 + bob * 2, 8, 1, mi_frame(&mi_title, frame), 0);
-  { View tv = { v->buf, 4, 0, 0 }; draw_parts(&tv); }
+  if(!title_ready) title_unpack();
+  memcpy(v->buf, title_img, sizeof title_img);
   gfx_text(v->buf, 13, 33, "MANDEX", C_BLACK, 6);
   gfx_text_o(v->buf, 10, 30, "MANDEX", C_GOLD, C_RED2, 6);
-  gfx_text_o(v->buf, 12, 66, "SUPERBLY STICKY.", C_WHITE, C_BLACK, 1);
-  gfx_text_o(v->buf, 12, 76, "DANGEROUSLY UNDERDRESSED.", C_WHITE, C_BLACK, 1);
-  gfx_text_o(v->buf, 12, 96, "DEMOLISH THE LANDLORDS' BUILDINGS", C_PINK, C_BLACK, 1);
-  gfx_text_o(v->buf, 12, 106, "WITH ONE VERY STICKY MAN.", C_PINK, C_BLACK, 1);
-  gfx_text_o(v->buf, 12, 174, "DRAG + LIFT = FLING   TAP = FLOP", C_WHITE, C_BLACK, 1);
+  gfx_text_o(v->buf, 12, 174, "DRAG + LIFT: FLING   TAP: FLOP", C_WHITE, C_BLACK, 1);
 }
 
 static void title_bottom(View *v){
@@ -534,6 +538,11 @@ static void present(void){
   DC_FlushRange(buf_top, sizeof buf_top);
   DC_FlushRange(buf_bot, sizeof buf_bot);
   swiWaitForVBlank();
+  if(title_pal_on != (app == ST_TITLE)){                         /* the top screen's palette: the title picture on the title, the game's otherwise */
+    title_pal_on = app == ST_TITLE;
+    for(int k = 0; k < TITLE_DS_NCOL; k++)
+      BG_PALETTE_SUB[TITLE_DS_BASE + k] = title_pal_on ? RGB15(TITLE_DS_PAL[k * 3] >> 3, TITLE_DS_PAL[k * 3 + 1] >> 3, TITLE_DS_PAL[k * 3 + 2] >> 3) : gfx_pal[TITLE_DS_BASE + k];
+  }
   dmaCopy(buf_bot, BG_GFX, sizeof buf_bot);
   dmaCopy(buf_top, BG_GFX_SUB, sizeof buf_top);
 }

@@ -11,6 +11,8 @@ ds/source/sfx.c, sfx.h     DS sound: glide/arpeggio effects on PSG + noise chann
 dreamcast/main.c           Dreamcast front-end (KallistiOS PVR) - still the first-cut one
 art/manspr.h               GENERATED man pixel art shared by both consoles (tools/gen_manspr.py)
 tools/gen_manspr.py        builds art/manspr.h from the HTML prototype (needs Playwright, only for this step)
+art/title.h                GENERATED title picture for the DS (run-length coded, 256x192) and the Dreamcast (320x240 as flat quads) (tools/gen_title.py)
+tools/gen_title.py         builds art/title.h + docs/title_art.png from the HTML title (drawTitlePicture in web/index.html)
 test/                      host regression tests, robustness sweep, DS/DC host harnesses
 docs/                      screenshots rendered by the host harness (real DS drawing code)
 ```
@@ -28,7 +30,7 @@ fart A/B.  Each frame also carries belly and rear "blob" centres and radii for t
   booger, sweat when the sling is pulled hard, Zzz while asleep.  DS also has sounds (slap, boing, grunt, burp,
   fart, flick, yawn, snore: all PSG/noise note lists in `ds/source/sfx.c`) and "BUUURP!" / "PFFFFT!" popups.
   Dreamcast has no sound yet, so its gags are visual only, and no text popups.
-- Win screen: two men doing the butt-wiggle dance.  Lose screen: the sad pose.  DS title: he flexes, with gags too.
+- Win screen: two men doing the butt-wiggle dance.  Lose screen: the sad pose.  Title (HTML, DS, Dreamcast): the man dropping butt-first onto a very surprised landlord, no tagline.  The DS title is the picture on the top screen in its own sub-engine palette slots 64.. (swapped in only while the title is up) with the logo and the control hint drawn on top; the Dreamcast now has a title screen too (logo baked into the picture, blinking PRESS START, START or A begins).
 - Jiggle physics (cosmetic, in `core/mx.c: man_jiggle`, so all ports agree): the man's belly and rear are two damped
   springs (belly K400/D7, rear K250/D6, clamp 1.5 cells) kicked by his change of velocity while flying, when he hits
   something and when he drops; hits also squash him about 12% along the impact direction.  It never touches the
@@ -50,7 +52,7 @@ fart A/B.  Each frame also carries belly and rear "blob" centres and radii for t
 ## NEW MAN SPRITES pass (DS + Dreamcast)
 - The man now matches the HTML prototype: curvy dad bod, belly roll, chest hair, tube socks, brown shoes, briefs with the gold
   logo, towel cape, gold shades + handlebar mustache. `docs/man_sprites.png` shows every frame (zoomed 4x).
-- **10 frames**: aim idle (2, belly sways), drag/yelling, flex (2, used on the title screen), flying (2, legs + cape), belly-flop ball,
+- **10 frames**: aim idle (2, belly sways), drag/yelling, flex (2), flying (2, legs + cape), belly-flop ball,
   stuck/dizzy star (2). DS: dragging the man in the sling switches to the yelling frame; the HUD shows head-and-shoulders busts.
 - They are **generated, not hand-drawn**: `python3 tools/gen_manspr.py` runs the HTML's own drawing code in headless Chromium,
   shrinks it to chunky pixel art (outlined, fixed 22-colour palette) and writes `art/manspr.h`, which both consoles include.
@@ -224,3 +226,12 @@ DC:  analog stick pulls the man back, A launches / belly flops; START next/retry
 3. DC: bring it up to the DS front-end's level (text, HUD, sound via AICA from the same event list, sprites).
 4. DC 3D upgrade (64x32x24 voxels, instanced cubes, 3D support flood fill) - core stays 2D until then.
 5. Saves: DS FAT/SRAM for best scores; DC VMU.
+
+## TITLE SCREEN pass (HTML + DS + Dreamcast)
+- The HTML title is drawn by `drawSlamScene` / `drawSlam` / `drawLandlordScared` in `web/index.html`.  `drawSlam` poses him as a small real 3D pose (joints
+  in his own space, turned about 29 degrees to the camera so we see his back and rear from the right, mild perspective, every limb a projected tapered capsule
+  and every mass a projected ellipsoid, drawn far to near): butt down, legs up in a V with socks and shoes, hands on his shins, the towel streaming up behind him.
+- `python3 tools/gen_title.py` renders `drawTitlePicture` 4x too big, box-filters it down, quantises it (DS 190 colours, Dreamcast 96) and writes `art/title.h`.
+  DS: RLE, unpacked once into a 48 KB buffer, memcpy'd to the top screen each frame; the text colours (palette slots < 64) are untouched.
+  Dreamcast: ~9.6k flat quads (horizontal runs merged with identical runs below), drawn at 2x; PRESS START is ~460 more.
+- Not run on hardware or in an emulator: the DS/Dreamcast title code is checked only by the host harnesses (`docs/ds_1_title.png`, `docs/dc_title.png`) and the CI compile.
