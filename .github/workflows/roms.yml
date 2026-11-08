@@ -61,7 +61,7 @@ jobs:
           sudo apt-get install -y -qq desmume xvfb imagemagick x11-utils >/dev/null
           export LIBGL_ALWAYS_SOFTWARE=1
           xvfb-run -a -s "-screen 0 1024x768x24" bash -c '
-            desmume-cli --disable-sound --opengl-2d=0 --cpu-mode=1 mandex.nds > desmume.log 2>&1 &
+            desmume-cli --disable-sound mandex.nds > desmume.log 2>&1 &
             PID=$!
             for t in 4 8 14; do
               sleep $t
