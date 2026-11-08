@@ -21,18 +21,20 @@ include $(DEVKITARM)/ds_rules
 
 TARGET  := mandex
 CORE    := ../core
-INCLUDE := -I$(DEVKITPRO)/libnds/include -I$(CORE) -I../art -Isource
+# libnds 2.x sits on top of calico (its own headers and library); older libnds has no calico directory and this still works
+CALICO  := $(DEVKITPRO)/calico
+INCLUDE := -I$(DEVKITPRO)/libnds/include -I$(CALICO)/include -I$(CORE) -I../art -Isource
 
 # MX_FIXED         20.12 fixed point (the ARM9 has no FPU)
 # MX_LIBNDS_MATH   core uses libnds mulf32/divf32/sqrtf32 (hardware divide + sqrt units)
 # MX_HOT_ITCM      the solver's hot functions go into the 32 KB instruction TCM
 # SUBSTEPS         starting physics substeps per frame (the game adapts at run time)
-DEFS    := -DARM9 -DMX_FIXED -DMX_LIBNDS_MATH -DMX_HOT_ITCM -DSUBSTEPS=3
+DEFS    := -D__NDS__ -DARM9 -DMX_FIXED -DMX_LIBNDS_MATH -DMX_HOT_ITCM -DSUBSTEPS=3
 
 CFLAGS  := -std=gnu99 -g -Wall -O2 -march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
            -ffast-math -mthumb-interwork $(INCLUDE) $(DEFS)
 LDFLAGS := -specs=ds_arm9.specs -g -mthumb-interwork -Wl,-Map,$(TARGET).map
-LIBS    := -L$(DEVKITPRO)/libnds/lib -lnds9 -lm
+LIBS    := -L$(DEVKITPRO)/libnds/lib -L$(CALICO)/lib -lnds9 -lcalico_ds9 -lm
 
 # ARM mode for the hot code (solver + pixel blitting), Thumb for the rest.
 ARM_OBJS   := source/gfx.o $(CORE)/mx.o $(CORE)/cloth.o
