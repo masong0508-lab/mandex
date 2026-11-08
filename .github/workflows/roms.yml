@@ -58,6 +58,11 @@ jobs:
           cp /tmp/hw/*.nds out/hello_raw.nds
           python3 tools/ntr_patch.py out/hello_raw.nds out/hello_patched.nds
           ndstool -i out/hello_raw.nds | grep -iE "unit|ARM9 (entry|RAM|code)|ARM7 (entry|RAM|code)"
+      - name: Dump calico specs and linker scripts
+        run: |
+          for f in $DEVKITPRO/calico/share/ds9.specs $DEVKITPRO/calico/share/ds9-legacy.specs; do echo "##### $f"; cat $f; done
+          for f in $(find $DEVKITPRO/calico -name "ds9*.ld"); do echo "##### $f"; cat $f; done
+          echo "##### ds_rules"; grep -n "ndstool\|_ARM7\|-9\|-7" $DEVKITARM/ds_rules | head -20
       - name: Diagnostics (full headers, installed libnds flavours)
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
