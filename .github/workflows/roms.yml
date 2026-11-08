@@ -77,9 +77,12 @@ jobs:
           done
       - name: Header hexdump of stage1
         run: |
-          xxd -l 512 out/mandex_bare_stage1.nds
-          echo ---- arm9 head; xxd -s 0x4000 -l 64 out/mandex_bare_stage1.nds; xxd -s 0x4800 -l 64 out/mandex_bare_stage1.nds
-          ls -l out/mandex_bare_stage1.nds
+          python3 - <<'PY'
+          d = open("out/mandex_bare_stage1.nds", "rb").read()
+          for o in list(range(0, 0x200, 16)) + list(range(0x4000, 0x4010, 16)) + list(range(0x4800, 0x4840, 16)):
+              print("%08x: %s" % (o, " ".join("%02x" % x for x in d[o:o + 16])))
+          print("size", len(d))
+          PY
       - name: Diagnostics (full headers, installed libnds flavours)
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
