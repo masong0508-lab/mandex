@@ -29,6 +29,12 @@ jobs:
             sh tools/build_ds_bare.sh ds/$n.nds $d
             python3 tools/ntr_patch.py ds/$n.nds out/$n.nds
           done
+          python3 - <<'PY'
+          import struct
+          for n in ("stage0_red_crt", "mandex"):
+              d = open("out/%s.nds" % n, "rb").read()
+              print(n, "ARM9 @0x4000:", d[0x4000:0x4008].hex(), " @0x4800 (entry):", d[0x4800:0x4810].hex())
+          PY
           ndstool -i out/mandex.nds | grep -iE "unit|ARM9 (offset|entry|RAM|code)|ARM7 (offset|entry|RAM|code)|Logo CRC|Header CRC"
       - uses: actions/upload-artifact@v4
         with:
