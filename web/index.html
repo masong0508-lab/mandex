@@ -447,7 +447,7 @@ function explodeMan(){const m=man;ST().pops++;pdTouch();men--;
 function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long and he goes pop
   m.inf=Math.min(1,m.inf+dt/3.6);m.airT+=dt;
   if(m.airT>.07){m.airT=0;SFX.hiss();P({k:6,x:VX+(rnd()-.5)*10,y:VY+16,vx:(rnd()-.5)*70,vy:-30-rnd()*50,l:.5,l0:.5,s:3+rnd()*3,c:'#cfe9ff'});
-    if(m.inf>.5){sweat(m.x-2,m.y-30);SFX.creak(m.inf)}}
+    if(m.inf>.5){if(rnd()<.3)sweat(m.x-2,m.y-30);SFX.creak(m.inf)}}
   if(m.inf>=1)explodeMan()}
 function drawValve(){
   const m=man,f=m.mode==='aim'?m.inf:0,t=time;
@@ -469,8 +469,7 @@ function drawInfFX(m){
   if(m.pwr==='towel'&&m.mode==='fly'&&m.gt<1.8){ctx.rotate(m.ang);const fl=Math.sin(time*18)*5;ctx.fillStyle='#ff9ec8';ctx.strokeStyle='#000';ctx.lineWidth=2;
     for(const sd of[-1,1]){ctx.beginPath();ctx.moveTo(-6,sd*6);ctx.quadraticCurveTo(-30,sd*(30+fl),-54,sd*(14+fl));ctx.quadraticCurveTo(-34,sd*8,-6,sd*6);ctx.closePath();ctx.fill();ctx.stroke()}}
   if(m.inf>.05){const f=m.inf,r=m.R*1.25;
-    ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(-r*.35,-r*.5,r*.14,r*.3,-.5,0,7);ctx.fill();                    // shiny stretched skin
-    if(f>.6){ctx.globalAlpha=(f-.6)*1.2*(.6+.4*Math.sin(time*24));ctx.fillStyle='#ff3a3a';ctx.beginPath();ctx.arc(0,-4,r*1.1,0,7);ctx.fill()}}
+    if(f>.85){ctx.globalAlpha=(f-.85)*3*(.6+.4*Math.sin(time*30));ctx.strokeStyle='#ff4a4a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-4,r*1.1,0,7);ctx.stroke()}}
   ctx.restore()}
 function manPlow(){
   bounceRubber();
@@ -632,6 +631,7 @@ function pYoke(C,S,ox,fill){const R=[],L=[],n=YOKE.length;
 function curls(list){ctx.save();ctx.strokeStyle=HAIR;ctx.lineWidth=.8;ctx.lineCap='round';for(const[x,y,d]of list){ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+d*1.1,y+.6,x+d*.4,y+1.9);ctx.stroke()}ctx.restore()}   // tiny curly hairs
 function blobClip(parts){const u=new Path2D();for(const q of parts)u.addPath(q.p);ctx.clip(u)}
 function face(cx,cy,sc,kind,t,side,x){ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);newFace(kind,t,x||{});ctx.restore()}
+let INF=0;   // how inflated the belly is (0..1) for the side-profile sprite
 let JIG=null;   // belly/rear spring offsets for the current render (set by renderMan; null = off)
 function jigMerge(o){if(!JIG)return o;o=Object.assign({},o||{});o.bo=JIG.bo;o.ro=JIG.ro;o.belly=o.belly?[o.belly[0]*JIG.bs[0],o.belly[1]*JIG.bs[1]]:JIG.bs;return o}
 function drawFront(pose,fk,t,o){
@@ -692,8 +692,15 @@ function drawSide(t,fk){
     ctx.strokeStyle='#e33';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx,sy-4);ctx.quadraticCurveTo(sx+1.2,sy,sx,sy+4);ctx.stroke();
     blob([pEll(ax-4,ay+1,6.5,3.2,'#8a5a2b',.5+fl*.3)],{ow:1.5,shc:'rgba(60,30,10,.4)',hl:0})};
   leg(-12,8,-27,12+fl*2,-44,4+fl*4,SKD);leg(-10,6,-24,16-fl*2,-42,13-fl*3,SK);
-  blob([pEll(2+(bo?bo[0]:0),-2+(bo?bo[1]:0),21,14.5),pEll(14,-9,12,10)],{ow:1.9});                                                             // belly and chest: one body
-  curls(Array.from({length:5},(_,k)=>[16+(k%2)*2,-12+k*2,k%2?1:-1]));
+  {const f=INF,bx=2+(bo?bo[0]:0)+f*10,by=-2+(bo?bo[1]:0)-f*6,rx=21+f*17,ry=14.5+f*17;                                                          // belly and chest: one body; the belly is what swells
+   blob([pEll(bx,by,rx,ry),pEll(14+f*5,-9-f*5,12+f*2,10+f*2)],{ow:1.9});
+   if(f>.04){ctx.save();ctx.lineCap='round';
+     ctx.fillStyle='rgba(255,255,255,'+(.18+f*.25)+')';ctx.beginPath();ctx.ellipse(bx+rx*.35,by-ry*.45,rx*.16,ry*.3,-.6,0,6.3);ctx.fill();                  // shiny stretched skin
+     if(f>.3){ctx.strokeStyle='rgba(205,70,60,'+Math.min(.8,(f-.3)*1.4)+')';ctx.lineWidth=1.3;for(let k=-2;k<=2;k++){ctx.beginPath();ctx.arc(bx-rx*.15,by+k*ry*.28,rx*.78,-.35,.35);ctx.stroke()}}   // stretch marks
+     const nx=bx+rx*.8,ny=by+ry*.1;ctx.strokeStyle='rgba(176,92,52,.9)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(nx,ny,1.6+f*3,-1.6,1.6);ctx.stroke();      // the belly button pops out
+     if(f>.65){ctx.globalAlpha=(f-.65)*1.6*(.6+.4*Math.sin(time*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(bx,by,rx,ry,0,0,6.3);ctx.fill()}
+     ctx.restore()}}
+  curls(Array.from({length:5},(_,k)=>[16+INF*24+(k%2)*2,-12-INF*8+k*2,k%2?1:-1]));
   T(ro,()=>{blob([pEll(-13,6,13.5,11.5,BR),pEll(3,10,14,6.5,BR)],{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
     ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-16,2,3.6,2.6,-.5,0,6.3);ctx.fill();
     ctx.strokeStyle='rgba(110,10,32,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(-6,9,8,2.1,3.7);ctx.stroke();
@@ -1567,12 +1574,13 @@ function renderMan(){
     JIG=jigOpts(j,sx,sy,wob*.17);drawFront('star','dizzy',time);JIG=null;ctx.restore();return}
   ctx.save();ctx.translate(m.x,m.y);jigSquash(j);
   if(m.mode==='aim'){const sc=.5*(1+m.pop*.5),a=Math.atan2(SY-m.y,SX-m.x)*.25,sy=sc*(dragging?.94:1);
-    const ix=1+m.inf*.75,iy=1+m.inf*1.1;ctx.translate((m.inf>.5?Math.sin(time*45)*m.inf*2.2:0),-m.inf*20);ctx.rotate(a);ctx.scale(sc*ix,sy*iy);JIG=jigOpts(j,sc*ix,sy*iy,a);
+    const ix=1,iy=1;ctx.translate((m.inf>.5?Math.sin(time*45)*m.inf*2.2:0)+(m.inf>.02?-7:0),m.inf>.02?-4:0);ctx.rotate(a);ctx.scale(sc*ix,sy*iy);JIG=jigOpts(j,sc*ix,sy*iy,a);
     const fn=dragging?null:gagFrame(m.G),sp=fn&&spinLive(m.G);
-    if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else drawFront('up',dragging?'scream':'cool',time);
+    if(m.inf>.02){INF=m.inf;ctx.rotate(-1.45);ctx.scale(1.7,1.7);drawSide(time,'scream');INF=0}                  // side profile: rear on the valve, belly swelling out the front
+    else if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else drawFront('up',dragging?'scream':'cool',time);
     JIG=null}
   else if(m.dive){ctx.rotate(m.spin);ctx.scale(.62,.62);JIG=jigOpts(j,.62,.62,m.spin);drawBall(time,'scream');JIG=null}
-  else{const k=1+m.inf*.6;ctx.rotate(m.ang);ctx.scale(.64*k,.64*k);JIG=jigOpts(j,.64*k,.64*k,m.ang);drawSide(time,'scream');JIG=null}
+  else{ctx.rotate(m.ang);ctx.scale(.64,.64);JIG=jigOpts(j,.64,.64,m.ang);INF=m.inf;drawSide(time,'scream');INF=0;JIG=null}
   ctx.restore()}
 function drawLandlord(t){
   const bob=Math.sin(t.t*5)*.8;ctx.save();ctx.translate(t.x,t.y+bob);ctx.scale(1.15,1.15);
