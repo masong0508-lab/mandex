@@ -66,6 +66,19 @@ s32 sqrtf32(s32 a){
   return (s32)R32(0x040002B4);
 }
 
+/* two cascaded hardware timers = a 32-bit tick counter at 33.5 MHz */
+void cpuStartTiming(int t){
+  (void)t;
+  R16(0x04000102) = 0; R16(0x04000106) = 0;
+  R16(0x04000100) = 0; R16(0x04000104) = 0;
+  R16(0x04000106) = 0x84;                           /* timer 1: enabled, count-up (cascade) */
+  R16(0x04000102) = 0x80;                           /* timer 0: enabled, F/1 */
+}
+u32 cpuEndTiming(void){
+  R16(0x04000102) = 0;
+  return ((u32)R16(0x04000104) << 16) | R16(0x04000100);
+}
+
 /* ------------------------------------------------------------- sound (ARM7 does the register writes) */
 enum { C_PLAY_PSG = 1, C_PLAY_NOISE = 2, C_FREQ = 3, C_KILL = 4 };
 static u8 busy[16];

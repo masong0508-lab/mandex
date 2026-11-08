@@ -68,7 +68,11 @@ void touchRead(touchPosition *t);
 /* fixed-point math, 20.12 */
 static inline s32 mulf32(s32 a, s32 b){ return (s32)(((s64)a * b) >> 12); }
 s32 divf32(s32 a, s32 b);
+#define sqrtf32 mx_sqrtf32            /* sqrtf32 collides with a compiler builtin name */
 s32 sqrtf32(s32 a);
+static inline void DC_FlushRange(const void *p, u32 n){ (void)p; (void)n; }   /* caches are never turned on */
+void cpuStartTiming(int t);
+u32 cpuEndTiming(void);
 
 /* sound: commands go to the ARM7 */
 typedef enum { DutyCycle_50 = 3 } DutyCycle;
