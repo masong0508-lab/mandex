@@ -8,7 +8,7 @@ name: ROMs
 on:
   push:
     branches: [main]
-    paths: ["ds/**", "dreamcast/**", "core/**", "art/**", ".github/workflows/roms.yml"]
+    paths: ["ds/**", "dreamcast/**", "3ds/**", "core/**", "art/**", ".github/workflows/roms.yml"]
   workflow_dispatch:
 
 jobs:
@@ -112,3 +112,22 @@ jobs:
           zip -9 ../mandex-roms.zip mandex.nds mandex_nosound.nds stage0_red_crt.nds stage1_red.nds stage2_green.nds stage4_yellow.nds mandex.cdi mandex.elf README.txt
       - uses: actions/upload-artifact@v4
         with: { name: mandex-roms, path: mandex-roms.zip }
+
+  n3ds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the 3DS homebrew (libctru, software rendering)
+        run: |
+          export DEVKITPRO=${DEVKITPRO:-/opt/devkitpro}
+          export DEVKITARM=${DEVKITARM:-$DEVKITPRO/devkitARM}
+          [ -f "$DEVKITPRO/libctru/include/3ds.h" ] || dkp-pacman -S --noconfirm 3ds-dev
+          make -C 3ds
+          mkdir -p out3ds && cp 3ds/mandex.3dsx 3ds/mandex.elf out3ds/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-3ds
+          path: out3ds/*
+          if-no-files-found: error

@@ -263,3 +263,10 @@ those: ARM9 image at 0x02000000 with a 0x800-byte secure-area filler, entry 0x02
 `ndstool -h 0x4000`.  `ds/bare/nds.h` is a small stand-in for <nds.h>; `hw9.c` does video / keys / timers / divider / sqrt / sound
 commands; `arm7.c` polls X/Y, the pen (SPI touch with firmware calibration) and plays the sound ring buffer.  Caches are not enabled,
 there is no ITCM use.  NOT verified on any emulator or hardware.  `tools/ntr_patch.py` fills the secure area and fixes the CRCs.
+
+## Nintendo 3DS build (3ds/)
+
+Homebrew `.3dsx` (devkitARM + libctru, no citro2d/citro3d): the shared core in float mode, drawn in software straight into the two framebuffers.
+Top screen = the whole level at 3 px per voxel; bottom screen = the sling at 4 px per voxel (touch to drag the man back, lift to fling, tap in flight to belly flop).
+D-pad / circle pad + A also work. No sound, no save, no outfits/achievements/power-ups yet. CI job `n3ds` uploads the artifact `mandex-3ds` (mandex.3dsx + mandex.elf).
+Nothing has been run on a real 3DS or in an emulator (Citra / Lime3DS): it is only known to compile.
