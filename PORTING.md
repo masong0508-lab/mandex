@@ -270,3 +270,22 @@ Homebrew `.3dsx` (devkitARM + libctru, no citro2d/citro3d): the shared core in f
 Top screen = the whole level at 3 px per voxel; bottom screen = the sling at 4 px per voxel (touch to drag the man back, lift to fling, tap in flight to belly flop).
 D-pad / circle pad + A also work. No sound, no save, no outfits/achievements/power-ups yet. CI job `n3ds` uploads the artifact `mandex-3ds` (mandex.3dsx + mandex.elf).
 Nothing has been run on a real 3DS or in an emulator (Citra / Lime3DS): it is only known to compile.
+
+## Uniform controls + 3DS stereo 3D
+
+| Action | DS | 3DS | Dreamcast |
+|---|---|---|---|
+| Aim | touch drag or D-pad | touch drag, D-pad or circle pad | analog stick |
+| Release / belly flop | A (touch to dive too) | A, B or touch | A or B |
+| Power-up cycle | X | X | X |
+| Pause / resume | START | START | START |
+| Restart level | SELECT | SELECT | Y (no SELECT on the pad) |
+| Title: level | D-pad left/right | D-pad left/right | D-pad left/right |
+| Title: outfit | L / R | L / R | left / right trigger |
+| Play | A or START | A, START or touch | A or START |
+| End screen: back to title | B | B | not available (title art is freed to save VRAM) |
+
+3DS 3D: the top screen is drawn once per eye with per-layer horizontal disparity scaled by the 3D slider
+(sky furthest, then back faces of blocks, the building, landlords, sling and valve, aim dots, the man and
+debris nearest). Slider at zero draws one flat image. This is a parallax effect, not real geometry,
+and has not been seen on a real 3DS or in an emulator.

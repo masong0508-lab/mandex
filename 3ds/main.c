@@ -20,7 +20,8 @@
 #include "mx_meta.h"
 
 static MxWorld world;
-enum { ST_TITLE, ST_PLAY };
+enum { ST_TITLE, ST_PLAY, ST_PAUSE };
+static float g_dim = 1.0f;                      /* 1 = normal; <1 draws the dark back layer that gives blocks thickness in 3D */
 static int app = ST_TITLE, sel = 0, frame, dragging, pad_used, cells0 = 1;
 static float pad_dx, pad_dy;
 static int best[MX_NUM_LEVELS];
@@ -104,6 +105,9 @@ static inline int VY(const View *v, float c){ return v->oy + (int)floorf((c - v-
 static void draw_sky(const View *v){
   Scr *s = v->s;
   for(int y = 0; y < s->h; y += 4){ int t = y * 90 / s->h; rect(s, 0, y, s->w, 4, RGB(90 + t / 2, 170 + t / 2, 240 - t / 3)); }
+  for(int k = -1; k < 5; k++){ int hx = v->ox + k * 110 + 30, hy = VY(v, MX_ROWS) - 8;            /* far hills: they carry the 3D depth of the backdrop */
+    disc(s, hx, hy + 10, 70, RGB(120, 170, 190)); disc(s, hx + 55, hy + 24, 54, RGB(150, 200, 215)); }
+  for(int k = 0; k < 4; k++) disc(s, v->ox + 40 + k * 120, 40 + (k & 1) * 22, 16, RGB(250, 252, 255));   /* clouds */
   rect(s, 0, VY(v, MX_ROWS), s->w, s->h, RGB(96, 64, 38));
   rect(s, 0, VY(v, MX_ROWS) - 2, s->w, 3, RGB(70, 170, 70));
 }
@@ -119,6 +123,7 @@ static void draw_cells(const View *v){
     const uint8_t *c = mx_material_rgb(m);
     float f = .55f + .45f * RTOF(world.hp[i]) / (float)mx_material_hp(m);   /* darker as it takes damage */
     if(f > 1) f = 1;
+    f *= g_dim;
     u32 col = RGB((int)(c[0] * f), (int)(c[1] * f), (int)(c[2] * f));
     if(world.brk[i]) col = RGB((int)(c[0] * f * .8f), (int)(c[1] * f * .8f), (int)(c[2] * f * .8f));
     rect(v->s, sx, sy, p, p, col);
@@ -130,7 +135,7 @@ static void draw_cells(const View *v){
       const MxCell *a = &ch->cells[k];
       if(a->dead) continue;
       const uint8_t *col = mx_material_rgb(a->m);
-      rect(v->s, VX(v, RTOF(a->wx)) - p / 2, VY(v, RTOF(a->wy)) - p / 2, p, p, RGB(col[0], col[1], col[2]));
+      rect(v->s, VX(v, RTOF(a->wx)) - p / 2, VY(v, RTOF(a->wy)) - p / 2, p, p, RGB((int)(col[0] * g_dim), (int)(col[1] * g_dim), (int)(col[2] * g_dim)));
     }
   }
 }
@@ -197,6 +202,24 @@ static void draw_world(const View *v){
   draw_sky(v); draw_cells(v); draw_landlords(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
 }
 
+/* Stereoscopic top screen.  The slider sets how strong the depth is; each layer gets a horizontal disparity D (px at full slider):
+   D > 0 sits behind the screen (hills, sky), 0 is the screen plane (the blocks' front faces), D < 0 floats in front (landlords, man, sling, debris).
+   The blocks also get a dark back layer a few px behind them, so every wall has visible thickness. */
+static void draw_world_3d(const View *vt, int sgn, float sl){
+  View a = *vt;
+  #define DX(D) ((int)lroundf(sgn * (D) * sl * 0.5f))
+  int stereo = sl > 0.03f;
+  a.ox = vt->ox + DX(10); draw_sky(&a);
+  if(stereo){ a.ox = vt->ox + DX(4); g_dim = .45f; draw_cells(&a); g_dim = 1.0f; }       /* back faces */
+  a.ox = vt->ox; draw_cells(&a);
+  a.ox = vt->ox + DX(-3); draw_landlords(&a);
+  a.ox = vt->ox + DX(-4); draw_sling(&a); draw_valve(&a);
+  a.ox = vt->ox + DX(-5); draw_aim(&a);
+  a.ox = vt->ox + DX(-7); draw_man(&a);
+  a.ox = vt->ox + DX(-10); draw_parts(&a);
+  #undef DX
+}
+
 /* ---------------------------------------------------------------- HUD / panels */
 static int alive(void){ return mx_targets_alive(&world); }
 static void draw_hud(void){
@@ -238,23 +261,27 @@ int main(void){
   while(aptMainLoop()){
     hidScanInput();
     u32 down = hidKeysDown(), held = hidKeysHeld(), up = hidKeysUp();
-    if(down & KEY_START) break;
     touchPosition t; hidTouchRead(&t);
     frame++;
 
     if(app == ST_TITLE){
-      if(down & (KEY_RIGHT | KEY_R)){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
-      if(down & (KEY_LEFT | KEY_L)){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
-      if(down & KEY_Y){ for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } }
-      if(down & (KEY_A | KEY_TOUCH)){ app = ST_PLAY; load_level(sel); }
+      if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
+      if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
+      if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } }
+      if(down & (KEY_A | KEY_START | KEY_TOUCH)){ app = ST_PLAY; load_level(sel); }
+    } else if(app == ST_PAUSE){
+      if(down & KEY_START) app = ST_PLAY;
+      if(down & KEY_SELECT){ load_level(world.level); app = ST_PLAY; }
+      if(down & KEY_B){ app = ST_TITLE; sel = world.level; load_level(sel); }
     } else {
       MxMan *m = &world.man;
+      if((down & KEY_START) && world.state == MX_PLAY) app = ST_PAUSE;
       if(down & KEY_SELECT) load_level(world.level);
-      if((down & KEY_L) && m->mode == MAN_AIM){ int nx = world.pw_sel; for(int k = 0; k < 4; k++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; }
+      if((down & KEY_X) && m->mode == MAN_AIM){ int nx = world.pw_sel; for(int k = 0; k < 4; k++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; }
         if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); }
-      if(down & KEY_X){ app = ST_TITLE; sel = world.level; load_level(sel); }
+      if((down & KEY_B) && world.state != MX_PLAY){ app = ST_TITLE; sel = world.level; load_level(sel); }       /* B on the end screen = back to the title */
       if(world.state != MX_PLAY){
-        if(down & (KEY_A | KEY_TOUCH)){
+        if(down & (KEY_A | KEY_START | KEY_TOUCH)){
           int next = world.state == MX_WIN ? world.level + 1 : world.level;
           if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel = 0; load_level(0); } else { sel = next; load_level(next); }
         }
@@ -266,18 +293,20 @@ int main(void){
         }
         if((up & KEY_TOUCH) && dragging){ dragging = 0; mx_release(&world); }
         if(!dragging && !pad_used && m->seated){}                      /* seated on the valve: leave him there until he is dragged off */
-        if(held & (KEY_DLEFT | KEY_DRIGHT | KEY_DUP | KEY_DDOWN | KEY_CPAD_LEFT | KEY_CPAD_RIGHT | KEY_CPAD_UP | KEY_CPAD_DOWN)){
-          if(held & (KEY_DLEFT | KEY_CPAD_LEFT)) pad_dx -= .25f;
-          if(held & (KEY_DRIGHT | KEY_CPAD_RIGHT)) pad_dx += .25f;
-          if(held & (KEY_DUP | KEY_CPAD_UP)) pad_dy -= .25f;
-          if(held & (KEY_DDOWN | KEY_CPAD_DOWN)) pad_dy += .25f;
-          pad_used = 1; mx_set_pull(&world, R(1) * pad_dx, R(1) * pad_dy);
+        if(!dragging && (held & (KEY_DLEFT | KEY_DRIGHT | KEY_DUP | KEY_DDOWN | KEY_CPAD_LEFT | KEY_CPAD_RIGHT | KEY_CPAD_UP | KEY_CPAD_DOWN))){   /* same pad aiming as the DS */
+          if(!pad_used){ pad_dx = -6.0f; pad_dy = 3.0f; pad_used = 1; }
+          if(held & (KEY_DLEFT | KEY_CPAD_LEFT)) pad_dx -= .3f;
+          if(held & (KEY_DRIGHT | KEY_CPAD_RIGHT)) pad_dx += .3f;
+          if(held & (KEY_DUP | KEY_CPAD_UP)) pad_dy -= .3f;
+          if(held & (KEY_DDOWN | KEY_CPAD_DOWN)) pad_dy += .3f;
+          if(pad_dx < -12) pad_dx = -12; if(pad_dx > 2) pad_dx = 2; if(pad_dy < -8) pad_dy = -8; if(pad_dy > 12) pad_dy = 12;
+          mx_set_pull(&world, R(1) * pad_dx, R(1) * pad_dy);
         }
-        if((down & KEY_A) && pad_used){ pad_used = 0; pad_dx = pad_dy = 0; mx_release(&world); }
+        if((down & KEY_A) && pad_used){ pad_used = 0; mx_release(&world); }
       } else if(m->mode == MAN_FLY){
         if(down & (KEY_A | KEY_B | KEY_TOUCH)) mx_dive(&world);
       }
-      mx_update(&world, R(1.0 / 60.0));
+      if(app == ST_PLAY) mx_update(&world, R(1.0 / 60.0));
       on_events();
       mx_meta_events(&stats, &world);
       for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a);
@@ -289,23 +318,28 @@ int main(void){
     }
 
     /* ---- draw ---- */
-    top.fb = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL); top.w = 400; top.h = 240;
     bot.fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL); bot.w = 320; bot.h = 240;
-    draw_world(&vt);
+    float sl = osGet3DSliderState();                   /* the 3D slider: 0 = flat, 1 = full depth */
+    gfxSet3dEnabled(sl > 0.03f);
+    for(int eye = 0; eye < (sl > 0.03f ? 2 : 1); eye++){
+    top.fb = gfxGetFramebuffer(GFX_TOP, eye ? GFX_RIGHT : GFX_LEFT, NULL, NULL); top.w = 400; top.h = 240;
+    draw_world_3d(&vt, eye ? 1 : -1, sl);
     if(app == ST_TITLE){
       rect(&top, 70, 40, 260, 90, RGB(15, 18, 30));
       textc(&top, 200, 52, "MANDEX", 6, RGB(255, 210, 63));
       textc(&top, 200, 100, "THE LANDLORD SMASHER", 2, RGB(255, 255, 255));
       char b[48]; sprintf(b, "< LEVEL %d  %s >", sel + 1, mx_level_name(sel)); textc(&top, 200, 150, b, 2, RGB(255, 255, 255));
-      textc(&top, 200, 176, "A / TOUCH = PLAY", 2, RGB(125, 255, 90));
-      { char ob[64]; sprintf(ob, "Y: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
+      textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
+      { char ob[64]; sprintf(ob, "L/R: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {
       draw_hud(); draw_end();
+      if(app == ST_PAUSE){ rect(&top, 110, 80, 180, 70, RGB(15, 18, 30)); textc(&top, 200, 88, "PAUSED", 3, RGB(255, 210, 63)); textc(&top, 200, 116, "START RESUME", 1, RGB(255, 255, 255)); textc(&top, 200, 126, "SELECT RESTART  B MENU", 1, RGB(255, 255, 255)); }
+    }
     }
     draw_world(&vb);
     if(app == ST_PLAY){
       if(world.man.mode == MAN_AIM && !dragging && world.state == MX_PLAY) textc(&bot, 200, 12, "DRAG BACK AND LET GO", 2, RGB(255, 255, 255));
-      if(world.man.mode == MAN_AIM && world.state == MX_PLAY){ static const char *const PWN[4] = { "NONE", "BEANS", "TOWEL", "SPLAT" }; char pb[48]; sprintf(pb, "L: POWER-UP %s", PWN[world.pw_sel]); textc(&bot, 160, 228, pb, 1, world.pw_sel ? RGB(255, 210, 63) : RGB(200, 200, 200)); }
+      if(world.man.mode == MAN_AIM && world.state == MX_PLAY){ static const char *const PWN[4] = { "NONE", "BEANS", "TOWEL", "SPLAT" }; char pb[48]; sprintf(pb, "X: POWER-UP %s", PWN[world.pw_sel]); textc(&bot, 160, 228, pb, 1, world.pw_sel ? RGB(255, 210, 63) : RGB(200, 200, 200)); }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
     } else textc(&bot, 160, 12, "TOUCH TO START", 2, RGB(255, 255, 255));
     gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();

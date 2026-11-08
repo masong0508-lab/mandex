@@ -8,9 +8,11 @@
  * Controls (port A controller)
  *   analog stick : pull the man back in the sling (push the direction you
  *                  want to pull him: left/down fires up and to the right)
- *   A            : release the sling / belly flop in mid-air
- *   START        : start from the title screen; next level after a win, retry after a loss
- *   Y            : restart the level
+ *   A or B       : release the sling / belly flop in mid-air
+ *   X            : cycle the power-up
+ *   START        : start from the title; pause / resume; next level after a win, retry after a loss
+ *   Y            : restart the level (the DS and 3DS use SELECT)
+ *   title        : D-pad left/right = level, triggers = outfit
  *
  * Not done yet: sound via AICA, and the real-3D voxel upgrade described in MANDEX_DESIGN.md.
  * Texture memory: ~3.8 MB (the title picture, 1 MB of it, is freed when the game starts).
@@ -325,7 +327,7 @@ static void fx_step(int calm, int strain){
 
 /* The title: the whole landscape with the man dropping butt-first on a landlord (a 852x480 picture, art/dcart.h, from the HTML title, logo included).
    The picture is wider than the screen, so the screen pans across it: hold on the logo, glide right to the man, hold, glide back. */
-static int on_title = 1, title_t;
+static int on_title = 1, title_t, paused, title_lv;
 static int title_pan(int t, int range){                 /* 0..range for tick t: hold (90), glide right (160), hold (150), glide back (160), smoothstep */
   t %= 560;
   int k = t < 90 ? 0 : t < 250 ? t - 90 : t < 400 ? 160 : t < 560 ? 160 - (t - 400) : 0;
@@ -336,7 +338,7 @@ static void draw_title(void){
   int pan = title_pan(title_t, 852 - 640);
   tquad(&hdr_ttl, DCT_TTL_W, DCT_TTL_H, (float)-pan, 0, 852, 480, 0, 0, 852, 480, Z_BG, WHITE);
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
-  { char tb[64]; snprintf(tb, sizeof tb, "< LEFT/RIGHT: OUTFIT - %s >", mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD); }
+  { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD); }
 }
 
 /* ---- the world ---- */
@@ -570,21 +572,27 @@ int main(int argc, char **argv){
 
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
   load_level(0);
-  uint32 prev = 0;
+  uint32 prev = 0; int prev_trig = 0;
   while(1){
     maple_device_t *dev = maple_enum_type(0, MAPLE_FUNC_CONTROLLER);
     cont_state_t *st = dev ? (cont_state_t *)maple_dev_status(dev) : NULL;
     if(st){
       uint32 pressed = st->buttons & ~prev; prev = st->buttons;
       if(on_title){
-        if(pressed & (CONT_DPAD_RIGHT | CONT_DPAD_LEFT)){
-          for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + ((pressed & CONT_DPAD_RIGHT) ? k : MX_NUM_OUTFITS - k)) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
+        if(pressed & (CONT_DPAD_RIGHT | CONT_DPAD_LEFT)) title_lv = (title_lv + ((pressed & CONT_DPAD_RIGHT) ? 1 : MX_NUM_LEVELS - 1)) % MX_NUM_LEVELS;
+        { int tl = (st->ltrig > 128 && !(prev_trig & 1)), tr = (st->rtrig > 128 && !(prev_trig & 2)); prev_trig = (st->ltrig > 128) | ((st->rtrig > 128) << 1);
+        if(tl || tr){
+          for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + (tr ? k : MX_NUM_OUTFITS - k)) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
           recolor_man(outfit_sel);
-        }
-        if(pressed & (CONT_START | CONT_A)){ on_title = 0; if(tx_ttl){ pvr_mem_free(tx_ttl); tx_ttl = 0; } }
+        } }
+        if(pressed & (CONT_START | CONT_A)){ on_title = 0; load_level(title_lv); if(tx_ttl){ pvr_mem_free(tx_ttl); tx_ttl = 0; } }
       } else if(world.state != MX_PLAY){
         if(pressed & CONT_START) load_level(world.state == MX_WIN ? world.level + 1 : world.level);
+      } else if(paused){
+        if(pressed & CONT_START) paused = 0;
+        if(pressed & CONT_Y){ load_level(world.level); paused = 0; }
       } else {
+        if(pressed & CONT_START) paused = 1;
         if(pressed & CONT_Y) load_level(world.level);
         if(world.man.mode == MAN_AIM){
           float jx = st->joyx / 127.0f, jy = st->joyy / 127.0f;
@@ -593,12 +601,12 @@ int main(int argc, char **argv){
           if(pressed & CONT_X){ int nx = world.pw_sel; for(int k = 0; k < 4; k++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; }
             if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); }
           if(!(world.man.seated && jx == 0 && jy == 0)) mx_set_pull(&world, jx * MX_PULL_MAX, jy * MX_PULL_MAX);   /* seated on the valve: a centred stick leaves him there */
-          if(pressed & CONT_A){ mx_release(&world); hint_t = 0; }
-        } else if(pressed & CONT_A) mx_dive(&world);
+          if(pressed & (CONT_A | CONT_B)){ mx_release(&world); hint_t = 0; }
+        } else if(pressed & (CONT_A | CONT_B)) mx_dive(&world);
       }
     }
     if(on_title){ title_t++; }
-    else {
+    else if(!paused){
       mx_update(&world, DT);
       handle_events();
       mx_meta_events(&stats, &world);
@@ -615,7 +623,7 @@ int main(int argc, char **argv){
     pvr_scene_begin();
     pvr_list_begin(PVR_LIST_TR_POLY);
     cur_hdr = 0;
-    if(on_title) draw_title(); else draw_all();
+    if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART", 320, 270, 24, WHITE, 1, Z_HUD); } }
     pvr_list_finish();
     pvr_scene_finish();
   }
