@@ -47,6 +47,17 @@ jobs:
             make -C ds EXTRA_DEFS="-DMX_NOSOUND -DMX_STAGE=$n"
             python3 tools/ntr_patch.py ds/mandex.nds out/stage$n.nds
           done
+      - name: Official devkitPro example, same patch pipeline
+        run: |
+          export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
+          ls $DEVKITPRO/examples/nds | head -30
+          ex=$(find $DEVKITPRO/examples/nds -type d -name hello_world | head -1); echo "example: $ex"
+          cp -r "$ex" /tmp/hw && cd /tmp/hw && make 2>&1 | tail -5
+          ls -la /tmp/hw/*.nds
+          cd - >/dev/null
+          cp /tmp/hw/*.nds out/hello_raw.nds
+          python3 tools/ntr_patch.py out/hello_raw.nds out/hello_patched.nds
+          ndstool -i out/hello_raw.nds | grep -iE "unit|ARM9 (entry|RAM|code)|ARM7 (entry|RAM|code)"
       - name: Diagnostics (full headers, installed libnds flavours)
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
@@ -127,6 +138,6 @@ jobs:
         run: |
           cd pack && ls -la
           printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - plain DS header; melonDS / DeSmuME / DraStic / flashcart\n  mandex_nosound_calico.nds  Nintendo DS - same game with sound start-up disabled; try it if mandex.nds will not boot\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
-          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound_calico.nds stage1.nds stage2.nds stage3.nds stage4.nds mandex.cdi mandex.elf README.txt
+          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound_calico.nds stage1.nds stage2.nds stage3.nds stage4.nds hello_raw.nds hello_patched.nds mandex.cdi mandex.elf README.txt
       - uses: actions/upload-artifact@v4
         with: { name: mandex-roms, path: mandex-roms.zip }
