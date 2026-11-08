@@ -102,15 +102,31 @@ typedef struct { Scr *s; int ppc, ox, oy; float cx, cy; } View;   /* screen px =
 static inline int VX(const View *v, float c){ return v->ox + (int)floorf((c - v->cx) * v->ppc); }
 static inline int VY(const View *v, float c){ return v->oy + (int)floorf((c - v->cy) * v->ppc); }
 
-static void draw_sky(const View *v){
-  Scr *s = v->s;
-  for(int y = 0; y < s->h; y += 4){ int t = y * 90 / s->h; rect(s, 0, y, s->w, 4, RGB(90 + t / 2, 170 + t / 2, 240 - t / 3)); }
-  for(int k = -1; k < 5; k++){ int hx = v->ox + k * 110 + 30, hy = VY(v, MX_ROWS) - 8;            /* far hills: they carry the 3D depth of the backdrop */
-    disc(s, hx, hy + 10, 70, RGB(120, 170, 190)); disc(s, hx + 55, hy + 24, 54, RGB(150, 200, 215)); }
-  for(int k = 0; k < 4; k++) disc(s, v->ox + 40 + k * 120, 40 + (k & 1) * 22, 16, RGB(250, 252, 255));   /* clouds */
-  rect(s, 0, VY(v, MX_ROWS), s->w, s->h, RGB(96, 64, 38));
-  rect(s, 0, VY(v, MX_ROWS) - 2, s->w, 3, RGB(70, 170, 70));
+static float g_pan, g_sl; static int g_sgn;   /* eye sign and slider, so layers inside the sky can have their own disparity */
+#define LD(D) ((int)lroundf(g_sgn * (D) * g_sl * 0.5f))
+static float g_pan_unused;                              /* camera drift in px: follows the man, each layer scrolls by its own fraction */
+static void hills(Scr *s, int base, int ox, int step, int r, int amp, int col0, int col1, int col2){
+  for(int k = -2; k < s->w / step + 3; k++){ int x = ox + k * step, h = ((k * 37 + 11) & 7) * amp / 7;
+    disc(s, x, base - h + r / 2, r, (k & 1) ? col1 : col0); }
+  rect(s, 0, base + r / 2, s->w, s->h, col2);
 }
+static void draw_sky(const View *v){
+  Scr *s = v->s; int gy = VY(v, MX_ROWS);
+  for(int y = 0; y < s->h; y += 4){ int t = y * 90 / s->h; rect(s, 0, y, s->w, 4, RGB(90 + t / 2, 170 + t / 2, 240 - t / 3)); }
+  disc(s, 330 + LD(10) - (int)(g_pan * .02f), 44, 22, RGB(255, 245, 190));                              /* sun: almost at infinity */
+  for(int k = 0; k < 5; k++){ int cx = LD(-2 * (k & 1)) + ((k * 97 + (int)(frame * (.12f + .05f * (k & 1))) - (int)(g_pan * .06f)) % 480) - 40;   /* drifting clouds */
+    int cy = 30 + (k * 23) % 60; disc(s, cx, cy, 14, RGB(250, 252, 255)); disc(s, cx + 14, cy + 3, 11, RGB(244, 248, 255)); disc(s, cx - 13, cy + 4, 10, RGB(244, 248, 255)); }
+  hills(s, gy - 30, v->ox + LD(-8) - (int)(g_pan * .10f), 120, 70, 28, RGB(128, 170, 205), RGB(138, 180, 210), RGB(128, 170, 205));   /* far hills */
+  hills(s, gy - 14, v->ox + LD(-4) - (int)(g_pan * .22f), 90, 52, 18, RGB(95, 150, 150), RGB(105, 160, 150), RGB(95, 150, 150));     /* near hills */
+  rect(s, 0, gy, s->w, s->h, RGB(96, 64, 38));
+  rect(s, 0, gy - 2, s->w, 3, RGB(70, 170, 70));
+}
+static void draw_fore(const View *v){               /* grass blades and a fence post in front of everything: the nearest layer */
+  Scr *s = v->s; int gy = VY(v, MX_ROWS);
+  for(int x = -((int)g_pan % 18) - 18; x < s->w + 18; x += 18){ int h = 6 + ((x * 7 + 3) & 7), sw = (int)(sinf(frame * .05f + x) * 1.5f);
+    rect(s, x + sw, gy - h + 6, 2, h, RGB(48, 140, 52)); rect(s, x + 4 + sw, gy - h / 2 + 6, 2, h / 2, RGB(70, 170, 70)); }
+}
+static void draw_shadow(const View *v, int cx, int cy_ground, int w){ rect(v->s, cx - w / 2, cy_ground, w, 3, RGB(60, 90, 40)); }
 static void draw_cells(const View *v){
   int p = v->ppc;
   for(int y = 0; y < MX_ROWS; y++) for(int x = 0; x < MX_COLS; x++){
@@ -206,17 +222,24 @@ static void draw_world(const View *v){
    D > 0 sits behind the screen (hills, sky), 0 is the screen plane (the blocks' front faces), D < 0 floats in front (landlords, man, sling, debris).
    The blocks also get a dark back layer a few px behind them, so every wall has visible thickness. */
 static void draw_world_3d(const View *vt, int sgn, float sl){
-  View a = *vt;
+  View a = *vt; g_sgn = sgn; g_sl = sl;
   #define DX(D) ((int)lroundf(sgn * (D) * sl * 0.5f))
   int stereo = sl > 0.03f;
-  a.ox = vt->ox + DX(10); draw_sky(&a);
+  const MxMan *m = &world.man; float mxc = RTOF(m->x);
+  float tp = (m->mode == MAN_FLY || m->mode == MAN_STUCK) ? (mxc - 20.0f) * 6.0f : 0.0f;   /* camera drift follows the flying man */
+  g_pan += (tp - g_pan) * .08f;
+  int fly = (m->mode == MAN_FLY) ? 1 : 0, dv = m->dive ? 3 : 0;
+  a.ox = vt->ox + DX(14); draw_sky(&a);                                                   /* far plane (hills/clouds inside carry their own parallax) */
   if(stereo){ a.ox = vt->ox + DX(4); g_dim = .45f; draw_cells(&a); g_dim = 1.0f; }       /* back faces */
   a.ox = vt->ox; draw_cells(&a);
   a.ox = vt->ox + DX(-3); draw_landlords(&a);
   a.ox = vt->ox + DX(-4); draw_sling(&a); draw_valve(&a);
   a.ox = vt->ox + DX(-5); draw_aim(&a);
-  a.ox = vt->ox + DX(-7); draw_man(&a);
+  if(m->mode != MAN_NONE && m->mode != MAN_WAIT){                                         /* ground shadow stays on the ground plane, man lifts off it */
+    int sh = VX(&a, mxc); a.ox = vt->ox; draw_shadow(&a, VX(&a, mxc), VY(&a, (float)MX_ROWS) - 1, 26 - (int)(fabsf(RTOF(m->y) - MX_ROWS) * .3f > 14 ? 14 : fabsf(RTOF(m->y) - MX_ROWS) * .3f)); (void)sh; }
+  a.ox = vt->ox + DX(-7 - fly * 2 - dv); draw_man(&a);                                    /* he comes out of the screen when flying, further when diving */
   a.ox = vt->ox + DX(-10); draw_parts(&a);
+  a.ox = vt->ox + DX(-16); draw_fore(&a);                                                 /* grass in the face */
   #undef DX
 }
 
