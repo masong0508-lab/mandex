@@ -24,7 +24,7 @@ jobs:
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
           mkdir -p out
           # name | extra defines.  mandex = the game; the others are for finding where start-up stops: each paints both screens one colour and halts.
-          for v in "mandex|" "mandex_nosound|-DMX_NOSOUND" "stage1_red|-DMX_NOSOUND -DMX_STAGE=1" "stage2_green|-DMX_NOSOUND -DMX_STAGE=2" "stage4_yellow|-DMX_NOSOUND -DMX_STAGE=4"; do
+          for v in "stage0_red_crt|-DMX_CRT_STAGE=1" "mandex|" "mandex_nosound|-DMX_NOSOUND" "stage1_red|-DMX_NOSOUND -DMX_STAGE=1" "stage2_green|-DMX_NOSOUND -DMX_STAGE=2" "stage4_yellow|-DMX_NOSOUND -DMX_STAGE=4"; do
             n=${v%%|*}; d=${v#*|}
             sh tools/build_ds_bare.sh ds/$n.nds $d
             python3 tools/ntr_patch.py ds/$n.nds out/$n.nds
@@ -102,7 +102,7 @@ jobs:
       - name: Zip
         run: |
           cd pack && ls -la
-          printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - hardware build (own start-up code, no libnds); DraStic / melonDS / DeSmuME / flashcart\n  mandex_nosound.nds  Nintendo DS - same with sound off\n  stage1_red / stage2_green / stage4_yellow  - start-up test ROMs: the colour shows how far start-up got\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
-          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound.nds stage1_red.nds stage2_green.nds stage4_yellow.nds mandex.cdi mandex.elf README.txt
+          printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - hardware build (own start-up code, no libnds); DraStic / melonDS / DeSmuME / flashcart\n  mandex_nosound.nds  Nintendo DS - same with sound off\n  stage0_red_crt / stage1_red / stage2_green / stage4_yellow  - start-up test ROMs: the colour shows how far start-up got\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
+          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound.nds stage0_red_crt.nds stage1_red.nds stage2_green.nds stage4_yellow.nds mandex.cdi mandex.elf README.txt
       - uses: actions/upload-artifact@v4
         with: { name: mandex-roms, path: mandex-roms.zip }

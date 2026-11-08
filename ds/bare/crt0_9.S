@@ -3,6 +3,24 @@
 	.arm
 	.global _start
 _start:
+#if MX_CRT_STAGE == 1
+	@ diagnostic: first instructions only - power the screens, show the backdrop colour (palette entry 0) in red, stop
+	ldr	r0, =0x04000304
+	ldr	r1, =0x0203
+	strh	r1, [r0]
+	ldr	r0, =0x04000000
+	ldr	r1, =0x00010000
+	str	r1, [r0]
+	ldr	r0, =0x04001000
+	str	r1, [r0]
+	ldr	r0, =0x05000000
+	ldr	r1, =0x001F
+	strh	r1, [r0]
+	ldr	r0, =0x05000400
+	strh	r1, [r0]
+0:	b	0b
+	.pool
+#endif
 	mov	r0, #0x4000000
 	mov	r1, #0
 	str	r1, [r0, #0x208]		@ IME off (no interrupts used)

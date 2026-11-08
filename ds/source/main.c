@@ -565,8 +565,8 @@ static real clampr(real v, real lo, real hi){ return v < lo ? lo : v > hi ? hi :
 #ifdef MX_STAGE
 /* diagnostic: paint both screens one solid colour and stop, so the colour says how far start-up got */
 static void stage_halt(int n, int rgb){
-  BG_PALETTE[255] = rgb; BG_PALETTE_SUB[255] = rgb;
-  for(int i = 0; i < 256 * 192; i++){ ((u8 *)BG_GFX)[i] = 255; ((u8 *)BG_GFX_SUB)[i] = 255; }
+  BG_PALETTE[0] = rgb; BG_PALETTE_SUB[0] = rgb; BG_PALETTE[255] = rgb; BG_PALETTE_SUB[255] = rgb;   /* backdrop colour, in case the bitmap does not show */
+  for(int i = 0; i < 256 * 192 / 2; i++){ BG_GFX[i] = 0xFFFF; BG_GFX_SUB[i] = 0xFFFF; }            /* VRAM only takes 16-bit writes */
   if(n == MX_STAGE) for(;;) swiWaitForVBlank();
 }
 #define STAGE(n, rgb) stage_halt(n, rgb)
