@@ -19,21 +19,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: make -C ds
-      - name: Inspect the ROM
+      - name: Plain-DS (NTR) headers, two layouts
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
-          echo "=== ds_rules"; grep -n "nds\|ndstool\|twl\|dsi" $DEVKITARM/ds_rules | head -40 || true
-          echo "=== legacy specs"; cat $DEVKITPRO/calico/share/ds9-legacy.specs 2>&1 | head -20 || true
-          echo "=== default ROM unit code:"; ndstool -i ds/mandex.nds | grep -i "unit code\|DSi9\|DSi7" || true
+          mkdir -p out
+          # 1) calico's default layout (secure area + boot stub at 0x02004000)
+          python3 tools/ntr_patch.py ds/mandex.nds out/mandex.nds
+          # 2) the classic layout (ARM9 at 0x02000000, the one libnds 1.x homebrew used)
           make -C ds clean >/dev/null
-          sed -i 's|ds9.specs|ds9-legacy.specs|' ds/Makefile
-          make -C ds 2>&1 | tail -5 || true
-          echo "=== legacy ROM:"; ndstool -i ds/mandex.nds | grep -i "unit code\|DSi9\|DSi7\|ARM9 entry\|ARM9 RAM" || true
-          arm-none-eabi-readelf -lS ds/mandex.elf | grep -i "twl\|secure\|crt0\|\.main " | head
-          git checkout ds/Makefile
-          make -C ds clean >/dev/null; make -C ds 2>&1 | tail -2
+          make -C ds SPECS=-specs=$DEVKITPRO/calico/share/ds9-legacy.specs
+          python3 tools/ntr_patch.py ds/mandex.nds out/mandex_classic.nds
+          for f in out/*.nds; do echo "== $f"; ndstool -i $f | grep -i "unit code\|ARM9 entry\|ARM9 RAM\|ARM7 entry\|Header CRC\|DSi"; done
       - uses: actions/upload-artifact@v4
-        with: { name: rom-nds, path: ds/mandex.nds, if-no-files-found: error }
+        with:
+          name: rom-nds
+          path: out/*.nds
+          if-no-files-found: error
 
   dreamcast:
     runs-on: ubuntu-latest
@@ -101,7 +102,7 @@ jobs:
       - name: Zip
         run: |
           cd pack && ls -la
-          printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - melonDS / DeSmuME / flashcart\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
-          zip -9 ../mandex-roms.zip mandex.nds mandex.cdi mandex.elf README.txt
+          printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - plain DS header; melonDS / DeSmuME / DraStic / flashcart\n  mandex_classic.nds  Nintendo DS - same game, classic memory layout; try this one if mandex.nds will not boot\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
+          zip -9 ../mandex-roms.zip mandex.nds mandex_classic.nds mandex.cdi mandex.elf README.txt
       - uses: actions/upload-artifact@v4
         with: { name: mandex-roms, path: mandex-roms.zip }
