@@ -75,6 +75,11 @@ jobs:
             python3 tools/ntr_patch.py ds/$n.nds out/mandex_$n.nds
             ndstool -i out/mandex_$n.nds | grep -iE "unit|ARM9 (entry|RAM|code)|ARM7 (entry|RAM|code)"
           done
+      - name: Header hexdump of stage1
+        run: |
+          xxd -l 512 out/mandex_bare_stage1.nds
+          echo ---- arm9 head; xxd -s 0x4000 -l 64 out/mandex_bare_stage1.nds; xxd -s 0x4800 -l 64 out/mandex_bare_stage1.nds
+          ls -l out/mandex_bare_stage1.nds
       - name: Diagnostics (full headers, installed libnds flavours)
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
