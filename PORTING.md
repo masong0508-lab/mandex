@@ -255,3 +255,11 @@ quads in the translucent list, keyed by z; the man is a small mesh when he jiggl
 small software rasteriser for the PVR textures so the screens can be photographed on a host.  The old flat-rect title data in art/title.h (TITLE_DC_*) is no longer used.
 DS: the procedural backdrop gained snow-capped mountains, a city skyline, trees and rolling hills (palette slots 110..122); the ground gained grass blades, flowers and the fence.
 Screens: docs/dc_*.png, docs/ds_3_eviction_L5.png, docs/dc_art_sheet.png.
+
+## DS: "hardware" build (current)
+The DS ROM is built without libnds / calico (`ds/bare`, `tools/build_ds_bare.sh`): calico's start-up code did not boot in DraStic
+(white screen) and crashed melonDS, while ROMs with their own crt0 (the user's godguy_hw / wordPass / bore2) run.  Layout copied from
+those: ARM9 image at 0x02000000 with a 0x800-byte secure-area filler, entry 0x02000800, ARM7 at 0x02380000, plain DS header (unit code 0),
+`ndstool -h 0x4000`.  `ds/bare/nds.h` is a small stand-in for <nds.h>; `hw9.c` does video / keys / timers / divider / sqrt / sound
+commands; `arm7.c` polls X/Y, the pen (SPI touch with firmware calibration) and plays the sound ring buffer.  Caches are not enabled,
+there is no ITCM use.  NOT verified on any emulator or hardware.  `tools/ntr_patch.py` fills the secure area and fixes the CRCs.
