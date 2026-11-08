@@ -61,11 +61,12 @@ jobs:
           sudo apt-get install -y -qq desmume xvfb imagemagick x11-utils >/dev/null
           export LIBGL_ALWAYS_SOFTWARE=1
           xvfb-run -a -s "-screen 0 1024x768x24" bash -c '
-            desmume-cli --disable-sound mandex.nds > desmume.log 2>&1 &
+            desmume-cli --disable-sound --opengl-2d=0 --cpu-mode=1 mandex.nds > desmume.log 2>&1 &
             PID=$!
             for t in 4 8 14; do
               sleep $t
               if kill -0 $PID 2>/dev/null; then echo "t+$t: still running"; else echo "t+$t: EXITED"; fi
+              xwininfo -root -tree 2>/dev/null | grep -v "has no name" | head -8
               import -window root shot$t.png 2>/dev/null || true
               echo "mean brightness of the screen: $(convert shot$t.png -colorspace Gray -format "%[fx:mean]" info: 2>/dev/null)"
               echo "distinct colours: $(convert shot$t.png -format "%k" info: 2>/dev/null)"
