@@ -244,3 +244,14 @@ OOPS gag (consoles): the rare version of the cape taunt, as in the HTML (1 in MI
 (boxers slip, wobble, EEK, cover up, SNAP, WHEW) into art/manspr.h; art/manidle.h has GAG_OOPS (only ever picked as a cape taunt) and the new fx
 FX_EEK / FX_SNAP / FX_WHEW.  DS: two new tone effects (SFX_EEK, SFX_WHEW) plus EEK! / SNAP! popups, SNAP reuses the slap + boing sounds.  DC: sweat / spark
 particles.  Shots: docs/ds_oops_sheet.png, docs/dc_oops_sheet.png.  Run on a desktop test setup only; no real DS / Dreamcast / emulator, sounds never heard.
+
+
+GRAPHICS pass (both consoles).
+Dreamcast: no more flat quads.  tools/gen_dc_art.py bakes textures from the HTML's own drawing into art/dcart.h (run-length coded 16 bit pixels): a sky (RGB565), a
+mountains / city / hills / ground layer with the sling post (ARGB1555), an atlas (block tiles for every material x variant x damage, landlord, cloud, soft puff, stars, head icon,
+font), every man frame smooth at 1.6x the drawn size (ARGB4444, no towel: the cloth is still simulated), and an 852x480 title picture (RGB565).  dreamcast/main.c draws textured
+quads in the translucent list, keyed by z; the man is a small mesh when he jiggles; the HUD, banners, hint and end panels use the baked font.  Texture memory is about 3.8 MB
+(the title picture is freed when the game starts).  The real KallistiOS build in CI compiles it; nothing has been run on a Dreamcast or an emulator, and test/dc_render.c has a
+small software rasteriser for the PVR textures so the screens can be photographed on a host.  The old flat-rect title data in art/title.h (TITLE_DC_*) is no longer used.
+DS: the procedural backdrop gained snow-capped mountains, a city skyline, trees and rolling hills (palette slots 110..122); the ground gained grass blades, flowers and the fence.
+Screens: docs/dc_*.png, docs/ds_3_eviction_L5.png, docs/dc_art_sheet.png.

@@ -168,6 +168,9 @@ static void make_palette(void){
   setc(C_SUN, 255, 240, 140);    setc(C_SUNHALO, 235, 240, 235);
   setc(C_HILL1, 120, 170, 190);  setc(C_HILL2, 80, 150, 90);  setc(C_HILL3, 150, 200, 215);
   setc(C_GRASS, 90, 190, 60);    setc(C_GRASS2, 55, 140, 45);
+  setc(C_SNOW, 244, 249, 255);   setc(C_CITY, 143, 176, 212);  setc(C_CITY2, 205, 228, 246); setc(C_TREE, 63, 158, 74);   setc(C_TREE2, 88, 182, 88);
+  setc(C_TREE3, 40, 120, 56);    setc(C_TRUNK, 107, 74, 43);    setc(C_FENCE, 232, 220, 196); setc(C_FENCE2, 150, 130, 98);
+  setc(C_FL1, 255, 107, 138);    setc(C_FL2, 255, 210, 63);     setc(C_GRASS3, 130, 210, 100); setc(C_SUN2, 255, 252, 214);
   setc(C_DIRT, 122, 82, 50);     setc(C_DIRT2, 96, 62, 38);
   setc(C_SKIN, 244, 183, 142);   setc(C_SKIN2, 205, 135, 100);  setc(C_SKIN3, 255, 215, 180);
   setc(C_RED, 224, 36, 58);      setc(C_RED2, 160, 20, 40);     setc(C_WHITE, 255, 255, 255);
@@ -273,12 +276,31 @@ static void make_bg(void){
       }
     }
   }
-  /* two hill layers */
+  /* far mountains with snow caps */
   for(int x = 0; x < BGW; x++){
     int h1 = 126 - (tri(x, 150) * 3 / 5 + tri(x + 40, 53) / 3);
-    int h2 = 148 - (tri(x + 90, 110) / 2 + tri(x, 37) / 3);
     for(int y = h1; y < BGH; y++) bg[y * BGW + x] = (u8)(y == h1 ? C_HILL3 : C_HILL1);
-    for(int y = h2; y < BGH; y++) bg[y * BGW + x] = (u8)(y == h2 ? C_GRASS : ((y + x / 3) % 9 == 0 ? C_GRASS2 : C_HILL2));
+    if(h1 < 92){ int cap = 3 + tri(x, 12) / 2 + (92 - h1) / 3; for(int y = h1; y < h1 + cap; y++) bg[y * BGW + x] = C_SNOW; }   /* snow: a jagged cap on the high peaks */
+  }
+  /* a distant city between the mountains and the hills */
+  for(int x = 0; x < BGW; x += 13){
+    int hh = 14 + ((x * 29 + (x >> 3) * 7) % 30), top = 132 - hh;
+    for(int y = top; y < BGH; y++) for(int i = 0; i < 10 && x + i < BGW; i++) bg[y * BGW + x + i] = C_CITY;
+    for(int y = top + 3; y < 128; y += 4) for(int i = 2; i < 9; i += 3) if((x + y + i) % 5) bg[y * BGW + x + i] = C_CITY2;
+  }
+  /* rolling hills with trees */
+  for(int x = 0; x < BGW; x++){
+    int h2 = 148 - (tri(x + 90, 110) / 2 + tri(x, 37) / 3);
+    for(int y = h2; y < BGH; y++) bg[y * BGW + x] = (u8)(y == h2 ? C_GRASS3 : ((y + x / 3) % 9 == 0 ? C_GRASS2 : C_GRASS));
+  }
+  for(int x = 18; x < BGW - 10; x += 41 + ((x * 13) % 23)){
+    int h2 = 148 - (tri(x + 90, 110) / 2 + tri(x, 37) / 3), r = 5 + (x % 3);
+    for(int y = h2 - 4; y < h2 + 1; y++) bg[y * BGW + x] = C_TRUNK, bg[y * BGW + x + 1] = C_TRUNK;
+    for(int j = -r; j <= r; j++) for(int i = -r - 2; i <= r + 2; i++){
+      int cx = x, cy = h2 - 5 - r;
+      int d = (i * i) * 3 / 4 + j * j;
+      if(d <= r * r){ int px = cx + i, py = cy + j; if(px >= 0 && px < BGW && py >= 0) bg[py * BGW + px] = (u8)(j > r / 3 ? C_TREE3 : (i + j < 0 ? C_TREE2 : C_TREE)); }
+    }
   }
   /* shifted copies: bgs[c][i] = bg[i + c] */
   for(int c = 1; c < 4; c++) memcpy(bgs[c], bg + c, BGW * BGH - c);
@@ -309,6 +331,23 @@ void gfx_ground(const View *v){
   for(int y = gy + 4; y < 192; y++){
     memset(&v->buf[y * 256], (y - gy) & 4 ? C_DIRT2 : C_DIRT, 256);
     for(int x = ((y * 37) & 15); x < 256; x += 23) gfx_px(v->buf, x, y, C_DIRT2);   /* pebbles */
+  }
+  /* grass blades and the odd flower along the edge (world anchored, so they scroll with the ground) */
+  for(int x = 0; x < 256; x++){
+    int wx = x + v->cx, hsh = (wx * 2654435761u) >> 28;
+    if(hsh < 5) gfx_px(v->buf, x, gy - 1 - (hsh & 1), hsh & 1 ? C_GRASS : C_GRASS2);
+    if(hsh == 15 && (wx % 7) == 3) gfx_px(v->buf, x, gy - 2, (wx / 7) & 1 ? C_FL1 : C_FL2);
+  }
+  /* the fence (cells 37..70) */
+  int ppc = v->ppc, fx0 = 37 * ppc - v->cx, fx1 = 70 * ppc - v->cx;
+  if(fx1 > 0 && fx0 < 256 && gy > 6){
+    int ph = ppc * 5 / 2, step = ppc * 9 / 4 + 1;
+    gfx_rect(v->buf, fx0, gy - ppc * 7 / 4, fx1 - fx0, ppc / 2 + 1, C_FENCE);
+    gfx_rect(v->buf, fx0, gy - ppc * 3 / 4, fx1 - fx0, ppc / 2 + 1, C_FENCE);
+    for(int px = fx0; px < fx1; px += step){
+      gfx_rect(v->buf, px, gy - ph, ppc, ph, C_FENCE);
+      gfx_rect(v->buf, px + ppc, gy - ph, 1, ph, C_FENCE2);
+    }
   }
 }
 

@@ -30,6 +30,7 @@ enum {
   C_WALLD0, C_WALLD1, C_WALLD2, C_WALLD3,                    /* wallpaper pattern */
   C_SHADOW, C_GRAY, C_DARK,
   C_MAT = 64,                   /* 64 + mat*5 + {HI,BASE,LO,CRACK,DARK} */
+  C_SNOW = 110, C_CITY, C_CITY2, C_TREE, C_TREE2, C_TREE3, C_TRUNK, C_FENCE, C_FENCE2, C_FL1, C_FL2, C_GRASS3, C_SUN2,   /* scenery: 110..122 */
   C_MAN0 = 160                  /* 160.. : the man's own palette (art/manspr.h) */
 };
 enum { SH_HI, SH_BASE, SH_LO, SH_CRACK, SH_DARK };
