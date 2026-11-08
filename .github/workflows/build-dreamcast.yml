@@ -24,11 +24,16 @@ jobs:
       - name: Build mandex.elf
         shell: bash
         run: |
-          ENV_SH="$(ls /opt/toolchains/dc/kos/environ.sh /usr/local/kos/environ.sh /opt/kos/environ.sh 2>/dev/null | head -1)"
-          [ -n "$ENV_SH" ] || ENV_SH="$(find / -name environ.sh -path '*kos*' 2>/dev/null | head -1)"
-          echo "using $ENV_SH"
+          # (the discovery must not abort the script: under -e -o pipefail a failing ls killed the first version of this step before make ever ran)
+          ENV_SH=""
+          for f in /opt/toolchains/dc/kos/environ.sh /usr/local/kos/environ.sh /opt/kos/environ.sh; do [ -f "$f" ] && ENV_SH="$f" && break; done || true
+          if [ -z "$ENV_SH" ]; then ENV_SH="$(find / -name environ.sh -path '*kos*' 2>/dev/null | head -1 || true)"; fi
+          echo "using '$ENV_SH'"
+          [ -n "$ENV_SH" ] || { echo "no KallistiOS environ.sh found in this image"; ls /opt /usr/local 2>&1 | head -30; exit 1; }
           source "$ENV_SH"
+          echo "KOS_BASE=$KOS_BASE KOS_CC_BASE=$KOS_CC_BASE"
           make -C dreamcast
+          ls -la dreamcast/mandex.elf
       - uses: actions/upload-artifact@v4
         with:
           name: mandex-elf
