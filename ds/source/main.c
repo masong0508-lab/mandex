@@ -562,19 +562,34 @@ static void present(void){
 
 static real clampr(real v, real lo, real hi){ return v < lo ? lo : v > hi ? hi : v; }
 
+#ifdef MX_STAGE
+/* diagnostic: paint both screens one solid colour and stop, so the colour says how far start-up got */
+static void stage_halt(int n, int rgb){
+  BG_PALETTE[255] = rgb; BG_PALETTE_SUB[255] = rgb;
+  for(int i = 0; i < 256 * 192; i++){ ((u8 *)BG_GFX)[i] = 255; ((u8 *)BG_GFX_SUB)[i] = 255; }
+  if(n == MX_STAGE) for(;;) swiWaitForVBlank();
+}
+#define STAGE(n, rgb) stage_halt(n, rgb)
+#else
+#define STAGE(n, rgb) ((void)0)
+#endif
 int main(void){
   lcdMainOnBottom();                                  /* main engine = touch screen */
   videoSetMode(MODE_5_2D);   videoSetModeSub(MODE_5_2D);
   vramSetBankA(VRAM_A_MAIN_BG); vramSetBankC(VRAM_C_SUB_BG);
   bgInit(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
   bgInitSub(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
+  STAGE(1, RGB15(31,0,0));                             /* red */
   gfx_init();
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? mx_material_hp(k) : 1;
   for(int i = 0; i < 256; i++){ BG_PALETTE[i] = gfx_pal[i]; BG_PALETTE_SUB[i] = gfx_pal[i]; }
+  STAGE(2, RGB15(0,31,0));                             /* green */
   sfx_init();
   music_set(music_pref);
+  STAGE(3, RGB15(0,0,31));                             /* blue */
 
   load_level(sel_level);
+  STAGE(4, RGB15(31,31,0));                            /* yellow */
   int slow_frames = 0, fast_frames = 0, phys_ticks = 0;
 
   for(;;){

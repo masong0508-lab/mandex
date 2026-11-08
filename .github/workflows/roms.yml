@@ -39,6 +39,14 @@ jobs:
           make -C ds clean >/dev/null
           make -C ds EXTRA_DEFS=-DMX_NOSOUND
           python3 tools/ntr_patch.py ds/mandex.nds out/mandex_nosound_calico.nds
+      - name: Staged start-up diagnostic ROMs
+        run: |
+          export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
+          for n in 1 2 3 4; do
+            make -C ds clean >/dev/null
+            make -C ds EXTRA_DEFS="-DMX_NOSOUND -DMX_STAGE=$n"
+            python3 tools/ntr_patch.py ds/mandex.nds out/stage$n.nds
+          done
       - name: Diagnostics (full headers, installed libnds flavours)
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
@@ -119,6 +127,6 @@ jobs:
         run: |
           cd pack && ls -la
           printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - plain DS header; melonDS / DeSmuME / DraStic / flashcart\n  mandex_nosound_calico.nds  Nintendo DS - same game with sound start-up disabled; try it if mandex.nds will not boot\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
-          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound_calico.nds mandex.cdi mandex.elf README.txt
+          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound_calico.nds stage1.nds stage2.nds stage3.nds stage4.nds mandex.cdi mandex.elf README.txt
       - uses: actions/upload-artifact@v4
         with: { name: mandex-roms, path: mandex-roms.zip }
