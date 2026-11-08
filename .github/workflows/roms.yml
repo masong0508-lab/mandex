@@ -22,12 +22,16 @@ jobs:
       - name: Inspect the ROM
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
-          ls -la ds/mandex.nds ds/*.elf || true
-          arm-none-eabi-readelf -lS ds/mandex.elf | head -70
-          ndstool -i ds/mandex.nds 2>&1 | head -60
-          grep -n "itcm\|dtcm" ds/mandex.map | head -20
-          arm-none-eabi-size ds/mandex.elf
-          ls $DEVKITPRO/calico/bin $DEVKITPRO/calico/share 2>&1 | head -30 || true
+          echo "=== ds_rules"; grep -n "nds\|ndstool\|twl\|dsi" $DEVKITARM/ds_rules | head -40 || true
+          echo "=== legacy specs"; cat $DEVKITPRO/calico/share/ds9-legacy.specs 2>&1 | head -20 || true
+          echo "=== default ROM unit code:"; ndstool -i ds/mandex.nds | grep -i "unit code\|DSi9\|DSi7" || true
+          make -C ds clean >/dev/null
+          sed -i 's|ds9.specs|ds9-legacy.specs|' ds/Makefile
+          make -C ds 2>&1 | tail -5 || true
+          echo "=== legacy ROM:"; ndstool -i ds/mandex.nds | grep -i "unit code\|DSi9\|DSi7\|ARM9 entry\|ARM9 RAM" || true
+          arm-none-eabi-readelf -lS ds/mandex.elf | grep -i "twl\|secure\|crt0\|\.main " | head
+          git checkout ds/Makefile
+          make -C ds clean >/dev/null; make -C ds 2>&1 | tail -2
       - uses: actions/upload-artifact@v4
         with: { name: rom-nds, path: ds/mandex.nds, if-no-files-found: error }
 
