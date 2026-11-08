@@ -12,7 +12,7 @@ A9="-march=armv5te -mtune=arm946e-s -mthumb-interwork -DARM9"
 for f in ds/source/main.c ds/source/sfx.c; do $CC $COMMON $A9 -mthumb -c $f -o $W/$(basename $f .c).o; done
 for f in ds/source/gfx.c core/mx.c core/cloth.c $B/hw9.c; do $CC $COMMON $A9 -marm -c $f -o $W/$(basename $f .c).o; done
 $CC $A9 -marm -c $B/crt0_9.S -o $W/crt0_9.o
-$CC -nostartfiles -specs=nosys.specs -T $B/arm9.ld -Wl,--gc-sections -Wl,-Map,$W/arm9.map $W/crt0_9.o $W/*.o -o $W/arm9.elf -lm -lc -lgcc
+$CC -nostartfiles -specs=nosys.specs -T $B/arm9.ld -Wl,--gc-sections -Wl,-Map,$W/arm9.map $W/crt0_9.o $(ls $W/*.o | grep -v crt0) -o $W/arm9.elf -lm -lc -lgcc
 arm-none-eabi-objcopy -O binary $W/arm9.elf $W/arm9.bin
 $CC -march=armv4t -mcpu=arm7tdmi -marm -Os -ffreestanding -c $B/arm7.c -o $W/arm7.o
 $CC -march=armv4t -mcpu=arm7tdmi -marm -c $B/crt0_7.S -o $W/crt0_7.o
