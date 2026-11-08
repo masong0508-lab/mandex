@@ -1,9 +1,9 @@
 /*
  * MANDEX - Sega Dreamcast front-end (KallistiOS + PVR).
  *
- * 640x480, 5 px per voxel, every voxel drawn as a flat-shaded PVR quad
- * (a few thousand quads is nothing for the PVR).  The game logic is the
- * shared core in ../core in its float build - the SH-4 has an FPU.
+ * 640x480, 5 px per voxel.  Everything is drawn as textured PVR quads from art baked out of the HTML prototype (tools/gen_dc_art.py -> art/dcart.h):
+ * the sky and the hills, a tile for every building block (material x variant x damage), smooth high-resolution man and landlord sprites, a real font
+ * for the HUD and the menus, and the title picture.  The game logic is the shared core in ../core in its float build - the SH-4 has an FPU.
  *
  * Controls (port A controller)
  *   analog stick : pull the man back in the sling (push the direction you
@@ -12,14 +12,16 @@
  *   START        : start from the title screen; next level after a win, retry after a loss
  *   Y            : restart the level
  *
- * Not done yet (all slated for the next pass): text/score font, sound via
- * AICA, and the real-3D voxel upgrade described in MANDEX_DESIGN.md.
+ * Not done yet: sound via AICA, and the real-3D voxel upgrade described in MANDEX_DESIGN.md.
+ * Texture memory: ~3.8 MB (the title picture, 1 MB of it, is freed when the game starts).
  */
 #include <kos.h>
+#include <stdio.h>
+#include <string.h>
 #include "manspr.h"
 #include "manidle.h"
-#define MX_TITLE_DC
-#include "title.h"
+#define MX_DCART
+#include "dcart.h"
 #include <math.h>
 #include <stdlib.h>
 #include "mx.h"
@@ -33,30 +35,75 @@ KOS_INIT_FLAGS(INIT_DEFAULT);
 #define DT  (1.0f / 60.0f)
 
 static MxWorld world;
-static pvr_poly_hdr_t hdr;
 
-enum { Z_BG = 1, Z_SLING, Z_VOX, Z_CHUNK, Z_TARGET, Z_MAN, Z_FX, Z_HUD };
+/* layers: bigger z is nearer */
+#define Z_BG     1.00f
+#define Z_CLOUD  1.10f
+#define Z_BGB    1.20f
+#define Z_ROOM   1.30f
+#define Z_SLING  1.40f
+#define Z_VOX    2.00f
+#define Z_CHUNK  2.10f
+#define Z_TARGET 2.20f
+#define Z_MAN    3.00f
+#define Z_FX     4.00f
+#define Z_HUD    5.00f
+#define Z_END    6.00f
+static int hint_t;                            /* ticks left of the 'pull back' hint */
 static float MAXHP[MX_NMAT];                 /* filled from the core's material table in main() */
 
 static uint32 argb(int r, int g, int b, int a){ return ((uint32)a << 24) | ((uint32)r << 16) | ((uint32)g << 8) | (uint32)b; }
+#define WHITE argb(255, 255, 255, 255)
 
+/* ---- textures ---- */
+static pvr_ptr_t tx_bga, tx_bgb, tx_atl, tx_man, tx_ttl;
+static pvr_poly_hdr_t hdr_col, hdr_bga, hdr_bgb, hdr_atl, hdr_man, hdr_ttl;
+static const pvr_poly_hdr_t *cur_hdr;
+static void use(const pvr_poly_hdr_t *h){ if(cur_hdr != h){ pvr_prim((void *)h, sizeof *h); cur_hdr = h; } }
+
+static pvr_ptr_t load_tex(const unsigned short *rle, int rle_len, int w, int h){
+  unsigned short *tmp = (unsigned short *)malloc((size_t)w * h * 2);
+  size_t n = 0, tot = (size_t)w * h;
+  for(int i = 0; i + 1 < rle_len && n < tot; i += 2){ unsigned cnt = rle[i]; unsigned short v = rle[i + 1]; while(cnt-- && n < tot) tmp[n++] = v; }
+  pvr_ptr_t p = pvr_mem_malloc((size_t)w * h * 2);
+  if(p) pvr_txr_load(tmp, p, (uint32)((size_t)w * h * 2));
+  free(tmp);
+  return p;
+}
+static void make_hdr(pvr_poly_hdr_t *h, int fmt, int w, int hh, pvr_ptr_t p){
+  pvr_poly_cxt_t c;
+  pvr_poly_cxt_txr(&c, PVR_LIST_TR_POLY, fmt | PVR_TXRFMT_NONTWIDDLED, w, hh, p, PVR_FILTER_BILINEAR);
+  c.gen.culling = PVR_CULLING_NONE;
+  c.txr.uv_clamp = PVR_UVCLAMP_UV;
+  pvr_poly_compile(h, &c);
+}
+
+/* ---- primitives ---- */
+static void vtx(float x, float y, float z, float u, float v, uint32 c, int eol){
+  pvr_vertex_t p;
+  p.flags = eol ? PVR_CMD_VERTEX_EOL : PVR_CMD_VERTEX; p.x = x; p.y = y; p.z = z; p.u = u; p.v = v; p.argb = c; p.oargb = 0;
+  pvr_prim(&p, sizeof p);
+}
 static void quad(float x, float y, float w, float h, float z, uint32 c){
-  pvr_vertex_t v;
-  v.flags = PVR_CMD_VERTEX; v.z = z; v.u = v.v = 0; v.argb = c; v.oargb = 0;
-  v.x = x;     v.y = y;     pvr_prim(&v, sizeof v);
-  v.x = x + w;              pvr_prim(&v, sizeof v);
-  v.x = x;     v.y = y + h; pvr_prim(&v, sizeof v);
-  v.flags = PVR_CMD_VERTEX_EOL; v.x = x + w; pvr_prim(&v, sizeof v);
+  use(&hdr_col);
+  vtx(x, y, z, 0, 0, c, 0); vtx(x + w, y, z, 0, 0, c, 0); vtx(x, y + h, z, 0, 0, c, 0); vtx(x + w, y + h, z, 0, 0, c, 1);
 }
-static void disc(float cx, float cy, float r, float z, uint32 c){
-  for(float dy = -r; dy <= r; dy += 2.0f){ float hw = sqrtf(r * r - dy * dy); quad(cx - hw, cy + dy, hw * 2, 2.0f, z, c); }
+static void gquad(float x, float y, float w, float h, float z, uint32 ct, uint32 cb){      /* vertical gradient */
+  use(&hdr_col);
+  vtx(x, y, z, 0, 0, ct, 0); vtx(x + w, y, z, 0, 0, ct, 0); vtx(x, y + h, z, 0, 0, cb, 0); vtx(x + w, y + h, z, 0, 0, cb, 1);
 }
+/* a textured quad: texel rectangle (sx, sy, sw, sh) of a tw x th texture, drawn at x, y, w, h */
+static void tquad(const pvr_poly_hdr_t *hd, int tw, int th, float x, float y, float w, float h, float sx, float sy, float sw, float sh, float z, uint32 c){
+  use(hd);
+  float u0 = sx / tw, v0 = sy / th, u1 = (sx + sw) / tw, v1 = (sy + sh) / th;
+  vtx(x, y, z, u0, v0, c, 0); vtx(x + w, y, z, u1, v0, c, 0); vtx(x, y + h, z, u0, v1, c, 0); vtx(x + w, y + h, z, u1, v1, c, 1);
+}
+static void atl(float x, float y, float w, float h, const short *r, float z, uint32 c){ tquad(&hdr_atl, 512, 512, x, y, w, h, r[0], r[1], r[2], r[3], z, c); }
 /* a quad with four arbitrary corners (a b c d = a triangle strip), for the towel */
 static void quad4(const float *x, const float *y, float z, uint32 c){
-  pvr_vertex_t v;
-  v.flags = PVR_CMD_VERTEX; v.z = z; v.u = v.v = 0; v.argb = c; v.oargb = 0;
-  for(int k = 0; k < 3; k++){ v.x = x[k]; v.y = y[k]; pvr_prim(&v, sizeof v); }
-  v.flags = PVR_CMD_VERTEX_EOL; v.x = x[3]; v.y = y[3]; pvr_prim(&v, sizeof v);
+  use(&hdr_col);
+  for(int k = 0; k < 3; k++) vtx(x[k], y[k], z, 0, 0, c, 0);
+  vtx(x[3], y[3], z, 0, 0, c, 1);
 }
 static void seg(float x0, float y0, float x1, float y1, float w, float z, uint32 c){      /* a line w px wide */
   float dx = x1 - x0, dy = y1 - y0, l = sqrtf(dx * dx + dy * dy);
@@ -65,8 +112,27 @@ static void seg(float x0, float y0, float x1, float y1, float w, float z, uint32
   float X4[4] = { x0 + nx, x1 + nx, x0 - nx, x1 - nx }, Y4[4] = { y0 + ny, y1 + ny, y0 - ny, y1 - ny };
   quad4(X4, Y4, z, c);
 }
-static float X(float cell){ return OX + cell * PXC; }
-static float Y(float cell){ return OY + cell * PXC; }
+static void puff(float cx, float cy, float r, float z, uint32 c){ atl(cx - r, cy - r, r * 2, r * 2, DCA_PUFF, z, c); }     /* soft round blob */
+
+static float man_zoom = 1.0f;                           /* the end panels draw the man bigger */
+static float shx, shy;                                  /* screen shake */
+static float X(float cell){ return OX + cell * PXC + shx; }
+static float Y(float cell){ return OY + cell * PXC + shy; }
+static float XB(float cell){ return OX + cell * PXC; }
+static float YB(float cell){ return OY + cell * PXC; }
+
+/* ---- the font (art/dcart.h: ASCII 32..95, upper case; y is the baseline; align 0 left, 1 centre, 2 right) ---- */
+static int glyph(int c){ if(c >= 'a' && c <= 'z') c -= 32; if(c < DCA_FONT_FIRST || c >= DCA_FONT_FIRST + DCA_FONT_N) c = '?'; return c - DCA_FONT_FIRST; }
+static float text_w(const char *s, float size){ float w = 0; for(; *s; s++) w += DCA_FONT[glyph((unsigned char)*s)][2]; return w * size / DCA_FONT_SIZE; }
+static void text(const char *s, float x, float y, float size, uint32 col, int align, float z){
+  float sc = size / DCA_FONT_SIZE, w = text_w(s, size);
+  if(align == 1) x -= w * 0.5f; else if(align == 2) x -= w;
+  for(; *s; s++){
+    const short *g = DCA_FONT[glyph((unsigned char)*s)];
+    if(*s != ' ') tquad(&hdr_atl, 512, 512, x + (g[2] * 0.5f - 22) * sc, y - 36 * sc, 44 * sc, 48 * sc, g[0], g[1], 44, 48, z, col);
+    x += g[2] * sc;
+  }
+}
 
 /* ---- tiny particle pool driven by core events and the idle gags ---- */
 enum { PK_BIT, PK_STINK, PK_FLY, PK_ZZZ, PK_SWEAT };
@@ -75,7 +141,7 @@ static Part parts[256];
 static float frand(void){ return (float)rand() / (float)RAND_MAX; }
 static void spawn_k(int kind, float x, float y, float vx, float vy, float life, uint32 c){      /* x,y in cells, vx,vy in px/s */
   for(int i = 0; i < 256; i++) if(parts[i].life <= 0){
-    parts[i].x = X(x); parts[i].y = Y(y); parts[i].vx = vx; parts[i].vy = vy; parts[i].life = parts[i].max = life; parts[i].c = c; parts[i].kind = kind; return;
+    parts[i].x = XB(x); parts[i].y = YB(y); parts[i].vx = vx; parts[i].vy = vy; parts[i].life = parts[i].max = life; parts[i].c = c; parts[i].kind = kind; return;
   }
 }
 static void spawn(float x, float y, uint32 c, float spd){
@@ -100,7 +166,8 @@ static void handle_events(void){
 }
 
 
-/* belly / rear jiggle, in sprite pixels (the core keeps them in cells; the art is 4 px per cell), plus squash factors */
+
+/* belly / rear jiggle, in sprite pixels of the old 4-px-per-cell art (the core keeps them in cells), plus squash factors */
 typedef struct { float bx, by, rx, ry, sx, sy; } Jig;
 static Jig man_jig(void){
   const MxMan *m = &world.man; Jig j = { m->bx * 4, m->by * 4, m->rx * 4, m->ry * 4, 1, 1 };
@@ -112,32 +179,36 @@ static Jig man_jig(void){
 }
 static float blob(float dx, float dy, float rad){ float d2 = dx * dx + dy * dy, r2 = rad * rad; if(rad < 2) r2 = 4; return d2 < r2 ? 1.0f - d2 / r2 : 0.0f; }
 
-/* one frame of the man: pixel size is PXC/4 because the art is authored at 4 px per cell.  One quad per horizontal run;
-   with a Jig, runs are cut short and each piece is moved by the belly / rear springs, rows are squashed about the anchor. */
-static void draw_frame(const MsFrame *f, float cx, float cy, int face, float z, const Jig *jg){
-  float s = PXC / 4.0f;
+/* one frame of the man (art/dcart.h, MAN texture): a smooth sprite 1.6x the size it is drawn at.  Without a Jig it is one quad; with one it is a small
+   mesh whose vertices are pushed by the belly / rear springs (the same weights as the pixel version had) and squashed about the anchor. */
+#define MG_X 8
+#define MG_Y 10
+static void draw_frame(int fr, float cx, float cy, int face, float z, const Jig *jg){
+  const short *f = DCM_FR[fr];
+  float sc = DCM_SCALE * man_zoom, s = PXC / 4.0f;
   int live = jg && (jg->bx != 0 || jg->by != 0 || jg->rx != 0 || jg->ry != 0 || jg->sx != 1 || jg->sy != 1);
   float sx = live ? jg->sx : 1, sy = live ? jg->sy : 1;
-  int axd = face > 0 ? f->ax : f->w - 1 - f->ax;
-  int bcx = face > 0 ? f->bcx : f->w - 1 - f->bcx, rcx = face > 0 ? f->rcx : f->w - 1 - f->rcx;
-  int maxrun = live ? 5 : 1000;
-  for(int j = 0; j < f->h; j++){
-    int i = 0;
-    while(i < f->w){
-      int srcx = face > 0 ? i : f->w - 1 - i, c = f->px[j * f->w + srcx];
-      int k = i + 1;
-      while(k < f->w && k - i < maxrun && f->px[j * f->w + (face > 0 ? k : f->w - 1 - k)] == c) k++;
-      if(c){
-        float ox = 0, oy = 0;
-        if(live){
-          float mx = (i + k) * 0.5f, wb = blob(mx - bcx, j - f->bcy, (float)f->brad), wr = blob(mx - rcx, j - f->rcy, (float)f->rrad);
-          ox = (jg->bx * wb + jg->rx * wr) * s; oy = (jg->by * wb + jg->ry * wr) * s;
-        }
-        float qx = cx + ((i - axd) * sx) * s + ox, qy = cy + ((j - f->ay) * sy) * s + oy;
-        quad(qx, qy, (k - i) * s * sx + 0.4f, s * sy + 0.4f, z, argb(MS_PAL[c - 1][0], MS_PAL[c - 1][1], MS_PAL[c - 1][2], 255));
-      }
-      i = k;
+  int gx = live ? MG_X : 1, gy = live ? MG_Y : 1;
+  float px[MG_Y + 1][MG_X + 1], py[MG_Y + 1][MG_X + 1];
+  for(int j = 0; j <= gy; j++) for(int i = 0; i <= gx; i++){
+    float u = f[2] * (float)i / gx, v = f[3] * (float)j / gy;                  /* sprite pixel (0..w, 0..h) */
+    float dx = 0, dy = 0;
+    if(live){
+      float wb = blob(u - f[6], v - f[7], (float)f[8]), wr = blob(u - f[9], v - f[10], (float)f[11]);
+      dx = (jg->bx * wb + jg->rx * wr) * s; dy = (jg->by * wb + jg->ry * wr) * s;
     }
+    float ex = (u - f[4]) * sc * sx;
+    px[j][i] = cx + (face > 0 ? ex : -ex) + dx;
+    py[j][i] = cy + (v - f[5]) * sc * sy + dy;
+  }
+  use(&hdr_man);
+  for(int j = 0; j < gy; j++) for(int i = 0; i < gx; i++){
+    float u0 = (f[0] + f[2] * (float)i / gx) / DCT_MAN_W, u1 = (f[0] + f[2] * (float)(i + 1) / gx) / DCT_MAN_W;
+    float v0 = (f[1] + f[3] * (float)j / gy) / DCT_MAN_H, v1 = (f[1] + f[3] * (float)(j + 1) / gy) / DCT_MAN_H;
+    vtx(px[j][i], py[j][i], z, u0, v0, WHITE, 0);
+    vtx(px[j][i + 1], py[j][i + 1], z, u1, v0, WHITE, 0);
+    vtx(px[j + 1][i], py[j + 1][i], z, u0, v1, WHITE, 0);
+    vtx(px[j + 1][i + 1], py[j + 1][i + 1], z, u1, v1, WHITE, 1);
   }
 }
 
@@ -146,7 +217,7 @@ static void draw_frame(const MsFrame *f, float cx, float cy, int face, float z, 
 static void draw_cloth(const Cloth *cl, float cx, float cy, int face, float z, int pass){
   ClothQuad q[CL_NQ];
   int n = cloth_quads(cl, q);
-  float s = 0.36f * PXC / 4.0f;
+  float s = 0.36f * PXC / 4.0f * man_zoom;
   uint32 ol = argb(MS_PAL[MS_CL_OUT - 1][0], MS_PAL[MS_CL_OUT - 1][1], MS_PAL[MS_CL_OUT - 1][2], 255);
   for(int k = 0; k < n; k++){
     const ClothQuad *o = &q[k];
@@ -171,7 +242,7 @@ static ClothActor tow_play, tow_win[2];          /* towels: the man in the sling
 static void man_with_towel(ClothActor *ta, int fr, float x, float y, int face, float z, const Jig *jg){
   cloth_actor_frame(ta, fcount, MS_HAND[fr], face);
   if(ta->live) draw_cloth(&ta->c, x, y, face, z - 0.5f, 0);
-  draw_frame(&MS_FRAMES[fr], x, y, face, z, jg);
+  draw_frame(fr, x, y, face, z, jg);
   if(ta->live) draw_cloth(&ta->c, x, y, face, z + 0.5f, 1);
 }
 static void idle_fx(int fx, float wx, float wy, int face){
@@ -215,9 +286,8 @@ static void fx_step(int calm, int strain){
   }
 }
 
-/* The title: the whole landscape with the man dropping butt-first on a landlord (art/title.h, made by tools/gen_title.py from the HTML title, logo included).
-   Flat quads at 2x like everything else here.  The picture is wider than the screen, so the screen pans across it: hold on the logo, glide right to the man,
-   hold, glide back.  PRESS START is a second small set of quads that blinks. */
+/* The title: the whole landscape with the man dropping butt-first on a landlord (a 852x480 picture, art/dcart.h, from the HTML title, logo included).
+   The picture is wider than the screen, so the screen pans across it: hold on the logo, glide right to the man, hold, glide back. */
 static int on_title = 1, title_t;
 static int title_pan(int t, int range){                 /* 0..range for tick t: hold (90), glide right (160), hold (150), glide back (160), smoothstep */
   t %= 560;
@@ -226,49 +296,90 @@ static int title_pan(int t, int range){                 /* 0..range for tick t: 
   return (range * ((u * u * (3 * 256 - 2 * u)) >> 16)) >> 8;
 }
 static void draw_title(void){
-  int pan = title_pan(title_t, TITLE_DC_W * 2 - 640);   /* whole pixels, so neighbouring quads never leave a seam */
-  for(int i = 0; i < TITLE_DC_NRECT; i++){
-    const unsigned short *r = TITLE_DC_RECT[i]; const unsigned char *c = &TITLE_DC_PAL[r[4] * 3];
-    int x = r[0] * 2 - pan, w = r[2] * 2;
-    if(x + w <= 0 || x >= 640) continue;
-    quad((float)x, r[1] * 2.0f, (float)w, r[3] * 2.0f, Z_BG, argb(c[0], c[1], c[2], 255));
+  int pan = title_pan(title_t, 852 - 640);
+  tquad(&hdr_ttl, DCT_TTL_W, DCT_TTL_H, (float)-pan, 0, 852, 480, 0, 0, 852, 480, Z_BG, WHITE);
+  if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
+}
+
+/* ---- the world ---- */
+static int variant(int x, int y){ return (x * 5 + y * 3 + (x >> 2)) & 3; }
+static void tile(float px, float py, int m, int v, int d, float z){
+  int t = ((m - 1) * 4 + v) * 3 + d;
+  float tx = DCA_TILE_X + (t & 15) * DCA_TILE_S + 1, ty = DCA_TILE_Y + (t >> 4) * DCA_TILE_S + 1;
+  tquad(&hdr_atl, 512, 512, px, py, PXC + 0.35f, PXC + 0.35f, tx, ty, 16, 16, z, WHITE);
+}
+static void tile_rot(float cx, float cy, float ca, float sa, int m, int v, int d, float z){      /* a block of a flying chunk, turned */
+  int t = ((m - 1) * 4 + v) * 3 + d;
+  float tx = DCA_TILE_X + (t & 15) * DCA_TILE_S + 1, ty = DCA_TILE_Y + (t >> 4) * DCA_TILE_S + 1;
+  float u0 = tx / 512, v0 = ty / 512, u1 = (tx + 16) / 512, v1 = (ty + 16) / 512, h = PXC * 0.5f + 0.2f;
+  float ex[4] = { -h, h, -h, h }, ey[4] = { -h, -h, h, h }, uu[4] = { u0, u1, u0, u1 }, vv[4] = { v0, v0, v1, v1 };
+  use(&hdr_atl);
+  for(int k = 0; k < 4; k++) vtx(cx + ex[k] * ca - ey[k] * sa, cy + ex[k] * sa + ey[k] * ca, z, uu[k], vv[k], WHITE, k == 3);
+}
+static int dmg(float hp, int m){ float r = hp / MAXHP[m]; return r > 0.66f ? 0 : r > 0.33f ? 1 : 2; }
+
+static void draw_landlord(float x, float y, float z){
+  const short *r = DCA_LANDLORD;
+  atl(x - r[4] * 0.5f, y - r[5] * 0.5f, r[2] * 0.5f, r[3] * 0.5f, r, z, WHITE);
+}
+
+static void draw_rooms(void){
+  static const unsigned char PAP[4][3] = { { 238, 214, 170 }, { 200, 225, 205 }, { 225, 190, 205 }, { 190, 205, 235 } };
+  for(int r = 0; r < world.nrooms; r++){
+    const MxRoom *rm = &world.rooms[r];
+    int fl = rm->y + rm->h, cover = 0;
+    if(fl < MX_ROWS) for(int x = rm->x; x < rm->x + rm->w; x++) cover += world.grid[fl * MX_COLS + x] != 0;
+    if(cover * 2 < rm->w) continue;                                      /* floor gone: no wallpaper left hanging */
+    float x0 = X(rm->x), y0 = Y(rm->y), w = rm->w * PXC, h = rm->h * PXC;
+    const unsigned char *p = PAP[rm->pal & 3];
+    gquad(x0, y0, w, h, Z_ROOM, argb(p[0], p[1], p[2], 255), argb(p[0] * 9 / 10, p[1] * 9 / 10, p[2] * 9 / 10, 255));
+    for(float k = 0; k < w; k += 10) quad(x0 + k, y0, 5, h, Z_ROOM + 0.01f, argb(0, 0, 0, 18));       /* wallpaper stripes */
+    quad(x0, y0 + h - 3, w, 3, Z_ROOM + 0.02f, argb(0, 0, 0, 46));                                  /* shadow along the floor */
   }
-  if((title_t >> 5) & 1) return;
-  for(int i = 0; i < TITLE_START_NRECT; i++){
-    const unsigned short *r = TITLE_START_RECT[i];
-    quad(TITLE_START_X + (float)r[0], TITLE_START_Y + (float)r[1], r[2], r[3], Z_HUD, r[4] == 1 ? argb(0, 0, 0, 255) : argb(255, 255, 255, 255));
+}
+
+typedef struct { float x, y, s, v; } Cloud;
+static void draw_clouds(void){
+  static const Cloud C[4] = { { 100, 90, 1.0f, 6 }, { 430, 60, 0.8f, 4 }, { 660, 130, 1.1f, 8 }, { -120, 170, 0.9f, 5 } };
+  const short *r = DCA_CLOUD;
+  for(int i = 0; i < 4; i++){
+    float x = fmodf(C[i].x + world.time * C[i].v + 400.0f, 1000.0f) - 250.0f;
+    atl(x, C[i].y, r[2] * C[i].s, r[3] * C[i].s, r, Z_CLOUD + i * 0.001f, argb(255, 255, 255, 235));
   }
 }
 
 static void draw_all(void){
-  /* sky + ground */
-  quad(0, 0, 640, 140, Z_BG, argb(70, 140, 225, 255));
-  quad(0, 140, 640, 310, Z_BG, argb(150, 205, 245, 255));
-  quad(0, 450, 640, 8, Z_BG, argb(90, 180, 70, 255));
-  quad(0, 458, 640, 22, Z_BG, argb(110, 76, 48, 255));
-  /* sling */
-  quad(X(15.8f), Y(MX_ANCHOR_Y + 5), 8, 450 - Y(MX_ANCHOR_Y + 5), Z_SLING, argb(122, 82, 48, 255));
-  quad(X(14.6f), Y(MX_ANCHOR_Y + 5), 30, 6, Z_SLING, argb(122, 82, 48, 255));
-  /* voxels: each drawn where the wobble lattice has pushed it; a snapped joint shows as a dark crack */
-  for(int y = 0; y < MX_ROWS; y++) for(int x = 0; x < MX_COLS; x++){
-    int i = y * MX_COLS + x, m = world.grid[i];
-    if(!m) continue;
-    const uint8_t *c = mx_material_rgb(m);
-    float r = world.hp[i] / MAXHP[m], k = r > 0.66f ? 1.0f : r > 0.33f ? 0.75f : 0.5f;
-    float px = OX + x * PXC, py = OY + y * PXC;
-    if(world.wob_on){ px += world.ox[i] * PXC; py += world.oy[i] * PXC; }
-    quad(px, py, PXC, PXC, Z_VOX, argb((int)(c[0] * k), (int)(c[1] * k), (int)(c[2] * k), 255));
-    if(world.brk[i]) quad(px + PXC * 0.2f, py + PXC * 0.45f, PXC * 0.6f, 1.5f, Z_VOX + 0.1f, argb((int)(c[0] * 0.3f), (int)(c[1] * 0.3f), (int)(c[2] * 0.3f), 255));
+  shx = shy = 0;
+  if(world.shake > 0.05f){ shx = (frand() - 0.5f) * world.shake * 0.6f; shy = (frand() - 0.5f) * world.shake * 0.6f; }
+  /* backdrop: sky, drifting clouds, hills / city / ground + the sling post */
+  tquad(&hdr_bga, DCT_BGA_W, DCT_BGA_H, 0, 0, 640, 480, 0, 0, 512, 256, Z_BG, WHITE);
+  draw_clouds();
+  tquad(&hdr_bgb, DCT_BGB_W, DCT_BGB_H, 0, 0, 1024, 512, 0, 0, 1024, 512, Z_BGB, WHITE);
+  draw_rooms();
+  const MxMan *m = &world.man;
+  /* sling band behind the man */
+  if(m->mode == MAN_AIM){
+    seg(XB(MX_ANCHOR_X) + 8.0f, YB(MX_ANCHOR_Y) + 15.0f, X(m->x) + 2.5f, Y(m->y) + 3.8f, 2.8f, Z_SLING, argb(42, 22, 10, 255));
   }
-  /* rigid chunks: each voxel at its simulated world position */
+  /* voxels: each tile drawn where the wobble lattice has pushed it; a snapped joint shows as a dark crack */
+  for(int y = 0; y < MX_ROWS; y++) for(int x = 0; x < MX_COLS; x++){
+    int i = y * MX_COLS + x, mt = world.grid[i];
+    if(!mt) continue;
+    float px = X(x), py = Y(y);
+    if(world.wob_on){ px += world.ox[i] * PXC; py += world.oy[i] * PXC; }
+    int d = dmg(world.hp[i], mt);
+    if(d == 0 && world.brk[i]) d = 1;
+    tile(px, py, mt, variant(x, y), d, Z_VOX);
+  }
+  /* rigid chunks: each voxel at its simulated position, turned with the chunk */
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
     const MxChunk *ch = &world.chunks[c];
     if(!ch->active) continue;
+    float ca = cosf(ch->ang), sa = sinf(ch->ang);
     for(int k = 0; k < ch->count; k++){
       const MxCell *a = &ch->cells[k];
       if(a->dead) continue;
-      const uint8_t *col = mx_material_rgb(a->m);
-      quad(X(a->wx) - PXC * 0.5f, Y(a->wy) - PXC * 0.5f, PXC, PXC, Z_CHUNK, argb(col[0], col[1], col[2], 255));
+      tile_rot(X(a->wx), Y(a->wy), ca, sa, a->m, variant((int)(a->lx * 7), (int)(a->ly * 3)), dmg(a->h, a->m), Z_CHUNK);
     }
   }
   /* landlords */
@@ -276,15 +387,20 @@ static void draw_all(void){
     const MxTarget *t = &world.targets[i];
     if(!t->alive) continue;
     float wx, wy; mx_target_offset(&world, t, &wx, &wy);
-    float x = X(t->x + wx), y = Y(t->y + wy);
-    quad(x - 8, y - 4, 16, 18, Z_TARGET, argb(74, 85, 104, 255));        /* suit */
-    disc(x, y - 10, 7, Z_TARGET, argb(242, 199, 161, 255));              /* head */
-    quad(x - 8, y - 20, 16, 3, Z_TARGET, argb(17, 17, 17, 255));         /* hat brim */
-    quad(x - 5, y - 30, 10, 10, Z_TARGET, argb(17, 17, 17, 255));        /* hat */
-    quad(x - 1, y - 2, 3, 10, Z_TARGET, argb(210, 40, 40, 255));         /* tie */
+    draw_landlord(X(t->x + wx), Y(t->y + wy) + sinf(world.time * 5 + t->t) * 0.5f, Z_TARGET);
   }
-  /* the man: the shared pixel-art frames (art/manspr.h, built from the HTML prototype), one quad per horizontal run */
-  const MxMan *m = &world.man;
+  /* the aiming dots */
+  if(m->mode == MAN_AIM){
+    float dx = m->x - MX_ANCHOR_X, dy = m->y - MX_ANCHOR_Y;
+    if(dx * dx + dy * dy > 3.0f) for(int k = 1; k <= 16; k++){
+      float ox, oy; mx_preview_point(&world, (float)k / 9.0f, &ox, &oy);
+      int gx = (int)ox, gy = (int)oy;
+      if(gx < 0 || gx >= MX_COLS || gy >= MX_ROWS) break;
+      if(gy >= 0 && world.grid[gy * MX_COLS + gx]) break;
+      puff(X(ox), Y(oy), 4.2f - k * 0.12f, Z_FX, argb(255, 255, 255, 235 - k * 11));
+    }
+  }
+  /* the man: smooth sprites from art/dcart.h */
   if(m->mode != MAN_NONE && m->mode != MAN_WAIT){
     float x = X(m->x), y = Y(m->y);
     int ph = (int)(world.time * 60.0f), face = 1, fr = (ph >> 4) & 1 ? MSF_IDLE_A : MSF_IDLE_B;
@@ -293,52 +409,99 @@ static void draw_all(void){
       float dx = m->x - MX_ANCHOR_X, dy = m->y - MX_ANCHOR_Y;
       if(dx * dx + dy * dy > 4.0f) fr = MSF_DRAG;                         /* pulled back: yelling */
       else fr = mi_frame(&mi, ph);                                        /* waiting: idle gags */
-      quad(X(MX_ANCHOR_X) + 6, Y(MX_ANCHOR_Y) + 36, x - (X(MX_ANCHOR_X) + 6) + 4, 3, Z_SLING, argb(40, 22, 10, 255));
     }
-    else if(m->mode == MAN_STUCK){ disc(x, y + 6, 26, Z_MAN, argb(111, 227, 74, 255)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
+    else if(m->mode == MAN_STUCK){ puff(x, y + 6, 30, Z_MAN - 0.2f, argb(111, 227, 74, 200)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
     else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
     man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
   }
+  if(m->mode == MAN_AIM)
+    seg(XB(MX_ANCHOR_X) - 6.0f, YB(MX_ANCHOR_Y) + 13.8f, X(m->x) - 1.0f, Y(m->y) + 3.8f, 2.8f, Z_MAN + 1.0f, argb(42, 22, 10, 255));
   for(int i = 0; i < 256; i++) if(parts[i].life > 0){
     const Part *p = &parts[i]; float age = 1.0f - p->life / p->max;
+    uint32 c = p->c & 0x00ffffff;
     switch(p->kind){
-    case PK_STINK: {                                                      /* green cloud: swells, then thins out */
-      float r = 6 + age * 20; int a = (int)(150 * (1.0f - age * age));
-      disc(p->x, p->y, r, Z_FX, argb((p->c >> 16) & 255, (p->c >> 8) & 255, p->c & 255, a > 20 ? a : 20));
-      break; }
+    case PK_STINK: { float r = 7 + age * 20; int a = (int)(150 * (1.0f - age * age)); puff(p->x, p->y, r, Z_FX, c | ((uint32)(a > 20 ? a : 20) << 24)); break; }   /* green cloud: swells, then thins out */
     case PK_FLY: { float t = world.time * 18.0f + i; quad(p->x + sinf(t * 1.3f) * 9, p->y + cosf(t) * 7, 3, 3, Z_FX, p->c); break; }
-    case PK_ZZZ: { float z = 9; uint32 w = p->c;                           /* a little Z from three bars */
-      quad(p->x, p->y, z, 2, Z_FX, w); quad(p->x + z - 2, p->y + 2, 2, z - 4, Z_FX, w); quad(p->x, p->y + z - 2, z, 2, Z_FX, w); break; }
-    case PK_SWEAT: quad(p->x, p->y, 3, 5, Z_FX, p->c); break;
-    default: quad(p->x, p->y, 4, 4, Z_FX, p->c);
+    case PK_ZZZ: { text("Z", p->x, p->y, 16 + age * 8, argb(255, 255, 255, (int)(255 * (1.0f - age))), 1, Z_FX); break; }
+    case PK_SWEAT: puff(p->x, p->y, 3.0f, Z_FX, p->c); break;
+    default: { float a = 1.0f - age; puff(p->x, p->y, 3.4f + a * 1.6f, Z_FX, c | ((uint32)((int)(255 * (a > 0.3f ? 1.0f : a / 0.3f))) << 24)); }
     }
   }
-  /* HUD: men left as little red-brief icons, landlords left as dark squares */
-  quad(0, 0, 640, 26, Z_HUD, argb(15, 18, 30, 200));
-  for(int i = 0; i < world.men; i++){ quad(14 + i * 26, 6, 18, 14, Z_HUD + 1, argb(244, 183, 142, 255)); quad(14 + i * 26, 14, 18, 6, Z_HUD + 1, argb(224, 36, 58, 255)); }
-  for(int i = 0; i < world.ntargets; i++) quad(620 - i * 24, 6, 16, 16, Z_HUD + 1, world.targets[i].alive ? argb(255, 90, 90, 255) : argb(60, 70, 60, 255));
-  if(world.state == MX_WIN){                                              /* victory: two men doing the butt-wiggle dance */
-    quad(120, 200, 400, 80, Z_HUD + 1, argb(60, 220, 80, 230));
-    man_with_towel(&tow_win[0], mi_dance_frame(fcount), 180, 252, 1, Z_HUD + 2, 0);
-    man_with_towel(&tow_win[1], mi_dance_frame(fcount + 14), 460, 252, -1, Z_HUD + 2, 0);
+  if(world.flash > 0){ int a = (int)(world.flash * 400); if(a > 255) a = 255; quad(0, 0, 640, 480, Z_HUD - 0.5f, argb(255, 240, 200, a)); }
+
+  /* HUD */
+  gquad(0, 0, 640, 40, Z_HUD, argb(15, 18, 30, 200), argb(15, 18, 30, 150));
+  char buf[64], nm[40]; int n = 0;
+  for(const char *q = mx_level_name(world.level); *q && n < 38; q++) nm[n++] = (*q >= 'a' && *q <= 'z') ? *q - 32 : *q;
+  nm[n] = 0;
+  snprintf(buf, sizeof buf, "LV %d  %s", world.level + 1, nm);
+  text(buf, 12, 26, 16, argb(255, 210, 63, 255), 0, Z_HUD + 0.1f);
+  int alive = 0; for(int i = 0; i < world.ntargets; i++) alive += world.targets[i].alive;
+  snprintf(buf, sizeof buf, "LANDLORDS %d/%d", alive, world.ntargets);
+  text(buf, 440, 26, 15, alive ? argb(255, 138, 138, 255) : argb(125, 255, 90, 255), 0, Z_HUD + 0.1f);
+  { static float shown; shown += (world.score - shown) * 0.12f; if(fabsf(world.score - shown) < 0.6f) shown = (float)world.score;
+    snprintf(buf, sizeof buf, "%06d", (int)(shown + 0.5f)); text(buf, 634, 27, 14, WHITE, 2, Z_HUD + 0.1f); }
+  text("MEN", 292, 25, 11, argb(190, 190, 190, 255), 0, Z_HUD + 0.1f);
+  for(int i = 0; i < world.men; i++) atl(324 + i * 15, 11, 15, 16, DCA_ICON, Z_HUD + 0.1f, WHITE);
+  if(hint_t > 0 && world.state == MX_PLAY && m->mode == MAN_AIM)
+    text("PULL BACK WITH THE STICK, RELEASE WITH A!", 340, 330, 18, argb(255, 255, 255, 160 + (int)(95 * sinf(world.time * 5))), 1, Z_HUD);
+  if(m->mode == MAN_FLY && !m->dive) text("PRESS A = BELLY FLOP", 320, 466, 20, argb(255, 255, 255, 205), 1, Z_HUD);
+  if(world.banner > 0 && world.state == MX_PLAY){
+    int a = (int)(255 * (world.banner > 1 ? 1.0f : world.banner));
+    text(nm, 320, 180, 40, argb(255, 255, 255, a), 1, Z_HUD);
+    text("EVICT EVERY LANDLORD!", 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
   }
-  if(world.state == MX_LOSE){
-    quad(120, 200, 400, 80, Z_HUD + 1, argb(220, 60, 60, 230));
-    draw_frame(&MS_FRAMES[MSF_SAD], 320, 252, 1, Z_HUD + 2, 0);
+
+  if(world.state != MX_PLAY){
+    quad(0, 0, 640, 480, Z_END, argb(8, 10, 20, 184));
+    int win = world.state == MX_WIN;
+    man_zoom = 1.9f;
+    if(win){
+      man_with_towel(&tow_win[0], mi_dance_frame(fcount), 110, 330 - fabsf(sinf(fcount * 0.116f)) * 14, 1, Z_END + 1, 0);
+      man_with_towel(&tow_win[1], mi_dance_frame(fcount + 14), 530, 330 - fabsf(sinf(fcount * 0.116f + 1.3f)) * 14, -1, Z_END + 1, 0);
+    } else {
+      draw_frame(MSF_SAD, 110, 330, 1, Z_END + 1, 0);
+      for(int sd = -1; sd <= 1; sd += 2) for(int k = 0; k < 2; k++){
+        float f = fmodf(fcount / 66.0f + k * 0.5f + (sd > 0 ? 0.17f : 0), 1.0f);
+        puff(110 + sd * 22.0f, 284 + f * 60, 4.5f, Z_END + 2, argb(127, 212, 255, (int)(230 * (1 - f))));
+      }
+    }
+    text(win ? "EVICTION COMPLETE!" : "THE LANDLORDS LIVE...", 320, 190, 46, win ? argb(125, 255, 90, 255) : argb(255, 106, 106, 255), 1, Z_END + 2);
+    if(win){ int st = world.men >= 2 ? 3 : world.men >= 1 ? 2 : 1;
+      for(int i = 0; i < 3; i++) atl(320 - 105 + i * 70 - 31, 215, 62, 62, &DCA_STARS[i < st ? 0 : 4], Z_END + 2, WHITE); }
+    man_zoom = 1.0f;
+    snprintf(buf, sizeof buf, "SCORE  %d", world.score);
+    text(buf, 320, 330, 34, WHITE, 1, Z_END + 2);
+    if(((fcount >> 5) & 1) == 0 || fcount > 0) text(win ? "PRESS START: NEXT LEVEL" : "PRESS START: TRY AGAIN", 320, 390, 24, argb(255, 210, 63, 120 + (int)(120 * (0.5f + 0.5f * sinf(fcount * 0.1f)))), 1, Z_END + 2);
   }
-  if(world.flash > 0) quad(0, 0, 640, 480, Z_HUD + 2, argb(255, 240, 200, (int)(world.flash * 400)));
+}
+
+static void load_level(int n){ mx_load(&world, n); hint_t = 420; }
+
+static void gfx_init(void){
+  pvr_init_defaults();
+  { pvr_poly_cxt_t cxt;
+    pvr_poly_cxt_col(&cxt, PVR_LIST_TR_POLY);          /* translucent list so alpha works everywhere */
+    cxt.gen.culling = PVR_CULLING_NONE;
+    pvr_poly_compile(&hdr_col, &cxt); }
+  tx_bga = load_tex(DCT_BGA_RLE, DCT_BGA_RLE_LEN, DCT_BGA_W, DCT_BGA_H);
+  tx_bgb = load_tex(DCT_BGB_RLE, DCT_BGB_RLE_LEN, DCT_BGB_W, DCT_BGB_H);
+  tx_atl = load_tex(DCT_ATL_RLE, DCT_ATL_RLE_LEN, DCT_ATL_W, DCT_ATL_H);
+  tx_man = load_tex(DCT_MAN_RLE, DCT_MAN_RLE_LEN, DCT_MAN_W, DCT_MAN_H);
+  tx_ttl = load_tex(DCT_TTL_RLE, DCT_TTL_RLE_LEN, DCT_TTL_W, DCT_TTL_H);
+  make_hdr(&hdr_bga, PVR_TXRFMT_RGB565, DCT_BGA_W, DCT_BGA_H, tx_bga);
+  make_hdr(&hdr_bgb, PVR_TXRFMT_ARGB1555, DCT_BGB_W, DCT_BGB_H, tx_bgb);
+  make_hdr(&hdr_atl, PVR_TXRFMT_ARGB4444, DCT_ATL_W, DCT_ATL_H, tx_atl);
+  make_hdr(&hdr_man, PVR_TXRFMT_ARGB4444, DCT_MAN_W, DCT_MAN_H, tx_man);
+  make_hdr(&hdr_ttl, PVR_TXRFMT_RGB565, DCT_TTL_W, DCT_TTL_H, tx_ttl);
 }
 
 int main(int argc, char **argv){
   (void)argc; (void)argv;
-  pvr_init_defaults();
-  pvr_poly_cxt_t cxt;
-  pvr_poly_cxt_col(&cxt, PVR_LIST_TR_POLY);          /* translucent list so HUD/flash alpha works */
-  cxt.gen.culling = PVR_CULLING_NONE;
-  pvr_poly_compile(&hdr, &cxt);
+  gfx_init();
 
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
-  mx_load(&world, 0);
+  load_level(0);
   uint32 prev = 0;
   while(1){
     maple_device_t *dev = maple_enum_type(0, MAPLE_FUNC_CONTROLLER);
@@ -346,34 +509,35 @@ int main(int argc, char **argv){
     if(st){
       uint32 pressed = st->buttons & ~prev; prev = st->buttons;
       if(on_title){
-        if(pressed & (CONT_START | CONT_A)) on_title = 0;
+        if(pressed & (CONT_START | CONT_A)){ on_title = 0; if(tx_ttl){ pvr_mem_free(tx_ttl); tx_ttl = 0; } }
       } else if(world.state != MX_PLAY){
-        if(pressed & CONT_START) mx_load(&world, world.state == MX_WIN ? world.level + 1 : world.level);
+        if(pressed & CONT_START) load_level(world.state == MX_WIN ? world.level + 1 : world.level);
       } else {
-        if(pressed & CONT_Y) mx_load(&world, world.level);
+        if(pressed & CONT_Y) load_level(world.level);
         if(world.man.mode == MAN_AIM){
           float jx = st->joyx / 127.0f, jy = st->joyy / 127.0f;
           if(fabsf(jx) < 0.12f) jx = 0;
           if(fabsf(jy) < 0.12f) jy = 0;
           mx_set_pull(&world, jx * MX_PULL_MAX, jy * MX_PULL_MAX);
-          if(pressed & CONT_A) mx_release(&world);
+          if(pressed & CONT_A){ mx_release(&world); hint_t = 0; }
         } else if(pressed & CONT_A) mx_dive(&world);
       }
     }
     if(on_title){ title_t++; }
     else {
-    mx_update(&world, DT);
-    handle_events();
-    {
-      int calm = st && world.state == MX_PLAY && world.man.mode == MAN_AIM && world.banner <= 0 && !st->buttons && abs(st->joyx) < 30 && abs(st->joyy) < 30;
-      int strain = st && world.man.mode == MAN_AIM && (abs(st->joyx) > 90 || abs(st->joyy) > 90);
-      fx_step(calm, strain);
-    }
+      mx_update(&world, DT);
+      handle_events();
+      if(hint_t > 0) hint_t--;
+      {
+        int calm = st && world.state == MX_PLAY && world.man.mode == MAN_AIM && world.banner <= 0 && !st->buttons && abs(st->joyx) < 30 && abs(st->joyy) < 30;
+        int strain = st && world.man.mode == MAN_AIM && (abs(st->joyx) > 90 || abs(st->joyy) > 90);
+        fx_step(calm, strain);
+      }
     }
     pvr_wait_ready();
     pvr_scene_begin();
     pvr_list_begin(PVR_LIST_TR_POLY);
-    pvr_prim(&hdr, sizeof hdr);
+    cur_hdr = 0;
     if(on_title) draw_title(); else draw_all();
     pvr_list_finish();
     pvr_scene_finish();
