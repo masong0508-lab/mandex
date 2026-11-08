@@ -44,9 +44,16 @@ static const Sfx SFX[SFX_COUNT] = {
 static struct { int id, seg, left, freq, active; const Sfx *s; } vo[NV];
 static int cool[SFX_COUNT];
 
+#ifdef MX_NOSOUND
+static const int snd_ok = 0;            /* diagnostic build: never touch the ARM7 sound path */
+void sfx_init(void){ }
+#else
+static const int snd_ok = 1;
 void sfx_init(void){ soundEnable(); }
+#endif
 
 void sfx_play(int id, int pan){
+  if(!snd_ok) return;
   const Sfx *s = &SFX[id];
   if(cool[id] > 0) return;
   cool[id] = s->cool;
@@ -67,6 +74,7 @@ static const signed char TUNE[32] = {
   12, -1, 15, -1, 17, 15, 14, -1,  12, 10, 12, 14, 12, -1, -1, -1 };
 
 void music_set(int on){
+  if(!snd_ok){ mus_on = 0; return; }
   mus_on = on;
   if(!on && mus_id >= 0){ soundKill(mus_id); mus_id = -1; }
   mus_t = 0; mus_step = 0;

@@ -30,6 +30,15 @@ jobs:
           make -C ds SPECS=-specs=$DEVKITPRO/calico/share/ds9-legacy.specs
           python3 tools/ntr_patch.py ds/mandex.nds out/mandex_classic.nds
           for f in out/*.nds; do echo "== $f"; ndstool -i $f | grep -i "unit code\|ARM9 entry\|ARM9 RAM\|ARM7 entry\|Header CRC\|DSi"; done
+      - name: Silent diagnostic ROM (no ARM7 sound init)
+        run: |
+          export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
+          make -C ds clean >/dev/null
+          make -C ds EXTRA_DEFS=-DMX_NOSOUND SPECS=-specs=$DEVKITPRO/calico/share/ds9-legacy.specs
+          python3 tools/ntr_patch.py ds/mandex.nds out/mandex_nosound.nds
+          make -C ds clean >/dev/null
+          make -C ds EXTRA_DEFS=-DMX_NOSOUND
+          python3 tools/ntr_patch.py ds/mandex.nds out/mandex_nosound_calico.nds
       - name: Diagnostics (full headers, installed libnds flavours)
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
@@ -110,6 +119,6 @@ jobs:
         run: |
           cd pack && ls -la
           printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - plain DS header; melonDS / DeSmuME / DraStic / flashcart\n  mandex_classic.nds  Nintendo DS - same game, classic memory layout; try this one if mandex.nds will not boot\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
-          zip -9 ../mandex-roms.zip mandex.nds mandex_classic.nds mandex.cdi mandex.elf README.txt
+          zip -9 ../mandex-roms.zip mandex.nds mandex_classic.nds mandex_nosound.nds mandex_nosound_calico.nds mandex.cdi mandex.elf README.txt
       - uses: actions/upload-artifact@v4
         with: { name: mandex-roms, path: mandex-roms.zip }

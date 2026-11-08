@@ -29,7 +29,7 @@ INCLUDE := -I$(DEVKITPRO)/libnds/include -I$(CALICO)/include -I$(CORE) -I../art 
 # MX_LIBNDS_MATH   core uses libnds mulf32/divf32/sqrtf32 (hardware divide + sqrt units)
 # MX_HOT_ITCM      the solver's hot functions go into the 32 KB instruction TCM
 # SUBSTEPS         starting physics substeps per frame (the game adapts at run time)
-DEFS    := -D__NDS__ -DARM9 -DMX_FIXED -DMX_LIBNDS_MATH -DMX_HOT_ITCM -DSUBSTEPS=3
+DEFS    := $(EXTRA_DEFS) -D__NDS__ -DARM9 -DMX_FIXED -DMX_LIBNDS_MATH -DMX_HOT_ITCM -DSUBSTEPS=3
 
 CFLAGS  := -std=gnu99 -g -Wall -O2 -march=armv5te -mtune=arm946e-s -fomit-frame-pointer \
            -ffast-math -mthumb-interwork $(INCLUDE) $(DEFS)
