@@ -320,7 +320,7 @@ int main(void){
     /* ---- draw ---- */
     bot.fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL); bot.w = 320; bot.h = 240;
     float sl = osGet3DSliderState();                   /* the 3D slider: 0 = flat, 1 = full depth */
-    gfxSet3dEnabled(sl > 0.03f);
+    gfxSet3D(sl > 0.03f);
     for(int eye = 0; eye < (sl > 0.03f ? 2 : 1); eye++){
     top.fb = gfxGetFramebuffer(GFX_TOP, eye ? GFX_RIGHT : GFX_LEFT, NULL, NULL); top.w = 400; top.h = 240;
     draw_world_3d(&vt, eye ? 1 : -1, sl);
