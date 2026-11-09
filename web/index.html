@@ -1808,6 +1808,7 @@ function drawHUD(){
   txt('MEN',270,24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);txt('DRAG BACK  &  RELEASE!',SX+80,SY-60,22,'#fff','center');ctx.globalAlpha=1}
   if(state==='play'){const defs=[['beans','BEANS'],['towel','TOWEL'],['splat','SPLAT']];defs.forEach((d,i)=>{const n=pw.left[d[0]];btn(12+i*98,H-44,92,32,d[1]+' x'+n,()=>{if(man.mode==='aim'&&n>0)pw.sel=pw.sel===d[0]?null:d[0]},{size:14,on:pw.sel===d[0],disabled:n<=0||man.mode!=='aim'})});
+    btn(12+3*98+6,H-44,150,32,'TOOL: '+toolName(),()=>{if(man.mode!=='aim'||dragging)return;toolCycle();if(!toolOn('valve')&&(man.seated||man.vlv||man.inf>0)){man.seated=false;man.vlv=false;man.inf=0;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging});
     if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,H-18,16,'#fff','center');ctx.globalAlpha=1}
