@@ -610,7 +610,7 @@ function update(dt){
   if(state==='win'){endT+=dt;if(endT>.34){endT=0;SFX.wig()}}
   if(state==='play'){
     if(aliveTargets()===0){winT+=dt;if(winT>1.6){state='win';score+=men*3000;SFX.ding();onWin()}}
-    else if(men===0&&man.mode==='none'&&!busy()){loseT+=dt;if(loseT>1.8)state='lose'}}
+    else if(men===0&&man.mode==='none'){loseT+=dt;if((!busy()&&loseT>1.8)||loseT>15)state='lose'}}
 }
 
 // =====================================================================
