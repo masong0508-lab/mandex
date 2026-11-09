@@ -809,7 +809,7 @@ function drawFront(pose,fk,t,o){
     for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(-34+sw*2,30+k*6);ctx.quadraticCurveTo(0,36+k*6,34-sw*2,30+k*6);ctx.stroke()}}
   const sp=pose==='star'?15:pose==='flex'?7:3;
   for(const s of[-1,1]){let kx=s*(11+sp*.4),ky=39,ax=s*(11+sp),ay=55;const LG=o&&(s<0?o.legL:o.legR);if(LG){kx=LG[0];ky=LG[1];ax=LG[2];ay=LG[3]}
-    blob([pTap(s*10,24,8.8,kx,ky,6.6),pTap(kx,ky,6.4,ax,ay,4.9),pEll(kx,ky,6.7,6.5)]);                                     // thigh, shin and knee: one smooth leg
+    blob([pTap(s*10.6,24,9.5,kx,ky,6.6),pTap(kx,ky,6.4,ax,ay,4.9),pEll(kx,ky,6.7,6.5)]);                                     // thigh, shin and knee: one smooth leg
     curls(Array.from({length:5},(_,k)=>[kx+(k%2)*3-3,ky+3+k*2.4,k%2?1:-1]));
     const sx=ax+(kx-ax)*.32,sy=ay+(ky-ay)*.32;blob([pTap(sx,sy,6.1,ax,ay,5.5,'#fff')],{ow:1.5,shc:'rgba(110,110,165,.30)',hl:0});
     ctx.strokeStyle='#e33';ctx.lineWidth=1.5;ctx.lineCap='round';for(const dy of[1,4]){ctx.beginPath();ctx.moveTo(sx-5.6,sy+dy);ctx.quadraticCurveTo(sx,sy+dy+1.6,sx+5.6,sy+dy);ctx.stroke()}
@@ -820,7 +820,7 @@ function drawFront(pose,fk,t,o){
     if(pose==='flex')parts.push(pEll(s*31,-27,6.4,5.4));                                                                   // the bicep
     blob(parts);pitHair(s*21.5,-20.5,A[0],A[1],s)}
   if(o&&o.ro){ctx.save();ctx.translate(o.ro[0],o.ro[1])}
-  {const bp=new Path2D();bp.moveTo(-20,11);bp.bezierCurveTo(-23.5,14,-26,18.5,-25.2,24);bp.bezierCurveTo(-24.6,28.6,-22,31.4,-19.6,33.2);bp.quadraticCurveTo(-11,28.6,-3,36);bp.lineTo(3,36);bp.quadraticCurveTo(11,28.6,19.6,33.2);bp.bezierCurveTo(22,31.4,24.6,28.6,25.2,24);bp.bezierCurveTo(26,18.5,23.5,14,20,11);bp.closePath();   // the hips: flare out from the waist to the widest point, then taper smoothly into the thighs (no wings, no ledge)
+  {const bp=new Path2D();bp.moveTo(-20,11);bp.bezierCurveTo(-21.6,14.6,-24.6,19,-25,25.4);bp.bezierCurveTo(-25.2,28.6,-23,31,-20.2,32.4);bp.bezierCurveTo(-15.4,29.2,-7,29.6,-3,36);bp.lineTo(3,36);bp.bezierCurveTo(7,29.6,15.4,29.2,20.2,32.4);bp.bezierCurveTo(23,31,25.2,28.6,25,25.4);bp.bezierCurveTo(24.6,19,21.6,14.6,20,11);bp.closePath();   // the hips: flare out from the waist to the widest point, then taper smoothly into the thighs (no wings, no ledge)   // the hips: flare out from the waist to the widest point, then taper smoothly into the thighs (no wings, no ledge)
    blob([{p:bp,fill:BR,bb:[-27,10,27,37]}],{ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});}
   ctx.fillStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.ellipse(-15,23,2.8,6,.3,0,6.3);ctx.ellipse(15,23,2.8,6,-.3,0,6.3);ctx.fill();
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-5,29);ctx.lineTo(-5,21);ctx.lineTo(0,26);ctx.lineTo(5,21);ctx.lineTo(5,29);ctx.stroke();
