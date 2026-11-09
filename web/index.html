@@ -2395,7 +2395,7 @@ function ePut(cx,cy,m){const B=brushDims(),ox=cx-((B.w-1)>>1),oy=cy-((B.h-1)>>1)
 function eLine(a,b,m){const n=Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]));for(let t=1;t<=n;t++)ePut(Math.round(a[0]+(b[0]-a[0])*t/n),Math.round(a[1]+(b[1]-a[1])*t/n),m)}   // no gaps when you drag fast
 function eRect(a,b,m){const x0=Math.min(a[0],b[0]),x1=Math.max(a[0],b[0]),y0=Math.min(a[1],b[1]),y1=Math.max(a[1],b[1]);for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(x<EMIN||x>=COLS||y<0||y>=ROWS)continue;E.g[idx(x,y)]=m;eClearLord(x,y)}}
 function eDown(x,y){
-  if(y>=GY+3)return;const c=eCell(x,y);
+  if(y>=GY+3||x<EMIN*V)return;const c=eCell(x,y);
   if(E.tool==='lord'){eSnap();const k=E.t.findIndex(p=>Math.abs(p[0]-c[0])<=1&&Math.abs(p[1]-1-c[1])<=1);
     if(k>=0)E.t.splice(k,1);else if(E.t.length>=12)toast('ach','Max 12 landlords','');else if(c[0]>=EMIN&&c[1]<ROWS&&!E.g[idx(c[0],c[1])])E.t.push([c[0],c[1]+1]);return}
   eSnap();const m=E.tool==='erase'?0:E.mat;
@@ -2413,11 +2413,24 @@ function eSave(){
   if(E.id>=0)PD.custom[E.id]=L;else{PD.custom.push(L);E.id=PD.custom.length-1;ST().created++}
   pdTouch();pdSave();achCheck();toast('outfit','Saved: '+E.name,'find it under PLAY > MY LEVELS')}
 const MATCOL=['#444',...MAT.slice(1).map(m=>m.c)];
+function drawBrushPanel(){
+  const kb=(k,x,y)=>btn(x,y,100,44,BR_KIND[k],()=>eKind(k-E.bk),{size:15,on:E.bk===k});
+  panel(2,46,220,392);
+  kb(0,8,52);kb(1,116,52);kb(2,8,100);kb(3,116,100);
+  txt('SIZE '+brushLabel(),112,170,16,'#fff','center');
+  BR_SIZE[E.bk].forEach((n,i)=>btn(8+(i%4)*52,180+((i/4)|0)*46,48,42,E.bk===3?'R'+n:''+n,()=>{E.bs=i},{size:15,on:E.bs===i}));
+  txt('THICKNESS',112,284,14,'#cdd','center');
+  const th=E.bk===1||E.bk===2;
+  for(let t=1;t<=4;t++)btn(8+(t-1)*52,292,48,42,''+t,()=>{if(th)E.bt=t},{size:15,on:th&&E.bt===t,disabled:!th});
+  btn(8,344,100,44,E.shape==='pen'?'PEN':'RECT',()=>{E.shape=E.shape==='pen'?'rect':'pen'},{size:15});
+  btn(116,344,100,44,'UNDO',eUndo,{size:15});
+  btn(8,392,100,40,'ERASE',()=>{E.tool='erase'},{size:14,on:E.tool==='erase'});
+  btn(116,392,100,40,'LANDLORD',()=>{E.tool='lord'},{size:13,on:E.tool==='lord',col:'#ff8a8a'})}
 function drawEditor(){
   ctx.setTransform(1,0,0,1,0,0);
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const m=E.g[idx(x,y)];if(m)ctx.drawImage(SPR[m][hsh(x,y)&3][0],x*V,y*V)}
   ctx.fillStyle='rgba(255,60,60,.14)';ctx.fillRect(0,0,EMIN*V,GY);ctx.strokeStyle='rgba(255,90,90,.7)';ctx.setLineDash([6,5]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(EMIN*V,0);ctx.lineTo(EMIN*V,GY);ctx.stroke();ctx.setLineDash([]);
-  txt('SLING AREA',EMIN*V/2,40,16,'#ffb0b0','center');
+  txt('SLING AREA',EMIN*V/2,34,14,'#ffb0b0','center');drawBrushPanel();
   ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=1;ctx.beginPath();for(let x=EMIN;x<=COLS;x+=5){ctx.moveTo(x*V,0);ctx.lineTo(x*V,GY)}for(let y=0;y<=ROWS;y+=5){ctx.moveTo(EMIN*V,y*V);ctx.lineTo(W,y*V)}ctx.stroke();
   E.t.forEach((p,i)=>{ctx.save();ctx.translate(p[0]*V+V/2,p[1]*V-7);drawLandlord({t:time+i,x:0,y:0});ctx.restore()});
   if(E.drag&&!E.drag.pen){const a=E.drag.a,b=E.drag.b;ctx.fillStyle=E.drag.m?MATCOL[E.drag.m]:'rgba(255,255,255,.4)';ctx.globalAlpha=.55;ctx.fillRect(Math.min(a[0],b[0])*V,Math.min(a[1],b[1])*V,(Math.abs(a[0]-b[0])+1)*V,(Math.abs(a[1]-b[1])+1)*V);ctx.globalAlpha=1}
@@ -2431,9 +2444,6 @@ function drawEditor(){
     btn(x,y1,50,24,m?MAT[m].n.toUpperCase():'ERASE',()=>{if(m===0)E.tool='erase';else{E.tool='mat';E.mat=m}},{size:10,on,swatch:m?MATCOL[m]:null});x+=52}
   btn(x+4,y1,100,24,'LANDLORD',()=>{E.tool='lord'},{size:12,on:E.tool==='lord',col:'#ff8a8a'});x+=112;
   btn(x,y1,56,24,E.shape==='pen'?'PEN':'RECT',()=>{E.shape=E.shape==='pen'?'rect':'pen'},{size:12});x+=62;
-  btn(x,y1,76,24,BR_KIND[E.bk],()=>eKind(1),{size:12});x+=82;
-  btn(x,y1,26,24,'-',()=>eSize(-1),{size:16});txt(brushLabel(),x+54,y1+17,13,'#fff','center');btn(x+82,y1,26,24,'+',()=>eSize(1),{size:16});x+=114;
-  btn(x,y1,88,24,'THICK '+E.bt,eThick,{size:12,disabled:E.bk===0||E.bk===3});
   const y2=y1+28;x=8;
   btn(x,y2,26,24,'-',()=>{E.men=Math.max(1,E.men-1)},{size:16});txt('MEN '+E.men,x+62,y2+17,14,'#fff','center');btn(x+98,y2,26,24,'+',()=>{E.men=Math.min(12,E.men+1)},{size:16});x+=134;
   btn(x,y2,64,24,'UNDO',eUndo,{size:12});x+=70;
