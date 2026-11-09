@@ -709,11 +709,12 @@ function curls(list){ctx.save();ctx.strokeStyle=HAIR;ctx.lineWidth=.8;ctx.lineCa
 function blobClip(parts){const u=new Path2D();for(const q of parts)u.addPath(q.p);ctx.clip(u)}
 function face(cx,cy,sc,kind,t,side,x){ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);newFace(kind,t,x||{});ctx.restore()}
 // armpit tuft: a fan of coarse curly hairs poking out where the arm meets the torso (s = -1 left, +1 right)
-function pitHair(x,y,s){ctx.save();ctx.fillStyle=HAIR;ctx.strokeStyle=HAIR;ctx.lineCap='round';
-  // a painted-in patch: three overlapping soft lumps tucked into the crease under the arm, a couple of curled wisps on its lower edge, a lighter sheen so it has weight
-  for(const[dx,dy,r]of[[0,0,3.3],[s*2.3,1.7,2.7],[-s*1,3,2.5],[s*.6,4.4,1.7]]){ctx.beginPath();ctx.ellipse(x+dx,y+dy,r,r*1.12,0,0,6.3);ctx.fill()}
-  ctx.lineWidth=1.1;for(const[dx,dy,ex,ey]of[[s*3,3.6,s*5,5.4],[-s*.4,5.4,-s*.2,7.4]]){ctx.beginPath();ctx.moveTo(x+dx,y+dy);ctx.quadraticCurveTo(x+(dx+ex)/2+s,y+(dy+ey)/2,x+ex,y+ey);ctx.stroke()}
-  ctx.strokeStyle='rgba(150,100,60,.55)';ctx.lineWidth=.9;ctx.beginPath();ctx.arc(x+s*.4,y+.3,2.3,s>0?3.6:-.5,s>0?4.8:.7);ctx.stroke();ctx.restore()}
+function pitHair(rx,ry,ex,ey,s){   // armpit patch: drawn right after the arm and BEFORE the torso, so the torso edge overlaps it and it stays tucked in the crease under the arm
+  const t=.42,x=rx+(ex-rx)*t,y=ry+(ey-ry)*t+3.1,ang=Math.atan2(ey-ry,(ex-rx)*s)*.6;
+  ctx.save();ctx.translate(x,y);ctx.scale(s,1);ctx.rotate(ang);ctx.fillStyle=HAIR;ctx.strokeStyle=HAIR;ctx.lineCap='round';
+  for(const[dx,dy,a,b]of[[0,0,3.4,2.5],[2.6,.7,2.6,2],[-2.4,1,2.3,1.9],[.4,2.4,2.8,1.6]]){ctx.beginPath();ctx.ellipse(dx,dy,a,b,0,0,6.3);ctx.fill()}
+  ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(2.6,2.6);ctx.quadraticCurveTo(4.6,3.2,5.4,4.6);ctx.moveTo(-1.8,3.2);ctx.quadraticCurveTo(-1.2,4.4,-1.8,5.2);ctx.stroke();
+  ctx.strokeStyle='rgba(150,100,60,.5)';ctx.lineWidth=.8;ctx.beginPath();ctx.arc(.2,-.2,2,3.5,4.9);ctx.stroke();ctx.restore()}
 // dimples of Venus: two deep little pits above the butt, shaded on top, lit on the lower lip, and rowdy: they jiggle
 function dimples(cx,cy,w){for(const q of[-1,1]){const x=cx+q*w,y=cy+Math.sin(time*13+q*2.1)*.8;
   ctx.fillStyle='rgba(150,70,40,.5)';ctx.beginPath();ctx.ellipse(x,y,2.7,3.1,0,0,6.3);ctx.fill();
@@ -739,7 +740,7 @@ function drawFront(pose,fk,t,o){
   for(const s of[-1,1]){const A=o&&(s<0?o.armL:o.armR)||[s*AR[0],AR[1],s*AR[2],AR[3]];                                    // each arm is one mass: tapered upper arm and forearm, elbow, hand
     const parts=[pTap(s*21.5,-20.5,6.9,A[0],A[1],6.3),pTap(A[0],A[1],6,A[2],A[3],4.9),pEll(A[0],A[1],6.2,6.1),pEll(A[2],A[3],6.8,6.8)];
     if(pose==='flex')parts.push(pEll(s*31,-27,6.4,5.4));                                                                   // the bicep
-    blob(parts)}
+    blob(parts);pitHair(s*21.5,-20.5,A[0],A[1],s)}
   if(o&&o.ro){ctx.save();ctx.translate(o.ro[0],o.ro[1])}
   {const bp=new Path2D();bp.moveTo(-20,11);bp.quadraticCurveTo(-28,22,-22,31);bp.quadraticCurveTo(-12,28,-3,36);bp.lineTo(3,36);bp.quadraticCurveTo(12,28,22,31);bp.quadraticCurveTo(28,22,20,11);bp.closePath();
    blob([{p:bp,fill:BR,bb:[-29,10,29,37]}],{ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});}
@@ -766,7 +767,6 @@ function drawFront(pose,fk,t,o){
    curls(Array.from({length:6},(_,k)=>[k%2?.9:-.9,-13+k*2.6,k%2?1:-1]));
    if(bgrp)ctx.restore();
    for(const q of[-1,1]){ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(q*10+wo[0],12.4+wo[1]);ctx.quadraticCurveTo(q*19+wo[0],15+wo[1],q*26+wo[0],11.6+wo[1]);ctx.stroke()}}   // the fold under each roll
-  for(const q of[-1,1])pitHair(q*26,-10,q);
   if(o&&o.head){ctx.save();ctx.translate(o.head[0],o.head[1]);ctx.translate(0,-30);ctx.rotate(o.head[2]||0);ctx.translate(0,30)}
   ell(0,-31,10,6,SKD);blob([pEll(-14,-44,4,5)],{ow:1.5,sd:1.2,hl:0});blob([pEll(14,-44,4,5)],{ow:1.5,sd:1.2,hl:0});
   blob([pEll(-10.8,-38,5.4,5.8),pEll(10.8,-38,5.4,5.8),pEll(0,-34,11.2,8.2),pEll(0,-44,14.3,13.3)],{ow:1.8});               // cheeks, jaw and skull: one head, no seams
@@ -1158,9 +1158,9 @@ function drawBack(pose,t,o){o=jigMerge(o)||{};const bo=o.bo||[0,0],ro=o.ro||[0,0
   // right arm up, waving a towel flag: a real cloth (see TOWEL CLOTH).  The held edge is painted now (the fist covers it), the rest hangs in front of the arm and is painted after the body.
   const tow=!(o.noflag||NOTOWEL),wv=tow?armWave(.8):[0,0,0],hx=38+sh+wv[0],hy=-58+wv[1],ex=40+sh+wv[0]*.5,ey=-32+wv[1]*.5;let towFront=null;
   if(tow){const jobs=towelJobs(towelFor(TW_BACK,[hx,hy,wv[2]],1,2),0).sort((a,b)=>a.d-b.d);towFront=jobs.filter(q=>q.i>0);for(const q of jobs)if(q.i===0)q.fn()}
-  blob([pTap(21.5+sh,-21,6.9,ex,ey,6.3),pTap(ex,ey,6,hx,hy,4.9),pEll(ex,ey,6.2,6.1),pEll(hx,hy,6.8,6.8)]);
+  blob([pTap(21.5+sh,-21,6.9,ex,ey,6.3),pTap(ex,ey,6,hx,hy,4.9),pEll(ex,ey,6.2,6.1),pEll(hx,hy,6.8,6.8)]);pitHair(21.5+sh,-21,ex,ey,1);
   // left arm on hip
-  blob([pTap(-21.5+sh,-21,6.9,-40+sh,-8,6.3),pTap(-40+sh,-8,6,-24+hip*.5,9,4.9),pEll(-40+sh,-8,6.2,6.1),pEll(-24+hip*.5,9,6.8,6.8)]);
+  blob([pTap(-21.5+sh,-21,6.9,-40+sh,-8,6.3),pTap(-40+sh,-8,6,-24+hip*.5,9,4.9),pEll(-40+sh,-8,6.2,6.1),pEll(-24+hip*.5,9,6.8,6.8)]);pitHair(-21.5+sh,-21,-40+sh,-8,-1);
   // love handles + back
   blob([pYoke(1,0,sh),pEll(sh,-24,21,10),pEll(hip*.15+bo[0],-6+bo[1],23,24)]);                  // shoulders, upper back and belly: one mass
   ctx.save();ctx.translate(bo[0],bo[1]);
@@ -1168,7 +1168,6 @@ function drawBack(pose,t,o){o=jigMerge(o)||{};const bo=o.bo||[0,0],ro=o.ro||[0,0
   ctx.fillStyle='rgba(255,255,255,.26)';ctx.beginPath();ctx.ellipse(-9+sh*.5,-14,7,10,.2,0,6.3);ctx.fill();
   ctx.fillStyle='rgba(176,92,52,.26)';ctx.beginPath();ctx.ellipse(hip*.1+sh*.4,-12,1.7,16,0,0,6.3);ctx.fill();dimples(hip*.2,5,6.2);   // the spine: a soft groove, and two dimples above the butt
   ctx.restore();
-  for(const q of[-1,1])pitHair(q*26+sh,-10,q);
   curls([[-14,-26,-1],[-11,-22,-1],[-16,-21,-1],[13,-27,1],[10,-23,1],[15,-22,1],[-5,-30,-1],[4,-31,1]].map(([q,w,d])=>[q+sh*.5,w,d]));
   // briefs hugging two round cheeks (crease, highlight, soft shading, a pinch of fabric at the top), then waistband + tag, then love handles on top
   const bx=hip*.6,cy0=23;ctx.save();ctx.translate(ro[0],ro[1]);
