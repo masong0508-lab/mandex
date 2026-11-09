@@ -2158,7 +2158,7 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);
   if(state==='title')return;
   if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options')goMenu();return}
   if(state==='select'&&(e.key==='u'||e.key==='U')){PD.unlockAll=!PD.unlockAll;pdTouch();toast('ach',PD.unlockAll?'All levels unlocked':'Levels locked again','');return}
-  if(state==='edit'){const k=e.key.toLowerCase();if(k>='1'&&k<='8'){E.tool='mat';E.mat=+k}else if(k==='e')E.tool='erase';else if(k==='l')E.tool='lord';else if(k==='r')E.shape=E.shape==='pen'?'rect':'pen';else if(k==='z')eUndo();else if(k==='b')E.brush=E.brush%4+1;return}
+  if(state==='edit'){const k=e.key.toLowerCase();if(k>='1'&&k<='8'){E.tool='mat';E.mat=+k}else if(k==='e')E.tool='erase';else if(k==='l')E.tool='lord';else if(k==='r')E.shape=E.shape==='pen'?'rect':'pen';else if(k==='z')eUndo();else if(k==='b')eSize(e.shiftKey?-1:1);else if(k==='v')eKind(1);else if(k==='t')eThick();return}
   if(state!=='play'&&state!=='win'&&state!=='lose')return;
   if(e.key==='r'||e.key==='R')retry();
   if(e.key==='n'||e.key==='N')nextAfterWin();
@@ -2367,20 +2367,32 @@ function importCode(){let s=null;try{s=prompt('Paste a level code:')}catch(e){}i
   catch(e){toast('ach','That code did not work','check you copied all of it')}}
 
 // ---------- the editor ----------
-const E={g:new Uint8Array(COLS*ROWS),t:[],men:5,mat:1,tool:'mat',shape:'pen',brush:1,undo:[],id:-1,name:'',drag:null};
+const E={g:new Uint8Array(COLS*ROWS),t:[],men:5,mat:1,tool:'mat',shape:'pen',bk:0,bs:0,bt:1,undo:[],id:-1,name:'',drag:null};
 const EMIN=28;   // columns left of this stay empty: the sling lives there
 function openEditor(back,which){
   testing=false;state='edit';hits=[];
   if(back)return;
   if(which!==undefined&&which>=0){const L=PD.custom[which];E.g=decodeCells(L.c);E.t=L.t.map(p=>p.slice());E.men=L.m|0||5;E.id=which;E.name=L.n}
   else{E.g=new Uint8Array(COLS*ROWS);E.t=[];E.men=5;E.id=-1;E.name=''}
-  E.undo=[];E.mat=1;E.tool='mat';E.shape='pen';E.brush=1}
+  E.undo=[];E.mat=1;E.tool='mat';E.shape='pen';E.bk=0;E.bs=0;E.bt=1}
 
 function eSnap(){E.undo.push([E.g.slice(),E.t.map(p=>p.slice())]);if(E.undo.length>30)E.undo.shift()}
 function eUndo(){const s=E.undo.pop();if(s){E.g=s[0];E.t=s[1]}}
 function eCell(px,py){return[Math.floor(px/V),Math.floor(py/V)]}
 function eClearLord(x,y){E.t=E.t.filter(p=>!(p[0]===x&&p[1]-1===y))}
-function ePut(cx,cy,m){for(let j=0;j<E.brush;j++)for(let i=0;i<E.brush;i++){const x=cx+i-((E.brush-1)>>1),y=cy+j-((E.brush-1)>>1);if(x<EMIN||x>=COLS||y<0||y>=ROWS)continue;E.g[idx(x,y)]=m;eClearLord(x,y)}}
+// brushes: SQUARE n x n, WIDE n x thickness (long beams), TALL thickness x n (columns), ROUND radius n (discs)
+const BR_KIND=['SQUARE','WIDE','TALL','ROUND'];
+const BR_SIZE=[[1,2,3,4,6,8,12],[4,6,10,16,24,32,48],[4,6,10,16,24,36],[1,2,3,5,8,12,16]];
+function brushDims(){const k=E.bk,n=BR_SIZE[k][E.bs];
+  if(k===0)return{w:n,h:n,r:0};if(k===1)return{w:n,h:E.bt,r:0};if(k===2)return{w:E.bt,h:n,r:0};return{w:2*n+1,h:2*n+1,r:n}}
+function brushLabel(){const B=brushDims();return E.bk===3?'R'+B.r:B.w+'x'+B.h}
+function brushHas(i,j,B){if(!B.r)return true;const dx=i-B.r,dy=j-B.r;return dx*dx+dy*dy<=B.r*B.r+B.r*.5}
+function eKind(d){E.bk=(E.bk+d+4)%4;E.bs=Math.min(E.bs,BR_SIZE[E.bk].length-1)}
+function eSize(d){const n=BR_SIZE[E.bk].length;E.bs=(E.bs+d+n)%n}
+function eThick(){if(E.bk===1||E.bk===2)E.bt=E.bt%4+1}
+function ePut(cx,cy,m){const B=brushDims(),ox=cx-((B.w-1)>>1),oy=cy-((B.h-1)>>1);
+  for(let j=0;j<B.h;j++)for(let i=0;i<B.w;i++){if(!brushHas(i,j,B))continue;const x=ox+i,y=oy+j;if(x<EMIN||x>=COLS||y<0||y>=ROWS)continue;E.g[idx(x,y)]=m;eClearLord(x,y)}}
+function eLine(a,b,m){const n=Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]));for(let t=1;t<=n;t++)ePut(Math.round(a[0]+(b[0]-a[0])*t/n),Math.round(a[1]+(b[1]-a[1])*t/n),m)}   // no gaps when you drag fast
 function eRect(a,b,m){const x0=Math.min(a[0],b[0]),x1=Math.max(a[0],b[0]),y0=Math.min(a[1],b[1]),y1=Math.max(a[1],b[1]);for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(x<EMIN||x>=COLS||y<0||y>=ROWS)continue;E.g[idx(x,y)]=m;eClearLord(x,y)}}
 function eDown(x,y){
   if(y>=GY+3)return;const c=eCell(x,y);
@@ -2388,8 +2400,8 @@ function eDown(x,y){
     if(k>=0)E.t.splice(k,1);else if(E.t.length>=12)toast('ach','Max 12 landlords','');else if(c[0]>=EMIN&&c[1]<ROWS&&!E.g[idx(c[0],c[1])])E.t.push([c[0],c[1]+1]);return}
   eSnap();const m=E.tool==='erase'?0:E.mat;
   if(E.shape==='rect'){E.drag={a:c,b:c,m};return}
-  E.drag={pen:true,m};ePut(c[0],c[1],m)}
-function eMove(x,y){if(!E.drag)return;const c=eCell(x,y);if(E.drag.pen){if(y<GY+3)ePut(c[0],Math.min(c[1],ROWS-1),E.drag.m)}else E.drag.b=[c[0],Math.min(c[1],ROWS-1)]}
+  E.drag={pen:true,m,l:c};ePut(c[0],c[1],m)}
+function eMove(x,y){if(!E.drag)return;const c=eCell(x,y);if(E.drag.pen){if(y<GY+3){const t=[c[0],Math.min(c[1],ROWS-1)];eLine(E.drag.l,t,E.drag.m);E.drag.l=t}}else E.drag.b=[c[0],Math.min(c[1],ROWS-1)]}
 function eUp(){if(E.drag&&!E.drag.pen)eRect(E.drag.a,E.drag.b,E.drag.m);E.drag=null}
 function eBuild(){const g=E.g.slice(),t=E.t.map(p=>p.slice());return{name:E.name||'Test Level',men:E.men,custom:true,build(){for(let i=0;i<g.length;i++)if(g[i])set(i%COLS,(i/COLS)|0,g[i]);for(const[cx,row]of t)tgt(cx,row)}}}
 function eTest(){if(!E.t.length){toast('ach','Add at least one landlord','use the LANDLORD tool');return}testing=true;load(-1,eBuild())}
@@ -2409,14 +2421,19 @@ function drawEditor(){
   ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=1;ctx.beginPath();for(let x=EMIN;x<=COLS;x+=5){ctx.moveTo(x*V,0);ctx.lineTo(x*V,GY)}for(let y=0;y<=ROWS;y+=5){ctx.moveTo(EMIN*V,y*V);ctx.lineTo(W,y*V)}ctx.stroke();
   E.t.forEach((p,i)=>{ctx.save();ctx.translate(p[0]*V+V/2,p[1]*V-7);drawLandlord({t:time+i,x:0,y:0});ctx.restore()});
   if(E.drag&&!E.drag.pen){const a=E.drag.a,b=E.drag.b;ctx.fillStyle=E.drag.m?MATCOL[E.drag.m]:'rgba(255,255,255,.4)';ctx.globalAlpha=.55;ctx.fillRect(Math.min(a[0],b[0])*V,Math.min(a[1],b[1])*V,(Math.abs(a[0]-b[0])+1)*V,(Math.abs(a[1]-b[1])+1)*V);ctx.globalAlpha=1}
-  else if(mouseY<GY&&mouseX>EMIN*V){const c=eCell(mouseX,mouseY);ctx.strokeStyle='#fff';ctx.lineWidth=2;const b=E.tool==='lord'?2:E.brush;ctx.strokeRect((c[0]-((b-1)>>1))*V,(c[1]-((b-1)>>1))*V,b*V,b*V)}
+  else if(mouseY<GY&&mouseX>EMIN*V){const c=eCell(mouseX,mouseY);ctx.strokeStyle='#fff';ctx.lineWidth=2;if(E.tool==='lord')ctx.strokeRect((c[0]-0)*V,(c[1]-0)*V,2*V,2*V);
+    else{const B=brushDims(),ox=c[0]-((B.w-1)>>1),oy=c[1]-((B.h-1)>>1);
+      if(B.r){ctx.beginPath();ctx.arc(c[0]*V+V/2,c[1]*V+V/2,(B.r+.5)*V,0,7);ctx.stroke()}else ctx.strokeRect(ox*V,oy*V,B.w*V,B.h*V);
+      ctx.fillStyle='rgba(255,255,255,.12)';for(let j=0;j<B.h;j++)for(let i=0;i<B.w;i++)if(brushHas(i,j,B))ctx.fillRect((ox+i)*V,(oy+j)*V,V,V)}}
   ctx.fillStyle='rgba(12,14,26,.94)';ctx.fillRect(0,GY+3,W,H-GY-3);
   let x=8;const y1=GY+8;
   for(let m=0;m<=8;m++){const on=(E.tool==='erase'&&m===0)||(E.tool==='mat'&&E.mat===m&&m>0);
     btn(x,y1,50,24,m?MAT[m].n.toUpperCase():'ERASE',()=>{if(m===0)E.tool='erase';else{E.tool='mat';E.mat=m}},{size:10,on,swatch:m?MATCOL[m]:null});x+=52}
   btn(x+4,y1,100,24,'LANDLORD',()=>{E.tool='lord'},{size:12,on:E.tool==='lord',col:'#ff8a8a'});x+=112;
   btn(x,y1,56,24,E.shape==='pen'?'PEN':'RECT',()=>{E.shape=E.shape==='pen'?'rect':'pen'},{size:12});x+=62;
-  btn(x,y1,70,24,'BRUSH '+E.brush,()=>{E.brush=E.brush%4+1},{size:12});
+  btn(x,y1,76,24,BR_KIND[E.bk],()=>eKind(1),{size:12});x+=82;
+  btn(x,y1,26,24,'-',()=>eSize(-1),{size:16});txt(brushLabel(),x+54,y1+17,13,'#fff','center');btn(x+82,y1,26,24,'+',()=>eSize(1),{size:16});x+=114;
+  btn(x,y1,88,24,'THICK '+E.bt,eThick,{size:12,disabled:E.bk===0||E.bk===3});
   const y2=y1+28;x=8;
   btn(x,y2,26,24,'-',()=>{E.men=Math.max(1,E.men-1)},{size:16});txt('MEN '+E.men,x+62,y2+17,14,'#fff','center');btn(x+98,y2,26,24,'+',()=>{E.men=Math.min(12,E.men+1)},{size:16});x+=134;
   btn(x,y2,64,24,'UNDO',eUndo,{size:12});x+=70;
