@@ -555,6 +555,7 @@ function update(dt){
     for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<m.R+t.r+6)killTarget(t);
     m.a=m.t>2?Math.max(0,1-(m.t-2)/.6):1;if(m.t>2.6){goo(m.x,m.y,20,240);SFX.pop();m.mode='done'}}
   if(man.jg)jigStep(man,dt);
+  if(man.jg&&(man.mode==='stuck'||man.mode==='fly'))ragStep(man,dt);
   if(man.mode==='done'){man={mode:'wait',x:-999,y:-999,t:0,a:1,R:14};waitT=0}
   if(man.mode==='wait'){waitT+=dt;if(waitT>.7&&(chunks.length===0||waitT>3.5)){if(men>0)nextMan();else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14}}}
   processExpl();
@@ -637,7 +638,7 @@ function blobClip(parts){const u=new Path2D();for(const q of parts)u.addPath(q.p
 function face(cx,cy,sc,kind,t,side,x){ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);newFace(kind,t,x||{});ctx.restore()}
 let INF=0;   // how inflated the belly is (0..1) for the side-profile sprite
 let JIG=null;   // belly/rear spring offsets for the current render (set by renderMan; null = off)
-function jigMerge(o){if(!JIG)return o;o=Object.assign({},o||{});o.bo=JIG.bo;o.ro=JIG.ro;o.belly=o.belly?[o.belly[0]*JIG.bs[0],o.belly[1]*JIG.bs[1]]:JIG.bs;return o}
+function jigMerge(o){if(!JIG)return o;o=Object.assign({},o||{});o.bo=JIG.bo;o.ro=JIG.ro;o.sk=JIG.sk;if(JIG.armL&&!o.armL){o.armL=JIG.armL;o.armR=JIG.armR;o.legL=JIG.legL;o.legR=JIG.legR}o.belly=o.belly?[o.belly[0]*JIG.bs[0],o.belly[1]*JIG.bs[1]]:JIG.bs;return o}
 function drawFront(pose,fk,t,o){
   o=jigMerge(o);
   const sw=Math.sin(t*4);
@@ -645,7 +646,7 @@ function drawFront(pose,fk,t,o){
     ctx.fillStyle=TOW;ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.stroke();ctx.strokeStyle=TOWS;ctx.lineWidth=3;
     for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(-34+sw*2,30+k*6);ctx.quadraticCurveTo(0,36+k*6,34-sw*2,30+k*6);ctx.stroke()}}
   const sp=pose==='star'?15:pose==='flex'?7:3;
-  for(const s of[-1,1]){const kx=s*(11+sp*.4),ky=39,ax=s*(11+sp),ay=55;
+  for(const s of[-1,1]){let kx=s*(11+sp*.4),ky=39,ax=s*(11+sp),ay=55;const LG=o&&(s<0?o.legL:o.legR);if(LG){kx=LG[0];ky=LG[1];ax=LG[2];ay=LG[3]}
     blob([pTap(s*10,24,8.8,kx,ky,6.6),pTap(kx,ky,6.4,ax,ay,4.9),pEll(kx,ky,6.7,6.5)]);                                     // thigh, shin and knee: one smooth leg
     curls(Array.from({length:5},(_,k)=>[kx+(k%2)*3-3,ky+3+k*2.4,k%2?1:-1]));
     const sx=ax+(kx-ax)*.32,sy=ay+(ky-ay)*.32;blob([pTap(sx,sy,6.1,ax,ay,5.5,'#fff')],{ow:1.5,shc:'rgba(110,110,165,.30)',hl:0});
@@ -669,7 +670,7 @@ function drawFront(pose,fk,t,o){
    const xf=(q,M)=>{const p=new Path2D();p.addPath(q.p,M);const b=q.bb,pts=[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]].map(c=>[M.a*c[0]+M.c*c[1]+M.e,M.b*c[0]+M.d*c[1]+M.f]);
      return{p,fill:q.fill,bb:[Math.min(...pts.map(c=>c[0])),Math.min(...pts.map(c=>c[1])),Math.max(...pts.map(c=>c[0])),Math.max(...pts.map(c=>c[1]))]}};
    ctx.fillStyle='rgba(110,30,30,.30)';for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(q*17.5+wo[0],15.4+wo[1],10.6,3.2,0,0,6.3);ctx.fill()}                  // the shadow a love handle throws on the shorts
-   blob([pYoke(1,0,0),pEll(0,-22,21,10),xf(pEll(0,-2+INF*14,22+INF*16,17+INF*20),bM),pEll(-17.5+wo[0],10.4+wo[1],11,6.4),pEll(17.5+wo[0],10.4+wo[1],11,6.4)]);
+   blob([pYoke(1,0,0),pEll(0,-22,21,10),(o&&o.sk?pSkin(skPts(0,-2+INF*14,22+INF*16,17+INF*20,o.sk,o.belly,o.bdy)):xf(pEll(0,-2+INF*14,22+INF*16,17+INF*20),bM)),pEll(-17.5+wo[0],10.4+wo[1],11,6.4),pEll(17.5+wo[0],10.4+wo[1],11,6.4)]);
    ctx.save();ctx.translate(0,-3);curls(Array.from({length:14},(_,k)=>[-5+(k*7)%11,-21+((k*5)%9),k%2?1:-1]));ctx.restore();
    ctx.strokeStyle='rgba(176,92,52,.7)';ctx.lineWidth=1.3;ctx.lineCap='round';ctx.beginPath();ctx.arc(-9,-18,7,.2,2.6);ctx.stroke();ctx.beginPath();ctx.arc(9,-18,7,.5,2.9);ctx.stroke();       // under each pec
    ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.ellipse(-8,-28,6,2.8,-.3,0,6.3);ctx.fill();
@@ -750,8 +751,8 @@ function drawSide(t,fk){
     const sx=ax+(kx-ax)*.4,sy=ay+(ky-ay)*.4;blob([pTap(sx,sy,5.2,ax,ay,4.8,'#fff')],{ow:1.4,shc:'rgba(110,110,165,.30)',hl:0});
     ctx.strokeStyle='#e33';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx,sy-4);ctx.quadraticCurveTo(sx+1.2,sy,sx,sy+4);ctx.stroke();
     blob([pEll(ax-4,ay+1,6.5,3.2,'#8a5a2b',.5+fl*.3)],{ow:1.5,shc:'rgba(60,30,10,.4)',hl:0})};
-  leg(-12,8,-27,12+fl*2,-44,4+fl*4,SKD);leg(-10,6,-24,16-fl*2,-42,13-fl*3,SK);
-  {const f=INF;blob([pEll(2+(bo?bo[0]:0),-2+(bo?bo[1]:0),21,14.5),pEll(14,-9,12,10)],{ow:1.9});                                               // his normal chest and back never change
+  {const LG=JIG&&JIG.legs,L0=LG?LG[0]:[-27,12+fl*2,-44,4+fl*4],L1=LG?LG[1]:[-24,16-fl*2,-42,13-fl*3];leg(-12,8,L0[0],L0[1],L0[2],L0[3],SKD);leg(-10,6,L1[0],L1[1],L1[2],L1[3],SK)}
+  {const f=INF;blob([JIG&&JIG.sk?pSkin(skPts(2,-2,21,14.5,JIG.sk)):pEll(2+(bo?bo[0]:0),-2+(bo?bo[1]:0),21,14.5),pEll(14,-9,12,10)],{ow:1.9});                                               // his normal chest and back never change
    if(f>.02){const bx=11+f*8,by=4+f*6,rx=9+f*17,ry=8+f*15;blob([pEll(bx,by,rx,ry)],{ow:1.9});                                                         // only the belly bulges, out the front and down
      ctx.save();ctx.lineCap='round';ctx.fillStyle='rgba(255,255,255,'+(.18+f*.25)+')';ctx.beginPath();ctx.ellipse(bx+rx*.3,by-ry*.4,rx*.17,ry*.28,-.6,0,6.3);ctx.fill();
      if(f>.3){ctx.strokeStyle='rgba(205,70,60,'+Math.min(.8,(f-.3)*1.4)+')';ctx.lineWidth=1.3;for(let k=-1;k<=1;k++){ctx.beginPath();ctx.arc(bx-rx*.2,by+k*ry*.3,rx*.8,-.35,.35);ctx.stroke()}}
@@ -1519,7 +1520,7 @@ function drawTexts(){for(const t of texts){ctx.globalAlpha=Math.min(1,(t.l-t.t)*
 //  Pure decoration: nothing in the physics reads these numbers.
 // =====================================================================
 const JIG_GAIN=.55,JIG_RGAIN=.42,JIG_MAX=1.8,JVIS=.5;      // JVIS = how much of a cell shows on screen (1 cell would be a huge 16 design units)
-function jigNew(){return{px:0,py:0,vx:0,vy:0,has:false,bx:0,by:0,bvx:0,bvy:0,rx:0,ry:0,rvx:0,rvy:0,sq:0,sa:0,st:0,pk:0}}
+function jigNew(){return{sk:skNew(),px:0,py:0,vx:0,vy:0,has:false,bx:0,by:0,bvx:0,bvy:0,rx:0,ry:0,rvx:0,rvy:0,sq:0,sa:0,st:0,pk:0}}
 function jigStep(m,dt){
   const j=m.jg;if(!j||dt<=0)return;
   if(m.mode==='none'||m.mode==='wait'||m.mode==='done')return;
@@ -1537,15 +1538,77 @@ function jigStep(m,dt){
   j.rvx+=(-250*j.rx-4*j.rvx)*dt;j.rvy+=(-250*j.ry-4*j.rvy)*dt;
   j.bx=clamp(j.bx+j.bvx*dt,-JIG_MAX,JIG_MAX);j.by=clamp(j.by+j.bvy*dt,-JIG_MAX,JIG_MAX);
   j.rx=clamp(j.rx+j.rvx*dt,-JIG_MAX,JIG_MAX);j.ry=clamp(j.ry+j.rvy*dt,-JIG_MAX,JIG_MAX);
+  skStep(j,dt,mag<150?dvx:0,mag<150?dvy:0);   // BODYPHYS
   j.sq*=Math.pow(.88,dt*60);
   if(!isFinite(j.bx+j.by+j.rx+j.ry+j.bvx+j.bvy+j.rvx+j.rvy+j.sq)){const k=j.has;Object.assign(j,jigNew());j.has=k;j.px=px;j.py=py}
   const bm=Math.hypot(j.bx,j.by);if(bm>j.pk)j.pk=bm}
+
+// BODYPHYS v2 (frame-rate independent ragdoll)
+// ===== BODYPHYS: soft skin + ragdoll limbs (cosmetic, nothing in the game physics reads these) =====
+// Belly skin: a ring of SKN points.  The top of the ring is glued to the chest (pin ~1), the bottom hangs free (pin ~.1), so the belly
+// wobbles and squashes but can never come off the torso.  Offsets are kept in cells in world orientation, like the other jiggle springs.
+const SKN=14,SKPIN=[];for(let i=0;i<SKN;i++)SKPIN.push(clamp(.55-.5*Math.sin(i/SKN*6.2832),.12,.95));
+function skNew(){const z=()=>new Array(SKN).fill(0);return{x:z(),y:z(),vx:z(),vy:z()}}
+function skStep(j,dt,dvx,dvy){const q=j.sk;if(!q)return;
+  for(let n=0;n<2;n++){const h=dt/2;
+    for(let i=0;i<SKN;i++){const a=(i+SKN-1)%SKN,b=(i+1)%SKN,k=50+650*SKPIN[i],f=1-SKPIN[i];
+      if(n===0){q.vx[i]-=dvx*.9*f;q.vy[i]-=dvy*.9*f}
+      q.vx[i]+=(-k*q.x[i]-5*q.vx[i]+80*(q.x[a]+q.x[b]-2*q.x[i]))*h;q.vy[i]+=(-k*q.y[i]-5*q.vy[i]+80*(q.y[a]+q.y[b]-2*q.y[i]))*h}
+    for(let i=0;i<SKN;i++){q.x[i]=clamp(q.x[i]+q.vx[i]*h,-1.4,1.4);q.y[i]=clamp(q.y[i]+q.vy[i]*h,-1.4,1.4)}}
+  if(!isFinite(q.x[0]+q.y[3]+q.vx[5]+q.vy[8]))j.sk=skNew()}
+// ring points of an ellipse + the spring offsets, rescaled about the centroid so the belly keeps its volume (squash = bulge)
+function skPts(cx,cy,rx,ry,sk,bs,bdy){const P=[],R=[];let A0=0,A1=0,mx=0,my=0;
+  for(let i=0;i<SKN;i++){const a=i/SKN*6.2832;let x=cx+rx*Math.cos(a),y=cy+ry*Math.sin(a);if(bs){x*=bs[0];y=(y+2)*bs[1]-2+(bdy||0)}R.push([x,y]);P.push([x+sk[i][0],y+sk[i][1]])}
+  for(let i=0;i<SKN;i++){const j=(i+1)%SKN;A0+=R[i][0]*R[j][1]-R[j][0]*R[i][1];A1+=P[i][0]*P[j][1]-P[j][0]*P[i][1];mx+=P[i][0];my+=P[i][1]}
+  mx/=SKN;my/=SKN;const k=Math.pow(Math.abs(A0)/Math.max(1,Math.abs(A1)),.4);
+  return P.map(p=>[mx+(p[0]-mx)*k,my+(p[1]-my)*k])}
+function pSkin(P,fill){const p=new Path2D(),n=P.length;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;p.moveTo(P[0][0],P[0][1]);
+  for(let i=0;i<n;i++){const a=P[(i+n-1)%n],b=P[i],c=P[(i+1)%n],d=P[(i+2)%n];
+    p.bezierCurveTo(b[0]+(c[0]-a[0])/6,b[1]+(c[1]-a[1])/6,c[0]-(d[0]-b[0])/6,c[1]-(d[1]-b[1])/6,c[0],c[1]);
+    x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[0]);y1=Math.max(y1,b[1])}
+  p.closePath();return{p,fill,bb:[x0-3,y0-3,x1+3,y1+3]}}
+// Ragdoll limbs: root -> mid -> end verlet chains in WORLD space.  The root is pinned to the body, a weak spring pulls each joint to the pose,
+// gravity droops it, bone lengths hold, and joints are pushed out of solid voxels / the ground.  Landing in a wall, hands and feet rest on what is left.
+const RAG_ST=[[-21.5,-20.5,-40,-28,-57,-36],[21.5,-20.5,40,-28,57,-36],[-10,24,-17,39,-26,55],[10,24,17,39,26,55]];   // armL armR legL legR of the 'star' pose
+function ragFl(){const f=Math.sin(time*16);return[[-12,8,-27,12+f*2,-44,4+f*4],[-10,6,-24,16-f*2,-42,13-f*3]]}
+function ragXf(m){if(m.mode==='stuck'){const w=Math.sin(m.t*26)*Math.exp(-m.t*3.2),a=w*.17;return{k:'st',a,sx:.56*(1-w*.05),sy:.45*(1+w*.07),c:Math.cos(a),s:Math.sin(a)}}
+  if(m.mode==='fly'&&!m.dive){const a=m.ang;return{k:'fl',a,sx:.64,sy:.64,c:Math.cos(a),s:Math.sin(a)}}return null}
+function rW(X,m,x,y){return[m.x+x*X.sx*X.c-y*X.sy*X.s,m.y+x*X.sx*X.s+y*X.sy*X.c]}
+function rL(X,m,x,y){const dx=x-m.x,dy=y-m.y;return[(dx*X.c+dy*X.s)/X.sx,(-dx*X.s+dy*X.c)/X.sy]}
+function ragHit(p){if(!solidAt(p.x,p.y))return;const gx=Math.floor(p.x/V),gy=Math.floor(p.y/V);let bx=0,by=0,bd=1e9,nx=0,ny=0;
+  for(let d=1;d<=3&&bd>=1e9;d++)for(const[ox,oy]of[[-1,0],[1,0],[0,-1],[0,1]]){const cx=gx+ox*d,cy=gy+oy*d;if(solidAt(cx*V+V/2,cy*V+V/2))continue;
+    const tx=ox?(ox<0?(cx+1)*V-.5:cx*V+.5):p.x,ty=oy?(oy<0?(cy+1)*V-.5:cy*V+.5):p.y,dd=Math.hypot(tx-p.x,ty-p.y);if(dd<bd){bd=dd;bx=tx;by=ty;nx=ox;ny=oy}}
+  if(bd>=1e9)return;p.x=bx;p.y=by;let vx=p.x-p.px,vy=p.y-p.py;const vn=vx*nx+vy*ny;if(vn<0){vx-=vn*nx;vy-=vn*ny}   // slide along the surface, lose speed
+  p.px=p.x-vx*.6;p.py=p.y-vy*.6}
+function ragStep(m,dt){const X=ragXf(m);if(!X){m.rg=null;return}
+  dt=clamp(dt,1/240,1/20);const f60=dt*60;
+  const rest=X.k==='st'?RAG_ST:ragFl(),kr=(X.k==='st'?[.05,.035]:[.2,.14]).map(k=>1-Math.pow(1-k,f60)),gk=X.k==='st'?1:.3,sc=(X.sx+X.sy)/2;
+  if(!m.rg||m.rg.k!==X.k)m.rg={k:X.k,P:rest.map(r=>{const t=rW(X,m,r[0],r[1]),f=X.k==='st'?.45:1;
+    return[0,1,2].map(i=>{const q=rW(X,m,r[0]+(r[2*i]-r[0])*(i?f:0),r[1]+(r[2*i+1]-r[1])*(i?f:0));return{x:q[0],y:q[1],px:q[0],py:q[1]}})})};
+  const pdt=m.rg.dt||dt;
+  m.rg.P.forEach((c,ci)=>{const r=rest[ci],t=rW(X,m,r[0],r[1]);c[0].x=c[0].px=t[0];c[0].y=c[0].py=t[1];
+    for(let j=1;j<3;j++){const p=c[j],q=rW(X,m,r[2*j],r[2*j+1]),dk=Math.pow(.97,f60)*dt/pdt,vx=(p.x-p.px)*dk,vy=(p.y-p.py)*dk;p.px=p.x;p.py=p.y;
+      p.x+=vx+(q[0]-p.x)*kr[j-1];p.y+=vy+(q[1]-p.y)*kr[j-1]+G*gk*dt*dt}
+    const L1=Math.hypot(r[2]-r[0],r[3]-r[1])*sc,L2=Math.hypot(r[4]-r[2],r[5]-r[3])*sc;
+    for(let it=0;it<4;it++){
+      let dx=c[1].x-c[0].x,dy=c[1].y-c[0].y,d=Math.hypot(dx,dy)||1,e=(d-L1)/d;c[1].x-=dx*e;c[1].y-=dy*e;
+      dx=c[2].x-c[1].x;dy=c[2].y-c[1].y;d=Math.hypot(dx,dy)||1;e=(d-L2)/d*.5;c[1].x+=dx*e;c[1].y+=dy*e;c[2].x-=dx*e;c[2].y-=dy*e;
+      if(X.k==='st'&&it>0){ragHit(c[1]);ragHit(c[2])}}
+    if(!isFinite(c[1].x+c[2].y)){m.rg=null}});
+  if(m.rg)m.rg.dt=dt}
+function ragOpts(o,m){const X=ragXf(m),r=m.rg;if(!o||!X||!r||r.k!==X.k)return;
+  const L=r.P.map(c=>{const a=rL(X,m,c[1].x,c[1].y),b=rL(X,m,c[2].x,c[2].y);return[a[0],a[1],b[0],b[1]]});
+  if(X.k==='st'){o.armL=L[0];o.armR=L[1];o.legL=L[2];o.legR=L[3]}else o.legs=L}
 // springs (cells) -> offsets in the figure's own drawing units (what drawFront/drawSide/drawBall expect)
 function jigOpts(j,sx,sy,ang){
   if(!j)return null;
   const c=Math.cos(-ang),s=Math.sin(-ang),K=V*JVIS;
   const bo=[(j.bx*c-j.by*s)*K/sx,(j.bx*s+j.by*c)*K/sy],ro=[(j.rx*c-j.ry*s)*K/sx,(j.rx*s+j.ry*c)*K/sy];
-  return{bo,ro,bs:[1+.006*(Math.abs(bo[1])-Math.abs(bo[0])),1+.006*(Math.abs(bo[0])-Math.abs(bo[1]))]}}
+  const bs=[1+.006*(Math.abs(bo[1])-Math.abs(bo[0])),1+.006*(Math.abs(bo[0])-Math.abs(bo[1]))];
+  if(!j.sk)return{bo,ro,bs};
+  const sk=j.sk.x.map((x,i)=>{const y=j.sk.y[i];return[(x*c-y*s)*K/sx,(x*s+y*c)*K/sy]});
+  let mx=0,my=0,w=0;sk.forEach((p,i)=>{const f=1-SKPIN[i];mx+=p[0]*f;my+=p[1]*f;w+=f});   // the belly decor (navel, hair, shine) rides the free part of the skin
+  return{bo:[mx/w,my/w],ro,bs,sk}}
 function jigSquash(j){if(j&&j.sq>.02){const k=j.sq*.12;ctx.rotate(j.sa);if(j.st)ctx.scale(1+k,1-k*.7);else ctx.scale(1-k,1+k*.8);ctx.rotate(-j.sa)}}
 
 // =====================================================================
@@ -1629,7 +1692,7 @@ function renderMan(){
     const wob=Math.sin(m.t*26)*Math.exp(-m.t*3.2);            // rocks from side to side for about a second after landing
     ctx.rotate(wob*.17);jigSquash(j);
     const sx=.56*(1-wob*.05),sy=.45*(1+wob*.07);ctx.scale(sx,sy);
-    JIG=jigOpts(j,sx,sy,wob*.17);drawFront('star','dizzy',time);JIG=null;ctx.restore();return}
+    JIG=jigOpts(j,sx,sy,wob*.17);ragOpts(JIG,m);drawFront('star','dizzy',time);JIG=null;ctx.restore();return}
   ctx.save();ctx.translate(m.x,m.y);jigSquash(j);
   if(m.mode==='aim'){const sc=.5*(1+m.pop*.5),a=Math.atan2(SY-m.y,SX-m.x)*.25,sy=sc*(dragging?.94:1);
     const ix=1,iy=1;ctx.translate((m.inf>.5?Math.sin(time*45)*m.inf*2.2:0)+((m.inf>.02&&dragging&&m.vlv)?-7:0),(m.inf>.02&&dragging&&m.vlv)?-4:0);ctx.rotate(a);ctx.scale(sc*ix,sy*iy);JIG=jigOpts(j,sc*ix,sy*iy,a);
@@ -1639,7 +1702,7 @@ function renderMan(){
     else if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else drawFront('up',dragging?'scream':'cool',time);
     JIG=null}
   else if(m.dive){ctx.rotate(m.spin);ctx.scale(.62,.62);JIG=jigOpts(j,.62,.62,m.spin);drawBall(time,'scream');JIG=null}
-  else{ctx.rotate(m.ang);ctx.scale(.64,.64);JIG=jigOpts(j,.64,.64,m.ang);INF=m.inf;drawSide(time,'scream');INF=0;JIG=null}
+  else{ctx.rotate(m.ang);ctx.scale(.64,.64);JIG=jigOpts(j,.64,.64,m.ang);ragOpts(JIG,m);INF=m.inf;drawSide(time,'scream');INF=0;JIG=null}
   ctx.restore()}
 function drawLandlord(t){
   const bob=Math.sin(t.t*5)*.8;ctx.save();ctx.translate(t.x,t.y+bob);ctx.scale(1.15,1.15);
