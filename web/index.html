@@ -708,6 +708,15 @@ function pYoke(C,S,ox,fill){const R=[],L=[],n=YOKE.length;
 function curls(list){ctx.save();ctx.strokeStyle=HAIR;ctx.lineWidth=.8;ctx.lineCap='round';for(const[x,y,d]of list){ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+d*1.1,y+.6,x+d*.4,y+1.9);ctx.stroke()}ctx.restore()}   // tiny curly hairs
 function blobClip(parts){const u=new Path2D();for(const q of parts)u.addPath(q.p);ctx.clip(u)}
 function face(cx,cy,sc,kind,t,side,x){ctx.save();ctx.translate(cx,cy);ctx.scale(sc,sc);newFace(kind,t,x||{});ctx.restore()}
+// armpit tuft: a fan of coarse curly hairs poking out where the arm meets the torso (s = -1 left, +1 right)
+function pitHair(x,y,s){ctx.save();ctx.strokeStyle=HAIR;ctx.lineWidth=1.5;ctx.lineCap='round';
+  for(let k=0;k<12;k++){const f=k/11,a=.15+f*1.15,l=4.2+((k*5)%4)*1.1,x0=x+s*(((k*3)%5)-2)*.7,y0=y+(((k*7)%5)-2)*.6,ex=x0+s*Math.cos(a)*l,ey=y0+Math.sin(a)*l+.6,cu=(k%2?1:-1)*1.7;
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.quadraticCurveTo((x0+ex)/2-s*cu*.4,(y0+ey)/2+cu,ex,ey);ctx.stroke()}ctx.restore()}
+// dimples of Venus: two deep little pits above the butt, shaded on top, lit on the lower lip, and rowdy: they jiggle
+function dimples(cx,cy,w){for(const q of[-1,1]){const x=cx+q*w,y=cy+Math.sin(time*13+q*2.1)*.8;
+  ctx.fillStyle='rgba(150,70,40,.5)';ctx.beginPath();ctx.ellipse(x,y,2.7,3.1,0,0,6.3);ctx.fill();
+  ctx.fillStyle='rgba(110,45,25,.35)';ctx.beginPath();ctx.ellipse(x,y-.7,1.8,1.9,0,0,6.3);ctx.fill();
+  ctx.strokeStyle='rgba(255,235,215,.75)';ctx.lineWidth=1;ctx.lineCap='round';ctx.beginPath();ctx.arc(x,y,3.2,.5,Math.PI-.5);ctx.stroke()}}
 let INF=0;   // how inflated the belly is (0..1) for the side-profile sprite
 let JIG=null;   // belly/rear spring offsets for the current render (set by renderMan; null = off)
 function jigMerge(o){if(!JIG)return o;o=Object.assign({},o||{});o.bo=JIG.bo;o.ro=JIG.ro;o.sk=JIG.sk;if(JIG.armL&&!o.armL){o.armL=JIG.armL;o.armR=JIG.armR;o.legL=JIG.legL;o.legR=JIG.legR}o.belly=o.belly?[o.belly[0]*JIG.bs[0],o.belly[1]*JIG.bs[1]]:JIG.bs;return o}
@@ -755,6 +764,7 @@ function drawFront(pose,fk,t,o){
    curls(Array.from({length:6},(_,k)=>[k%2?.9:-.9,-13+k*2.6,k%2?1:-1]));
    if(bgrp)ctx.restore();
    for(const q of[-1,1]){ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(q*10+wo[0],12.4+wo[1]);ctx.quadraticCurveTo(q*19+wo[0],15+wo[1],q*26+wo[0],11.6+wo[1]);ctx.stroke()}}   // the fold under each roll
+  for(const q of[-1,1])pitHair(q*23.2,-15,q);
   if(o&&o.head){ctx.save();ctx.translate(o.head[0],o.head[1]);ctx.translate(0,-30);ctx.rotate(o.head[2]||0);ctx.translate(0,30)}
   ell(0,-31,10,6,SKD);blob([pEll(-14,-44,4,5)],{ow:1.5,sd:1.2,hl:0});blob([pEll(14,-44,4,5)],{ow:1.5,sd:1.2,hl:0});
   blob([pEll(-10.8,-38,5.4,5.8),pEll(10.8,-38,5.4,5.8),pEll(0,-34,11.2,8.2),pEll(0,-44,14.3,13.3)],{ow:1.8});               // cheeks, jaw and skull: one head, no seams
@@ -1154,8 +1164,9 @@ function drawBack(pose,t,o){o=jigMerge(o)||{};const bo=o.bo||[0,0],ro=o.ro||[0,0
   ctx.save();ctx.translate(bo[0],bo[1]);
   for(const q of[-1,1]){ctx.fillStyle='rgba(176,92,52,.15)';ctx.beginPath();ctx.ellipse(q*7+sh*.5,-18,6.5,8.5,-q*.35,0,6.3);ctx.fill()}   // shoulder blades
   ctx.fillStyle='rgba(255,255,255,.26)';ctx.beginPath();ctx.ellipse(-9+sh*.5,-14,7,10,.2,0,6.3);ctx.fill();
-  ctx.fillStyle='rgba(176,92,52,.26)';ctx.beginPath();ctx.ellipse(hip*.1+sh*.4,-12,1.7,16,0,0,6.3);ctx.fill();ctx.fillStyle='rgba(176,92,52,.16)';for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(hip*.2+q*5.6,10,1.8,2.2,0,0,6.3);ctx.fill()}   // the spine: a soft groove, and two dimples above the butt
+  ctx.fillStyle='rgba(176,92,52,.26)';ctx.beginPath();ctx.ellipse(hip*.1+sh*.4,-12,1.7,16,0,0,6.3);ctx.fill();dimples(hip*.2,5,6.2);   // the spine: a soft groove, and two dimples above the butt
   ctx.restore();
+  for(const q of[-1,1])pitHair(q*23.2+sh,-15,q);
   curls([[-14,-26,-1],[-11,-22,-1],[-16,-21,-1],[13,-27,1],[10,-23,1],[15,-22,1],[-5,-30,-1],[4,-31,1]].map(([q,w,d])=>[q+sh*.5,w,d]));
   // briefs hugging two round cheeks (crease, highlight, soft shading, a pinch of fabric at the top), then waistband + tag, then love handles on top
   const bx=hip*.6,cy0=23;ctx.save();ctx.translate(ro[0],ro[1]);
@@ -1420,7 +1431,7 @@ function drawSpin(th,o){
     dec([belly],0,-6,()=>curls(Array.from({length:6},(_,k)=>[k%2?.9:-.9,-7+k*2.6,k%2?1:-1])));
     dec([belly],-7,-10,()=>{ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(0,0,8,5,-.4,0,6.3);ctx.fill()});
     dec([belly],0,5.5,()=>{ctx.strokeStyle='rgba(176,92,52,.85)';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.arc(0,-1.5,2.4,.1,3.1);ctx.stroke()});               // navel
-    dec([belly],0,0,()=>{ctx.fillStyle='rgba(176,92,52,.24)';ctx.beginPath();ctx.ellipse(0,0,1.6,10,0,0,6.3);ctx.fill();ctx.fillStyle='rgba(176,92,52,.16)';for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(q*5.6,9,1.8,2.2,0,0,6.3);ctx.fill()}},{back:1});      // spine and the two dimples above the butt
+    dec([belly],0,0,()=>{ctx.fillStyle='rgba(176,92,52,.24)';ctx.beginPath();ctx.ellipse(0,0,1.6,10,0,0,6.3);ctx.fill();dimples(0,4,6.2)},{back:1});      // spine and the two dimples above the butt
     for(const h of hnd){ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(h.px,h.py,h.rx*.8,h.b*.7,0,.35,Math.PI-.35);ctx.stroke()}});            // the fold under each roll
 
   // ---------------- head: neck, jaw, skull, ears, hair shell (painted as small quads over a wavy hairline), top knot, nose and face
