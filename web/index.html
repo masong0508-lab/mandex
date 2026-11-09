@@ -186,14 +186,14 @@ const LEVELS=[
    house({x:64,w:6,floors:4,fh:8,wall:2,floor:2,roof:2,gable:false,paper:'#f0d9c0'});
    house({x:76,w:20,floors:5,fh:8,ft:2,wall:6,floor:3,roof:6,paper:'#cfd8e6'});
    tgt(55,59);tgt(58,50);tgt(67,43);tgt(80,59);tgt(90,51);tgt(84,43);tgt(92,35);tgt(82,27);tnt(88,59);tnt(80,35);tnt(92,27)}},
- {name:'Bouncy Castle',men:6,build(){   // rubber walls: the man rebounds - come in through the wooden roofs or use TNT
-   house({x:54,w:14,floors:3,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f0c9d9'});
-   house({x:78,w:14,floors:4,wall:RUBBER,floor:BRICK,roof:WOOD,gable:false,paper:'#cfe0f0'});
-   tgt(59,59);tgt(63,50);tgt(59,41);tgt(83,59);tgt(87,50);tgt(83,41);tgt(87,32);tnt(64,59);tnt(88,41)}},
- {name:'Sandcastle Shakedown',men:7,build(){   // houses perched on sand: dig out the foundations and everything slumps
-   mound(46,30,9);house({x:56,g:50,w:10,floors:2,wall:STONE,floor:WOOD,roof:STONE,gable:true,paper:'#cfe0c0'});
-   mound(86,28,9);house({x:95,g:50,w:10,floors:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0e0a8'});
-   tgt(60,50);tgt(62,41);tgt(99,50);tgt(101,41);tgt(76,59);tnt(58,59);tnt(98,59)}}];
+ {name:'Bouncy Castle',men:6,build(){   // rubber walls: the man rebounds - a fat 2-cell-wall castle and a tall 12-wide-slab tower; come in through the wooden roofs or use TNT
+   house({x:52,w:16,floors:3,fh:8,wt:2,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f0c9d9'});
+   house({x:76,w:12,floors:5,fh:7,ft:2,wall:RUBBER,floor:BRICK,roof:WOOD,gable:false,paper:'#cfe0f0'});
+   tgt(58,59);tgt(63,51);tgt(58,43);tgt(80,59);tgt(84,52);tgt(80,45);tgt(84,31);tnt(62,59);tnt(84,38)}},
+ {name:'Sandcastle Shakedown',men:7,build(){   // a deep sand mound under a squat stone house, a shallow one under a tall brick tower: dig out the foundations
+   mound(44,34,10);house({x:54,g:49,w:12,floors:2,fh:8,wt:2,wall:STONE,floor:WOOD,roof:STONE,gable:true,paper:'#cfe0c0'});
+   mound(84,32,8);house({x:92,g:51,w:14,floors:3,fh:7,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0e0a8'});
+   tgt(62,49);tgt(58,41);tgt(96,51);tgt(100,44);tgt(96,37);tgt(80,59);tnt(60,49);tnt(100,51)}}];
 
 // ---------- levels 8..20 ----------
 function pyramid(x,w,m,top){for(let r=0;w-2*r>0&&ROWS-1-r>=top;r++)rect(x+r,ROWS-1-r,w-2*r,1,m)}
@@ -202,10 +202,11 @@ LEVELS.push(
    house({x:58,w:10,floors:6,fh:6,wall:GLASS,floor:WOOD,roof:WOOD,gable:false,paper:'#d8ecf5'});
    house({x:80,w:18,floors:2,fh:12,ft:3,wall:GLASS,floor:STONE,roof:STONE,gable:false,paper:'#f0e0f0'});
    tgt(62,59);tgt(64,53);tgt(62,41);tgt(63,29);tgt(86,59);tgt(92,47);tgt(84,47);tnt(66,59);tnt(90,59)}},
- {name:'Steel Mill Standoff',men:7,build(){      // steel walls shrug off a flop: dive through the wooden roof, or detonate the TNT inside
-   house({x:62,w:14,floors:3,wall:STEEL,floor:BRICK,roof:WOOD,gable:false,paper:'#c9ccd4'});
-   rect(80,38,6,22,STEEL);rect(80,36,6,2,WOOD);
-   tgt(67,59);tgt(72,50);tgt(66,41);tgt(68,30);tgt(83,36);tnt(70,59);tnt(66,50);tnt(72,41)}},
+ {name:'Steel Mill Standoff',men:7,build(){      // thick steel mill, a 34-tall steel smokestack with a wooden cap, and a long low brick shed: dive through the wood or detonate the TNT inside
+   house({x:60,w:16,floors:3,fh:9,wt:2,ft:2,wall:STEEL,floor:BRICK,roof:WOOD,gable:false,paper:'#c9ccd4'});
+   rect(82,26,4,34,STEEL);rect(80,24,8,2,WOOD);
+   house({x:90,w:14,floors:1,fh:8,wall:BRICK,floor:WOOD,roof:WOOD,gable:false,paper:'#d8d4c4'});
+   tgt(65,59);tgt(70,50);tgt(65,41);tgt(68,30);tgt(84,24);tgt(95,59);tgt(97,49);tnt(66,50);tnt(72,41);tnt(98,59)}},
  {name:'Twin Peaks',men:6,build(){               // a slim thick-walled brick spire and a broad stone block, joined by a 26-long double-thick wooden bridge
    house({x:54,w:8,floors:6,fh:8,wt:2,wall:BRICK,floor:WOOD,roof:BRICK,gable:false,paper:'#f0d9c0'});
    house({x:88,w:12,floors:4,fh:10,wall:STONE,floor:WOOD,roof:STONE,gable:false,paper:'#d9e4f0'});
@@ -215,43 +216,45 @@ LEVELS.push(
    const D=[[48,4,2],[55,5,3],[63,6,4],[72,7,5],[82,8,6]];
    D.forEach(([x,w,f],k)=>house({x,w,floors:f,fh:8,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:k%2?'#f0e0a8':'#cfe0c0'}));
    tgt(49,59);tgt(57,43);tgt(66,35);tgt(75,27);tgt(85,59);tgt(85,35)}},
- {name:'Rubber Ducky Resort',men:7,build(){      // sand dunes under bouncy walls: nothing here wants to stay still
-   mound(48,36,10);house({x:57,g:49,w:16,floors:3,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f8d4e4'});
-   mound(88,24,8);house({x:93,g:51,w:10,floors:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:false,paper:'#cfe0f0'});
-   tgt(61,49);tgt(69,49);tgt(61,40);tgt(69,31);tgt(97,51);tgt(98,42);tnt(66,49);tnt(100,51)}},
+ {name:'Rubber Ducky Resort',men:7,build(){      // two big dunes under bouncy walls: nothing here wants to stay still
+   mound(46,38,11);house({x:56,g:48,w:16,floors:3,fh:7,wt:2,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f8d4e4'});
+   mound(88,26,9);house({x:97,g:50,w:10,floors:3,fh:8,wt:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:false,paper:'#cfe0f0'});
+   tgt(60,48);tgt(66,41);tgt(60,34);tgt(101,50);tgt(101,34);tgt(103,42);tnt(66,48);tnt(103,50)}},
  {name:'TNT Pyramid',men:5,build(){              // brick pyramid with a powder keg in the middle
    pyramid(52,40,BRICK,46);rect(66,55,12,4,TNT);rect(70,50,4,5,TNT);
    tgt(57,54);tgt(86,54);tgt(72,46);tgt(46,60);tgt(98,60)}},
- {name:'Skyscraper Special',men:8,build(){       // six floors of steel and stone
-   house({x:72,w:16,floors:6,wall:STONE,floor:STEEL,roof:STEEL,gable:false,paper:'#d9dde8'});
-   house({x:54,w:12,floors:3,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0e0a8'});
-   tgt(76,59);tgt(84,50);tgt(76,41);tgt(84,32);tgt(76,23);tgt(84,14);tgt(58,59);tgt(61,41);tnt(80,50);tnt(78,32);tnt(60,50)}},
- {name:'Bridge Troll',men:8,build(){             // landlords on a bridge deck; more hide in the hut under it
-   rect(58,36,6,24,STONE);rect(98,36,6,24,STONE);rect(58,34,46,2,WOOD);
-   house({x:74,w:14,floors:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:false,paper:'#f0d9c0'});
-   tgt(68,34);tgt(80,34);tgt(92,34);tgt(78,59);tgt(84,50);tnt(86,34);tnt(62,34);tnt(96,34);tnt(66,59)}},
- {name:'Fort Knoxed',men:8,build(){               // steel keep, stone towers
-   house({x:60,w:30,floors:2,wall:STEEL,floor:STONE,roof:STEEL,crenel:true,paper:'#c9ccd4'});
-   house({x:52,w:9,floors:4,wall:STONE,floor:STONE,roof:STONE,crenel:true,paper:'#b9b2c8'});
-   house({x:89,w:9,floors:4,wall:STONE,floor:STONE,roof:STONE,crenel:true,paper:'#b9b2c8'});
-   tgt(66,59);tgt(79,59);tgt(83,59);tgt(70,50);tgt(80,50);tgt(56,41);tgt(93,32);tnt(74,50);tnt(70,59);tnt(80,59)}},
- {name:'Jenga Joe',men:7,build(){                // alternating thin brick slabs: pull the right one
-   for(let r=0;r<9;r++){const y=ROWS-1-r*5;rect(66,y,24,1,r%2?BRICK:WOOD);
-     if(r<8){rect(66,y-4,2,4,r%2?WOOD:BRICK);rect(88,y-4,2,4,r%2?WOOD:BRICK);if(r%3===1)rect(76,y-4,2,4,STONE)}}
+ {name:'Skyscraper Special',men:8,build(){       // seven floors of 2-thick stone walls and steel slabs, next to a tall-roomed brick house
+   house({x:72,w:16,floors:7,fh:7,wt:2,ft:2,wall:STONE,floor:STEEL,roof:STEEL,gable:false,paper:'#d9dde8'});
+   house({x:52,w:10,floors:3,fh:10,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0e0a8'});
+   tgt(76,59);tgt(84,52);tgt(76,45);tgt(84,38);tgt(76,31);tgt(84,24);tgt(56,59);tgt(58,39);tnt(80,52);tnt(80,31);tnt(58,49)}},
+ {name:'Bridge Troll',men:8,build(){             // fat 8-wide stone piers, a 50-long 3-thick wooden deck; landlords on the deck and more in the brick hut under it
+   rect(56,34,8,26,STONE);rect(98,34,8,26,STONE);rect(56,32,50,3,WOOD);
+   house({x:72,w:18,floors:2,fh:9,wt:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:false,paper:'#f0d9c0'});
+   tgt(66,32);tgt(80,32);tgt(94,32);tgt(77,59);tgt(85,50);tnt(88,32);tnt(62,32);tnt(80,50)}},
+ {name:'Fort Knoxed',men:8,build(){               // a keep with 3-thick steel walls between a tall slim tower and a short fat one
+   house({x:62,w:26,floors:2,fh:10,wt:3,ft:2,wall:STEEL,floor:STONE,roof:STEEL,crenel:true,paper:'#c9ccd4'});
+   house({x:50,w:10,floors:5,fh:8,wt:2,ft:2,wall:STONE,floor:STONE,roof:STONE,crenel:true,paper:'#b9b2c8'});
+   house({x:90,w:10,floors:4,fh:9,wt:2,ft:2,wall:STONE,floor:STONE,roof:STONE,crenel:true,paper:'#b9b2c8'});
+   tgt(68,59);tgt(78,59);tgt(72,49);tgt(80,49);tgt(55,43);tgt(55,27);tgt(95,32);tnt(72,59);tnt(76,49);tnt(94,41)}},
+ {name:'Jenga Joe',men:7,build(){                // long thin wooden slabs and short fat brick slabs, stacked on columns of different widths: pull the right one
+   for(let r=0;r<9;r++){const y=ROWS-1-r*5,th=r%2?2:1;
+     if(th===1)rect(62,y,30,1,WOOD);else rect(66,y-1,22,2,BRICK);
+     if(r<8){const ch=5-th-0;const cw=r%2?2:3,xa=r%2?68:64,xb=r%2?85:88;
+       rect(xa,y-4,cw,4-(th-1),r%2?WOOD:BRICK);rect(xb,y-4,cw,4-(th-1),r%2?WOOD:BRICK);if(r%3===1)rect(76,y-4,2,3,STONE)}}
    tgt(70,59);tgt(80,49);tgt(72,39);tgt(84,29);tgt(76,19);tnt(78,59);tnt(70,39)}},
  {name:'Moat Madness',men:7,build(){              // a sandcastle moat: knock the keep into the sand
    mound(46,60,8);house({x:60,g:51,w:12,floors:3,wall:STONE,floor:WOOD,roof:STONE,gable:false,crenel:true,paper:'#cfe0c0'});
    house({x:80,g:51,w:12,floors:3,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0e0a8'});
    tgt(64,51);tgt(68,42);tgt(65,33);tgt(84,51);tgt(88,42);tgt(76,52);tnt(70,51);tnt(90,51)}},
- {name:'Glass Cannon',men:6,build(){               // a glass skyscraper on a stone plinth
-   rect(60,52,40,8,STONE);house({x:64,g:51,w:32,floors:4,wall:GLASS,floor:WOOD,roof:STEEL,gable:false,paper:'#e8f0f8'});
-   tgt(69,51);tgt(76,51);tgt(90,51);tgt(72,42);tgt(88,33);tgt(86,24);tnt(83,51);tnt(84,42)}},
- {name:'Mandex Manor',men:10,build(){               // the finale: three buildings, every material
-   house({x:48,w:10,floors:3,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0d9c0'});
-   house({x:62,w:26,floors:4,wall:STONE,floor:STEEL,roof:STONE,crenel:true,paper:'#b9b2c8'});
-   house({x:92,w:12,floors:5,wall:GLASS,floor:STONE,roof:STEEL,gable:false,paper:'#e8f0f8'});
-   rect(58,41,4,1,WOOD);rect(88,32,4,1,WOOD);
-   tgt(52,59);tgt(55,41);tgt(68,59);tgt(80,59);tgt(70,50);tgt(84,41);tgt(79,32);tgt(96,50);tgt(99,32);tgt(97,23);tnt(75,50);tnt(94,59);tnt(66,41)}}
+ {name:'Glass Cannon',men:6,build(){               // a 40-wide glass skyscraper on a 10-tall stone plinth, 2-thick wooden slabs
+   rect(56,50,48,10,STONE);house({x:60,g:49,w:40,floors:4,fh:8,ft:2,wall:GLASS,floor:WOOD,roof:STEEL,gable:false,paper:'#e8f0f8'});
+   tgt(66,49);tgt(74,49);tgt(94,49);tgt(70,41);tgt(90,33);tgt(88,25);tnt(84,49);tnt(84,41)}},
+ {name:'Mandex Manor',men:10,build(){               // the finale: a slim brick spire, a wide stone hall with 2-thick walls, a tall glass tower, two bridges
+   house({x:46,w:8,floors:5,fh:8,wt:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0d9c0'});
+   house({x:60,w:28,floors:4,fh:9,wt:2,ft:2,wall:STONE,floor:STEEL,roof:STONE,crenel:true,paper:'#b9b2c8'});
+   house({x:92,w:12,floors:6,fh:7,ft:2,wall:GLASS,floor:STONE,roof:STEEL,gable:false,paper:'#e8f0f8'});
+   rect(54,41,6,1,WOOD);rect(88,32,4,2,WOOD);
+   tgt(49,59);tgt(50,43);tgt(65,59);tgt(78,59);tgt(68,50);tgt(82,41);tgt(72,32);tgt(96,52);tgt(99,38);tgt(95,24);tnt(72,50);tnt(98,59);tnt(64,41)}}
 );
 
 function load(l,custom){
