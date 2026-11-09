@@ -1,7 +1,7 @@
 # MANDEX
 
 An Angry Birds-style game: a sticky dad-bod man in red underwear and a pink towel-cape gets flung into voxel buildings and
-wrecks them with sandbox-style destruction physics, to evict the landlords inside.  Tasteful, silly, not explicit.
+wrecks them with sandbox-style destruction physics, to evict the landlords inside.  Tasteful, silly, and a tad explicit.
 
 ![poses](docs/man_sprites.png)
 
