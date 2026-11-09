@@ -554,8 +554,7 @@ function drawValve(){
   ctx.restore()}
 function drawInfFX(m){
   ctx.save();ctx.translate(m.x,m.y);
-  if(m.pwr==='towel'&&m.mode==='fly'&&m.gt<1.8){ctx.rotate(m.ang);const fl=Math.sin(time*18)*5;ctx.fillStyle='#ff9ec8';ctx.strokeStyle='#000';ctx.lineWidth=2;
-    for(const sd of[-1,1]){ctx.beginPath();ctx.moveTo(-6,sd*6);ctx.quadraticCurveTo(-30,sd*(30+fl),-54,sd*(14+fl));ctx.quadraticCurveTo(-34,sd*8,-6,sd*6);ctx.closePath();ctx.fill();ctx.stroke()}}
+  pwFlightFX(m);
   if(m.inf>.05){const f=m.inf,r=m.R*1.25;
     if(f>.85){ctx.globalAlpha=(f-.85)*3*(.6+.4*Math.sin(time*30));ctx.strokeStyle='#ff4a4a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,-4,r*1.1,0,7);ctx.stroke()}}
   ctx.restore()}
@@ -635,16 +634,112 @@ function updChug(dt){const m=man,c=m.chug;
   else if(ph<5){m.x=STX;m.y=CHUG_Y+((ph===2||ph===4)?Math.sin(time*34)*.7:0)}
   else{const u=clamp((t-CT_D)/(CT_END-CT_D),0,1);m.x=STX+(SX-STX)*u;m.y=CHUG_Y+(SY-CHUG_Y)*u-Math.sin(u*Math.PI)*40}
   if(t>=CT_END){m.x=SX;m.y=SY;m.chug=null;m.bel=Math.max(0,Math.min(STOM_MAX-m.inf,c.b0+c.extra+BEL_SET));pw.sel='burp';ring(SX,SY,40,'#ffd23f');popText(SX,SY-64,'LOADED!','#ffd23f',24)}}
+// ---- POWER-UP TOOL SPRITES: shaded, outlined props in the air valve's style (bean tin, towel rack, goo bucket, soda crate) plus their in-flight bits.
+const pwRR=(x,y,w,h,r,fill,lw)=>{ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);if(fill){ctx.fillStyle=fill;ctx.fill()}ctx.lineWidth=lw==null?2:lw;ctx.strokeStyle='#000';ctx.stroke()};
+const pwQ=i=>{const v=Math.sin(i*127.1+311.7)*43758.5453;return v-Math.floor(v)};
+function pwGlow(x,y,r,col){const g=ctx.createRadialGradient(x,y,2,x,y,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}
+function pwHG(x0,x1,st){const g=ctx.createLinearGradient(x0,0,x1,0);for(let i=0;i<st.length;i+=2)g.addColorStop(st[i],st[i+1]);return g}
+function pwVG(y0,y1,st){const g=ctx.createLinearGradient(0,y0,0,y1);for(let i=0;i<st.length;i+=2)g.addColorStop(st[i],st[i+1]);return g}
+function pwSpark(x,y,r,a){ctx.save();ctx.globalAlpha=a;ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(x,y-r);ctx.quadraticCurveTo(x+r*.18,y-r*.18,x+r,y);ctx.quadraticCurveTo(x+r*.18,y+r*.18,x,y+r);ctx.quadraticCurveTo(x-r*.18,y+r*.18,x-r,y);ctx.quadraticCurveTo(x-r*.18,y-r*.18,x,y-r);ctx.fill();ctx.restore()}
+function pwCrate(cx,w,h){const x=cx-w/2,y=GY-h;ctx.save();ctx.lineJoin='round';pwRR(x,y,w,h,2,pwVG(y,GY,[0,'#b8824a',1,'#7a5230']));
+  ctx.strokeStyle='rgba(40,20,5,.55)';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(x+1,y+h*.5);ctx.lineTo(x+w-1,y+h*.5);ctx.stroke();
+  ctx.fillStyle='rgba(60,32,10,.55)';ctx.fillRect(x+5,y+1,4,h-2);ctx.fillRect(x+w-9,y+1,4,h-2);
+  ctx.fillStyle='rgba(255,230,180,.4)';ctx.fillRect(x+2,y+1.5,w-4,1.6);
+  ctx.fillStyle='#e2dccb';for(const[nx,ny]of[[x+7,y+4],[x+w-7,y+4],[x+7,y+h-4],[x+w-7,y+h-4]]){ctx.beginPath();ctx.arc(nx,ny,1.1,0,7);ctx.fill()}ctx.restore()}
+// BEANS: a big tin on a crate, ring-pull lid curled back, spoon, green stink drifting up
+function pwBeans(armed,spent){const cx=88,t=time,by=GY-14,x0=cx-15,top=by-34;pwCrate(cx,64,14);ctx.save();ctx.lineJoin='round';if(spent)ctx.globalAlpha=.5;
+  if(armed)pwGlow(cx,top+16,46,'rgba(182,224,74,'+(.4+.12*Math.sin(t*5))+')');
+  for(const[bx,bw]of[[cx-27,6],[cx-33,5.5],[cx+26,6]]){ctx.fillStyle='#b5541c';ctx.beginPath();ctx.ellipse(bx,by-2.6,bw/2+1,2.6,.3,0,7);ctx.fill();ctx.lineWidth=1.2;ctx.strokeStyle='#000';ctx.stroke();ctx.fillStyle='rgba(255,190,120,.7)';ctx.fillRect(bx-1.4,by-3.8,2,1)}
+  ctx.lineCap='round';ctx.strokeStyle='#000';ctx.lineWidth=4.2;ctx.beginPath();ctx.moveTo(cx-6,top-1);ctx.lineTo(cx-17,top-19);ctx.stroke();ctx.strokeStyle='#cfd4e0';ctx.lineWidth=2;ctx.stroke();
+  ctx.save();ctx.translate(cx-17,top-19);ctx.rotate(.5);ctx.fillStyle='#cfd4e0';ctx.beginPath();ctx.ellipse(0,-3,4.2,5.2,0,0,7);ctx.fill();ctx.lineWidth=1.6;ctx.strokeStyle='#000';ctx.stroke();ctx.fillStyle='#b5541c';ctx.beginPath();ctx.ellipse(0,-2.4,2.8,3.4,0,0,7);ctx.fill();ctx.restore();
+  ctx.beginPath();ctx.moveTo(x0,top);ctx.lineTo(x0,by);ctx.ellipse(cx,by,15,4,0,Math.PI,0,true);ctx.lineTo(x0+30,top);ctx.closePath();ctx.fillStyle=pwHG(x0,x0+30,[0,'#8f95aa',.28,'#f4f6fb',.65,'#c5cad8',1,'#767b90']);ctx.fill();
+  ctx.save();ctx.clip();ctx.fillStyle=pwHG(x0,x0+30,[0,'#a8291a',.28,'#ee5238',.65,'#c4321f',1,'#7c1a10']);ctx.fillRect(x0,top+8,30,by-top-12);
+  ctx.fillStyle='rgba(255,240,200,.9)';ctx.fillRect(x0,top+9,30,1.6);ctx.fillRect(x0,by-6,30,1.6);
+  for(const[bx,byy]of[[-5,17],[3,19],[-1,23]]){ctx.fillStyle='#a8531b';ctx.beginPath();ctx.ellipse(cx+bx,top+byy,3.6,2.2,.4,0,7);ctx.fill();ctx.fillStyle='rgba(255,200,140,.8)';ctx.fillRect(cx+bx-1.6,top+byy-1.2,2,.9)}
+  ctx.fillStyle='rgba(255,255,255,.5)';ctx.fillRect(x0+4,top+3,3,by-top-9);ctx.restore();
+  ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.beginPath();ctx.moveTo(x0,top);ctx.lineTo(x0,by);ctx.ellipse(cx,by,15,4,0,Math.PI,0,true);ctx.lineTo(x0+30,top);ctx.stroke();
+  txt('BEANS',cx,top+31,8,'#fff','center','#4a0c04');
+  ctx.beginPath();ctx.ellipse(cx,top,15,4.4,0,0,7);ctx.fillStyle='#e4e7ef';ctx.fill();ctx.lineWidth=2;ctx.stroke();
+  ctx.beginPath();ctx.ellipse(cx,top+.4,12.4,3.2,0,0,7);ctx.fillStyle=spent?'#4a4f60':'#9a4416';ctx.fill();ctx.lineWidth=1.2;ctx.stroke();
+  if(!spent)for(const[bx,bz]of[[-6,-.6],[-1,.8],[5,-.4],[2,-1.4],[-9,.9],[8,.8]]){ctx.fillStyle='#d4692a';ctx.beginPath();ctx.ellipse(cx+bx,top+bz,2.4,1.4,.3,0,7);ctx.fill();ctx.fillStyle='rgba(255,215,160,.8)';ctx.fillRect(cx+bx-1,top+bz-.9,1.4,.6)}
+  ctx.beginPath();ctx.moveTo(cx+7,top-1);ctx.quadraticCurveTo(cx+19,top-4,cx+15,top-14);ctx.quadraticCurveTo(cx+9,top-7,cx+4,top-1.6);ctx.closePath();ctx.fillStyle='#d6dae6';ctx.fill();ctx.lineWidth=1.6;ctx.stroke();
+  ctx.beginPath();ctx.ellipse(cx+12,top-6,2.2,3,.5,0,7);ctx.lineWidth=1.4;ctx.strokeStyle='#000';ctx.stroke();
+  if(!spent){for(let i=0;i<4;i++){const p=(t*.5+i/4)%1,px=cx-8+i*5+Math.sin(t*3+i*2)*(2+4*p),py=top-5-p*(armed?44:32),a=(1-p)*(armed?.8:.5);ctx.fillStyle='rgba(150,205,60,'+a+')';ctx.beginPath();ctx.arc(px,py,3+p*(armed?7:5),0,7);ctx.fill();ctx.strokeStyle='rgba(60,110,20,'+a*.8+')';ctx.lineWidth=1.2;ctx.stroke()}
+    ctx.lineCap='round';for(const sd of[-1,1]){const p=(t*.7+(sd>0?.5:0))%1;ctx.strokeStyle='rgba(120,185,40,'+(.9-p*.9)+')';ctx.lineWidth=2;ctx.beginPath();for(let k=0;k<=6;k++){const yy=top-8-p*10-k*3.4,xx=cx+sd*(20+Math.sin(k*1.3+t*5)*2.4);k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)}ctx.stroke()}}
+  ctx.restore()}
+// TOWEL: a wooden rack with the pink terry towel draped over the bar
+function pwTowel(armed,spent){const cx=88,t=time;ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  if(armed)pwGlow(cx,GY-30,50,'rgba(255,158,200,'+(.42+.12*Math.sin(t*5))+')');
+  for(const sx of[-28,28]){pwRR(cx+sx-3.5,GY-56,7,56,2,pwHG(cx+sx-3.5,cx+sx+3.5,[0,'#8a5a30',.4,'#d6a468',1,'#6a4524']));pwRR(cx+sx-10,GY-5,20,5,2,'#6a4524')}
+  if(!spent){const sw=Math.sin(t*1.7)*1.6,hy=GY-9;ctx.beginPath();ctx.moveTo(cx-26,GY-52);ctx.lineTo(cx+26,GY-52);ctx.lineTo(cx+27+sw*.4,hy-2);
+    for(let k=1;k<=6;k++)ctx.quadraticCurveTo(cx+27-(k-.5)*9+sw*.6,hy+(k%2?3:-1),cx+27-k*9+sw*.4*(1-k/6),hy-1+(k%2?0:1.5));
+    ctx.closePath();ctx.fillStyle=pwHG(cx-27,cx+27,[0,'#ffb4d4',.35,'#ff8fbe',.75,'#f06aa4',1,'#d2548a']);ctx.fill();
+    ctx.save();ctx.clip();ctx.fillStyle='#fff4f9';ctx.fillRect(cx-30,hy-14,60,5);ctx.fillStyle='#f06aa4';ctx.fillRect(cx-30,hy-8,60,2.4);
+    ctx.fillStyle='rgba(190,60,110,.45)';for(let i=0;i<34;i++){const px=cx-24+pwQ(i)*48,py=GY-48+pwQ(i+40)*30;ctx.beginPath();ctx.arc(px,py,1,0,7);ctx.fill()}
+    ctx.fillStyle='rgba(255,255,255,.3)';ctx.fillRect(cx-23,GY-50,4,40);ctx.fillStyle='rgba(120,20,60,.2)';ctx.fillRect(cx+4,GY-50,2,40);ctx.restore();
+    ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.stroke();
+    ctx.strokeStyle='#ffc9e0';ctx.lineWidth=1.6;ctx.beginPath();for(let i=0;i<13;i++){const fx=cx-25+i*4.2+sw*.3*(hy/GY);ctx.moveTo(fx,hy+1);ctx.lineTo(fx+(i%2?.8:-.8),hy+5)}ctx.stroke()}
+  pwRR(cx-33,GY-57,66,7,3.5,pwHG(cx-33,cx+33,[0,'#c8935a',.5,'#f0c486',1,'#a8763c']));
+  for(const sx of[-35,35]){ctx.beginPath();ctx.arc(cx+sx,GY-53.5,4.4,0,7);ctx.fillStyle='#f0c486';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.stroke()}
+  if(!spent){if(!armed)pwSpark(cx+20+Math.sin(t*2)*2,GY-40,3,.5+.5*Math.sin(t*3));else{pwSpark(cx-18,GY-40+Math.sin(t*4)*3,4,.5+.5*Math.sin(t*6));pwSpark(cx+18,GY-26+Math.sin(t*3+1)*3,3.4,.5+.5*Math.sin(t*5+1))}}
+  ctx.restore()}
+// SPLAT: a tin pail brimming with goo, drips down the side, bubbles popping, a puddle at its foot
+function pwSplat(armed,spent){const cx=88,t=time,bot=GY-3,top=GY-40;ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  if(armed)pwGlow(cx,GY-24,48,'rgba(125,255,70,'+(.4+.12*Math.sin(t*5))+')');
+  ctx.fillStyle=spent?'rgba(70,160,40,.35)':'rgba(70,170,40,.8)';ctx.beginPath();ctx.ellipse(cx+4,GY-1,spent?20:36,4.6,0,0,7);ctx.fill();if(!spent){ctx.fillStyle='rgba(200,255,170,.6)';ctx.beginPath();ctx.ellipse(cx-4,GY-2.4,10,1.2,0,0,7);ctx.fill()}
+  ctx.strokeStyle='#000';ctx.lineWidth=4.4;ctx.beginPath();ctx.arc(cx,top,19,Math.PI,0);ctx.stroke();ctx.strokeStyle='#c9ced9';ctx.lineWidth=2;ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx-18,top);ctx.lineTo(cx+18,top);ctx.lineTo(cx+14,bot);ctx.ellipse(cx,bot,14,3.4,0,0,Math.PI);ctx.closePath();ctx.fillStyle=pwHG(cx-18,cx+18,[0,'#707b97',.25,'#dce3f5',.6,'#97a1bc',1,'#566079']);ctx.fill();
+  ctx.save();ctx.clip();ctx.fillStyle='#ffd23f';ctx.fillRect(cx-20,top+11,40,17);ctx.fillStyle='#1c1c24';for(let k=-4;k<9;k++){ctx.beginPath();ctx.moveTo(cx-20+k*9,top+28);ctx.lineTo(cx-20+k*9+5,top+28);ctx.lineTo(cx-20+k*9+14,top+11);ctx.lineTo(cx-20+k*9+9,top+11);ctx.fill()}
+  ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(cx-14,top+1,3,bot-top);ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(cx-19,top+8,40,1.4);ctx.fillRect(cx-19,bot-7,40,1.4);ctx.restore();
+  ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.beginPath();ctx.moveTo(cx-18,top);ctx.lineTo(cx-14,bot);ctx.ellipse(cx,bot,14,3.4,0,Math.PI,0,true);ctx.lineTo(cx+18,top);ctx.stroke();
+  pwRR(cx-13,top+14,26,11,2.5,'#fffdf4',1.6);txt('SPLAT',cx,top+23,9,'#d12b2b','center','rgba(0,0,0,0)');
+  ctx.beginPath();ctx.ellipse(cx,top,19,4.6,0,0,7);ctx.fillStyle='#b4bdd6';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.stroke();
+  if(spent){ctx.beginPath();ctx.ellipse(cx,top+.6,15.5,3.4,0,0,7);ctx.fillStyle='#2a2f3d';ctx.fill();ctx.fillStyle='rgba(110,210,60,.6)';ctx.beginPath();ctx.ellipse(cx,top+2,13,1.6,0,0,7);ctx.fill()}
+  else{const bob=Math.sin(t*2.4)*1.6;
+    for(const[dx,ph]of[[-14,0],[-3,2.1],[11,4.2]]){const L=9+10*(.5+.5*Math.sin(t*1.3+ph)),w=5;ctx.beginPath();ctx.moveTo(cx+dx-w/2,top);ctx.lineTo(cx+dx-w/2,top+L);ctx.arc(cx+dx,top+L,w/2+.6,Math.PI,0,true);ctx.lineTo(cx+dx+w/2,top);ctx.closePath();ctx.fillStyle=pwHG(cx+dx-4,cx+dx+4,[0,'#5cc232',.4,'#a8ff6a',1,'#46a024']);ctx.fill();ctx.lineWidth=1.8;ctx.strokeStyle='#000';ctx.stroke();ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(cx+dx-1.4,top+3,1.2,L-3)}
+    ctx.beginPath();ctx.moveTo(cx-18,top+1);ctx.quadraticCurveTo(cx-19,top-9-bob,cx-8,top-12-bob);ctx.quadraticCurveTo(cx,top-19-bob,cx+9,top-12-bob);ctx.quadraticCurveTo(cx+19,top-9,cx+18,top+1);ctx.quadraticCurveTo(cx,top+7,cx-18,top+1);ctx.closePath();
+    ctx.fillStyle=pwVG(top-18,top+6,[0,'#b8ff7a',.5,'#6fd83c',1,'#3f9a22']);ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.75)';ctx.beginPath();ctx.ellipse(cx-7,top-9-bob,4.4,2,-.5,0,7);ctx.fill();ctx.beginPath();ctx.arc(cx+8,top-6-bob,1.5,0,7);ctx.fill();
+    for(let i=0;i<3;i++){const p=(t*.7+i/3)%1,bx=cx-9+i*9+Math.sin(t*4+i)*2,by=top-14-bob-p*18;ctx.strokeStyle='rgba(225,255,200,'+(1-p)+')';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(bx,by,2+p*2,0,7);ctx.stroke()}}
+  ctx.restore()}
+// the burpburster's soda crate (the old bare plank stand)
+function burpCrate(cx,TY){ctx.save();ctx.lineJoin='round';const x=cx-38,w=76,h=GY-TY;pwRR(x,TY,w,h,2,pwVG(TY,GY,[0,'#b8824a',1,'#6f4a2a']));
+  ctx.fillStyle='#c99358';ctx.fillRect(x+1,TY+1,w-2,4);ctx.fillStyle='rgba(255,235,190,.5)';ctx.fillRect(x+2,TY+1.4,w-4,1.4);
+  ctx.strokeStyle='rgba(40,20,5,.55)';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(x+1,TY+6);ctx.lineTo(x+w-1,TY+6);ctx.stroke();
+  ctx.fillStyle='rgba(60,32,10,.5)';ctx.fillRect(x+5,TY+7,4,h-8);ctx.fillRect(x+w-9,TY+7,4,h-8);
+  pwRR(cx-9,TY+9,18,5,2.5,'#2a160a',1.2);
+  txt('BURP-COLA',cx,TY+17.5,7,'#ffe6b0','center','#4a2208');
+  ctx.fillStyle='#e2dccb';for(const[nx,ny]of[[x+4,TY+3],[x+w-4,TY+3]]){ctx.beginPath();ctx.arc(nx,ny,1.1,0,7);ctx.fill()}ctx.restore()}
+// the placed prop for the three one-shot tools
+function drawPwProp(){if(state!=='play')return;const t=OPT().tool||'valve';if(!PWTOOLS.includes(t))return;const armed=pw.sel===t&&man.mode==='aim',spent=pw.left[t]<=0;
+  (t==='beans'?pwBeans:t==='towel'?pwTowel:pwSplat)(armed,spent)}
+// in flight: the towel cape, a goo trail, stink behind the beans, fizz around a loaded burp
+function pwFlightFX(m){const R=m.R||14,sp=Math.hypot(m.vx,m.vy)||1,ux=-m.vx/sp,uy=-m.vy/sp,t=time;
+  if(m.mode!=='fly')return;
+  if(m.pwr==='splat'&&!m.splatted){for(let i=0;i<7;i++){const d=R*.8+i*9+Math.sin(t*14+i*2)*2,x=ux*d+(pwQ(i)-.5)*10,y=uy*d+(pwQ(i+9)-.5)*10,r=Math.max(1.6,5.4-i*.55);ctx.globalAlpha=Math.max(.2,1-i*.11);ctx.fillStyle=pwVG(y-r,y+r,[0,'#b8ff7a',1,'#46a024']);ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle='#1c4a0c';ctx.stroke()}
+    ctx.globalAlpha=1;for(const a of[.5,2.3,4.1]){const x=Math.cos(a)*R*.7,y=Math.sin(a)*R*.7;ctx.fillStyle='#8cf04a';ctx.beginPath();ctx.ellipse(x,y,4.4,3.2,a,0,7);ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle='#1c4a0c';ctx.stroke();ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(x-1.6,y-1.6,1.8,1)}}
+  if(m.pwr==='beans'&&!m.beaned){for(let i=0;i<6;i++){const d=R+i*9,x=ux*d+Math.sin(t*9+i*1.7)*4,y=uy*d+Math.cos(t*8+i)*3,r=3.4+i*.9;ctx.fillStyle='rgba(150,205,60,'+Math.max(.08,.5-i*.075)+')';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}}
+  if(m.pwr==='burp'&&!m.burped){for(let i=0;i<8;i++){const p=(t*.9+i*.125)%1,a=i*2.4+t*1.5,x=Math.cos(a)*R*(.8+.5*p),y=-p*R*1.5+Math.sin(a)*R*.4,r=1.8+(i%3);ctx.fillStyle='rgba(255,236,140,'+(.35*(1-p))+')';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.strokeStyle='rgba(255,255,255,'+(.9*(1-p))+')';ctx.lineWidth=1.4;ctx.stroke();ctx.fillStyle='rgba(255,255,255,'+(.8*(1-p))+')';ctx.fillRect(x-r*.5,y-r*.5,r*.4,r*.3)}}
+  if(m.pwr==='towel'&&m.gt<1.8){ctx.save();ctx.rotate(m.ang);const fl=Math.sin(t*18)*5;
+    for(const sd of[-1,1]){const g=ctx.createLinearGradient(-6,0,-54,sd*24);g.addColorStop(0,'#ffb4d4');g.addColorStop(.6,'#f56fa8');g.addColorStop(1,'#d2548a');ctx.beginPath();ctx.moveTo(-6,sd*6);ctx.quadraticCurveTo(-30,sd*(30+fl),-54,sd*(14+fl));ctx.quadraticCurveTo(-34,sd*8,-6,sd*6);ctx.closePath();ctx.fillStyle=g;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-44,sd*(9+fl*.5));ctx.quadraticCurveTo(-48,sd*(12+fl*.7),-53,sd*(13.4+fl));ctx.stroke();
+      ctx.strokeStyle='#ffc9e0';ctx.lineWidth=1.4;for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(-54,sd*(14+fl)+k*2.4);ctx.lineTo(-60,sd*(14+fl)+k*3.2);ctx.stroke()}
+      ctx.fillStyle='rgba(190,60,110,.5)';for(let k=0;k<5;k++){ctx.beginPath();ctx.arc(-14-k*8,sd*(10+k*2.4+fl*.2*k/4),1,0,7);ctx.fill()}}
+    ctx.beginPath();ctx.arc(-5,0,4.4,0,7);ctx.fillStyle='#ff8fbe';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.stroke();ctx.restore()}}
+// the soda bottle: glass, fizzing cola, foam, wave label, crown cap
 function bottleDraw(x,y,lvl,col){ctx.save();ctx.translate(x,y);ctx.lineJoin='round';ctx.lineWidth=1.6;ctx.strokeStyle='#2a160a';
   ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-7,-20);ctx.quadraticCurveTo(-7,-26,-3.5,-29);ctx.lineTo(-3,-35);ctx.lineTo(3,-35);ctx.lineTo(3.5,-29);ctx.quadraticCurveTo(7,-26,7,-20);ctx.lineTo(7,0);ctx.closePath();
-  ctx.fillStyle='rgba(235,245,255,.9)';ctx.fill();ctx.save();ctx.clip();ctx.fillStyle=col;ctx.fillRect(-8,-30*lvl,16,30*lvl);
-  ctx.fillStyle='#f4f4f4';ctx.fillRect(-8,-17,16,8);ctx.fillStyle='#d22';ctx.fillRect(-8,-15,16,4);ctx.fillStyle='rgba(255,255,255,.55)';ctx.fillRect(-5.2,-28,1.6,26);ctx.restore();
-  ctx.stroke();ctx.fillStyle='#d22';ctx.fillRect(-3.5,-38,7,3.4);ctx.strokeRect(-3.5,-38,7,3.4);ctx.restore()}
+  ctx.fillStyle=pwHG(-7,7,[0,'rgba(170,195,220,.95)',.35,'rgba(246,251,255,.95)',1,'rgba(160,182,210,.95)']);ctx.fill();ctx.save();ctx.clip();
+  const fy=-30*lvl;ctx.fillStyle=col;ctx.fillRect(-8,fy,16,30*lvl+1);ctx.fillStyle=pwVG(fy,0,[0,'rgba(255,255,255,.22)',1,'rgba(0,0,0,.34)']);ctx.fillRect(-8,fy,16,30*lvl+1);
+  if(lvl>.03){for(let i=0;i<5;i++){const p=(time*.5+i*.21)%1,by=-2-p*30*lvl;if(by>fy+1){ctx.fillStyle='rgba(255,255,255,.78)';ctx.beginPath();ctx.arc(-4+(i%3)*4+Math.sin(time*3+i)*1.2,by,.8+(i%2)*.5,0,7);ctx.fill()}}
+    if(lvl<.97){ctx.fillStyle='rgba(255,255,255,.92)';for(const bx of[-5,-1.5,2,5]){ctx.beginPath();ctx.ellipse(bx,fy,2.6,1.7,0,0,7);ctx.fill()}}}
+  ctx.fillStyle='#f6f4ea';ctx.fillRect(-8,-18,16,9);ctx.fillStyle='#d22';ctx.beginPath();ctx.moveTo(-8,-12.6);ctx.quadraticCurveTo(-4,-16,0,-12.6);ctx.quadraticCurveTo(4,-9.2,8,-12.6);ctx.lineTo(8,-10.4);ctx.quadraticCurveTo(4,-7,0,-10.4);ctx.quadraticCurveTo(-4,-13.8,-8,-10.4);ctx.fill();
+  ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.arc(0,-15.4,1.3,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.6)';ctx.fillRect(-5.2,-28,1.6,26);ctx.fillStyle='rgba(0,0,0,.14)';ctx.fillRect(4,-28,2,27);ctx.restore();
+  ctx.stroke();ctx.fillStyle='#d22';ctx.fillRect(-3.8,-38,7.6,3.6);ctx.strokeRect(-3.8,-38,7.6,3.6);ctx.fillStyle='rgba(255,255,255,.55)';ctx.fillRect(-2.8,-37.4,1.4,2.2);ctx.fillRect(1.4,-37.4,1.2,2.2);ctx.restore()}
 const BOTCOL=['#5a2f1b','#7ddc3c'];
 function drawBurpStand(){if(state!=='play'||!toolOn('burp'))return;const c=man.chug,taken=c?(c.ph>=4?2:c.ph>=2?1:0):(pw.left.burp<=0?2:0),TY=GY-20;
-  ctx.save();ctx.lineJoin='round';ctx.lineWidth=2;ctx.strokeStyle='#4a2e14';ctx.fillStyle='#7a5230';
-  for(const lx of[-30,26]){ctx.fillRect(STX+lx,TY,5,20);ctx.strokeRect(STX+lx,TY,5,20)}
-  ctx.fillStyle='#8f6238';ctx.fillRect(STX-36,TY,72,6);ctx.strokeRect(STX-36,TY,72,6);ctx.restore();
+  burpCrate(STX,TY);
   if(taken<1)bottleDraw(STX-24,TY,1,BOTCOL[0]);if(taken<2)bottleDraw(STX+24,TY,1,BOTCOL[1]);
   if(!c&&man.mode==='aim'&&pw.left.burp>0&&!dragging){ctx.globalAlpha=.7+.3*Math.sin(time*5);txt(pw.sel==='burp'?'HOLD: MORE SODA':'TAP TO CHUG  (HOLD = KEEP GUZZLING)',STX-26,TY-50,14,'#ffd23f','center');ctx.globalAlpha=1}
   if(man.mode==='aim'&&stom(man)>.001){const cap=OPT().noBurst?STOM_MAX:SODA_BURST,f=clamp(stom(man)/cap,0,1),w=64,x0=STX-w/2,y0=GY-124;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(x0,y0,w,8);
@@ -2212,7 +2307,7 @@ function draw(){
   ctx.save();ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
   for(const r of interiors){ctx.fillStyle=r.p;ctx.fillRect(r.x*V,r.y*V,r.w*V,r.h*V);ctx.fillStyle='rgba(0,0,0,.07)';for(let k=0;k<r.w*V;k+=16)ctx.fillRect(r.x*V+k,r.y*V,8,r.h*V);
     ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(r.x*V,(r.y+r.h)*V-5,r.w*V,5)}
-  drawSling(true);drawValve();drawBurpStand();
+  drawSling(true);drawValve();drawBurpStand();drawPwProp();
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
     if(wobOn){px=Math.round(px+ox[i]*V);py=Math.round(py+oy[i]*V)}   // swaying with the wobble
     ctx.drawImage(SPR[m][hsh(x,y)&3][r>.66?0:r>.33?1:2],px,py);
@@ -2627,7 +2722,6 @@ function drawOptions(){
   btn(bx,y,bw,56,'COLLAPSIBLE BUILDINGS: '+(o.collapse?'ON':'OFF'),()=>{o.collapse=!o.collapse;pdTouch();pdSave();SFX.pop()},{size:22,on:o.collapse,col:'#7dff5a'});y+=76;
   txt('ON: fallen rubble stays physical (keeps slumping and toppling) until the level ends.',W/2,y,15,'#cfd','center');y+=22;
   txt('OFF: rubble settles in place and locks solid, as before.',W/2,y,15,'#cfd','center');y+=44;
-  btn(bx,y,bw,56,'POWER-UP TOOL: '+toolName(),()=>{toolCycle();pdTouch();pdSave();SFX.pop()},{size:22,on:toolName()!=='NONE',col:'#7dff5a'});y+=76;
   btn(bx,y,bw,56,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();muted=!muted},{size:22,on:!muted,col:'#7dff5a'});y+=68;
   btn(bx,y,bw,44,'CHEAT: STOMACH NEVER BURSTS: '+(o.noBurst?'ON':'OFF'),()=>{o.noBurst=!o.noBurst;pdTouch();pdSave();SFX.pop()},{size:17,on:!!o.noBurst,col:'#ff9ec8'});y+=52;
   btn(bx,y,bw,44,'BURP CHARGE (BIGGER STOMACH = BIGGER BURP): '+(o.burpCharge?'ON':'OFF'),()=>{o.burpCharge=!o.burpCharge;pdTouch();pdSave();SFX.pop()},{size:16,on:!!o.burpCharge,col:'#7dff5a'})}
