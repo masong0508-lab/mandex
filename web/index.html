@@ -1624,6 +1624,16 @@ function drawManFrame(n){
     drawFront('up','pick',.3,Object.assign(hang(),{after(){
       const hx=a?8:6.5,hy=a?-41:-38.5;blob([pTap(21.5,-20.5,6.8,37,-24,6),pTap(37,-24,5.8,hx,hy,4.8),pEll(37,-24,5.8,5.8),pEll(hx,hy,6.4,6),pTap(hx-2,hy-1,1.9,1.6,a?-41.5:-40,1.5)])}}));break}
   case 'YAWN':drawFront('up','yawn',.3,{belly:[1.04,1.06],bdy:-1,armL:[-40,-34,-45,-56],armR:[40,-34,45,-56]});break;
+  case 'PIT_A':drawFront('up','cool',.3,{armL:[-42,-31,-27,-54],armR:[33,-6,31,16],head:[-2,2,-.2]});break;                                  // left hand behind his head, armpit wide open
+  case 'PIT_B':drawFront('up','bliss',.3,{armL:[-42,-31,-27,-54],armR:[33,-6,31,16],head:[-9,9,-.8],belly:[1.06,1.03]});break;               // nose buried in the pit, deep inhale
+  case 'PIT_C':drawFront('up','scream',.3,{armL:[-42,-31,-27,-54],armR:[40,-18,23,-33],head:[3,-1,.16],belly:[.97,.97]});break;             // recoils, fanning the air with the other hand
+  case 'WIPE_A':drawFront('up','cool',.3,Object.assign(hang(),{armR:[40,-33,15,-50],head:[0,2,.06]}));break;                                  // forearm across the brow
+  case 'WIPE_B':drawFront('up','cool',.3,Object.assign(hang(),{armR:[39,-33,9,-49],head:[0,2,-.05]}));break;
+  case 'WIPE_C':drawFront('up','cool',.3,Object.assign(hang(),{armR:[40,-24,50,-8]}));break;                                                  // flicks the sweat away
+  case 'NAV_A':drawFront('up','pick',.3,Object.assign(hang(),{armL:[-34,-6,-5,3],head:[0,5,0],belly:[1.02,1.02]}));break;                     // head down, picking at his belly button
+  case 'NAV_B':drawFront('up','pick',.3,Object.assign(hang(),{armL:[-37,-14,-10,-31],head:[-2,3,-.1]}));break;                                // holds the lint up to his nose
+  case 'KISS_A':drawFront('flex','cool',.3,{head:[-6,4,-.5]});break;                                                                          // flexes and admires the guns
+  case 'KISS_B':drawFront('flex','bliss',.3,{head:[-13,8,-.9]});break;                                                                        // kisses his own bicep
   case 'SLEEP_A':drawFront('up','sleep',.3,Object.assign(hang(),{belly:[1.04,1.04],head:[0,3,.12],fx:{bub:3}}));break;
   case 'SLEEP_B':drawFront('up','sleep',.3,Object.assign(hang(),{belly:[.98,.98],head:[0,4,.14],fx:{bub:8}}));break;
   case 'SAD':drawFront('up','sad',.3,{armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0],belly:[.98,.97]});break;
@@ -1644,6 +1654,7 @@ const MAN_FRAMES={
   FLY_A:_F(.40,[31,-17]),FLY_B:_F(.40,[31,-17]),DIVE:_F(.40,[18,-14]),STUCK_A:_F(.27,[0,-44]),STUCK_B:_F(.27,[0,-44]),
   BELLY_A:_F(.36,[0,-44]),BELLY_B:_F(.36,[0,-44]),SCRATCH_A:_F(.36,[0,-44]),SCRATCH_B:_F(.36,[0,-44]),
   BURP_A:_F(.36,[0,-44]),BURP_B:_F(.36,[0,-44]),PICK_A:_F(.36,[0,-44]),PICK_B:_F(.36,[0,-44]),YAWN:_F(.36,[0,-44]),
+  PIT_A:_F(.36,[0,-44]),PIT_B:_F(.36,[0,-44]),PIT_C:_F(.36,[0,-44]),WIPE_A:_F(.36,[0,-44]),WIPE_B:_F(.36,[0,-44]),WIPE_C:_F(.36,[0,-44]),NAV_A:_F(.36,[0,-44]),NAV_B:_F(.36,[0,-44]),KISS_A:_F(.36,[0,-44]),KISS_B:_F(.36,[0,-44]),
   SLEEP_A:_F(.36,[1.7,-40.9]),SLEEP_B:_F(.36,[2,-39.9]),SAD:_F(.36,[0,-39]),
   CAPE_A:_F(.36,[0,-44]),SPIN_0:_F(.36,[0,-44]),SPIN_1:_F(.36,[0,-44]),SPIN_2:_F(.36,[0,-44]),SPIN_3:_F(.36,[0,-44]),SPIN_4:_F(.36,[0,-44]),SPIN_5:_F(.36,[0,-44]),SPIN_6:_F(.36,[0,-44]),SPIN_7:_F(.36,[0,-44]),SPIN_8:_F(.36,[0,-44]),SPIN_9:_F(.36,[0,-44]),SPIN_10:_F(.36,[0,-44]),SPIN_11:_F(.36,[0,-44]),SPIN_12:_F(.36,[0,-44]),SPIN_R1:_F(.36,[0,-44]),SPIN_R2:_F(.36,[0,-44]),SPIN_R3:_F(.36,[0,-44]),SPIN_R4:_F(.36,[0,-44]),SPIN_R5:_F(.36,[0,-44]),SPIN_R6:_F(.36,[0,-44]),SPIN_R7:_F(.36,[0,-44]),SPIN_R8:_F(.36,[0,-44]),SPIN_R9:_F(.36,[0,-44]),SPIN_R10:_F(.36,[0,-44]),SPIN_R11:_F(.36,[0,-44]),SPIN_BL:_F(.36,[0,-44]),SPIN_BR:_F(.36,[0,-44]),OOPS_A:_F(.36,[0,-44]),OOPS_B:_F(.36,[0,-44]),OOPS_C:_F(.36,[0,-44]),OOPS_D:_F(.36,[0,-44]),OOPS_E:_F(.36,[0,-44]),OOPS_F:_F(.36,[0,-44]),OOPS_G:_F(.36,[0,-44]),OOPS_H:_F(.36,[0,-44]),BACK_C:_F(.36,null),BACK_L:_F(.36,null),BACK_R:_F(.36,null),FART_A:_F(.36,null),FART_B:_F(.36,null)};
 function P(o){if(parts.length<1400)parts.push(o)}
@@ -1790,6 +1801,10 @@ const MAN_GAGS=[
  {name:'burp',steps:[['BURP_A',.55,'grunt'],['BURP_B',.7,'burp'],['BURP_A',.3,''],['IDLE_A',.3,'']]},
  {name:'pick_nose',steps:[['PICK_A',.3,'sniff'],['PICK_B',.3,''],['PICK_A',.3,''],['PICK_B',.3,''],['PICK_A',.35,'booger'],['IDLE_B',.4,'']]},
  {name:'yawn',steps:[['YAWN',1.1,'yawn'],['IDLE_A',.2,'']]},
+ {name:'armpit_sniff',steps:[['PIT_A',.4,'grunt'],['PIT_B',.5,'sniff'],['PIT_A',.2,''],['PIT_B',.6,'sniff'],['PIT_C',.9,'stink'],['PIT_C',.3,''],['IDLE_B',.3,'']]},
+ {name:'brow_wipe',steps:[['WIPE_A',.3,'sweat'],['WIPE_B',.25,''],['WIPE_A',.25,''],['WIPE_B',.25,''],['WIPE_C',.45,'flick'],['IDLE_A',.3,'']]},
+ {name:'navel_lint',steps:[['NAV_A',.35,''],['NAV_A',.35,'sniff'],['NAV_B',.6,'sniff'],['NAV_B',.4,'stink_s'],['IDLE_A',.3,'']]},
+ {name:'bicep_kiss',steps:[['KISS_A',.4,'grunt'],['KISS_B',.35,'smooch'],['KISS_A',.25,''],['KISS_B',.35,'smooch'],['IDLE_A',.3,'']]},
  {name:'fart',steps:[['BACK_C',.5,''],['FART_A',.5,'grunt'],['FART_B',.7,'fart'],['FART_B',.5,''],['BACK_C',.5,'']]},
  {name:'butt_wiggle',steps:[['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_C',.3,'']]},
  {name:'flex_show',steps:[['FLEX_A',.3,'grunt'],['FLEX_B',.3,''],['FLEX_A',.3,''],['FLEX_B',.3,''],['IDLE_A',.2,'']]},
@@ -1841,6 +1856,13 @@ const GAGFX={
  taunt(Q){SFX.taunt();SFX.boing();Q.ws=-Q.ws;gagKick(Q,0,0,Q.ws*34,16);const[x,y]=gw(Q,22,-30);popText(x+14,y-14,'NYAH!','#ffd23f',22)},
  grunt(Q){SFX.grunt();const[x,y]=gw(Q,-8,-52);P({k:7,x,y,vx:-30,vy:-60,l:.8,l0:.8,s:2.6,c:'#bfe8ff'})},
  sniff(Q){SFX.sniff()},
+ stink(Q){SFX.eek();gagKick(Q,0,-10,0,0);const[x,y]=gw(Q,-27,-22),k=Math.max(1,Q.sc*.7);
+  for(let i=0;i<7;i++)P({k:6,x:x+(rnd()-.5)*18*k,y:y+(rnd()-.5)*10*k,vx:-20-rnd()*60,vy:-14-rnd()*34,l:1.3+rnd()*.5,l0:1.8,s:(6+rnd()*5)*k,c:i%2?'#a6d63c':'#8fbf2e'});
+  for(let i=0;i<3;i++)P({k:9,x:x+(i-1)*12*k,y:y-8*k,vx:-8,vy:-30-rnd()*18,l:1.4,l0:1.4,ph:rnd()*6});popText(x-30*k,y-24*k,'PEE-YEW!','#b6e05a',22)},
+ stink_s(Q){const[x,y]=gw(Q,-10,-34),k=Math.max(1,Q.sc*.7);for(let i=0;i<3;i++)P({k:6,x:x+(rnd()-.5)*10*k,y:y+(rnd()-.5)*6*k,vx:-10-rnd()*30,vy:-10-rnd()*20,l:1+rnd()*.4,l0:1.4,s:(4+rnd()*3)*k,c:'#a6d63c'});popText(x-14*k,y-20*k,'EW...','#b6e05a',18)},
+ sweat(Q){const[x,y]=gw(Q,6,-52);for(let i=0;i<3;i++)P({k:7,x:x+(rnd()-.5)*14,y:y+(rnd()-.5)*4,vx:(rnd()-.5)*20,vy:-10,l:.9,l0:.9,s:2.6,c:'#bfe8ff'})},
+ flick(Q){SFX.whew();const[x,y]=gw(Q,46,-12);for(let i=0;i<6;i++)P({k:7,x,y,vx:60+rnd()*110,vy:-40-rnd()*90,l:.9,l0:.9,s:2.4,c:'#bfe8ff'})},
+ smooch(Q){SFX.boing();const[x,y]=gw(Q,-26,-34);popText(x-12,y-18,'MWAH!','#ff7eb0',20);for(let i=0;i<3;i++)popText(x+(rnd()-.5)*34,y-30-i*10,'♥','#ff5d8f',16)},
  slip(Q){SFX.slip();gagKick(Q,0,6,0,6)},
  drop(Q){SFX.flop();gagKick(Q,0,22,0,10);const[x,y]=gw(Q,0,30);dust(x,y+20,3,4)},
  eek(Q){SFX.eek();gagKick(Q,0,-12,0,0);const[x,y]=gw(Q,24,-58);popText(x+12,y-18,'EEEK!','#ff7eb0',26);for(let i=0;i<4;i++)P({k:7,x:x+(rnd()-.5)*16,y,vx:(rnd()-.2)*80,vy:-60-rnd()*70,l:.8,l0:.8,s:2.6,c:'#bfe8ff'})},
