@@ -827,6 +827,24 @@ function dimples(cx,cy,w){for(const q of[-1,1]){const x=cx+q*w,y=cy+Math.sin(tim
 let INF=0;   // how inflated the belly is (0..1) for the side-profile sprite
 let JIG=null;   // belly/rear spring offsets for the current render (set by renderMan; null = off)
 function jigMerge(o){if(!JIG)return o;o=Object.assign({},o||{});o.bo=JIG.bo;o.ro=JIG.ro;o.sk=JIG.sk;if(JIG.armL&&!o.armL){o.armL=JIG.armL;o.armR=JIG.armR;o.legL=JIG.legL;o.legR=JIG.legR}o.belly=o.belly?[o.belly[0]*JIG.bs[0],o.belly[1]*JIG.bs[1]]:JIG.bs;return o}
+// STRAINFX: past a full stomach (cheat mode / big soda) the skin goes tight: glossy sheen, stretch marks round the navel, bulging veins, a popped
+// outie navel and a throb.  Also stops the old red flash from turning the whole belly into a solid red blob.  (cx,cy,rx,ry) = belly ellipse, (nx,ny) = navel.
+// STRAINFX
+function strainFX(cx,cy,rx,ry,f,nx,ny,t){
+  if(f<=1)return;const k=Math.min(1,(f-1)*1.4),th=.5+.5*Math.sin(t*(7+k*9));
+  ctx.save();ctx.globalAlpha=1;ctx.lineCap='round';
+  const g=ctx.createRadialGradient(cx-rx*.32,cy-ry*.38,1,cx,cy,Math.max(rx,ry));
+  g.addColorStop(0,'rgba(255,255,255,'+(.4*k)+')');g.addColorStop(.5,'rgba(255,190,190,0)');g.addColorStop(1,'rgba(255,80,100,'+((.28+.18*th)*k)+')');
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,6.3);ctx.fill();
+  ctx.strokeStyle='rgba(190,55,90,'+(.5*k)+')';ctx.lineWidth=1;
+  for(let i=0;i<10;i++){const a=i/10*6.2832+.31,c=Math.cos(a),sn=Math.sin(a),r0=.16+.05*(i%3),r1=.55+.16*((i*7)%4)/3;
+    ctx.beginPath();ctx.moveTo(nx+c*rx*r0,ny+sn*ry*r0);ctx.quadraticCurveTo(nx+c*rx*(r0+r1)/2-sn*3,ny+sn*ry*(r0+r1)/2+c*3,nx+c*rx*r1,ny+sn*ry*r1);ctx.stroke()}
+  ctx.strokeStyle='rgba(88,108,205,'+(.42*k)+')';ctx.lineWidth=1.3+th*.5;
+  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(cx+q*rx*.2,cy-ry*.55);ctx.quadraticCurveTo(cx+q*rx*.7,cy-ry*.2,cx+q*rx*.55,cy+ry*.35);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+q*rx*.5,cy-ry*.3);ctx.quadraticCurveTo(cx+q*rx*.85,cy,cx+q*rx*.8,cy+ry*.2);ctx.stroke()}
+  ctx.strokeStyle='rgba(255,255,255,'+(.22*k*th)+')';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(cx,cy,rx*.93,ry*.93,0,0,6.3);ctx.stroke();
+  ctx.fillStyle='#f2b98f';ctx.strokeStyle='rgba(120,60,30,.85)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(nx,ny,1.6+k*2.2,1.3+k*1.7,0,0,6.3);ctx.fill();ctx.stroke();      // outie
+  ctx.restore()}
 function drawFront(pose,fk,t,o){
   o=jigMerge(o);
   const sw=Math.sin(t*4);
@@ -868,7 +886,7 @@ function drawFront(pose,fk,t,o){
    ctx.strokeStyle='rgba(176,92,52,.8)';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(0,4+INF*16,2.4+INF*2.5,.1,3.1);ctx.stroke();                                                      // navel
    if(INF>.04){const f=INF,cy=-2+f*14,rx=22+f*16,ry=17+f*20;ctx.save();ctx.fillStyle='rgba(255,255,255,'+(.2+f*.25)+')';ctx.beginPath();ctx.ellipse(-rx*.4,cy-ry*.35,rx*.2,ry*.2,-.5,0,6.3);ctx.fill();
      if(f>.3){ctx.strokeStyle='rgba(205,70,60,'+Math.min(.8,(f-.3)*1.4)+')';ctx.lineWidth=1.2;ctx.lineCap='round';for(const q of[-1,1])for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(q*rx*.15,cy+(k-1)*ry*.3,rx*.8,q>0?-.5+Math.PI*0:Math.PI-.5,q>0?.5:Math.PI+.5);ctx.stroke()}}
-     if(f>.65){ctx.globalAlpha=(f-.65)*1.6*(.6+.4*Math.sin(time*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(0,cy,rx*.97,ry*.97,0,0,6.3);ctx.fill()}ctx.restore()}
+     if(f>.65){ctx.globalAlpha=Math.min(.5,(f-.65)*1.6)*(.6+.4*Math.sin(time*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(0,cy,rx*.97,ry*.97,0,0,6.3);ctx.fill()}ctx.globalAlpha=1;strainFX(0,cy,rx,ry,f,0,4+f*16-1.5,time);ctx.restore()}
    curls(Array.from({length:6},(_,k)=>[k%2?.9:-.9,-13+k*2.6,k%2?1:-1]));
    if(bgrp)ctx.restore();
    for(const q of[-1,1]){ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(q*10+wo[0],12.4+wo[1]);ctx.quadraticCurveTo(q*19+wo[0],15+wo[1],q*26+wo[0],11.6+wo[1]);ctx.stroke()}}   // the fold under each roll
@@ -902,7 +920,8 @@ function drawSeatSide(f,t){
    if(f>.25){ctx.strokeStyle='rgba(205,70,60,'+Math.min(.85,(f-.25)*1.4)+')';ctx.lineWidth=1.3;for(let k=-1;k<=1;k++){ctx.beginPath();ctx.arc(bx-rx*.25,by+k*ry*.32,rx*.82,-.4,.4);ctx.stroke()}}
    ctx.strokeStyle='rgba(176,92,52,.95)';ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(bx+rx*.9,by+ry*.12,1.4+f*3.4,-1.6,1.6);ctx.stroke();                                // belly button pops out
    curls(Array.from({length:4},(_,k)=>[bx+rx*.45+(k%2),by-4+k*2.4,k%2?1:-1]));
-   if(f>.65){ctx.globalAlpha=(f-.65)*1.6*(.6+.4*Math.sin(t*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(bx,by,rx,ry,0,0,6.3);ctx.fill()}
+   if(f>.65){ctx.globalAlpha=Math.min(.5,(f-.65)*1.6)*(.6+.4*Math.sin(t*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(bx,by,rx,ry,0,0,6.3);ctx.fill()}
+   ctx.globalAlpha=1;strainFX(bx,by,rx,ry,f,bx+rx*.9,by+ry*.12,t);
    ctx.restore()}
   // boxers: the rear on the nozzle, waistband striped, the belly hangs over it
   blob([pEll(-4,-8,14,10,BR),pEll(6,-4,12,7,BR)],{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
@@ -946,7 +965,8 @@ function drawSide(t,fk){
      ctx.save();ctx.lineCap='round';ctx.fillStyle='rgba(255,255,255,'+(.18+f*.25)+')';ctx.beginPath();ctx.ellipse(bx+rx*.3,by-ry*.4,rx*.17,ry*.28,-.6,0,6.3);ctx.fill();
      if(f>.3){ctx.strokeStyle='rgba(205,70,60,'+Math.min(.8,(f-.3)*1.4)+')';ctx.lineWidth=1.3;for(let k=-1;k<=1;k++){ctx.beginPath();ctx.arc(bx-rx*.2,by+k*ry*.3,rx*.8,-.35,.35);ctx.stroke()}}
      ctx.strokeStyle='rgba(176,92,52,.9)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(bx+rx*.85,by+ry*.1,1.6+f*3,-1.6,1.6);ctx.stroke();                 // the belly button pops out
-     if(f>.65){ctx.globalAlpha=(f-.65)*1.6*(.6+.4*Math.sin(time*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(bx,by,rx,ry,0,0,6.3);ctx.fill()}
+     if(f>.65){ctx.globalAlpha=Math.min(.5,(f-.65)*1.6)*(.6+.4*Math.sin(time*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(bx,by,rx,ry,0,0,6.3);ctx.fill()}
+     ctx.globalAlpha=1;strainFX(bx,by,rx,ry,f,bx+rx*.85,by+ry*.1,time);
      ctx.restore()}}
   curls(Array.from({length:5},(_,k)=>[16+INF*18+(k%2)*2,-12+INF*6+k*2,k%2?1:-1]));
   T(ro,()=>{blob([pEll(-13,6,13.5,11.5,BR),pEll(3,10,14,6.5,BR)],{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
