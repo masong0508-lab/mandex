@@ -289,3 +289,10 @@ Nothing has been run on a real 3DS or in an emulator (Citra / Lime3DS): it is on
 (sky furthest, then back faces of blocks, the building, landlords, sling and valve, aim dots, the man and
 debris nearest). Slider at zero draws one flat image. This is a parallax effect, not real geometry,
 and has not been seen on a real 3DS or in an emulator.
+
+## TURNING IDLES pass (HTML only)
+The browser idle gags now run on the 3D turn rig (`drawSpin`) instead of flat front poses: real head yaw / pitch / roll (`ld`, `hp`, `hr`),
+body yaw with planted feet and lagging hips (`th`, `plant`), free 3D arms (`arms`), the cape hanging in 3D and swinging after the turn,
+gaze, and 11 face expressions (`FACE3`).  Key poses are `T_*` entries of `SPIN_POSE`; `spinLive` glides between them.  Gags: look around + double take,
+belly slap in 3/4 view, butt scratch + sniff, armpit sniff, brow wipe, belly-button lint, nose pick, bicep kiss, flex show, burp, yawn; fart and butt wiggle
+now step-turn round first.  The console sprites (`art/manspr.h`, `art/manidle.h`) are unchanged and would need `tools/gen_manspr.py` support for the `T_*` frames.

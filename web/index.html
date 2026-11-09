@@ -1371,16 +1371,48 @@ const TOWEL_HAND=(()=>{const r=v=>Math.round(v*1000)/1000+0,H={};
   for(const n in SPIN_POSE){const q=SPIN_POSE[n],th=q.th*Math.PI/180,oU=-(q.hip||0)*.35,sw=spinSway(q.th,q.psi||0,q.hip||0),b=oopsArms(q.oops?Object.assign({},OOPS_DEF,q.oops):null).rF,C=Math.cos(th),S=Math.sin(th);H[n]=[r(b[0]*C+b[2]*S+oU+sw.shx),r(b[1]+sw.bob),r(-b[0]*S+b[2]*C)]}
   for(const[n,hip]of[['BACK_C',0],['BACK_L',-6],['BACK_R',6],['FART_A',-1.5],['FART_B',1.5]])H[n]=[r(38-hip*.35),-58,0];
   return H})();
+
+// =====================================================================
+//  TURNING IDLES.  The idle gags run on the same 3D rig as the cape-taunt turn (drawSpin), so the head and body really rotate in perspective:
+//  th = body yaw, ld = head yaw RELATIVE to the body, hp = head pitch (+ = looks down), hr = head roll, hdx/hdy = the head ducks in / out,
+//  gz = where the eyes look, arms = {L,R} each [elbow xyz, hand xyz] in body space (x right, y down, z toward the viewer),
+//  plant = feet stay planted while the hips turn about 40% as far as the shoulders, cape = the towel hangs off his shoulders (lagging the turn).
+// =====================================================================
+const GRIN={w:5.4,d:4.9,y:10.6,lift:.6,teeth:1,tongue:1};
+const FACE3={
+ base:{e:'open',br:[-7.8,-8.8],m:GRIN},cool:{e:'shade',br:null,m:GRIN},bliss:{e:'happy',br:[-7.8,-8.8],m:GRIN},
+ smirk:{e:'wink',br:[-7.4,-9.5],m:{w:5.2,d:3.2,y:11,lift:.6,teeth:1,tongue:1}},
+ whiff:{e:'happy',br:[-9.6,-10.6],m:{w:3.6,d:1.1,y:12,lift:-1,teeth:0,tongue:0}},
+ pick:{e:'cross',br:[-8.2,-6.6],m:{w:4.6,d:1.8,y:12,lift:-1.2,teeth:0,tongue:0}},
+ scream:{e:'wide',br:[-9.5,-8],m:{w:4.6,d:5.8,y:9.8,lift:3.5,teeth:0,tongue:1}},
+ queasy:{e:'down',br:[-7.6,-10.6],m:{w:5,d:1.4,y:12.6,lift:-1.6,teeth:0,tongue:0}},
+ kiss:{e:'happy',br:[-7.4,-9],m:{w:2.4,d:2.8,y:12,lift:2.2,teeth:0,tongue:0}},
+ burp:{e:'wide',br:[-9.4,-10.6],ch:1,m:{w:2.6,d:2.6,y:11,lift:1.6,teeth:0,tongue:0}},
+ burpo:{e:'sleepy',br:[-7.2,-8.4],m:{w:3.4,d:3.7,y:10.3,lift:2.2,teeth:0,tongue:1}},
+ yawn:{e:'squint',br:[-8,-6.5],m:{w:5.4,d:7,y:8.8,lift:3.6,teeth:0,tongue:1}}};
+function eye3(s,k,gz){const ex=s*6,gx=(gz[0]||0)*1.8,gy=(gz[1]||0)*1.4;
+  if(k==='shade'){ctx.beginPath();ctx.ellipse(ex,-.8,5.7,4.6,s*.08,0,6.3);ctx.fillStyle='#1c1c2a';ctx.fill();ctx.strokeStyle='#e2b53c';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.55)';ctx.beginPath();ctx.ellipse(ex-2.4,-2.6,2.4,1,-.3,0,6.3);ctx.fill();ctx.beginPath();ctx.moveTo(0,-2);ctx.lineTo(s*.8,-2);ctx.stroke()}
+  else if(k==='happy'||(k==='wink'&&s<0)){ctx.strokeStyle=OUT;ctx.lineWidth=2.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(ex,.8,3.7,Math.PI*1.1,Math.PI*1.9);ctx.stroke()}
+  else if(k==='sleepy'){ctx.strokeStyle=OUT;ctx.lineWidth=2.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(ex,-2.4,3.6,Math.PI*.1,Math.PI*.9);ctx.stroke()}
+  else if(k==='squint'){ctx.strokeStyle=OUT;ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(s*9.5,-4.5);ctx.lineTo(s*3.8,-1);ctx.lineTo(s*9.5,2.5);ctx.stroke()}
+  else if(k==='cross')eye(s,-1,4.4,4.8,-s*1.7,.3,1.9);
+  else if(k==='wide')eye(s,-1,4.9,5.6,gx,-.6,2);
+  else if(k==='down')eye(s,-1,5,5.8,0,.9,1.8);
+  else eye(s,-1,4.6,5.4,.5+gx,.1+gy,2.4)}
+function quiffDraw(cx,sx,pd){ctx.save();ctx.translate(cx,pd*.4);ctx.scale(sx,1);ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(-14,-46);ctx.quadraticCurveTo(-17,-62,-5,-58);ctx.quadraticCurveTo(0,-68,6,-58);ctx.quadraticCurveTo(17,-62,14,-46);ctx.quadraticCurveTo(8,-53,0,-51);ctx.quadraticCurveTo(-8,-53,-14,-46);ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.6;ctx.stroke();ctx.restore()}
+let CAPEA=0,CAPET=-9;
+function capeAng(th){if(time-CAPET>.3)CAPEA=th;else CAPEA+=(th-CAPEA)*.1;CAPET=time;return CAPEA}   // the cape swings after the body
 function drawSpin(th,o){
   o=o||{};
-  const hip=o.hip||0,cl=o.cl||0,cr=o.cr||0,psi=(o.psi||0)*Math.PI/180,ld=(o.ld||0)*Math.PI/180,spd=o.spd==null?1:o.spd,dir=o.dir||1,tt=o.t||0;
+  const hip=o.hip||0,cl=o.cl||0,cr=o.cr||0,psi=(o.psi||0)*Math.PI/180+(o.plant?-.6*th:0),ld=(o.ld||0)*Math.PI/180,hpA=(o.hp||0)*Math.PI/180,pdv=hpA*13,CA=o.arms,fk=o.face||'',FX=FACE3[fk]||FACE3.base,gzv=o.gz||[0,0],spd=o.spd==null?1:o.spd,dir=o.dir||1,tt=o.t||0;
   const C=Math.cos(th),S=Math.sin(th),C2=Math.cos(th+psi),S2=Math.sin(th+psi),Ch=Math.cos(th+ld),Sh=Math.sin(th+ld);        // C,S = whole body; C2,S2 = hips (twisted a bit more for the wiggle)
   const oU=-hip*.35,oM=hip*.15,oL=hip*.6;                                              // screen sway of the upper body / belly / hips
-  const bo=JIG?JIG.bo:[0,0],ro=JIG?JIG.ro:[0,0],bs=JIG?JIG.bs:[1,1],wo=[(bo[0]+ro[0])/2,(bo[1]+ro[1])/2];
+  const bo=JIG?JIG.bo:[0,0],ro=JIG?JIG.ro:[0,0],bs=(JIG?JIG.bs:[1,1]).map((v,i)=>v*(o.belly?o.belly[i]:1)),wo=[(bo[0]+ro[0])/2,(bo[1]+ro[1])/2];
   const cmp=(a,b)=>Math.abs(a.d-b.d)>1e-4?a.d-b.d:a.n-b.n;
   let list=[],seq=0;
   const add=(d,f)=>{list.push({d,f,n:seq++})},addLeg=(d,f)=>{list.push({d,f,n:seq++,leg:1})};   // legs are not shifted by the sway/crouch (their hips already are)
-  const SW=spinSway(th*180/Math.PI,(o.psi||0),hip),bob=SW.bob,shx=SW.shx;
+  const SW=o.plant?spinSway(0,0,hip):spinSway(th*180/Math.PI,(o.psi||0),hip),bob=SW.bob,shx=SW.shx;
   const OP=o.oops?Object.assign({},OOPS_DEF,o.oops):null;                                                            // the "oops" gag: boxers down, bare butt, covering up
   // the bare butt, seen from behind: curvy, full and heavy (a little muscle under the curves), a paler 'tan line' skin, a deep soft cleft, a fold under each cheek, sparse hair, a heavy wobble
   // little curly wisps, deterministic: [x, y, dx, dy] on a cheek (x counted from the cleft)
@@ -1426,7 +1458,7 @@ function drawSpin(th,o){
       ribbonStripes(-30,30,yc,2.6,6.2,'rgba(224,36,58,.85)');
       ctx.restore()}
     ctx.restore()});
-  const group=(d,build)=>{const keep=list;list=[];build();const sub=list.sort(cmp);list=keep;add(d,()=>{for(const p of sub)p.f()})};
+  const group=(d,build)=>{const keep=list;list=[];build();const sub=list.sort(cmp);list=keep;add(d,()=>{ctx.save();if(o.hr||o.hdx||o.hdy){ctx.translate(oU+(o.hdx||0),-33+(o.hdy||0));ctx.rotate((o.hr||0)*Math.PI/180);ctx.translate(-oU,33)}for(const p of sub)p.f();ctx.restore()})};
   const P3=(x,y,z,ox)=>[x*C+z*S+(ox||0),y,-x*S+z*C];
   // soft shade on the lower right + a sheen on the upper left, so each ellipsoid reads as round
   const shade=(px,py,rx,ry,sa,ha,col)=>{
@@ -1434,19 +1466,19 @@ function drawSpin(th,o){
       ctx.beginPath();ctx.rect(px-rx-3,py-ry-3,rx*2+6,ry*2+6);ctx.ellipse(px-rx*.2,py-ry*.24,rx*1.04,ry*1.04,0,0,6.2832);
       ctx.fillStyle=(col||'rgba(150,70,30,')+sa+')';ctx.fill('evenodd');ctx.restore()}
     if(ha>0){ctx.fillStyle='rgba(255,255,255,'+ha+')';ctx.beginPath();ctx.ellipse(px-rx*.34,py-ry*.46,rx*.4,ry*.2,-.4,0,6.2832);ctx.fill()}};
-  const G3=(x,y,z,a,b,c,q)=>{q=q||{};const cc=q.head?Ch:q.low?C2:C,ss=q.head?Sh:q.low?S2:S,ox=q.ox||0,oy=q.oy||0;
-    return{x,y,z,a,b,c,cc,ss,ox,oy,px:x*cc+z*ss+ox,py:y+oy,rx:Math.hypot(a*cc,c*ss),d:-x*ss+z*cc+(q.bias||0)}};
+  const G3=(x,y,z,a,b,c,q)=>{q=q||{};if(q.rot&&hpA){const dy=y+44.5,dz=z;y=-44.5+dy*Math.cos(hpA)+dz*Math.sin(hpA);z=dz*Math.cos(hpA)-dy*Math.sin(hpA)}const cc=q.head?Ch:q.low?C2:C,ss=q.head?Sh:q.low?S2:S,ox=q.ox||0,oy=q.oy||0;
+    return{vs:q.vs,x,y,z,a,b,c,cc,ss,ox,oy,px:x*cc+z*ss+ox,py:y+oy,rx:Math.hypot(a*cc,c*ss),d:-x*ss+z*cc+(q.bias||0)}};
   const E=(x,y,z,a,b,c,fill,lw,q)=>{q=q||{};const r=G3(x,y,z,a,b,c,q);
     add(q.d!=null?q.d:r.d,()=>{ell(r.px,r.py,r.rx,b,fill,lw);shade(r.px,r.py,r.rx,b,q.sh==null?.14:q.sh,q.hl==null?.3:q.hl,q.sc);if(q.then)q.then(r)});return r};
   // a spot (gx,gy) on the front (or back) of ellipsoid h: where it lands, how squarely it faces us (f) and how much it is squashed sideways (sx)
   const onS=(h,gx,gy,back)=>{const dx=(gx-h.x)/h.a,dy=(gy-h.y)/h.b,k=1-dx*dx-dy*dy;if(k<=0)return null;
     const sg=back?-1:1,sq=Math.sqrt(k),gz=h.z+sg*h.c*sq,nx=dx/h.a,ny=dy/h.b,nz=sg*sq/h.c,nl=Math.hypot(nx,ny,nz)||1,nh=Math.hypot(nx,nz)/nl;
     const f=(-nx*h.ss+nz*h.cc)/nl;
-    return{px:gx*h.cc+gz*h.ss+h.ox,py:gy+h.oy,f,gz,h,sx:nh>.05?Math.min(1,Math.max(0,f/nh)):0}};
+    return{px:gx*h.cc+gz*h.ss+h.ox,py:gy+h.oy,f,gz,h,sy:h.vs?Math.sqrt(Math.max(.4,1-(ny/nl)*(ny/nl))):1,sx:nh>.05?Math.min(1,Math.max(0,f/nh)):0}};
   const dec=(hosts,gx,gy,fn,q)=>{q=q||{};let best=null;
     for(const h of hosts){const s=onS(h,gx,gy,q.back);if(s&&(!best||(q.back?s.gz<best.gz:s.gz>best.gz)))best=s}
     if(!best||best.f<(q.min==null?.1:q.min))return;
-    ctx.save();ctx.translate(best.px,best.py);ctx.scale(Math.max(.08,best.sx),1);fn(best);ctx.restore()};
+    ctx.save();ctx.translate(best.px,best.py);ctx.scale(Math.max(.08,best.sx),best.sy);fn(best);ctx.restore()};
   ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
 
   // ---------------- legs: each foot is planted where it was put; a 2-bone IK finds the knee from the (swaying, crouching) hip down to it
@@ -1470,15 +1502,16 @@ function drawSpin(th,o){
       dec([shoe],s*15.5,sy0-2.6,()=>{ctx.strokeStyle='#5a3515';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(-4,0);ctx.lineTo(4,0);ctx.stroke()})})}
 
   // ---------------- arms: left fist on the hip, right hand held up high with the towel
-  const AR=oopsArms(OP),lS=P3(-21.5,-20.5,0,oU),lE=P3(AR.lE[0],AR.lE[1],AR.lE[2],oU),lF=P3(AR.lF[0],AR.lF[1],AR.lF[2],oU),rS=P3(21.5,-20.5,0,oU),rE=P3(AR.rE[0],AR.rE[1],AR.rE[2],oU),rF=P3(AR.rF[0],AR.rF[1],AR.rF[2],oU);
-  const live=!NOTOWEL&&o.t!=null,wv=live?armWave(OP?1-.85*OP.cover:1):[0,0,0];                                                          // browser only: he waves the raised hand (the exported baked hand has no wave)
+  const AR=CA?{lE:CA.L.slice(0,3),lF:CA.L.slice(3),rE:CA.R.slice(0,3),rF:CA.R.slice(3)}:oopsArms(OP),lS=P3(-21.5,-20.5,0,oU),lE=P3(AR.lE[0],AR.lE[1],AR.lE[2],oU),lF=P3(AR.lF[0],AR.lF[1],AR.lF[2],oU),rS=P3(21.5,-20.5,0,oU),rE=P3(AR.rE[0],AR.rE[1],AR.rE[2],oU),rF=P3(AR.rF[0],AR.rF[1],AR.rF[2],oU);
+  const live=!NOTOWEL&&o.t!=null&&!CA,wv=live?armWave(OP?1-.85*OP.cover:1):[0,0,0];                                                          // browser only: he waves the raised hand (the exported baked hand has no wave)
   for(let n=0;n<3;n++){rF[n]+=wv[n];rE[n]+=wv[n]*.5}
   const covering=OP&&OP.cover>.05,kc=OP?OP.cover:0,hRx=6.8+3*kc,hRy=6.8+1.8*kc;
   // each arm is ONE mass: a tapered upper arm, a tapered forearm, a soft elbow and the hand, so there are no ball-and-stick joints
   const armParts=(S,E,F)=>[pTap(S[0],S[1],6.9,E[0],E[1],6.3),pTap(E[0],E[1],6.0,F[0],F[1],4.9),pEll(E[0],E[1],6.2,6.1),pEll(F[0],F[1],hRx,hRy)];
   const knuckles=(F)=>{ctx.save();ctx.strokeStyle='rgba(140,72,44,.55)';ctx.lineWidth=1;ctx.lineCap='round';for(let n=-1;n<=1;n++){ctx.beginPath();ctx.arc(F[0]+n*2.7,F[1]+.4,1.5,.3,2.8);ctx.stroke()}ctx.restore()};
-  add(covering?Math.max(lE[2],lF[2])-.5:lF[2]+6,()=>{blob(armParts(lS,lE,lF));if(!covering)knuckles(lF)});                       // left arm (hand on the hip, or reaching back)
-  add(covering?Math.max(rE[2],rF[2])-.5:rS[2]-.3,()=>blob(armParts(rS,rE,rF)));                                                  // right arm (raised with the towel)
+  const AD=(E,F,i)=>(E[2]+F[2])/2+(o.ad?o.ad[i]:0);
+  add(CA?AD(lE,lF,0):covering?Math.max(lE[2],lF[2])-.5:lF[2]+6,()=>{blob(armParts(lS,lE,lF));if(!covering)knuckles(lF)});                       // left arm (hand on the hip, or reaching back)
+  add(CA?AD(rE,rF,1):covering?Math.max(rE[2],rF[2])-.5:rS[2]-.3,()=>blob(armParts(rS,rE,rF)));                                                  // right arm (raised with the towel)
   const palm=F=>{blob([pEll(F[0],F[1],hRx,hRy)],{ow:0});                                                                          // the hand again on top: a big flat palm, fingers pressed over the butt
     if(kc>.5){ctx.strokeStyle='rgba(140,72,44,.6)';ctx.lineWidth=1.1;ctx.lineCap='round';for(let n=-1;n<=1;n++){ctx.beginPath();ctx.moveTo(F[0]+n*3.6,F[1]+3.2);ctx.lineTo(F[0]+n*3.9,F[1]+7);ctx.stroke()}}};
 
@@ -1526,19 +1559,20 @@ function drawSpin(th,o){
 
   // ---------------- head: neck, jaw, skull, ears, hair shell (painted as small quads over a wavy hairline), top knot, nose and face
   group(1,()=>{
-    const U={ox:oU,head:1},A=15,B=14.2,Cc=14.5,hcy=-44.5,C=Ch,S=Sh;                 // the head has its own turn angle (C,S here are the head's)
+    const U={ox:oU,head:1,vs:1},U2={ox:oU,head:1,rot:1},A=15,B=14.2,Cc=14.5,hcy=-44.5,C=Ch,S=Sh;                 // the head has its own turn angle (C,S here are the head's)
     E(0,-31.5,0,10,6,9,SKD,0,{ox:oU,head:1,sh:.08,hl:0,d:-900});
     const jaw=G3(0,-34,2,11.2,8.2,11,U),hd=G3(0,-44,0,14.3,13.3,13.5,U);
     add(0,()=>blob([pEll(jaw.px,jaw.py,jaw.rx,jaw.b),pEll(hd.px,hd.py,hd.rx,hd.b)],{ow:1.8}));                              // jaw and skull: one head, no chin seam
     const shell={x:0,y:hcy,z:0,a:A,b:B,c:Cc,cc:C,ss:S,ox:oU,oy:0};
-    for(const s of[-1,1]){const r=G3(s*14.2,-44,-1,4,5,4,U),near=r.d>=0;
+    for(const s of[-1,1]){const r=G3(s*14.2,-44,-1,4,5,4,U2),near=r.d>=0;
       add(near?20:-700+r.d,()=>blob([pEll(r.px,r.py,r.rx,5)],{ow:1.5,sd:1.4}))}
-    const nz=G3(0,-39.7,13.2,3.4,2.9,3.6,U);
+    const nz=G3(0,-39.7,13.2,3.4,2.9,3.6,U2);
     add(nz.d>=0?21:-650,()=>{ell(nz.px,nz.py,nz.rx,2.9,'#f3a784',1.2);shade(nz.px,nz.py,nz.rx,2.9,.1,.7)});
     const yh=f=>{const a=Math.abs(Math.atan2(Math.sin(f),Math.cos(f)));if(a<=1.5708)return -51+5*Math.sin(a)*Math.sin(a);const s=(a-1.5708)/1.5708;return -46+10*s*s*(3-2*s)};
     const vh=f=>Math.max(-1,Math.min(1,(yh(f)-hcy)/B));
-    const fac=(f,v)=>{const rr=Math.sqrt(Math.max(0,1-v*v));return(-(rr*Math.sin(f)/A)*S+(rr*Math.cos(f)/Cc)*C)/Math.hypot(rr*Math.sin(f)/A,v/B,rr*Math.cos(f)/Cc)};
-    const hp=(f,v)=>{const rr=Math.sqrt(Math.max(0,1-v*v));return[A*rr*Math.sin(f)*C+Cc*rr*Math.cos(f)*S+oU,hcy+B*v]};
+    const cpt=Math.cos(hpA),spt=Math.sin(hpA);
+    const fac=(f,v)=>{const rr=Math.sqrt(Math.max(0,1-v*v)),nx=rr*Math.sin(f)/A,ny=v/B,nzz=rr*Math.cos(f)/Cc,nz2=nzz*cpt-ny*spt;return(-nx*S+nz2*C)/Math.hypot(nx,ny,nzz)};
+    const hp=(f,v)=>{const rr=Math.sqrt(Math.max(0,1-v*v)),X=A*rr*Math.sin(f),Y=B*v,Z=Cc*rr*Math.cos(f),Y2=Y*cpt+Z*spt,Z2=Z*cpt-Y*spt;return[X*C+Z2*S+oU,hcy+Y2]};
     add(10,()=>{                                                                                                       // hair
       const NU=32,NV=7;ctx.fillStyle=HAIR;ctx.strokeStyle=HAIR;ctx.lineWidth=.8;ctx.lineJoin='round';ctx.beginPath();
       for(let i=0;i<NU;i++){const f0=i/NU*6.2832,f1=(i+1)/NU*6.2832,fm=(f0+f1)/2;
@@ -1554,26 +1588,27 @@ function drawSpin(th,o){
       ctx.fillStyle='rgba(255,255,255,.16)';ctx.beginPath();ctx.ellipse(oU-5,hcy-B*.7,4.8,2.3,-.35,0,6.2832);ctx.fill();
       dec([shell],0,-52,()=>{ctx.strokeStyle='rgba(25,12,4,.75)';ctx.lineWidth=1.3;ctx.beginPath();for(let a=0;a<9;a+=.4){const r=a*.55;a?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r*.8):ctx.moveTo(0,0)}ctx.stroke()},{back:1})});
     const tk=G3(0,-62.6,-1,5.6,5.2,5,U);                                                                                 // top knot
-    add(30,()=>{ell(tk.px,tk.py,tk.rx,5.2,HAIR,0);ctx.strokeStyle=OUT;ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(tk.px,tk.py,tk.rx,5.2,0,Math.PI,6.2832);ctx.stroke();
+    if(o.quiff)add(31,()=>quiffDraw(oU+Sh*5,Math.max(.3,Math.abs(Ch)),pdv));else add(30,()=>{ell(tk.px,tk.py,tk.rx,5.2,HAIR,0);ctx.strokeStyle=OUT;ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(tk.px,tk.py,tk.rx,5.2,0,Math.PI,6.2832);ctx.stroke();
       ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.ellipse(tk.px-1.4,tk.py-1.8,1.7,.9,-.4,0,6.2832);ctx.fill()});
     // face (only the spots that face us are drawn, squashed by how squarely they face us)
-    const FH=[jaw,hd],fy=ly=>ly-43;
+    const FH=[jaw,hd],fy=ly=>ly-43+pdv;
     const fd=(lx,ly,fn,hosts)=>dec(hosts||FH,lx,fy(ly),()=>{ctx.translate(-lx,-ly);fn()});
     add(40,()=>{
       ctx.save();ctx.beginPath();ctx.ellipse(hd.px,hd.py,Math.max(.1,hd.rx-.9),hd.b-.9,0,0,6.2832);ctx.moveTo(jaw.px+Math.max(.1,jaw.rx-.9),jaw.py);ctx.ellipse(jaw.px,jaw.py,Math.max(.1,jaw.rx-.9),jaw.b-.9,0,0,6.2832);ctx.clip();
       for(const s of[-1,1]){
-        fd(s*6.15,-8.3,()=>OP&&OP.face?brow(s,9.5,-8.4,2.8,-13.8,2.4):brow(s,9.5,-7.8,2.8,-8.8),[hd]);
+        fd(s*6.15,-8.3,()=>OP&&OP.face?brow(s,9.5,-8.4,2.8,-13.8,2.4):FX.br&&brow(s,9.5,FX.br[0],2.8,FX.br[1]),[hd]);
+        if(FX.ch)fd(s*10.6,7,()=>{ell(s*10.6,7,5.2,4.7,SK,1.4)},[hd]);
         fd(s*6,-1,()=>{const f=OP&&OP.face;
           if(f==='squeeze'){ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(s*6-s*3.6,-4.2);ctx.lineTo(s*6+s*2.2,-1.2);ctx.lineTo(s*6-s*3.6,1.8);ctx.stroke()}
           else if(f==='sheepish'){eye(s,-1,4.6,5.2,-s*1.4,.8,2.3);ctx.fillStyle=SK;ctx.fillRect(s*6-6,-7,12,5.6);ctx.strokeStyle=OUT;ctx.lineWidth=1.7;ctx.beginPath();ctx.moveTo(s*6-5,-1.5);ctx.lineTo(s*6+5,-1.5);ctx.stroke()}
           else if(f)eye(s,-1,5.5,6.5,.3,.3,1.6);
-          else eye(s,-1,4.6,5.4,.5,.1,2.4)},[hd]);
+          else eye3(s,FX.e,gzv)},[hd]);
         fd(s*10.4,6,()=>{const f=OP&&OP.face;ctx.fillStyle=f?'rgba(255,55,75,.62)':'rgba(255,105,110,.34)';ctx.beginPath();ctx.ellipse(s*10.4,6,f?4.9:3.3,f?3.3:2.2,0,0,6.3);ctx.fill()});
         fd(s*5.3,5.7,()=>stacheLobe(s))}
       mouthWrap();ctx.restore()});
     // grin, wrapped round the jaw so it bends away as the head turns (points on the far side are pinned to the edge)
     const mouthSpec=()=>{const f=OP&&OP.face;
-      return f==='eek'?{w:3.6,d:6.4,y:9.6,lift:2.6,teeth:0,tongue:1}:f==='blush'?{w:4.6,d:1.7,y:11.6,lift:-1.1,teeth:0,tongue:0}:f==='squeeze'?{w:5.2,d:2.8,y:11.2,lift:-1.5,teeth:1,tongue:0}:f==='sheepish'?{w:4.8,d:2.4,y:10.9,lift:1,teeth:1,tongue:0}:{w:5.4,d:4.9,y:10.6,lift:.6,teeth:1,tongue:1}};
+      return f==='eek'?{w:3.6,d:6.4,y:9.6,lift:2.6,teeth:0,tongue:1}:f==='blush'?{w:4.6,d:1.7,y:11.6,lift:-1.1,teeth:0,tongue:0}:f==='squeeze'?{w:5.2,d:2.8,y:11.2,lift:-1.5,teeth:1,tongue:0}:f==='sheepish'?{w:4.8,d:2.4,y:10.9,lift:1,teeth:1,tongue:0}:FX.m};
     function mouthWrap(){
       const MM=mouthSpec(),w=MM.w,d=MM.d,y=MM.y,sg=S>=0?1:-1,pts=[],P=(lx,ly)=>{let b=null;for(const h of FH){const s=onS(h,lx,fy(ly),0);if(s&&(!b||s.gz>b.gz))b=s}
         if(!b)return[0,0,-1];let px=b.px;if(b.f<0){const h=b.h,dy=(fy(ly)-h.y)/h.b;px=h.px+sg*h.rx*Math.sqrt(Math.max(0,1-dy*dy))}return[px,b.py,b.f]};
@@ -1594,18 +1629,74 @@ function drawSpin(th,o){
     if(OP.bang>0){const k=OP.bang;ctx.save();ctx.translate(hx0+27,-66);ctx.scale(k,k);ctx.lineJoin='round';ctx.fillStyle='#ff3b30';ctx.strokeStyle=OUT;ctx.lineWidth=1.4;
       ctx.beginPath();ctx.moveTo(-2.2,-5);ctx.lineTo(2.2,-5);ctx.lineTo(1.2,3);ctx.lineTo(-1.2,3);ctx.closePath();ctx.fill();ctx.stroke();ctx.beginPath();ctx.arc(0,6.2,1.5,0,6.3);ctx.fill();ctx.stroke();ctx.restore()}});
   // ---------------- the towel: a real cloth pinned to the raised hand (see TOWEL CLOTH), drawn as depth sorted 3D quads
-  if(!NOTOWEL){const Hh=[rF[0],rF[1],rF[2]],tm=rF[1]>-62.5?2:1,cl=live?towelFor(TW_SPIN,Hh,0,tm):towelStatic(Hh,tm);for(const q of towelJobs(cl,rF[2]))add(q.d,q.fn)}
-  add(rF[2]+.2,()=>{if(covering)palm(rF);else{blob([pEll(rF[0],rF[1],6.8,6.8)],{ow:0});knuckles(rF)}});                // the raised hand over the towel's held edge
+  if(!NOTOWEL&&!CA){const Hh=[rF[0],rF[1],rF[2]],tm=rF[1]>-62.5?2:1,cl=live?towelFor(TW_SPIN,Hh,0,tm):towelStatic(Hh,tm);for(const q of towelJobs(cl,rF[2]))add(q.d,q.fn)}
+  if(!CA)add(rF[2]+.2,()=>{if(covering)palm(rF);else{blob([pEll(rF[0],rF[1],6.8,6.8)],{ow:0});knuckles(rF)}});                // the raised hand over the towel's held edge
 
+  if(o.prop){const H=o.prop.h==='L'?lF:rF;add(H[2]+.8,()=>{if(o.prop.k==='lint')lint(H[0]+(o.prop.dx||0),H[1]+(o.prop.dy||-7))})}
+  if(o.sweatB)add(60,()=>{ctx.save();ctx.translate(oU,0);sweatBeads();ctx.restore()});
+  if(o.cape){const ca=capeAng(th),Cq=Math.cos(ca),Sq=Math.sin(ca),N=8,Lp=[],Rp=[];
+    for(let j=0;j<=N;j++){const u=j/N,y=-27+u*76,w=14+u*18+Math.sin(tt*4+u*2)*1.4*u,z=-11.5-u*4+Math.sin(tt*3+u*3)*1.8*u;Lp.push([-w*Cq+z*Sq+oU*(1-u),y]);Rp.push([w*Cq+z*Sq+oU*(1-u),y])}
+    add(Cq>=0?-80:60,()=>{const mid=(a,b,k)=>[a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k];
+      ctx.beginPath();ctx.moveTo(Lp[0][0],Lp[0][1]);for(let j=1;j<=N;j++)ctx.lineTo(Lp[j][0],Lp[j][1]);ctx.quadraticCurveTo((Lp[N][0]+Rp[N][0])/2,Lp[N][1]+7,Rp[N][0],Rp[N][1]);for(let j=N-1;j>=0;j--)ctx.lineTo(Rp[j][0],Rp[j][1]);ctx.closePath();
+      ctx.fillStyle=Cq>=0?TOW:'#e8669f';ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();
+      ctx.strokeStyle=TOWS;ctx.lineWidth=3;ctx.lineCap='round';
+      for(let k=0;k<3;k++){const u=(57+k*6)/76,j=Math.min(N-1,Math.floor(u*N)),f=u*N-j,a=mid(Lp[j],Lp[j+1],f),b=mid(Rp[j],Rp[j+1],f);const ins=.06;ctx.beginPath();ctx.moveTo(a[0]+(b[0]-a[0])*ins,a[1]);ctx.quadraticCurveTo((a[0]+b[0])/2,a[1]+5,b[0]-(b[0]-a[0])*ins,b[1]);ctx.stroke()}})}
   list.sort(cmp);for(const p of list){if(p.leg)p.f();else{ctx.save();ctx.translate(shx,bob);p.f();ctx.restore()}}
   ctx.restore()}
 // live glide for the browser: blends the current step's pose into the next one so the turn is smooth at any frame rate
 function spinLive(Q){
   if(!Q||!Q.gag)return null;
   const st=Q.gag.steps,i=Q.step,a=SPIN_POSE[st[i][0]];if(!a)return null;
-  const nx=st[i+1],b=(nx&&SPIN_POSE[nx[0]])||a,k=Math.min(1,Math.max(0,Q.st/st[i][1])),ks=k*k*(3-2*k);
-  const th=a.th+(b.th-a.th)*k,L=(key)=>(a[key]||0)+((b[key]||0)-(a[key]||0))*ks;     // the feet, hips and head follow th itself (spinSway), the rest is blended between the two frames
-  return{th:th*Math.PI/180,hip:L('hip'),psi:L('psi'),ld:L('ld'),cl:L('cl'),cr:L('cr'),dir:b.th<a.th?-1:1,t:time,oops:(a.oops||b.oops)?oopsBlend(a.oops,b.oops,ks):null}}
+  const nx=st[i+1],b=(nx&&SPIN_POSE[nx[0]])||a,k=Math.min(1,Math.max(0,Q.st/st[i][1])),ks=st[i][3]==='l'?k:k*k*(3-2*k);
+  const T=!!(a.arms&&b.arms);
+  const th=a.th+(b.th-a.th)*(T?ks:k),L=(key)=>(a[key]||0)+((b[key]||0)-(a[key]||0))*ks;     // the feet, hips and head follow th itself (spinSway), the rest is blended between the two frames
+  const r={th:th*Math.PI/180,hip:L('hip'),psi:L('psi'),ld:L('ld'),cl:L('cl'),cr:L('cr'),dir:b.th<a.th?-1:1,t:time,oops:(a.oops||b.oops)?oopsBlend(a.oops,b.oops,ks):null};
+  if(T){const n=ks<.5?a:b;r.plant=n.plant;r.cape=n.cape;r.quiff=n.quiff;r.face=n.face;r.prop=n.prop;r.sweatB=n.sweatB;
+    r.hp=L('hp');r.hr=L('hr');r.hdx=L('hdx');r.hdy=L('hdy');r.gz=mixA(a.gz,b.gz,ks);r.belly=mixA(a.belly,b.belly,ks);
+    r.arms={L:mixA(a.arms.L,b.arms.L,ks),R:mixA(a.arms.R,b.arms.R,ks)};r.ad=mixA(a.ad||[0,0],b.ad||[0,0],ks)}
+  return r}
+// ---- the key poses of the turning idles (named T_*; the gags below step through them and spinLive glides between neighbours)
+(()=>{
+  const mir=a=>[-a[0],a[1],a[2],-a[3],a[4],a[5]];
+  const GL=[-35,-12,3,-33,-34,6],GR=mir(GL),DL=[-33,-6,0,-31,16,2],DR=mir(DL),HR=[41,-6,-1,26,8,3];
+  const TB={th:0,ld:0,hp:0,hr:0,hip:0,psi:0,hdx:0,hdy:0,gz:[0,0],belly:[1,1],face:'cool',cape:1,plant:1,quiff:1,arms:{L:GL,R:GR},ad:[0,0],prop:null,sweatB:0};
+  const tp=(n,o)=>{SPIN_POSE['T_'+n]=Object.assign({},TB,o)};
+  const A=(L,R)=>({L,R}),up=A([-40,-34,0,-45,-56,0],mir([-40,-34,0,-45,-56,0]));
+  tp('IDLE',{});
+  // look around, then a double take
+  tp('LKL',{th:-12,ld:-50,gz:[-1,0],hr:-3});tp('LKR',{th:12,ld:50,gz:[1,0],hr:3});tp('TAKE',{th:-6,ld:-14,hp:-6,hr:-4,face:'scream',belly:[.97,.97]});
+  // belly slap in three quarter view, looking at us
+  const SL={th:-48,ld:46,face:'bliss'};
+  tp('SLI',SL);tp('SLW',{...SL,arms:A(GL,[46,-22,2,50,-40,2])});tp('SLH',{...SL,belly:[1.1,.9],arms:A(GL,[36,-6,10,12,0,26]),ad:[0,12]});tp('SLR',{...SL,belly:[.94,1.07],arms:A(GL,[42,-14,4,40,-26,4])});
+  // turns half away and scratches his butt, glancing back at us, then sniffs the hand
+  const SB={th:68,ld:-70,face:'bliss'};
+  tp('SBI',{...SB,arms:A([-32,-12,3,-30,-30,8],HR)});tp('SBa',{...SB,arms:A([-30,0,-8,-16,16,-22],HR)});tp('SBb',{...SB,arms:A([-30,2,-8,-12,21,-24],HR)});
+  tp('SBN',{th:20,ld:-20,hp:8,face:'whiff',arms:A([-38,-14,8,-9,-36,16],HR)});tp('SBQ',{th:14,ld:24,hp:-4,hr:6,face:'queasy',arms:A([-38,-14,8,-9,-36,16],HR)});
+  // armpit sniff
+  const PA=[-43,-37,-2,-24,-58,-8];
+  tp('PS0',{hr:-2,arms:A([-40,-22,2,-38,-42,4],DR)});tp('PSA',{ld:-8,hr:-6,arms:A(PA,DR)});
+  tp('PSB',{th:6,ld:-62,hp:20,hr:-10,hdy:2,face:'whiff',belly:[1.07,1.03],arms:A(PA,DR)});tp('PSB2',{th:6,ld:-60,hp:16,hr:-9,hdy:2,face:'bliss',belly:[.99,1],arms:A(PA,DR)});
+  tp('PSQ',{th:2,ld:-30,hp:8,hr:-5,face:'queasy',belly:[.96,.98],arms:A(PA,DR)});
+  tp('PSC',{th:20,ld:44,hp:-6,hr:8,face:'scream',belly:[.97,.97],arms:A(PA,[41,-17,6,24,-33,10])});tp('PSC2',{th:24,ld:44,hp:-6,hr:8,face:'scream',belly:[.97,.97],arms:A(PA,[43,-11,6,29,-25,10])});
+  // brow wipe
+  tp('WA',{th:8,ld:-14,hp:8,hr:6,face:'burpo',sweatB:1,arms:A(DL,[40,-33,8,14,-48,18])});tp('WB',{th:10,ld:-14,hp:8,hr:4,face:'burpo',sweatB:1,arms:A(DL,[39,-33,8,8,-47,18])});
+  tp('WC',{th:0,ld:-20,arms:A(DL,[41,-24,2,52,-9,2])});tp('WD',{hp:6,face:'bliss',belly:[.98,.98],arms:A(DL,DR)});
+  // belly-button lint
+  const LP={k:'lint',h:'L'};
+  tp('NA',{hp:26,face:'pick',belly:[1.02,1.02],arms:A([-34,-6,6,-6,2,24],DR)});tp('NA2',{hp:26,face:'pick',belly:[1.03,1.02],arms:A([-34,-6,6,-6,1.5,24],DR)});
+  tp('NB',{th:6,ld:6,hp:8,hr:-4,face:'pick',arms:A([-41,-14,10,-26,-32,16],DR),prop:LP});tp('NC',{th:10,ld:14,hp:6,hr:-8,face:'whiff',arms:A([-38,-18,12,-12,-36,18],DR),prop:LP});
+  tp('ND',{th:4,ld:-6,hp:-4,face:'queasy',belly:[.97,.98],arms:A([-40,-18,12,-14,-38,18],DR),prop:LP});tp('NE',{ld:-24,arms:A([-38,-20,2,-50,-36,2],DR)});
+  // nose pick: shifty look both ways, then the pick
+  tp('SPL',{th:12,ld:-46,gz:[-1,0]});tp('SPR',{th:-10,ld:42,gz:[1,0]});
+  tp('PKA',{th:10,ld:-6,hp:6,face:'pick',arms:A(GL,[37,-24,10,8,-41,22])});tp('PKB',{th:10,ld:-6,hp:6,face:'pick',arms:A(GL,[37,-24,10,6.5,-38.5,22])});tp('PKF',{th:4,ld:-34,arms:A(GL,[41,-20,4,52,-34,6])});
+  // flex in three quarter view, kiss the bicep
+  const FA=A([-39,-21,2,-34,-47,2],[39,-21,8,34,-47,8]);
+  tp('FXA',{th:-46,ld:46,arms:FA});tp('FXB',{th:-46,ld:88,hp:10,hr:10,hdx:3,face:'kiss',arms:FA});tp('FXC',{th:-46,ld:46,face:'smirk',arms:FA});
+  tp('FXD',{th:46,ld:-46,arms:A([-39,-21,8,-34,-47,8],[39,-21,2,34,-47,2])});
+  // burp, yawn
+  tp('BPA',{hp:-12,face:'burp',belly:[1.07,1.06],arms:A(DL,DR)});tp('BPB',{th:6,hp:16,hdy:2,face:'burpo',belly:[.96,.96],arms:A(DL,DR)});
+  tp('YWA',{hp:-14,face:'yawn',belly:[1.04,1.06],arms:up});tp('YWB',{th:12,ld:6,hp:-14,face:'yawn',belly:[1.04,1.06],arms:up});tp('YWC',{th:-12,ld:-6,hp:-14,face:'yawn',belly:[1.04,1.06],arms:up});
+})();
 // little props for the new idle poses: beads of sweat on the brow, and a puff of belly-button lint
 function sweatBeads(){ctx.save();ctx.fillStyle='#bfe8ff';ctx.strokeStyle='rgba(60,120,170,.7)';ctx.lineWidth=.7;for(const[x,y]of[[-9,-51],[-3,-55],[10,-50],[-13,-44]]){ctx.beginPath();ctx.moveTo(x,y-2.4);ctx.quadraticCurveTo(x+1.9,y+.4,x,y+1.6);ctx.quadraticCurveTo(x-1.9,y+.4,x,y-2.4);ctx.fill();ctx.stroke()}ctx.restore()}
 function lint(x,y){ctx.save();ctx.fillStyle='#d7d4cf';ctx.strokeStyle='#8f8a84';ctx.lineWidth=.8;for(const[dx,dy,r]of[[0,0,2.3],[-1.9,.9,1.6],[1.8,1.1,1.7],[.3,-1.7,1.5]]){ctx.beginPath();ctx.arc(x+dx,y+dy,r,0,6.3);ctx.fill();ctx.stroke()}for(const[dx,dy,r]of[[0,0,2.3],[-1.9,.9,1.6],[1.8,1.1,1.7]]){ctx.beginPath();ctx.arc(x+dx,y+dy,r-.5,0,6.3);ctx.fill()}ctx.restore()}
@@ -1838,6 +1929,29 @@ const MAN_GAGS=[
   const mid=[['OOPS_A',.16,'slip'],['OOPS_B',.13,'drop'],['OOPS_C',.13,'boing'],['OOPS_B',.13,'boing'],['OOPS_C',.13,'boing'],['OOPS_B',.13,'boing'],['OOPS_C',.13,'boing'],
     ['OOPS_D',.4,'eek'],['OOPS_E',.13,''],['OOPS_F',.13,''],['OOPS_E',.13,''],['OOPS_F',.13,''],['OOPS_E',.13,''],['OOPS_F',.13,''],['OOPS_G',.4,'snap'],['OOPS_H',.5,'whew']];
   MAN_GAGS.push({name:'cape_oops',rare:1,steps:[...ct.slice(0,i0+4),...mid,...ct.slice(i1)]})})();
+// ---- the turning idles replace the flat ones; the back-view gags first do a real step-turn (same frames as the cape taunt)
+(()=>{
+  const keep=MAN_GAGS.filter(g=>g.name==='cape_taunt'||g.name==='cape_oops');
+  const I=(d,f)=>['T_IDLE',d,f||''],S=(n,d,f,e)=>['T_'+n,d,f||'',e];
+  const turnIn=[['CAPE_A',.3,'grunt'],['SPIN_0',.08,'whoosh'],...Array.from({length:12},(_,k)=>['SPIN_'+(k+1),.05,''])];
+  const turnOut=[['SPIN_R11',.05,'whoosh'],...Array.from({length:10},(_,k)=>['SPIN_R'+(10-k),.05,'']),['SPIN_0',.06,''],['CAPE_A',.25,''],I(.2)];
+  const fresh=[
+   {name:'look_around',steps:[I(.2),S('LKL',.6),S('LKL',.4),S('LKR',.9),S('LKR',.4),S('TAKE',.22,'hmm'),S('TAKE',.5),I(.45)]},
+   {name:'belly_slap',steps:[I(.2),S('SLI',.5),S('SLW',.16),S('SLH',.09,'slap'),S('SLR',.14),S('SLW',.16),S('SLH',.09,'slap'),S('SLR',.14),S('SLW',.16),S('SLH',.09,'slap'),S('SLR',.4,'jig'),S('SLI',.4),I(.4)]},
+   {name:'butt_scratch',steps:[I(.2),S('SBI',.7),S('SBa',.16),S('SBb',.16),S('SBa',.16),S('SBb',.16),S('SBa',.16),S('SBb',.16),S('SBN',.55),S('SBN',.35,'sniff'),S('SBQ',.5,'hmm'),S('SBQ',.35),I(.5)]},
+   {name:'armpit_sniff',steps:[I(.15),S('PS0',.3,'grunt'),S('PSA',.35),S('PSB',.45,'sniff'),S('PSB2',.4),S('PSB',.5,'sniff'),S('PSQ',.5,'hmm'),S('PSC',.35,'stink'),S('PSC2',.18),S('PSC',.18),S('PSC2',.18),S('PSC',.3),S('PSA',.35),I(.35)]},
+   {name:'brow_wipe',steps:[I(.15,'sweat'),S('WA',.2),S('WB',.2),S('WA',.2),S('WB',.2),S('WA',.2),S('WC',.22,'flick'),S('WC',.15),S('WD',.5,'whew'),I(.4)]},
+   {name:'navel_lint',steps:[I(.15),S('NA',.4),S('NA2',.28,'tug'),S('NA',.28),S('NA2',.28,'tug'),S('NB',.5),S('NB',.35,'hmm'),S('NC',.5,'sniff'),S('ND',.55,'stink_s'),S('NE',.3,'lintflick'),I(.45)]},
+   {name:'pick_nose',steps:[I(.15),S('SPL',.5),S('SPL',.25),S('SPR',.6),S('SPR',.25),S('PKA',.4,'sniff'),S('PKB',.28),S('PKA',.28),S('PKB',.28),S('PKA',.35),S('PKF',.25,'booger'),S('PKF',.3),I(.4)]},
+   {name:'bicep_kiss',steps:[I(.15,'grunt'),S('FXA',.45),S('FXA',.25),S('FXB',.4,'smooch'),S('FXA',.25),S('FXB',.4,'smooch'),S('FXC',.7,'wink'),I(.4)]},
+   {name:'flex_show',steps:[I(.1,'grunt'),S('FXA',.4),S('FXA',.3),S('FXD',.5),S('FXD',.3),S('FXA',.5),S('FXA',.25),I(.4)]},
+   {name:'burp',steps:[I(.15),S('BPA',.55,'grunt'),S('BPA',.2),S('BPB',.7,'burp'),S('BPB',.2),I(.4)]},
+   {name:'yawn',steps:[I(.15),S('YWA',.5),S('YWA',.2,'yawn'),S('YWB',.55),S('YWC',.55),S('YWC',.3),I(.4)]},
+   {name:'fart',steps:[...turnIn,['BACK_C',.4,''],['FART_A',.5,'grunt'],['FART_B',.7,'fart'],['FART_B',.5,''],['BACK_C',.4,''],...turnOut]},
+   {name:'butt_wiggle',steps:[...turnIn,['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_C',.3,''],...turnOut]}];
+  MAN_GAGS.length=0;MAN_GAGS.push(...fresh,...keep);
+  for(const g of MAN_GAGS){const l=g.steps[g.steps.length-1];if(/^IDLE_/.test(l[0]))l[0]='T_IDLE'}      // gags end on the same rig pose that he stands in
+})();
 // ---- gag engine.  One state object per man (Q); the host sets Q.ox/oy (body centre in world px), Q.sc (draw scale) and Q.jg (jiggle springs or null)
 function gagNew(gmin,gmax,first){return{gag:null,gi:-1,step:0,st:0,idleT:0,quiet:0,gap:first,gmin,gmax,last:-1,asleep:false,sleepT:0,sph:0,done:0,ws:1,ox:0,oy:0,sc:1,jg:null}}
 function gagReset(Q){if(!Q)return;Q.gag=null;Q.idleT=0;Q.quiet=0;Q.gap=MAN_IDLE.delay;Q.asleep=false;Q.sleepT=0}     // any touch: he snaps back to attention
@@ -1915,7 +2029,7 @@ function renderMan(){
     if(m.inf>.02&&dragging&&m.vlv){ctx.translate(0,8/sc);ctx.scale(1.4,1.4);drawSeatSide(m.inf,time)}                  // side profile: rear on the valve, belly swelling out the front
     else if(m.inf>.02){INF=m.inf;drawFront('up',m.inf>.5||dragging?'scream':'cool',time);INF=0}
     else if(m.bel>.02){INF=m.bel;drawFront('up',dragging?'scream':'cool',time);INF=0}   // burpburster: belly full of soda   // seated on the valve: front view, belly swelling
-    else if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else drawFront('up',dragging?'scream':'cool',time);
+    else if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else if(dragging)drawFront('up','scream',time);else{const bz=Math.sin(time*2.6);drawSpin(0,Object.assign({},SPIN_POSE.T_IDLE,{t:time,belly:[1+.012*bz,1-.01*bz]}))}
     JIG=null}
   else if(m.dive){ctx.rotate(m.spin);ctx.scale(.62,.62);JIG=jigOpts(j,.62,.62,m.spin);drawBall(time,'scream');JIG=null}
   else{ctx.rotate(m.ang);ctx.scale(.64,.64);JIG=jigOpts(j,.64,.64,m.ang);ragOpts(JIG,m);INF=Math.max(m.inf,m.bel||0);drawSide(time,'scream');INF=0;JIG=null}
