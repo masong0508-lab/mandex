@@ -1856,7 +1856,7 @@ cv.addEventListener('pointerdown',e=>{
   if(man.mode==='aim'&&valveOpen()&&!man.seated&&Math.hypot(x-VX,y-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.hiss();return}   // tap the valve: he sits and fills; drag him off to fire
   if(man.mode==='aim'&&Math.hypot(x-man.x,y-man.y)<70){dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
-cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[x,y]=pt(e);let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}if(man.seated&&Math.hypot(x-VX,y-VY)<38)return;man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false});
+cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[x,y]=pt(e);let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}if(man.seated&&Math.hypot(x-VX,y-VY)<38)return;if(valveOpen()&&!man.seated&&Math.hypot(x-VX,y-VY)<28){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.hiss();return}man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false});
 cv.addEventListener('pointerup',()=>{if(state==='edit'){eUp();return}if(dragging){dragging=false;if(man.mode==='aim'){if(man.vlv){man.seated=true;return}man.seated=false;launch()}}});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);
   if(e.code==='Space'){dive();e.preventDefault()}
