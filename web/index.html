@@ -667,6 +667,7 @@ function updTargets(dt){
 function update(dt){
   crackEv=0;time+=dt;for(const c of clouds){c.x+=c.v*dt;if(c.x>WW+140)c.x=-160}
   if(outfitCur.rainbow)applyOutfit(outfitCur,time);
+  if(state==='cutscene'){cutTick(dt);titleTick(dt);return}
   if(state==='title'||state==='edit'||UISTATES.includes(state)){titleTick(dt);return}
   if(freeze>0){freeze--;return}
   if(slow>0){slow-=dt;dt*=.4}
@@ -2101,6 +2102,7 @@ function draw(){
   if(camOn){ctx.fillStyle='#3d8fe8';ctx.fillRect(0,0,W,H);ctx.save();ctx.scale(CAM.z,CAM.z);ctx.translate(-CAM.x,-CAM.y)}
   if(camOn&&CAM.y<0){ctx.drawImage(bgA,0,0,WW,GY,0,CAM.y,WW,GY-CAM.y);ctx.drawImage(bgA,0,GY,WW,WH-GY,0,GY,WW,WH-GY)}else ctx.drawImage(bgA,0,0);   // sky stretches up so the sun is never cut off
   for(const c of clouds)drawCloud(c);ctx.drawImage(bgB,0,0);
+  if(state==='cutscene'){drawCutscene();return}
   if(state==='title'){drawTitle();return}
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='edit'){
     (state==='menu'?drawMenu:state==='options'?drawOptions:state==='select'?drawSelect:state==='ach'?drawAch:state==='outfit'?drawOutfits:drawEditor)();drawToasts(frameDt);return}
@@ -2185,6 +2187,7 @@ function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect(
 function backFromPlay(){if(testing){openEditor(true);return}goSelect()}
 cv.addEventListener('pointerdown',e=>{
   audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
+  if(state==='cutscene'){cutClick(x,y);return}
   if(state==='title'){goMenu();return}
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'){hitTest(x,y);return}
   if(state==='edit'){if(!hitTest(x,y)){eDown(x,y);try{cv.setPointerCapture(e.pointerId)}catch(_){}}return}
@@ -2200,6 +2203,7 @@ cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if
 cv.addEventListener('pointerup',()=>{if(state==='edit'){eUp();return}if(dragging){dragging=false;if(man.mode==='aim'){if(man.vlv){man.seated=true;return}man.seated=false;launch()}}});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);
   if(e.code==='Space'){dive();e.preventDefault()}
+  if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
   if(state==='title')return;
   if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options')goMenu();return}
   if(state==='select'&&(e.key==='u'||e.key==='U')){PD.unlockAll=!PD.unlockAll;pdTouch();toast('ach',PD.unlockAll?'All levels unlocked':'Levels locked again','');return}
@@ -2323,7 +2327,94 @@ const UISTATES=['menu','select','ach','outfit','options'];
 let selTab=0;
 function goMenu(){state='menu';hits=[]}
 function goSelect(){state='select';hits=[]}
-function startStory(i){testing=false;selTab=0;load(i)}
+function startStory(i){testing=false;selTab=0;if(i===0){startCut();return}load(i)}
+// ---------- OPENING CUTSCENE: the origin of MANDEX (plays before story level 1; tap = next, SKIP or Esc = straight to the level) ----------
+let cutI=0,cutT=0,cutFx=0;
+const cutTotal=()=>CUT[cutI].lines.reduce((n,s)=>n+s.length,0);
+function startCut(){state='cutscene';cutI=0;cutT=0;cutFx=0;hits=[]}
+function endCut(){load(0)}
+function cutNext(){cutI++;cutT=0;cutFx=0;if(cutI>=CUT.length)endCut()}
+function cutClick(x,y){if(x>W-122&&y<50){endCut();return}const rt=cutTotal()/40;if(cutT<rt)cutT=rt;else cutNext()}
+function cutTick(dt){cutT+=dt;if(cutT>cutTotal()/40+5)cutNext()}
+function cutOnce(f){if(!cutFx){cutFx=1;f()}}
+function cutSky(a,b,gy,gc){const g=ctx.createLinearGradient(0,0,0,gy);g.addColorStop(0,a);g.addColorStop(1,b);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);if(gc){ctx.fillStyle=gc;ctx.fillRect(0,gy,W,H-gy)}}
+function cutBox(lines,t,hl){
+  const n=lines.length,bh=22+n*30,y0=H-bh-18;
+  ctx.save();rrect(30,y0,W-60,bh,14);ctx.fillStyle='rgba(10,12,24,.88)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='rgba(255,255,255,.45)';ctx.stroke();ctx.restore();
+  let left=Math.floor(t*40);
+  for(let i=0;i<n;i++){const s=lines[i],k=Math.max(0,Math.min(s.length,left));left-=s.length;txt(s.slice(0,k),48,y0+35+i*30,22,i===hl?'#ffd23f':'#fff','left')}
+  if(Math.floor(t*40)>=cutTotal()&&Math.sin(time*7)>-.3)txt('TAP >',W-48,y0+bh-12,16,'#ffd23f','right')}
+function cutBubble(x,y,s,flip){
+  ctx.save();ctx.font='bold 20px "Trebuchet MS",Impact,sans-serif';const w=ctx.measureText(s).width+26;
+  rrect(x-w/2,y-24,w,40,12);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#222';ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+(flip?10:-22),y+15);ctx.lineTo(x+(flip?24:-30),y+34);ctx.lineTo(x+(flip?-2:-4),y+15);ctx.closePath();ctx.fillStyle='#fff';ctx.fill();ctx.stroke();
+  ctx.fillStyle='#222';ctx.textAlign='center';ctx.fillText(s,x,y+4);ctx.restore()}
+function cutTie(){const OU='#5a2f1b';ctx.fillStyle='#fff';for(const s of[-1,1]){ctx.beginPath();ctx.moveTo(s*2,-32);ctx.lineTo(s*11,-28);ctx.lineTo(s*3,-22);ctx.closePath();ctx.fill();ctx.strokeStyle=OU;ctx.lineWidth=1;ctx.stroke()}
+  ctx.fillStyle='#2a4d9c';ctx.strokeStyle=OU;ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(-3.4,-30);ctx.lineTo(3.4,-30);ctx.lineTo(2.6,-26);ctx.lineTo(7,8);ctx.lineTo(0,17);ctx.lineTo(-7,8);ctx.lineTo(-2.6,-26);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.strokeStyle='#8fb0ff';ctx.lineWidth=1.4;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(-3.6+k*.3,-18+k*7);ctx.lineTo(3.6-k*.3,-14+k*7);ctx.stroke()}}
+// Gerald: the same body, no cape, khaki shorts (or boxers), optional tie.  feetY = where his feet land
+function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD;if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
+  const op={nocape:true};if(o.belly)op.belly=o.belly;if(o.head)op.head=o.head;if(o.armL){op.armL=o.armL;op.armR=o.armR}if(o.tie)op.after=cutTie;
+  ctx.save();ctx.translate(x+(o.dx||0),feetY-48*s+(o.dy||0));ctx.scale(s,s);drawFront(o.pose||'up',o.face||'cool',cutT*.8+.3,op);ctx.restore();BR=sb;BRD=sd}
+function cutHouse(x,gy){ctx.fillStyle='#e8d3a8';ctx.fillRect(x,gy-135,240,135);ctx.fillStyle='#a8442f';ctx.beginPath();ctx.moveTo(x-20,gy-133);ctx.lineTo(x+120,gy-210);ctx.lineTo(x+260,gy-133);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#7a4a2a';ctx.fillRect(x+100,gy-75,40,75);ctx.fillStyle='#bfe3ff';ctx.fillRect(x+25,gy-100,50,45);ctx.fillRect(x+165,gy-100,50,45);ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.strokeRect(x+25,gy-100,50,45);ctx.strokeRect(x+165,gy-100,50,45)}
+function cutFence(x0,x1,gy){ctx.fillStyle='#f4efe4';ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1;for(let x=x0;x<x1;x+=16){ctx.fillRect(x,gy-42,10,42);ctx.strokeRect(x,gy-42,10,42)}ctx.fillRect(x0,gy-32,x1-x0,5);ctx.fillRect(x0,gy-16,x1-x0,5)}
+const CUT=[
+ {lines:["GERALD FITZGERALD.","Regional Assistant Manager of Paper Clip Compliance. Husband. Dad. Owner of one (1) good tie.","He had a house, a wife named Brenda, and a fence so white it hurt."],hl:0,draw(t){
+   cutSky('#6fc3ff','#e3f4ff',395,'#78bf68');ctx.fillStyle='#fff7c2';ctx.beginPath();ctx.arc(840,80,40,0,7);ctx.fill();
+   cutHouse(560,395);cutFence(420,545,395);
+   cutGerald(290,395,1.7,{tie:1,face:'cool',armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-27,-8,-26,16]});
+   if(t>1.4)cutBubble(300,165,"Honey, I'm home!",0)}},
+ {lines:["Then the papers arrived. On a Tuesday.","Brenda got the house, the dog, the boat, and the good towels.","Gerald got the couch. And one pink towel."],hl:2,draw(t){
+   cutSky('#262a3f','#4a4f6b',395,'#34333f');cutGerald(210,395,1.7,{tie:1,face:'sad',armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]});
+   ctx.save();ctx.translate(660,215);ctx.rotate(-.03);ctx.fillStyle='#f7f3e4';ctx.fillRect(-230,-175,460,350);ctx.strokeStyle='#999';ctx.lineWidth=2;ctx.strokeRect(-230,-175,460,350);
+   ctx.fillStyle='#222';ctx.font='bold 26px "Trebuchet MS",Impact,sans-serif';ctx.textAlign='center';ctx.fillText('DECREE OF DIVORCE',0,-130);ctx.fillRect(-200,-115,400,2);
+   const R=[['HOUSE','Brenda'],['DOG','Brenda'],['BOAT','Brenda'],['THE GOOD TOWELS','Brenda'],['COUCH','Gerald'],['ONE PINK TOWEL','Gerald']];
+   R.forEach((r,i)=>{if(t>.6+i*.6){ctx.font='bold 21px "Trebuchet MS",Impact,sans-serif';ctx.textAlign='left';ctx.fillStyle='#333';ctx.fillText(r[0],-200,-70+i*40);ctx.textAlign='right';ctx.fillStyle=r[1]==='Gerald'?'#2a8a2a':'#b02020';ctx.fillText(r[1],200,-70+i*40)}});
+   if(t>4.6){const k=Math.min(1,(t-4.6)*5),sc=2.2-1.2*k;ctx.save();ctx.translate(110,110);ctx.rotate(-.35);ctx.scale(sc,sc);ctx.globalAlpha=Math.min(1,k*1.6);ctx.strokeStyle='#d12b2b';ctx.lineWidth=5;ctx.strokeRect(-70,-24,140,48);ctx.fillStyle='#d12b2b';ctx.font='bold 34px "Trebuchet MS",Impact,sans-serif';ctx.textAlign='center';ctx.fillText('FINAL',0,12);ctx.restore();cutOnce(()=>SFX.thud(.7))}
+   ctx.restore()}},
+ {lines:["His lawyer, Dennis, charged $400 an hour.","His entire strategy was saying \"ooh, that's rough.\"","Gerald paid it. Gerald paid it all."],hl:-1,draw(t){
+   cutSky('#1d2030','#2d3248',395,'#262230');cutGerald(210,395,1.6,{tie:1,face:'sad',armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]});
+   const dx=700;ctx.fillStyle='#1c1c26';ctx.fillRect(dx-45,265,90,130);ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(dx-12,265);ctx.lineTo(dx+12,265);ctx.lineTo(dx,300);ctx.closePath();ctx.fill();ctx.fillStyle='#8a1a1a';ctx.beginPath();ctx.moveTo(dx-5,268);ctx.lineTo(dx+5,268);ctx.lineTo(dx+7,320);ctx.lineTo(dx,332);ctx.lineTo(dx-7,320);ctx.closePath();ctx.fill();
+   ell(dx,238,30,32,'#f2c7a1',2);ctx.fillStyle='#555';ctx.fillRect(dx-31,222,62,9);ell(dx-10,240,4,4,'#fff');ell(dx+10,240,4,4,'#fff');ell(dx-10,241,1.6,1.6,'#111');ell(dx+10,241,1.6,1.6,'#111');ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(dx-8,254);ctx.lineTo(dx+8,252);ctx.stroke();
+   ctx.fillStyle='#5a3a1a';ctx.fillRect(dx+55,350,60,45);if(t>1.2)cutBubble(dx-10,170,"Ooh. That's rough.",1);
+   txt('$'+Math.floor(t*1300).toLocaleString(),480,96,70,'#7dff5a','center','#0a3a0a');txt('BILLED SO FAR',480,128,18,'#cfd','center')}},
+ {lines:["Gerald spiraled.","The gym membership: cancelled. Dinner: standing over the sink. His only light: the fridge.","By day nine, the pants were gone. Gerald never asked where. He never looked."],hl:0,draw(t){
+   const day=Math.min(30,1+Math.floor(t*6)),k=Math.min(1,t/5.5);cutSky('#1c1828','#2a2438',380,'#241f2d');
+   const fl=.12+.08*Math.sin(t*17)+.05*Math.sin(t*5.3);ctx.fillStyle='rgba(120,200,255,'+fl+')';ctx.fillRect(0,0,W,H);
+   ctx.fillStyle='#111';ctx.fillRect(700,250,140,100);ctx.fillStyle='rgba(140,210,255,'+(.55+fl)+')';ctx.fillRect(708,258,124,84);
+   ctx.fillStyle='#6b3b3b';ctx.fillRect(220,290,320,105);ctx.fillRect(200,310,30,85);ctx.fillRect(530,310,30,85);
+   cutGerald(380,395,1.7,{tie:day<4,boxers:day>=9,face:day<9?'sad':'bliss',belly:[1+.3*k,1+.22*k],armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]});
+   ctx.fillStyle='#6b3b3b';ctx.fillRect(220,340,320,55);
+   for(let i=0;i<Math.min(6,1+Math.floor(t*1.6));i++){ctx.fillStyle=i%2?'#e8d9b8':'#d9c79a';ctx.fillRect(590+(i%2)*6,380-i*13,70,13);ctx.strokeStyle='#8a7a5a';ctx.lineWidth=1;ctx.strokeRect(590+(i%2)*6,380-i*13,70,13)}
+   txt('DAY '+day,60,70,54,'#ffd23f','left','#4a2a00')}},
+ {lines:["Then the landlord came. \"Rent was due Gerald.\"","Then every other landlord came. Every rent hike. Every \"no refunds.\" Every \"quiet hours.\"","Something inside Gerald snapped. Also his waistband."],hl:2,draw(t){
+   cutSky('#ff9a5a','#ffd7a0',395,'#5a4a3a');ctx.fillStyle='#6b4a2e';ctx.fillRect(60,205,150,190);ctx.fillStyle='#d9b84a';ctx.beginPath();ctx.arc(190,305,7,0,7);ctx.fill();
+   ctx.save();ctx.translate(135,285);ctx.rotate(-.04);ctx.fillStyle='#fff';ctx.fillRect(-40,-45,80,95);ctx.fillStyle='#d12b2b';ctx.font='bold 17px "Trebuchet MS",Impact,sans-serif';ctx.textAlign='center';ctx.fillText('EVICTION',0,-18);ctx.fillText('NOTICE',0,2);ctx.fillStyle='#999';for(let i=0;i<3;i++)ctx.fillRect(-28,12+i*11,56,3);ctx.restore();
+   cutGerald(360,395,1.6,{boxers:1,face:'sad',belly:[1.3,1.22],armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]});
+   [[620,0],[720,1.3],[820,2.6]].forEach(([x,o],i)=>{ctx.save();ctx.translate(x,395);ctx.scale(2.8,2.8);drawLandlord({x:0,y:0,t:t+o});ctx.restore()});
+   if(t>1.6)cutBubble(660,190,"RENT'S DUE, GERALD.",1)}},
+ {lines:["Gerald snapped.","The sky snapped. A little bit of the roof snapped.","And something old, and pink, and terry-cloth, answered the call."],hl:0,draw(t){
+   cutSky('#2a1048','#6a2a8a',395,'#1a0a2a');const f=Math.sin(t*31)*Math.sin(t*7.3);
+   if(f>.55){ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#fff';ctx.lineWidth=4;ctx.beginPath();let x=200+((t*97)%560),y=0;ctx.moveTo(x,y);while(y<390){y+=45;x+=(Math.sin(y*7+t)*40);ctx.lineTo(x,y)}ctx.stroke()}
+   const sh=Math.min(1,t/3.5)*7;cutGerald(480,395,1.9,{boxers:1,face:t<2.2?'sad':'scream',belly:[1.3,1.22],armL:[-27,-8,-26,16],armR:[27,-8,26,16],dx:Math.sin(t*60)*sh,dy:Math.cos(t*47)*sh*.5})}},
+ {lines:["GERALD FITZGERALD IS DEAD.","In his place: a sticky, shirtless, furious man in red underwear and a pink towel.","Behold: MANDEX."],hl:2,draw(t){
+   cutOnce(()=>SFX.boom());cutSky('#ff7a3c','#ffd23f',395,'#6b4a2e');
+   ctx.save();ctx.translate(480,260);ctx.rotate(t*.25);for(let i=0;i<16;i++){ctx.rotate(Math.PI/8);ctx.fillStyle=i%2?'rgba(255,255,255,.18)':'rgba(255,90,40,.22)';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(900,-90);ctx.lineTo(900,90);ctx.closePath();ctx.fill()}ctx.restore();
+   const k=Math.min(1,t*2.2);cutGerald(480,395,1.9,{boxers:1,pose:'flex',face:'cool',belly:[1.12,1.08]});
+   ctx.save();ctx.translate(480,170);ctx.rotate(-.04);ctx.scale(.4+.6*k,.4+.6*k);txt('MANDEX',0,0,100,'#ffd23f','center','#7a1a1a');ctx.restore();
+   if(t<.55){ctx.fillStyle='rgba(255,255,255,'+(1-t/.55)+')';ctx.fillRect(0,0,W,H)}}},
+ {lines:["His mission is simple.","EVICT. EVERY. LANDLORD.","LEVEL 1: SUBURBAN EVICTION"],hl:1,draw(t){
+   cutOnce(()=>SFX.ding());ctx.fillStyle='rgba(10,14,30,.4)';ctx.fillRect(0,0,W,H);
+   ctx.save();ctx.translate(250,395);ctx.scale(1.9,1.9);ctx.translate(0,-48);drawFront('flex','cool',t*.8+.3,{});ctx.restore();
+   cutHouse(560,395);ctx.save();ctx.translate(710,395);ctx.scale(2.2,2.2);drawLandlordScared(t);ctx.restore();
+   if(t>1.5)cutBubble(715,255,"Oh no.",1)}}
+];
+function drawCutscene(){
+  const sc=CUT[cutI];ctx.save();sc.draw(cutT);ctx.restore();cutBox(sc.lines,cutT,sc.hl);
+  btn(W-112,8,104,32,'SKIP >>',()=>{},{size:14});
+  for(let i=0;i<CUT.length;i++){ctx.fillStyle=i===cutI?'#ffd23f':'rgba(255,255,255,.4)';ctx.beginPath();ctx.arc(24+i*16,24,4,0,7);ctx.fill()}}
+
 function storyUnlocked(i){return PD.unlockAll||i<3||(PD.stars[i-1]||0)>0}
 function drawMenu(){
   ctx.fillStyle='rgba(10,14,30,.45)';ctx.fillRect(0,0,W,H);
