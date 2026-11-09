@@ -506,11 +506,13 @@ function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long 
     if(stom(m)>.5){SFX.creak(Math.min(1,stom(m)))}
     if(stom(m)>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
   if(!OPT().noBurst&&stom(m)>=1)explodeMan()}
-// ---- power-up tool slots: ten in all. Slot 0 is the air valve; slots 1-9 are reserved (invisible, skipped by the switcher) for tools still to come.
-const TOOLS=[{id:'valve',name:'AIR VALVE'},{id:'burp',name:'BURPBURSTER'}].concat(Array.from({length:8},(_,i)=>({id:'slot'+(i+2),name:'',reserved:true})));
+// ---- power-up tool slots: ten in all. Slots 0-4 are the air valve, burpbuster, beans, towel and splat; slots 5-9 are reserved (invisible, skipped by the switcher) for tools still to come.
+const TOOLS=[{id:'valve',name:'AIR VALVE'},{id:'burp',name:'BURPBURSTER'},{id:'beans',name:'BEANS'},{id:'towel',name:'TOWEL'},{id:'splat',name:'SPLAT'}].concat(Array.from({length:5},(_,i)=>({id:'slot'+(i+5),name:'',reserved:true})));
 const toolList=()=>TOOLS.filter(t=>!t.reserved);          // what the player can actually pick
 const toolOn=id=>(OPT().tool||'valve')===id;               // default stays the air valve; 'none' switches every tool off
 function toolCycle(){const ids=['none'].concat(toolList().map(t=>t.id)),o=OPT(),i=ids.indexOf(o.tool||'valve');o.tool=ids[(i+1)%ids.length]}
+const PWTOOLS=['beans','towel','splat'];
+function toolArm(){const t=OPT().tool||'valve';if(man.mode!=='aim'||man.chug||pw.sel==='burp')return;pw.sel=PWTOOLS.includes(t)&&pw.left[t]>0?t:null}
 const toolName=()=>{const t=OPT().tool||'valve';return t==='none'?'NONE':(TOOLS.find(x=>x.id===t)||{name:'?'}).name};
 function valveOpen(){return PD.unlockAll||storyDone()>=3}   // unlockable: beat 3 story levels (U on the level select unlocks everything)
 function drawValve(){
@@ -698,6 +700,7 @@ function updTargets(dt){
 //  UPDATE
 // =====================================================================
 function update(dt){
+  if(state==='play')toolArm();
   crackEv=0;time+=dt;for(const c of clouds){c.x+=c.v*dt;if(c.x>WW+140)c.x=-160}
   if(outfitCur.rainbow)applyOutfit(outfitCur,time);
   if(state==='cutscene'){cutTick(dt);titleTick(dt);return}
@@ -2236,8 +2239,8 @@ function drawHUD(){
   for(let i=0;i<men;i++){const x=(P?330:300)+i*(P?16:20),dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60);txt('DRAG BACK  &  RELEASE!',hp[0],hp[1],22,'#fff','center')};ctx.globalAlpha=1}
-  if(state==='play'){const defs=[['beans','BEANS'],['towel','TOWEL'],['splat','SPLAT']],lock=!!man.chug||pw.sel==='burp';defs.forEach((d,i)=>{const n=pw.left[d[0]];btn(12+i*98,H-44,92,32,d[1]+' x'+n,()=>{if(man.mode==='aim'&&n>0&&!lock)pw.sel=pw.sel===d[0]?null:d[0]},{size:14,on:pw.sel===d[0],disabled:n<=0||man.mode!=='aim'||lock})});
-    btn(12+3*98+6,H-44,190,32,'TOOL: '+toolName(),()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
+  if(state==='play'){const tid=OPT().tool||'valve',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+pw.left[tid]:'';
+    btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
     if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
