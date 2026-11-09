@@ -486,8 +486,15 @@ function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long 
     if(m.inf>.5){SFX.creak(m.inf)}
     if(m.inf>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
   if(m.inf>=1)explodeMan()}
+// ---- power-up tool slots: ten in all. Slot 0 is the air valve; slots 1-9 are reserved (invisible, skipped by the switcher) for tools still to come.
+const TOOLS=[{id:'valve',name:'AIR VALVE'}].concat(Array.from({length:9},(_,i)=>({id:'slot'+(i+1),name:'',reserved:true})));
+const toolList=()=>TOOLS.filter(t=>!t.reserved);          // what the player can actually pick
+const toolOn=id=>(OPT().tool||'valve')===id;               // default stays the air valve; 'none' switches every tool off
+function toolCycle(){const ids=['none'].concat(toolList().map(t=>t.id)),o=OPT(),i=ids.indexOf(o.tool||'valve');o.tool=ids[(i+1)%ids.length]}
+const toolName=()=>{const t=OPT().tool||'valve';return t==='none'?'NONE':(TOOLS.find(x=>x.id===t)||{name:'?'}).name};
 function valveOpen(){return PD.unlockAll||storyDone()>=3}   // unlockable: beat 3 story levels (U on the level select unlocks everything)
 function drawValve(){
+  if(!toolOn('valve'))return;
   const m=man,f=m.mode==='aim'?m.inf:0,t=time,open=valveOpen();
   ctx.save();ctx.lineCap='round';if(!open)ctx.globalAlpha=.38;
   ctx.fillStyle='#3d4452';ctx.fillRect(VX-16,GY-6,32,8);                           // base plate
@@ -1853,10 +1860,10 @@ cv.addEventListener('pointerdown',e=>{
   if(hitTest(x,y))return;
   if(state==='win'){nextAfterWin();return}
   if(state==='lose'){retry();return}
-  if(man.mode==='aim'&&valveOpen()&&!man.seated&&Math.hypot(x-VX,y-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.hiss();return}   // tap the valve: he sits and fills; drag him off to fire
+  if(man.mode==='aim'&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(x-VX,y-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.hiss();return}   // tap the valve: he sits and fills; drag him off to fire
   if(man.mode==='aim'&&Math.hypot(x-man.x,y-man.y)<70){dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
-cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[x,y]=pt(e);let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}if(man.seated&&Math.hypot(x-VX,y-VY)<38)return;if(valveOpen()&&!man.seated&&Math.hypot(x-VX,y-VY)<28){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.hiss();return}man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false});
+cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[x,y]=pt(e);let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}if(man.seated&&Math.hypot(x-VX,y-VY)<38)return;if(toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(x-VX,y-VY)<28){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.hiss();return}man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false});
 cv.addEventListener('pointerup',()=>{if(state==='edit'){eUp();return}if(dragging){dragging=false;if(man.mode==='aim'){if(man.vlv){man.seated=true;return}man.seated=false;launch()}}});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);
   if(e.code==='Space'){dive();e.preventDefault()}
@@ -1881,7 +1888,7 @@ let pdDirty=false;
 function pdSave(){pdDirty=false;try{localStorage.setItem(SAVE_KEY,JSON.stringify(PD))}catch(e){}}
 function pdTouch(){pdDirty=true}
 pdLoad();
-const OPT=()=>PD.opt||(PD.opt={collapse:false});
+const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'valve'});
 const ST=()=>PD.st;
 const totalStars=()=>{let n=0;for(const k in PD.stars)if(+k>=0)n+=PD.stars[k]||0;return n};
 const storyDone=()=>{let n=0;for(let i=0;i<LEVELS.length;i++)if((PD.stars[i]||0)>0)n++;return n};
@@ -2002,6 +2009,7 @@ function drawOptions(){
   btn(bx,y,bw,56,'COLLAPSIBLE BUILDINGS: '+(o.collapse?'ON':'OFF'),()=>{o.collapse=!o.collapse;pdTouch();pdSave();SFX.pop()},{size:22,on:o.collapse,col:'#7dff5a'});y+=76;
   txt('ON: fallen rubble stays physical (keeps slumping and toppling) until the level ends.',W/2,y,15,'#cfd','center');y+=22;
   txt('OFF: rubble settles in place and locks solid, as before.',W/2,y,15,'#cfd','center');y+=44;
+  btn(bx,y,bw,56,'POWER-UP TOOL: '+toolName(),()=>{toolCycle();pdTouch();pdSave();SFX.pop()},{size:22,on:toolName()!=='NONE',col:'#7dff5a'});y+=76;
   btn(bx,y,bw,56,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();muted=!muted},{size:22,on:!muted,col:'#7dff5a'})}
 function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
   hits.push({x,y,w,h,fn:locked?()=>SFX.pop():fn});const hov=mouseX>=x&&mouseX<x+w&&mouseY>=y&&mouseY<y+h;
