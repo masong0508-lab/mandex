@@ -579,31 +579,38 @@ function launch(){const dx=SX-man.x,dy=SY-man.y;if(Math.hypot(dx,dy)<14){man.x=S
   const sp0=1-.5*man.inf;man.R=14*(1+.9*man.inf);man.vx=dx*9.2*sp0;man.vy=dy*9.2*sp0;man.mode='fly';if(man.inf>.6){ST().inflated++;popText(man.x,man.y-60,'HOT AIR!','#9fd8ff',26)}
   if(pw.sel){man.pwr=pw.sel;pw.left[pw.sel]--;ST()['pw_'+pw.sel]++;pw.sel=null}pdTouch();man.gt=0;men--;onShot();hint=0;SFX.launch();SFX.wooo();man.ang=Math.atan2(man.vy,man.vx)*.6}
 // ---- BURPBURSTER: two big sodas on a stand, chugged in the sling's shadow; then a burp shockwave (tap) or a small delayed burst (no tap)
-const STX=88,CHUG_Y=GY-30,CT_HOP=.35,CT_B=.7,CT_END=CT_HOP+CT_B*2+CT_HOP,BEL_MAX=.3;   // BEL_MAX .3 = the "second sprite" belly: visible, not cartoonish
-function startChug(){const m=man;if(m.mode!=='aim'||m.chug||m.seated||m.vlv||dragging||m.inf>.02||pw.left.burp<=0)return;pw.sel=null;m.chug={t:0,b:0,gt:0};SFX.pop()}
+const STX=88,CHUG_Y=GY-30,BEL_MAX=.3,BEL_SET=.27;   // BEL_MAX .3 = the "second sprite" belly; it settles to BEL_SET once the soda has sloshed down
+// chug choreography: hop to the stand -> spin to face away and grab bottle 1 -> glug (back to camera) -> spin round to show off the belly -> bottle 2 -> leap back to the sling
+const CT_A=.3,CT_BK=CT_A+.25,CT_C=CT_BK+.55,CT_TB=CT_C+.25,CT_D=CT_TB+.55,CT_END=CT_D+.35;
+const easeIO=u=>{u=clamp(u,0,1);return u*u*(3-2*u)};
+function startChug(){const m=man;if(m.mode!=='aim'||m.chug||m.seated||m.vlv||dragging||m.inf>.02||pw.left.burp<=0)return;pw.sel=null;m.chug={t:0,ph:0,th:0,gt:0};SFX.pop()}
 function updChug(dt){const m=man,c=m.chug;c.t+=dt;const t=c.t;
-  const nb=t<CT_HOP?0:t<CT_HOP+CT_B?1:t<CT_HOP+CT_B*2?2:3;
-  if(nb!==c.b){c.b=nb;if(nb>=2){ring(STX,CHUG_Y-20,26,'#fff');popText(STX,CHUG_Y-56,'GLUG!','#ffd23f',20)}}
-  if(nb===1||nb===2){c.gt-=dt;if(c.gt<=0){c.gt=.12;SFX.gulp();if(parts.length<1200)P({k:6,x:STX+8,y:CHUG_Y-24,vx:(rnd()-.5)*30,vy:-30-rnd()*30,l:.5,l0:.5,s:2,c:'#dff3ff'})}}
-  m.bel=BEL_MAX*clamp((t-CT_HOP)/(CT_B*2),0,1);
-  if(t<CT_HOP){const u=t/CT_HOP;m.x=SX+(STX-SX)*u;m.y=SY+(CHUG_Y-SY)*u-Math.sin(u*Math.PI)*34}
-  else if(t<CT_END-CT_HOP){m.x=STX;m.y=CHUG_Y+Math.sin(time*34)*.7}
-  else{const u=clamp((t-(CT_END-CT_HOP))/CT_HOP,0,1);m.x=STX+(SX-STX)*u;m.y=CHUG_Y+(SY-CHUG_Y)*u-Math.sin(u*Math.PI)*34}
-  if(t>=CT_END){m.x=SX;m.y=SY;m.chug=null;m.bel=BEL_MAX;pw.sel='burp';ring(SX,SY,40,'#ffd23f');popText(SX,SY-64,'LOADED!','#ffd23f',24)}}
+  const ph=t<CT_A?0:t<CT_BK?1:t<CT_C?2:t<CT_TB?3:t<CT_D?4:5;
+  if(ph!==c.ph){c.ph=ph;if(ph===2||ph===4){ring(STX,CHUG_Y-20,26,'#fff');popText(STX,CHUG_Y-60,ph===2?'GLUG!':'GLUG GLUG!','#ffd23f',20)}}
+  c.th=ph===1?Math.PI*easeIO((t-CT_A)/(CT_BK-CT_A)):ph===2?Math.PI:ph===3?Math.PI+Math.PI*easeIO((t-CT_C)/(CT_TB-CT_C)):0;
+  if(ph===2||ph===4){c.gt-=dt;if(c.gt<=0){c.gt=.12;SFX.gulp();if(parts.length<1200)P({k:6,x:STX+8,y:CHUG_Y-24,vx:(rnd()-.5)*30,vy:-30-rnd()*30,l:.5,l0:.5,s:2,c:'#dff3ff'})}}
+  m.bel=ph===5?BEL_MAX+(BEL_SET-BEL_MAX)*easeIO((t-CT_D)/(CT_END-CT_D)):.15*clamp((t-CT_BK)/(CT_TB-CT_BK),0,1)+(BEL_MAX-.15)*clamp((t-CT_TB)/(CT_D-CT_TB),0,1);   // half the belly is hidden behind his back; the rest is revealed on the turn
+  if(ph===0){const u=t/CT_A;m.x=SX+(STX-SX)*u;m.y=SY+(CHUG_Y-SY)*u-Math.sin(u*Math.PI)*34}
+  else if(ph<5){m.x=STX;m.y=CHUG_Y+((ph===2||ph===4)?Math.sin(time*34)*.7:0)}
+  else{const u=clamp((t-CT_D)/(CT_END-CT_D),0,1);m.x=STX+(SX-STX)*u;m.y=CHUG_Y+(SY-CHUG_Y)*u-Math.sin(u*Math.PI)*40}
+  if(t>=CT_END){m.x=SX;m.y=SY;m.chug=null;m.bel=BEL_SET;pw.sel='burp';ring(SX,SY,40,'#ffd23f');popText(SX,SY-64,'LOADED!','#ffd23f',24)}}
 function bottleDraw(x,y,lvl,col){ctx.save();ctx.translate(x,y);ctx.lineJoin='round';ctx.lineWidth=1.6;ctx.strokeStyle='#2a160a';
   ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-7,-20);ctx.quadraticCurveTo(-7,-26,-3.5,-29);ctx.lineTo(-3,-35);ctx.lineTo(3,-35);ctx.lineTo(3.5,-29);ctx.quadraticCurveTo(7,-26,7,-20);ctx.lineTo(7,0);ctx.closePath();
   ctx.fillStyle='rgba(235,245,255,.9)';ctx.fill();ctx.save();ctx.clip();ctx.fillStyle=col;ctx.fillRect(-8,-30*lvl,16,30*lvl);
   ctx.fillStyle='#f4f4f4';ctx.fillRect(-8,-17,16,8);ctx.fillStyle='#d22';ctx.fillRect(-8,-15,16,4);ctx.fillStyle='rgba(255,255,255,.55)';ctx.fillRect(-5.2,-28,1.6,26);ctx.restore();
   ctx.stroke();ctx.fillStyle='#d22';ctx.fillRect(-3.5,-38,7,3.4);ctx.strokeRect(-3.5,-38,7,3.4);ctx.restore()}
 const BOTCOL=['#5a2f1b','#7ddc3c'];
-function drawBurpStand(){if(state!=='play'||!toolOn('burp'))return;const c=man.chug,nb=c?[2,1,0,0][c.b]:(pw.sel==='burp'||pw.left.burp<=0?0:2),TY=GY-20;
+function drawBurpStand(){if(state!=='play'||!toolOn('burp'))return;const c=man.chug,taken=c?(c.ph>=4?2:c.ph>=2?1:0):(pw.sel==='burp'||pw.left.burp<=0?2:0),TY=GY-20;
   ctx.save();ctx.lineJoin='round';ctx.lineWidth=2;ctx.strokeStyle='#4a2e14';ctx.fillStyle='#7a5230';
   for(const lx of[-30,26]){ctx.fillRect(STX+lx,TY,5,20);ctx.strokeRect(STX+lx,TY,5,20)}
   ctx.fillStyle='#8f6238';ctx.fillRect(STX-36,TY,72,6);ctx.strokeRect(STX-36,TY,72,6);ctx.restore();
-  if(nb>=1)bottleDraw(STX-24,TY,1,BOTCOL[0]);if(nb>=2)bottleDraw(STX+24,TY,1,BOTCOL[1]);
+  if(taken<1)bottleDraw(STX-24,TY,1,BOTCOL[0]);if(taken<2)bottleDraw(STX+24,TY,1,BOTCOL[1]);
   if(!c&&man.mode==='aim'&&pw.sel!=='burp'&&pw.left.burp>0&&!dragging){ctx.globalAlpha=.7+.3*Math.sin(time*5);txt('TAP TO CHUG',STX-26,TY-50,14,'#ffd23f','center');ctx.globalAlpha=1}}
-function drawChugMan(m){const c=m.chug;ctx.save();ctx.scale(.5,.5);INF=m.bel;drawFront('up','cool',time);INF=0;ctx.restore();
-  if(c.b===1||c.b===2){const k=c.b-1,lvl=1-clamp((c.t-CT_HOP-k*CT_B)/CT_B,0,1);ctx.save();ctx.translate(3,-17);ctx.rotate(Math.PI+.58+(1-lvl)*.3);ctx.translate(0,34);ctx.scale(.9,.9);bottleDraw(0,0,lvl,BOTCOL[k]);ctx.restore()}}
+function drawChugMan(m){const c=m.chug,ph=c.ph;ctx.save();ctx.scale(.5,.5);
+  if(ph===1||ph===3)drawSpin(c.th,{});else if(ph===2)drawBack(null,time,{});else{INF=m.bel;drawFront('up',ph===4?'cool':'cool',time);INF=0}
+  ctx.restore();
+  if(ph===2||ph===4){const k=ph===2?0:1,t0=ph===2?CT_BK:CT_TB,lvl=1-clamp((c.t-t0)/(CT_D-CT_TB),0,1),px=ph===2?0:3,py=ph===2?-20:-17,tl=ph===2?.32:.58;   // from behind only the upturned base shows over his head
+    ctx.save();ctx.translate(px,py);ctx.rotate(Math.PI+tl+(1-lvl)*.3);ctx.translate(0,34);ctx.scale(.9,.9);bottleDraw(0,0,lvl,BOTCOL[k]);ctx.restore()}}
 function inCone(rx,ry,dx,dy,L,k,pad){const al=rx*dx+ry*dy;if(al<4||al>L)return -1;const pe=Math.abs(-rx*dy+ry*dx);return pe<=k*al+pad?al:-1}
 function burpBlast(){const m=man;m.burped=true;const a=Math.atan2(m.vy,m.vx)*.5,dx=Math.cos(a),dy=Math.sin(a),L=128,n=Math.ceil(L/V)+2,cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);
   for(let j=-n;j<=n;j++)for(let i=-n;i<=n;i++){const al=inCone(i*V,j*V,dx,dy,L,.3,12);if(al<0)continue;damageCell(cx+i,cy+j,3+Math.floor(6*(1-al/L)))}
