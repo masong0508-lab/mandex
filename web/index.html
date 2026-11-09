@@ -593,6 +593,7 @@ const STX=88,CHUG_Y=GY-30,BEL_MAX=.3,BEL_SET=.27;
 // ONE stomach for both tools: air from the valve (m.inf, also slows the launch) + soda (m.bel, cosmetic).  stom(m) is how full he is overall.
 // The valve pops him when the stomach is full (1.0); soda keeps going a little further (SODA_BURST).  The two OPTIONS: noBurst (cheat) and burpCharge (a fuller stomach = a bigger burp).
 const SODA_BURST=1.15,SODA_RATE=.25,STOM_MAX=2.2;let sodaHold=false;
+// FIGURE2
 // BELLYMERGE: the belly is part of the torso's single outline; this adds the underside shadow and the fold where it meets the lap
 function bellyVol(bx,by,rx,ry,f){if(f<.05)return;const k=Math.min(1,f),gr=ctx.createLinearGradient(0,by-ry,0,by+ry);
   gr.addColorStop(.4,'rgba(176,92,52,0)');gr.addColorStop(1,'rgba(176,92,52,'+(.34*k)+')');ctx.save();ctx.fillStyle=gr;ctx.beginPath();ctx.ellipse(bx,by,Math.max(1,rx-.8),Math.max(1,ry-.8),0,0,6.3);ctx.fill();
@@ -702,7 +703,7 @@ function update(dt){
     if(man.mode==='fly'){const m=man;m.ang+=(m.dive?0:(Math.atan2(m.vy,m.vx)*.6-m.ang)*.15);if(m.dive)m.spin+=dt*14;
       m.gooT+=dt;if(m.gooT>.04){m.gooT=0;if(parts.length<1200)parts.push({k:3,x:m.x-m.vx*.01,y:m.y-m.vy*.01,vx:-m.vx*.05+(rnd()-.5)*40,vy:(rnd()-.5)*40,l:.7,l0:.7,s:2+rnd()*2})}
       m.stT+=dt;if(m.stT>.2){m.stT=0;const c=Math.cos(m.ang),sn=Math.sin(m.ang);   // stink trail
-        P({k:6,x:m.x+(-16*c-5*sn),y:m.y+(-16*sn+5*c),vx:-m.vx*.04+(rnd()-.5)*20,vy:-12-rnd()*16,l:.9+rnd()*.4,l0:1.3,s:5+rnd()*3,c:'#a6d63c'})}
+        P({k:6,x:m.x+(-30*c-8*sn),y:m.y+(-30*sn+8*c),vx:-m.vx*.04+(rnd()-.5)*20,vy:-12-rnd()*16,l:.9+rnd()*.4,l0:1.3,s:5+rnd()*3,c:'#a6d63c'})}
       if(m.x>WW+100||m.x<-100||m.gt>9)m.mode='done'}
   }else if(man.mode==='stuck'){const m=man;m.t+=dt;m.gooT+=dt;if(m.burpT>0){m.burpT-=dt;if(m.burpT<=0)burpPop()}
     const by=Math.floor((m.y+m.R+2)/V),gx=Math.floor(m.x/V);
@@ -966,10 +967,13 @@ function drawSide(t,fk){
     const sx=ax+(kx-ax)*.4,sy=ay+(ky-ay)*.4;blob([pTap(sx,sy,5.2,ax,ay,4.8,'#fff')],{ow:1.4,shc:'rgba(110,110,165,.30)',hl:0});
     ctx.strokeStyle='#e33';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx,sy-4);ctx.quadraticCurveTo(sx+1.2,sy,sx,sy+4);ctx.stroke();
     blob([pEll(ax-4,ay+1,6.5,3.2,'#8a5a2b',.5+fl*.3)],{ow:1.5,shc:'rgba(60,30,10,.4)',hl:0})};
+  // FIGURE2: far arm (darker, behind the torso) flung back and up
+  blob([pTap(12,-12,5.2,1,-27+fl*3,4.6,SKD),pTap(1,-27+fl*3,4.6,-9,-41+fl*5,4,SKD),pEll(-9.5,-42+fl*5,5.4,5.2,SKD)],{ow:1.7,hl:0});
   {const LG=JIG&&JIG.legs,L0=LG?LG[0]:[-27,12+fl*2,-44,4+fl*4],L1=LG?LG[1]:[-24,16-fl*2,-42,13-fl*3];leg(-12,8,L0[0],L0[1],L0[2],L0[3],SKD);leg(-10,6,L1[0],L1[1],L1[2],L1[3],SK)}
-  {const f=INF,bsh=f>.02?[pEll(10+f*4,-1+f*2,12+f*3,9+f*2),pEll(12+f*9,4+f*6,10+f*11,9+f*9),pEll(-2+f*3,8+f*3,12+f*4,8+f*3)]:[];
+  {const f=INF,sl=(man&&man.mode==='fly')?Math.min(1,Math.hypot(man.vx||0,man.vy||0)/1100):0,   // sl: how fast he is going; the belly slumps back and down with it
+   bsh=f>.02?[pEll(10+f*4-sl*f*1.5,-1+f*2,12+f*3,9+f*2),pEll(12+f*9-sl*f*4,4+f*6+sl*f*2,10+f*11,9+f*9+sl*f*1.5),pEll(-2+f*3-sl*f*2,8+f*3+sl*f,12+f*4,8+f*3)]:[];
    blob([JIG&&JIG.sk?pSkin(skPts(2,-2,21,14.5,JIG.sk)):pEll(2+(bo?bo[0]:0),-2+(bo?bo[1]:0),21,14.5),pEll(14,-9,12,10)].concat(bsh),{ow:1.9});   // chest + belly: ONE outline                                               // his normal chest and back never change
-   if(f>.02){const bx=12+f*9,by=4+f*6,rx=10+f*11,ry=9+f*9;bellyVol(bx,by,rx,ry,f);                                                         // only the belly bulges, out the front and down
+   if(f>.02){const bx=12+f*9-sl*f*4,by=4+f*6+sl*f*2,rx=10+f*11,ry=9+f*9+sl*f*1.5;bellyVol(bx,by,rx,ry,f);                                                         // only the belly bulges, out the front and down
      ctx.save();ctx.lineCap='round';ctx.fillStyle='rgba(255,255,255,'+(.18+f*.25)+')';ctx.beginPath();ctx.ellipse(bx+rx*.3,by-ry*.4,rx*.17,ry*.28,-.6,0,6.3);ctx.fill();
      if(f>.3){ctx.strokeStyle='rgba(205,70,60,'+Math.min(.8,(f-.3)*1.4)+')';ctx.lineWidth=1.3;for(let k=-1;k<=1;k++){ctx.beginPath();ctx.arc(bx-rx*.2,by+k*ry*.3,rx*.8,-.35,.35);ctx.stroke()}}
      ctx.strokeStyle='rgba(176,92,52,.9)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(bx+rx*.85,by+ry*.1,1.6+f*3,-1.6,1.6);ctx.stroke();                 // the belly button pops out
@@ -981,7 +985,9 @@ function drawSide(t,fk){
     ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-16,2,3.6,2.6,-.5,0,6.3);ctx.fill();
     ctx.strokeStyle='rgba(110,10,32,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(-6,9,8,2.1,3.7);ctx.stroke();
     bandAlong([-22,-3],[-2,1],[15,13],2.7,2)});                                                                                         // the waistband: a soft striped strip that follows the body
-  blob([pTap(18,-9,5.2,42,-12,4.4,SKD),pEll(42,-12,6.5,6,SKD)]);blob([pTap(19,-12,5.2,43,-17,4.6),pEll(43,-17,6.8,6.2)]);blob([pTap(22,-12,5.5,27,-16,5.5,SKD)],{ow:1.4,hl:0});
+  blob([pTap(15,-8,8.4,28,-15,6.6)],{ow:1.8});                                                                       // neck + shoulder line: the head sits ON a body
+  blob([pTap(15,-14,6.4,26,-40+fl*2,5.2),pTap(26,-40+fl*2,5.2,46,-41+fl*3,4.6),pEll(26,-40+fl*2,5.4,5.3)],{ow:1.8});     // near arm: up and forward past the head
+  blob([pEll(49,-41+fl*3,5.8,5.4),pEll(52.5,-45+fl*3,2.2,3)],{ow:1.6});                                                // open hand + thumb
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(24,-24);ctx.quadraticCurveTo(15,-26+fl*2,6,-29+fl*3);ctx.quadraticCurveTo(15,-22,20,-21);ctx.quadraticCurveTo(14,-17,8,-15+fl*2);ctx.quadraticCurveTo(22,-16,26,-19);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.3;ctx.stroke();
   blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});blob([pEll(25.5,-16,3,4)],{ow:1.3,sd:1,hl:0});
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(30,-21,11,3.45,5.75);ctx.fill();
