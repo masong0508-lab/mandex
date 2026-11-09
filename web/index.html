@@ -753,6 +753,13 @@ function thongFront(){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.st
   ctx.beginPath();ctx.moveTo(-5.8,19.6);ctx.quadraticCurveTo(-8.6,25,-5.4,30.2);ctx.quadraticCurveTo(0,34.4,5.4,30.2);ctx.quadraticCurveTo(8.6,25,5.8,19.6);ctx.quadraticCurveTo(0,21.2,-5.8,19.6);ctx.closePath();   // a small rounded pouch, not a shield
   ctx.fillStyle=TG;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1.3;ctx.stroke();
   ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(-2.6,25.2,1.2,3.2,.2,0,6.3);ctx.fill();ctx.restore()}
+// the butt creases seen from the front: each cheek's underside bulges just past the hip and folds over the thigh, so the fold shows as a curved crease low on each side (soft shadow + a crisp line + a lit lip below it)
+function gluteCreases(){ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+  for(const q of[-1,1]){const fold=()=>{ctx.beginPath();ctx.moveTo(q*22.4,22.4);ctx.bezierCurveTo(q*22.8,26.8,q*21,29.8,q*16.6,31.4);ctx.stroke()};
+    ctx.strokeStyle='rgba(150,70,40,.24)';ctx.lineWidth=3.2;fold();
+    ctx.strokeStyle='rgba(140,62,34,.8)';ctx.lineWidth=1.2;fold();
+    ctx.strokeStyle='rgba(255,238,222,.42)';ctx.lineWidth=.9;ctx.beginPath();ctx.moveTo(q*24.1,24.4);ctx.quadraticCurveTo(q*23.8,28.2,q*21.2,31);ctx.stroke()}
+  ctx.restore()}
 function thongBack(bx,cy0){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
   for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*13,15);ctx.quadraticCurveTo(bx+q*8,18.5,bx+q*3.2,20.5);ctx.stroke()}
   ctx.beginPath();ctx.moveTo(bx,20);ctx.quadraticCurveTo(bx,cy0+4,bx,cy0+12);ctx.stroke();                                    // the strap down the cleft
@@ -813,12 +820,12 @@ function drawFront(pose,fk,t,o){
     if(pose==='flex')parts.push(pEll(s*31,-27,6.4,5.4));                                                                   // the bicep
     blob(parts);pitHair(s*21.5,-20.5,A[0],A[1],s)}
   if(o&&o.ro){ctx.save();ctx.translate(o.ro[0],o.ro[1])}
-  {const bp=new Path2D();bp.moveTo(-20,11);bp.quadraticCurveTo(-28,22,-22,31);bp.quadraticCurveTo(-12,28,-3,36);bp.lineTo(3,36);bp.quadraticCurveTo(12,28,22,31);bp.quadraticCurveTo(28,22,20,11);bp.closePath();
-   blob([{p:bp,fill:BR,bb:[-29,10,29,37]}],{ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});}
+  {const bp=new Path2D();bp.moveTo(-20,11);bp.bezierCurveTo(-23.5,14,-26,18.5,-25.2,24);bp.bezierCurveTo(-24.6,28.6,-22,31.4,-19.6,33.2);bp.quadraticCurveTo(-11,28.6,-3,36);bp.lineTo(3,36);bp.quadraticCurveTo(11,28.6,19.6,33.2);bp.bezierCurveTo(22,31.4,24.6,28.6,25.2,24);bp.bezierCurveTo(26,18.5,23.5,14,20,11);bp.closePath();   // the hips: flare out from the waist to the widest point, then taper smoothly into the thighs (no wings, no ledge)
+   blob([{p:bp,fill:BR,bb:[-27,10,27,37]}],{ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});}
   ctx.fillStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.ellipse(-15,23,2.8,6,.3,0,6.3);ctx.ellipse(15,23,2.8,6,-.3,0,6.3);ctx.fill();
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-5,29);ctx.lineTo(-5,21);ctx.lineTo(0,26);ctx.lineTo(5,21);ctx.lineTo(5,29);ctx.stroke();
   {const yc=x=>13+4.6*(1-(x/21)*(x/21));blob([ribbonPoly(-21,21,yc,3.1,24,'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(-21,21,yc,3.1,5.4,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
-  if(THONG)thongFront();
+  if(THONG){gluteCreases();thongFront()}
   if(o&&o.ro)ctx.restore();
   // torso: shoulders, chest, belly and love handles are ONE mass, drawn after the briefs so the belly overhangs the waistband
   {const wo=o&&o.bo&&o.ro?[(o.bo[0]+o.ro[0])/2,(o.bo[1]+o.ro[1])/2]:[0,0],bM=new DOMMatrix();
