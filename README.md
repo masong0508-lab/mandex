@@ -26,6 +26,8 @@ One game, three front-ends sharing the same physics idea:
   boogers, sweat), a sleep with snot bubble after 20 s, a victory butt-wiggle dance and a sad slump on defeat.
 - **The towel** is a small cloth simulation (`core/cloth.c`, recipe in `docs/CLOTH.md`): it flutters, folds and turns edge-on
   with his body, the same in the browser, on the DS and on the Dreamcast.
+- **Options** (browser): a simple OPTIONS screen from the main menu.  *Collapsible buildings* makes damaged walls crumble and fall
+  after each run; off, wrecks settle where they land as before.
 - **Body jiggle**: his belly and rear are damped springs, kicked while he flies, hits something or drops, plus an
   impact squash.  It is cosmetic and never touches the physics.
 
