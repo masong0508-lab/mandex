@@ -501,11 +501,11 @@ function explodeMan(){const m=man;ST().pops++;pdTouch();men--;
   for(let i=0;i<16;i++)P({k:6,x:m.x,y:m.y,vx:(rnd()-.5)*300,vy:(rnd()-.5)*300,l:.8,l0:.8,s:8+rnd()*8,c:'#cfe9ff'});
   shake=16;flash=.55;SFX.boom();popText(Math.max(110,m.x),m.y-56,'POP!!','#ff5a5a',50);popText(Math.max(110,m.x),m.y-18,'-1 MAN','#fff',24);m.mode='done'}
 function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long and he goes pop
-  m.inf=Math.min(1,m.inf+dt/3.6);m.airT+=dt;
+  {const add=dt/3.6;if(OPT().noBurst&&m.inf>=1)m.bel=Math.max(0,Math.min(STOM_MAX-m.inf,(m.bel||0)+add));else m.inf=Math.min(1,m.inf+add)}m.airT+=dt;
   if(m.airT>.07){m.airT=0;SFX.hiss();P({k:6,x:VX+(rnd()-.5)*10,y:VY+16,vx:(rnd()-.5)*70,vy:-30-rnd()*50,l:.5,l0:.5,s:3+rnd()*3,c:'#cfe9ff'});
-    if(m.inf>.5){SFX.creak(m.inf)}
-    if(m.inf>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
-  if(m.inf>=1)explodeMan()}
+    if(stom(m)>.5){SFX.creak(Math.min(1,stom(m)))}
+    if(stom(m)>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
+  if(!OPT().noBurst&&stom(m)>=1)explodeMan()}
 // ---- power-up tool slots: ten in all. Slot 0 is the air valve; slots 1-9 are reserved (invisible, skipped by the switcher) for tools still to come.
 const TOOLS=[{id:'valve',name:'AIR VALVE'},{id:'burp',name:'BURPBURSTER'}].concat(Array.from({length:8},(_,i)=>({id:'slot'+(i+2),name:'',reserved:true})));
 const toolList=()=>TOOLS.filter(t=>!t.reserved);          // what the player can actually pick
@@ -515,7 +515,7 @@ const toolName=()=>{const t=OPT().tool||'valve';return t==='none'?'NONE':(TOOLS.
 function valveOpen(){return PD.unlockAll||storyDone()>=3}   // unlockable: beat 3 story levels (U on the level select unlocks everything)
 function drawValve(){
   if(!toolOn('valve'))return;
-  const m=man,f=m.mode==='aim'?m.inf:0,t=time,open=valveOpen();
+  const m=man,f=m.mode==='aim'?Math.min(1,stom(m)):0,t=time,open=valveOpen();
   ctx.save();ctx.lineCap='round';if(!open)ctx.globalAlpha=.38;
   // --- sprite: bolted base plate, shaded steel pipe with flanges, brass nozzle with hose clamp, ticked pressure gauge, hand wheel ---
   const rr=(x,y,w,h,r,fill)=>{ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ctx.rect(x,y,w,h);ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.stroke()};
@@ -546,9 +546,9 @@ function drawValve(){
   ctx.fillStyle='#59627a';ctx.fillRect(VX+5,VY+40,8,4);ctx.strokeRect(VX+5,VY+40,8,4);   // stub to the wheel
   if(open&&f>.02){ctx.globalAlpha=Math.min(.7,f);ctx.fillStyle='#cfe9ff';ctx.beginPath();ctx.ellipse(VX,VY-6-(t*40%8),3+f*3,2+f*2,0,0,7);ctx.fill();ctx.globalAlpha=1}   // puff at the tip
   if(!open){ctx.globalAlpha=.8;txt('LOCKED',VX,VY-12,11,'#aab','center');txt('beat 3 levels',VX,VY-26,10,'#889','center');ctx.globalAlpha=.38}
-  else if(m.mode==='aim'&&!m.seated&&!dragging&&m.inf===0){ctx.globalAlpha=.6+.4*Math.sin(t*4);txt('TAP: AIR VALVE',VX,VY-12,11,'#fff','center');ctx.globalAlpha=1}
-  if(m.mode==='aim'&&m.inf>0){const w=44;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(VX-w/2,VY-62,w,7);ctx.fillStyle=f<.5?'#7dff5a':f<.8?'#ffd23f':'#ff4a4a';ctx.fillRect(VX-w/2+1,VY-61,(w-2)*f,5);
-    if(f>.7&&Math.sin(t*20)>0)txt('DANGER!',VX,VY-68,13,'#ff4a4a','center')}
+  else if(m.mode==='aim'&&!m.seated&&!dragging&&stom(m)<.001){ctx.globalAlpha=.6+.4*Math.sin(t*4);txt('TAP: AIR VALVE',VX,VY-12,11,'#fff','center');ctx.globalAlpha=1}
+  if(m.mode==='aim'&&stom(m)>0){const w=44;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(VX-w/2,VY-62,w,7);ctx.fillStyle=f<.5?'#7dff5a':f<.8?'#ffd23f':'#ff4a4a';ctx.fillRect(VX-w/2+1,VY-61,(w-2)*f,5);
+    if(f>.7&&!OPT().noBurst&&Math.sin(t*20)>0)txt('DANGER!',VX,VY-68,13,'#ff4a4a','center')}
   ctx.restore()}
 function drawInfFX(m){
   ctx.save();ctx.translate(m.x,m.y);
@@ -587,52 +587,66 @@ function manStep(dt){
   manPlow()}
 function launch(){const dx=SX-man.x,dy=SY-man.y;if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}
   const sp0=1-.5*man.inf;man.R=14*(1+.9*man.inf);man.vx=dx*9.2*sp0;man.vy=dy*9.2*sp0;man.mode='fly';if(man.inf>.6){ST().inflated++;popText(man.x,man.y-60,'HOT AIR!','#9fd8ff',26)}
-  if(pw.sel){man.pwr=pw.sel;pw.left[pw.sel]--;ST()['pw_'+pw.sel]++;pw.sel=null}pdTouch();man.gt=0;men--;onShot();hint=0;SFX.launch();SFX.wooo();man.ang=Math.atan2(man.vy,man.vx)*.6}
+  if(pw.sel){man.pwr=pw.sel;man.bm=pw.sel==='burp'?burpMult(man):1;pw.left[pw.sel]--;ST()['pw_'+pw.sel]++;pw.sel=null}pdTouch();man.gt=0;men--;onShot();hint=0;SFX.launch();SFX.wooo();man.ang=Math.atan2(man.vy,man.vx)*.6}
 // ---- BURPBURSTER: two big sodas on a stand, chugged in the sling's shadow; then a burp shockwave (tap) or a small delayed burst (no tap)
-const STX=88,CHUG_Y=GY-30,BEL_MAX=.3,BEL_SET=.27;   // BEL_MAX .3 = the "second sprite" belly; it settles to BEL_SET once the soda has sloshed down
+const STX=88,CHUG_Y=GY-30,BEL_MAX=.3,BEL_SET=.27;
+// ONE stomach for both tools: air from the valve (m.inf, also slows the launch) + soda (m.bel, cosmetic).  stom(m) is how full he is overall.
+// The valve pops him when the stomach is full (1.0); soda keeps going a little further (SODA_BURST).  The two OPTIONS: noBurst (cheat) and burpCharge (a fuller stomach = a bigger burp).
+const SODA_BURST=1.15,SODA_RATE=.25,STOM_MAX=2.2;let sodaHold=false;
+const stom=m=>(m.inf||0)+(m.bel||0);
+const burpMult=m=>OPT().burpCharge?clamp(1+(stom(m)-BEL_SET)*2.2,1,3.2):1;   // BEL_MAX .3 = the "second sprite" belly; it settles to BEL_SET once the soda has sloshed down
 // chug choreography: hop to the stand -> spin to face away and grab bottle 1 -> glug (back to camera) -> spin round to show off the belly -> bottle 2 -> leap back to the sling
 const CT_A=.3,CT_BK=CT_A+.25,CT_C=CT_BK+.55,CT_TB=CT_C+.25,CT_D=CT_TB+.55,CT_END=CT_D+.35;
 const easeIO=u=>{u=clamp(u,0,1);return u*u*(3-2*u)};
-function startChug(){const m=man;if(m.mode!=='aim'||m.chug||m.seated||m.vlv||dragging||m.inf>.02||pw.left.burp<=0)return;pw.sel=null;m.chug={t:0,ph:0,th:0,gt:0};SFX.pop()}
-function updChug(dt){const m=man,c=m.chug;c.t+=dt;const t=c.t;
+function startChug(){const m=man;if(m.mode!=='aim'||m.chug||m.seated||m.vlv||dragging||pw.left.burp<=0)return;pw.sel=null;m.chug={t:0,ph:0,th:0,gt:0,b0:m.bel||0,extra:0,keep:0,rel:false};SFX.pop()}
+function updChug(dt){const m=man,c=m.chug;
+  if(!sodaHold)c.rel=true;                                   // let go: finish the trip back to the sling
+  if(!c.rel&&c.t+dt>=CT_D){c.t=CT_D-.0001;c.keep+=dt;c.extra=Math.min(STOM_MAX,c.extra+SODA_RATE*dt)}   // still holding after bottle two: he keeps guzzling and the stomach keeps growing
+  else c.t+=dt;
+  const t=c.t;
   const ph=t<CT_A?0:t<CT_BK?1:t<CT_C?2:t<CT_TB?3:t<CT_D?4:5;
   if(ph!==c.ph){c.ph=ph;if(ph===2||ph===4){ring(STX,CHUG_Y-20,26,'#fff');popText(STX,CHUG_Y-60,ph===2?'GLUG!':'GLUG GLUG!','#ffd23f',20)}}
   c.th=ph===1?Math.PI*easeIO((t-CT_A)/(CT_BK-CT_A)):ph===2?Math.PI:ph===3?Math.PI+Math.PI*easeIO((t-CT_C)/(CT_TB-CT_C)):0;
-  if(ph===2||ph===4){c.gt-=dt;if(c.gt<=0){c.gt=.12;SFX.gulp();if(parts.length<1200)P({k:6,x:STX+8,y:CHUG_Y-24,vx:(rnd()-.5)*30,vy:-30-rnd()*30,l:.5,l0:.5,s:2,c:'#dff3ff'})}}
-  m.bel=ph===5?BEL_MAX+(BEL_SET-BEL_MAX)*easeIO((t-CT_D)/(CT_END-CT_D)):.15*clamp((t-CT_BK)/(CT_TB-CT_BK),0,1)+(BEL_MAX-.15)*clamp((t-CT_TB)/(CT_D-CT_TB),0,1);   // half the belly is hidden behind his back; the rest is revealed on the turn
+  if(ph===2||ph===4){c.gt-=dt;if(c.gt<=0){c.gt=.12;SFX.gulp();if(stom(m)>.6)SFX.creak(Math.min(1,stom(m)));if(stom(m)>.5&&rnd()<.3)sweat(m.x,m.y-20);if(parts.length<1200)P({k:6,x:STX+8,y:CHUG_Y-24,vx:(rnd()-.5)*30,vy:-30-rnd()*30,l:.5,l0:.5,s:2,c:'#dff3ff'})}}
+  const fl=ph===5?BEL_MAX+(BEL_SET-BEL_MAX)*easeIO((t-CT_D)/(CT_END-CT_D)):.15*clamp((t-CT_BK)/(CT_TB-CT_BK),0,1)+(BEL_MAX-.15)*clamp((t-CT_TB)/(CT_D-CT_TB),0,1);
+  m.bel=Math.max(0,Math.min(STOM_MAX-m.inf,c.b0+c.extra+fl));if(!OPT().noBurst&&stom(m)>=SODA_BURST){m.chug=null;sodaHold=false;explodeMan();return}   // half the belly is hidden behind his back; the rest is revealed on the turn
   if(ph===0){const u=t/CT_A;m.x=SX+(STX-SX)*u;m.y=SY+(CHUG_Y-SY)*u-Math.sin(u*Math.PI)*34}
   else if(ph<5){m.x=STX;m.y=CHUG_Y+((ph===2||ph===4)?Math.sin(time*34)*.7:0)}
   else{const u=clamp((t-CT_D)/(CT_END-CT_D),0,1);m.x=STX+(SX-STX)*u;m.y=CHUG_Y+(SY-CHUG_Y)*u-Math.sin(u*Math.PI)*40}
-  if(t>=CT_END){m.x=SX;m.y=SY;m.chug=null;m.bel=BEL_SET;pw.sel='burp';ring(SX,SY,40,'#ffd23f');popText(SX,SY-64,'LOADED!','#ffd23f',24)}}
+  if(t>=CT_END){m.x=SX;m.y=SY;m.chug=null;m.bel=Math.max(0,Math.min(STOM_MAX-m.inf,c.b0+c.extra+BEL_SET));pw.sel='burp';ring(SX,SY,40,'#ffd23f');popText(SX,SY-64,'LOADED!','#ffd23f',24)}}
 function bottleDraw(x,y,lvl,col){ctx.save();ctx.translate(x,y);ctx.lineJoin='round';ctx.lineWidth=1.6;ctx.strokeStyle='#2a160a';
   ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-7,-20);ctx.quadraticCurveTo(-7,-26,-3.5,-29);ctx.lineTo(-3,-35);ctx.lineTo(3,-35);ctx.lineTo(3.5,-29);ctx.quadraticCurveTo(7,-26,7,-20);ctx.lineTo(7,0);ctx.closePath();
   ctx.fillStyle='rgba(235,245,255,.9)';ctx.fill();ctx.save();ctx.clip();ctx.fillStyle=col;ctx.fillRect(-8,-30*lvl,16,30*lvl);
   ctx.fillStyle='#f4f4f4';ctx.fillRect(-8,-17,16,8);ctx.fillStyle='#d22';ctx.fillRect(-8,-15,16,4);ctx.fillStyle='rgba(255,255,255,.55)';ctx.fillRect(-5.2,-28,1.6,26);ctx.restore();
   ctx.stroke();ctx.fillStyle='#d22';ctx.fillRect(-3.5,-38,7,3.4);ctx.strokeRect(-3.5,-38,7,3.4);ctx.restore()}
 const BOTCOL=['#5a2f1b','#7ddc3c'];
-function drawBurpStand(){if(state!=='play'||!toolOn('burp'))return;const c=man.chug,taken=c?(c.ph>=4?2:c.ph>=2?1:0):(pw.sel==='burp'||pw.left.burp<=0?2:0),TY=GY-20;
+function drawBurpStand(){if(state!=='play'||!toolOn('burp'))return;const c=man.chug,taken=c?(c.ph>=4?2:c.ph>=2?1:0):(pw.left.burp<=0?2:0),TY=GY-20;
   ctx.save();ctx.lineJoin='round';ctx.lineWidth=2;ctx.strokeStyle='#4a2e14';ctx.fillStyle='#7a5230';
   for(const lx of[-30,26]){ctx.fillRect(STX+lx,TY,5,20);ctx.strokeRect(STX+lx,TY,5,20)}
   ctx.fillStyle='#8f6238';ctx.fillRect(STX-36,TY,72,6);ctx.strokeRect(STX-36,TY,72,6);ctx.restore();
   if(taken<1)bottleDraw(STX-24,TY,1,BOTCOL[0]);if(taken<2)bottleDraw(STX+24,TY,1,BOTCOL[1]);
-  if(!c&&man.mode==='aim'&&pw.sel!=='burp'&&pw.left.burp>0&&!dragging){ctx.globalAlpha=.7+.3*Math.sin(time*5);txt('TAP TO CHUG',STX-26,TY-50,14,'#ffd23f','center');ctx.globalAlpha=1}}
+  if(!c&&man.mode==='aim'&&pw.left.burp>0&&!dragging){ctx.globalAlpha=.7+.3*Math.sin(time*5);txt(pw.sel==='burp'?'HOLD: MORE SODA':'TAP TO CHUG  (HOLD = KEEP GUZZLING)',STX-26,TY-50,14,'#ffd23f','center');ctx.globalAlpha=1}
+  if(man.mode==='aim'&&stom(man)>.001){const cap=OPT().noBurst?STOM_MAX:SODA_BURST,f=clamp(stom(man)/cap,0,1),w=64,x0=STX-w/2,y0=GY-124;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(x0,y0,w,8);
+    ctx.fillStyle=f<.55?'#7dff5a':f<.85?'#ffd23f':'#ff4a4a';ctx.fillRect(x0+1,y0+1,(w-2)*f,6);
+    if(!OPT().noBurst){ctx.fillStyle='#fff';ctx.fillRect(x0+w/SODA_BURST-1,y0-3,2,14);if(f>.85&&Math.sin(time*20)>0)txt('DANGER!',STX,y0-8,13,'#ff4a4a','center')}
+    if(OPT().burpCharge)txt('BURP x'+burpMult(man).toFixed(1),STX,y0+24,12,'#ff9ec8','center')}}
 function drawChugMan(m){const c=m.chug,ph=c.ph;ctx.save();ctx.scale(.5,.5);
-  if(ph===1||ph===3)drawSpin(c.th,{});else if(ph===2)drawBack(null,time,{});else{INF=m.bel;drawFront('up',ph===4?'cool':'cool',time);INF=0}
+  if(ph===1||ph===3)drawSpin(c.th,{});else if(ph===2)drawBack(null,time,{});else{INF=stom(m);drawFront('up','cool',time);INF=0}
   ctx.restore();
-  if(ph===2||ph===4){const k=ph===2?0:1,t0=ph===2?CT_BK:CT_TB,lvl=1-clamp((c.t-t0)/(CT_D-CT_TB),0,1),px=ph===2?0:3,py=ph===2?-20:-17,tl=ph===2?.32:.58;   // from behind only the upturned base shows over his head
+  if(ph===2||ph===4){const k=ph===2?0:1,t0=ph===2?CT_BK:CT_TB,lvl=c.keep>0?1-((c.keep*.8)%1):1-clamp((c.t-t0)/(CT_D-CT_TB),0,1),px=ph===2?0:3,py=ph===2?-20:-17,tl=ph===2?.32:.58;   // from behind only the upturned base shows over his head
     ctx.save();ctx.translate(px,py);ctx.rotate(Math.PI+tl+(1-lvl)*.3);ctx.translate(0,34);ctx.scale(.9,.9);bottleDraw(0,0,lvl,BOTCOL[k]);ctx.restore()}}
 function inCone(rx,ry,dx,dy,L,k,pad){const al=rx*dx+ry*dy;if(al<4||al>L)return -1;const pe=Math.abs(-rx*dy+ry*dx);return pe<=k*al+pad?al:-1}
-function burpBlast(){const m=man;m.burped=true;const a=Math.atan2(m.vy,m.vx)*.5,dx=Math.cos(a),dy=Math.sin(a),L=128,n=Math.ceil(L/V)+2,cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);
-  for(let j=-n;j<=n;j++)for(let i=-n;i<=n;i++){const al=inCone(i*V,j*V,dx,dy,L,.3,12);if(al<0)continue;damageCell(cx+i,cy+j,3+Math.floor(6*(1-al/L)))}
-  for(const ch of chunks){const al=inCone(ch.x-m.x,ch.y-m.y,dx,dy,L+20,.34,16);if(al<0)continue;const f=1-al/(L+20)*.6;ch.rest=false;ch.sleep=0;ch.vx+=dx*240*f;ch.vy+=dy*240*f-30}
+function burpBlast(){const m=man;m.burped=true;const a=Math.atan2(m.vy,m.vx)*.5,dx=Math.cos(a),dy=Math.sin(a),bm=m.bm||1,L=128*Math.sqrt(bm),n=Math.ceil(L/V)+2,cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);
+  for(let j=-n;j<=n;j++)for(let i=-n;i<=n;i++){const al=inCone(i*V,j*V,dx,dy,L,.3,12);if(al<0)continue;damageCell(cx+i,cy+j,Math.round((3+Math.floor(6*(1-al/L)))*bm))}
+  for(const ch of chunks){const al=inCone(ch.x-m.x,ch.y-m.y,dx,dy,L+20,.34,16);if(al<0)continue;const f=1-al/(L+20)*.6;ch.rest=false;ch.sleep=0;ch.vx+=dx*240*bm*f;ch.vy+=dy*240*bm*f-30}
   for(const t of targets)if(t.alive&&inCone(t.x-m.x,t.y-m.y,dx,dy,L+16,.36,t.r+8)>=0)killTarget(t);
   wobKick(Math.floor((m.x+dx*70)/V),Math.floor((m.y+dy*70)/V),6,dx*.3,dy*.3);
   m.vx=m.vx*.55;m.vy=m.vy*.55-50;                         // the recoil: he slows right down and lands softer
-  SFX.burpBig();shake=Math.max(shake,6);popText(m.x,m.y-38,'BUUURP!','#ffd23f',32);
+  SFX.burpBig();shake=Math.max(shake,6);popText(m.x,m.y-38,'BUUURP!','#ffd23f',32);if(bm>1.15)popText(m.x,m.y-66,'x'+bm.toFixed(1)+' POWER','#ff9ec8',22);
   for(let k=0;k<4;k++)ring(m.x+dx*(24+k*34),m.y+dy*(24+k*34),22+k*14,k%2?'#bfe8ff':'#fff');
   for(let i=0;i<32;i++){const sp=300+rnd()*320,sa=a+(rnd()-.5)*.7;P({k:6,x:m.x+dx*14,y:m.y+dy*14,vx:Math.cos(sa)*sp,vy:Math.sin(sa)*sp,l:.5+rnd()*.4,l0:.9,s:3+rnd()*4,c:i%3?'#dff3ff':'#c28b5a'})}}
 function burpPop(){const m=man;m.burped=true;m.burpT=0;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);
-  for(let j=-5;j<=5;j++)for(let i=-5;i<=5;i++){const d2=i*i+j*j;if(d2<=20)damageCell(cx+i,cy+j,4+Math.floor(5*(1-Math.sqrt(d2)/4.5)))}
+  for(let j=-5;j<=5;j++)for(let i=-5;i<=5;i++){const d2=i*i+j*j;if(d2<=20)damageCell(cx+i,cy+j,Math.round((4+Math.floor(5*(1-Math.sqrt(d2)/4.5)))*(m.bm||1)))}
   for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<58)killTarget(t);
   for(const ch of chunks){const rx=ch.x-m.x,ry=ch.y-m.y,d=Math.hypot(rx,ry);if(d>70||d<1)continue;const f=1-d/70;ch.rest=false;ch.sleep=0;ch.vx+=rx/d*200*f;ch.vy+=ry/d*200*f-20}
   wobKick(cx,cy,6,0,0);SFX.burpSmall();shake=Math.max(shake,7);popText(m.x,m.y-38,'burp.','#ffd23f',24);
@@ -2031,19 +2045,18 @@ function renderMan(){
     const wob=Math.sin(m.t*26)*Math.exp(-m.t*3.2);            // rocks from side to side for about a second after landing
     ctx.rotate(wob*.17);jigSquash(j);
     const bp=m.burpT>0?1+.07*Math.sin(time*38):1,sx=.56*(1-wob*.05)*bp,sy=.45*(1+wob*.07)*bp;ctx.scale(sx,sy);   // puffs up and shudders before the burst
-    JIG=jigOpts(j,sx,sy,wob*.17);ragOpts(JIG,m);INF=m.bel||0;drawFront('star','dizzy',time);INF=0;JIG=null;ctx.restore();return}
+    JIG=jigOpts(j,sx,sy,wob*.17);ragOpts(JIG,m);INF=stom(m);drawFront('star','dizzy',time);INF=0;JIG=null;ctx.restore();return}
   ctx.save();ctx.translate(m.x,m.y);jigSquash(j);
   if(m.mode==='aim'&&m.chug){drawChugMan(m);ctx.restore();return}
   if(m.mode==='aim'){const sc=.5*(1+m.pop*.5),a=Math.atan2(SY-m.y,SX-m.x)*.25,sy=sc*(dragging?.94:1);
-    const ix=1,iy=1;ctx.translate((m.inf>.5?Math.sin(time*45)*m.inf*2.2:0)+((m.inf>.02&&dragging&&m.vlv)?-7:0),(m.inf>.02&&dragging&&m.vlv)?-4:0);ctx.rotate(a);ctx.scale(sc*ix,sy*iy);JIG=jigOpts(j,sc*ix,sy*iy,a);
+    const ix=1,iy=1;ctx.translate((stom(m)>.5?Math.sin(time*45)*Math.min(1,stom(m))*2.2:0)+((stom(m)>.02&&dragging&&m.vlv)?-7:0),(stom(m)>.02&&dragging&&m.vlv)?-4:0);ctx.rotate(a);ctx.scale(sc*ix,sy*iy);JIG=jigOpts(j,sc*ix,sy*iy,a);
     const fn=dragging?null:gagFrame(m.G),sp=fn&&spinLive(m.G);
-    if(m.inf>.02&&dragging&&m.vlv){ctx.translate(0,8/sc);ctx.scale(1.4,1.4);drawSeatSide(m.inf,time)}                  // side profile: rear on the valve, belly swelling out the front
-    else if(m.inf>.02){INF=m.inf;drawFront('up',m.inf>.5||dragging?'scream':'cool',time);INF=0}
-    else if(m.bel>.02){INF=m.bel;drawFront('up',dragging?'scream':'cool',time);INF=0}   // burpburster: belly full of soda   // seated on the valve: front view, belly swelling
+    if(stom(m)>.02&&dragging&&m.vlv){ctx.translate(0,8/sc);ctx.scale(1.4,1.4);drawSeatSide(stom(m),time)}                  // side profile: rear on the valve, belly swelling out the front
+    else if(stom(m)>.02){INF=stom(m);drawFront('up',stom(m)>.5||dragging?'scream':'cool',time);INF=0}   // burpburster: belly full of soda   // seated on the valve: front view, belly swelling
     else if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else if(dragging)drawFront('up','scream',time);else{const bz=Math.sin(time*2.6);drawSpin(0,Object.assign({},SPIN_POSE.T_IDLE,{t:time,belly:[1+.012*bz,1-.01*bz]}))}
     JIG=null}
   else if(m.dive){ctx.rotate(m.spin);ctx.scale(.62,.62);JIG=jigOpts(j,.62,.62,m.spin);drawBall(time,'scream');JIG=null}
-  else{ctx.rotate(m.ang);ctx.scale(.64,.64);JIG=jigOpts(j,.64,.64,m.ang);ragOpts(JIG,m);INF=Math.max(m.inf,m.bel||0);drawSide(time,'scream');INF=0;JIG=null}
+  else{ctx.rotate(m.ang);ctx.scale(.64,.64);JIG=jigOpts(j,.64,.64,m.ang);ragOpts(JIG,m);INF=stom(m);drawSide(time,'scream');INF=0;JIG=null}
   ctx.restore()}
 function drawLandlord(t){
   const bob=Math.sin(t.t*5)*.8;ctx.save();ctx.translate(t.x,t.y+bob);ctx.scale(1.15,1.15);
@@ -2137,7 +2150,7 @@ function drawHUD(){
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60);txt('DRAG BACK  &  RELEASE!',hp[0],hp[1],22,'#fff','center')};ctx.globalAlpha=1}
   if(state==='play'){const defs=[['beans','BEANS'],['towel','TOWEL'],['splat','SPLAT']],lock=!!man.chug||pw.sel==='burp';defs.forEach((d,i)=>{const n=pw.left[d[0]];btn(12+i*98,H-44,92,32,d[1]+' x'+n,()=>{if(man.mode==='aim'&&n>0&&!lock)pw.sel=pw.sel===d[0]?null:d[0]},{size:14,on:pw.sel===d[0],disabled:n<=0||man.mode!=='aim'||lock})});
-    btn(12+3*98+6,H-44,190,32,'TOOL: '+toolName(),()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();if(!toolOn('valve')&&(man.seated||man.vlv||man.inf>0)){man.seated=false;man.vlv=false;man.inf=0;man.x=SX;man.y=SY}if(!toolOn('burp')&&pw.sel==='burp'){pw.sel=null;man.bel=0}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
+    btn(12+3*98+6,H-44,190,32,'TOOL: '+toolName(),()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
     if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
@@ -2195,12 +2208,12 @@ cv.addEventListener('pointerdown',e=>{
   if(state==='win'){nextAfterWin();return}
   if(state==='lose'){retry();return}
   const[wx,wy]=toWorld(x,y);
-  if(man.mode==='aim'&&toolOn('burp')&&!man.chug&&!man.seated&&pw.sel!=='burp'&&pw.left.burp>0&&Math.abs(wx-STX)<48&&wy>GY-62){startChug();return}   // tap the soda stand: he hops over and chugs
+  if(man.mode==='aim'&&toolOn('burp')&&!man.chug&&!man.seated&&pw.left.burp>0&&Math.abs(wx-STX)<48&&wy>GY-62){sodaHold=true;startChug();if(!man.chug)sodaHold=false;try{cv.setPointerCapture(e.pointerId)}catch(_){}return}   // tap the soda stand: he hops over and chugs
   if(man.mode==='aim'&&!man.chug&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(wx-VX,wy-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}   // tap the valve: he sits and fills; drag him off to fire
   if(man.mode==='aim'&&!man.chug&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?95:70)){AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}if(man.seated&&Math.hypot(x-VX,y-VY)<38)return;if(toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(x-VX,y-VY)<28){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false});
-cv.addEventListener('pointerup',()=>{if(state==='edit'){eUp();return}if(dragging){dragging=false;if(man.mode==='aim'){if(man.vlv){man.seated=true;return}man.seated=false;launch()}}});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
+cv.addEventListener('pointerup',()=>{sodaHold=false;if(state==='edit'){eUp();return}if(dragging){dragging=false;if(man.mode==='aim'){if(man.vlv){man.seated=true;return}man.seated=false;launch()}}});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);
   if(e.code==='Space'){dive();e.preventDefault()}
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
@@ -2436,7 +2449,9 @@ function drawOptions(){
   txt('ON: fallen rubble stays physical (keeps slumping and toppling) until the level ends.',W/2,y,15,'#cfd','center');y+=22;
   txt('OFF: rubble settles in place and locks solid, as before.',W/2,y,15,'#cfd','center');y+=44;
   btn(bx,y,bw,56,'POWER-UP TOOL: '+toolName(),()=>{toolCycle();pdTouch();pdSave();SFX.pop()},{size:22,on:toolName()!=='NONE',col:'#7dff5a'});y+=76;
-  btn(bx,y,bw,56,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();muted=!muted},{size:22,on:!muted,col:'#7dff5a'})}
+  btn(bx,y,bw,56,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();muted=!muted},{size:22,on:!muted,col:'#7dff5a'});y+=68;
+  btn(bx,y,bw,44,'CHEAT: STOMACH NEVER BURSTS: '+(o.noBurst?'ON':'OFF'),()=>{o.noBurst=!o.noBurst;pdTouch();pdSave();SFX.pop()},{size:17,on:!!o.noBurst,col:'#ff9ec8'});y+=52;
+  btn(bx,y,bw,44,'BURP CHARGE (BIGGER STOMACH = BIGGER BURP): '+(o.burpCharge?'ON':'OFF'),()=>{o.burpCharge=!o.burpCharge;pdTouch();pdSave();SFX.pop()},{size:16,on:!!o.burpCharge,col:'#7dff5a'})}
 function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
   hits.push({x,y,w,h,fn:locked?()=>SFX.pop():fn});const hov=mouseX>=x&&mouseX<x+w&&mouseY>=y&&mouseY<y+h;
   ctx.save();rrect(x,y,w,h,10);ctx.fillStyle=locked?'rgba(30,34,48,.8)':hov?'rgba(255,255,255,.3)':'rgba(15,18,30,.78)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=hov&&!locked?'#fff':'rgba(255,255,255,.3)';ctx.stroke();
