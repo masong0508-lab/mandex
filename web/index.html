@@ -1510,8 +1510,8 @@ function drawSpin(th,o){
   const armParts=(S,E,F)=>[pTap(S[0],S[1],6.9,E[0],E[1],6.3),pTap(E[0],E[1],6.0,F[0],F[1],4.9),pEll(E[0],E[1],6.2,6.1),pEll(F[0],F[1],hRx,hRy)];
   const knuckles=(F)=>{ctx.save();ctx.strokeStyle='rgba(140,72,44,.55)';ctx.lineWidth=1;ctx.lineCap='round';for(let n=-1;n<=1;n++){ctx.beginPath();ctx.arc(F[0]+n*2.7,F[1]+.4,1.5,.3,2.8);ctx.stroke()}ctx.restore()};
   const AD=(E,F,i)=>(E[2]+F[2])/2+(o.ad?o.ad[i]:0);
-  add(CA?AD(lE,lF,0):covering?Math.max(lE[2],lF[2])-.5:lF[2]+6,()=>{blob(armParts(lS,lE,lF));if(!covering)knuckles(lF)});                       // left arm (hand on the hip, or reaching back)
-  add(CA?AD(rE,rF,1):covering?Math.max(rE[2],rF[2])-.5:rS[2]-.3,()=>blob(armParts(rS,rE,rF)));                                                  // right arm (raised with the towel)
+  add(CA?AD(lE,lF,0):covering?Math.max(lE[2],lF[2])-.5:lF[2]+6,()=>{blob(armParts(lS,lE,lF));if(CA&&AD(lE,lF,0)<6)pitHair(lS[0],lS[1],lE[0],lE[1],-1);if(!covering)knuckles(lF)});                       // left arm (hand on the hip, or reaching back)
+  add(CA?AD(rE,rF,1):covering?Math.max(rE[2],rF[2])-.5:rS[2]-.3,()=>{blob(armParts(rS,rE,rF));if(CA&&AD(rE,rF,1)<6)pitHair(rS[0],rS[1],rE[0],rE[1],1)});                                                  // right arm (raised with the towel)
   const palm=F=>{blob([pEll(F[0],F[1],hRx,hRy)],{ow:0});                                                                          // the hand again on top: a big flat palm, fingers pressed over the butt
     if(kc>.5){ctx.strokeStyle='rgba(140,72,44,.6)';ctx.lineWidth=1.1;ctx.lineCap='round';for(let n=-1;n<=1;n++){ctx.beginPath();ctx.moveTo(F[0]+n*3.6,F[1]+3.2);ctx.lineTo(F[0]+n*3.9,F[1]+7);ctx.stroke()}}};
 
