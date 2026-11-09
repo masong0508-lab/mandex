@@ -706,6 +706,7 @@ function update(dt){
 //  CHARACTER ART
 // =====================================================================
 const SK='#f4b78e',SKD='#d98f64',SKH='#ffd5b4',OUT='#5a2f1b',HAIR='#4a2d1a';
+let THONG=false,TG='#ff2d6f';   // the thong outfit: skin-coloured 'shorts' plus thin straps and a little pouch in TG
 let BR='#e0243a',BRD='#a8162a',TOW='#ff7eb0',TOWS='#ff4f8f';   // the outfit colours (boxers, boxer shading, towel, towel edge); see OUTFITS
 function limb(x,y,x1,y1,w,col,hi){ctx.lineCap='round';ctx.strokeStyle=OUT;ctx.lineWidth=w+2.4;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x1,y1);ctx.stroke();
   ctx.strokeStyle=col;ctx.lineWidth=w;ctx.stroke();if(hi){ctx.strokeStyle=hi;ctx.lineWidth=w*.26;ctx.beginPath();ctx.moveTo(x-w*.18,y-w*.22);ctx.lineTo(x1-w*.18,y1-w*.22);ctx.stroke()}}
@@ -743,16 +744,25 @@ function blob(parts,o){o=o||{};const m=ctx.getTransform(),sc=Math.hypot(m.a,m.b)
   if(o.sh!==0)blobShade(parts,m,sc,o);
   ctx.restore()}
 // soft cloth: a curved ribbon (waistband, cuff) along y=yc(x) from xa to xb, half-height hw (thinner toward both ends), with a slight ripple; stitched stripes on top
-function ribbonPoly(xa,xb,yc,hw,n,fill,rip){const T=[],B=[];for(let i=0;i<=n;i++){const x=xa+(xb-xa)*i/n,u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u),r=(rip||0)*Math.sin(x*.85+1);T.push([x,yc(x)-h+r]);B.push([x,yc(x)+h+r*.7])}return pPoly(T.concat(B.reverse()),fill)}
-function ribbonStripes(xa,xb,yc,hw,step,col){ctx.save();ctx.strokeStyle=col||BR;ctx.lineWidth=1.25;ctx.lineCap='round';
+function ribbonPoly(xa,xb,yc,hw,n,fill,rip){if(THONG){hw=Math.max(.9,hw*.3);fill=TG}const T=[],B=[];for(let i=0;i<=n;i++){const x=xa+(xb-xa)*i/n,u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u),r=(rip||0)*Math.sin(x*.85+1);T.push([x,yc(x)-h+r]);B.push([x,yc(x)+h+r*.7])}return pPoly(T.concat(B.reverse()),fill)}
+function ribbonStripes(xa,xb,yc,hw,step,col){if(THONG)return;ctx.save();ctx.strokeStyle=col||BR;ctx.lineWidth=1.25;ctx.lineCap='round';
   for(let x=xa+step/2;x<xb;x+=step){const u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u)*.82;ctx.beginPath();ctx.moveTo(x,yc(x)-h);ctx.quadraticCurveTo(x+.5,yc(x),x+.2,yc(x)+h);ctx.stroke()}ctx.restore()}
 // a soft cloth band that follows a quadratic curve P0 -> C -> P1 (a waistband seen from the side), with stitched stripes across it
-function bandAlong(P0,C,P1,hw,step){const N=22,T=[],B=[],M=[];
+function thongFront(){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
+  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*7.5,19);ctx.quadraticCurveTo(q*15,17,q*21,14.5);ctx.stroke()}          // the side strings
+  ctx.beginPath();ctx.moveTo(-8.5,18.5);ctx.quadraticCurveTo(-9.5,28,0,35);ctx.quadraticCurveTo(9.5,28,8.5,18.5);ctx.quadraticCurveTo(0,21,-8.5,18.5);ctx.closePath();
+  ctx.fillStyle=TG;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1.4;ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(-3.5,24,1.6,4,.25,0,6.3);ctx.fill();ctx.restore()}
+function thongBack(bx,cy0){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
+  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*13,15);ctx.quadraticCurveTo(bx+q*8,18.5,bx+q*3.2,20.5);ctx.stroke()}
+  ctx.beginPath();ctx.moveTo(bx,20);ctx.quadraticCurveTo(bx,cy0+4,bx,cy0+12);ctx.stroke();                                    // the strap down the cleft
+  ctx.beginPath();ctx.moveTo(bx-4,18.2);ctx.lineTo(bx+4,18.2);ctx.lineTo(bx,25.5);ctx.closePath();ctx.fillStyle=TG;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1.1;ctx.stroke();ctx.restore()}
+function bandAlong(P0,C,P1,hw,step){if(THONG)hw=Math.max(.9,hw*.3);const N=22,T=[],B=[],M=[];
   for(let i=0;i<=N;i++){const u=i/N,a=(1-u)*(1-u),b=2*u*(1-u),c=u*u,x=a*P0[0]+b*C[0]+c*P1[0],y=a*P0[1]+b*C[1]+c*P1[1],tx=2*(1-u)*(C[0]-P0[0])+2*u*(P1[0]-C[0]),ty=2*(1-u)*(C[1]-P0[1])+2*u*(P1[1]-C[1]),l=Math.hypot(tx,ty)||1,nx=-ty/l,ny=tx/l,h=hw*(1-.2*Math.pow(2*u-1,4))+.25*Math.sin(i*1.7);
     T.push([x+nx*h,y+ny*h]);B.push([x-nx*h,y-ny*h]);M.push([x,y,nx,ny,h])}
-  blob([pPoly(T.concat(B.reverse()),'#fff8f2')],{ow:1.3,shc:'rgba(120,100,140,.38)',hl:0});
+  blob([pPoly(T.concat(B.reverse()),THONG?TG:'#fff8f2')],{ow:1.3,shc:'rgba(120,100,140,.38)',hl:0});
   ctx.save();ctx.strokeStyle='rgba(224,36,58,.85)';ctx.lineWidth=1.25;ctx.lineCap='round';
-  for(let i=1;i<N;i+=step||2){const m=M[i];ctx.beginPath();ctx.moveTo(m[0]+m[2]*m[4]*.8,m[1]+m[3]*m[4]*.8);ctx.lineTo(m[0]-m[2]*m[4]*.8,m[1]-m[3]*m[4]*.8);ctx.stroke()}ctx.restore()}
+  for(let i=1;!THONG&&i<N;i+=step||2){const m=M[i];ctx.beginPath();ctx.moveTo(m[0]+m[2]*m[4]*.8,m[1]+m[3]*m[4]*.8);ctx.lineTo(m[0]-m[2]*m[4]*.8,m[1]-m[3]*m[4]*.8);ctx.stroke()}ctx.restore()}
 // the shoulder line: ONE smooth outline from the neck, sloping down to a rounded shoulder, mirrored.  Turned by an angle (C = cos, S = sin) it narrows to the body's depth like a real torso.
 const YOKE=[[0,-33.6],[5,-33.3],[10,-32],[15,-29.6],[20,-26.3],[24.4,-22.6],[27,-18.6],[26.6,-14.6],[23.4,-11.6]];
 function pYoke(C,S,ox,fill){const R=[],L=[],n=YOKE.length;
@@ -808,6 +818,7 @@ function drawFront(pose,fk,t,o){
   ctx.fillStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.ellipse(-15,23,2.8,6,.3,0,6.3);ctx.ellipse(15,23,2.8,6,-.3,0,6.3);ctx.fill();
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-5,29);ctx.lineTo(-5,21);ctx.lineTo(0,26);ctx.lineTo(5,21);ctx.lineTo(5,29);ctx.stroke();
   {const yc=x=>13+4.6*(1-(x/21)*(x/21));blob([ribbonPoly(-21,21,yc,3.1,24,'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(-21,21,yc,3.1,5.4,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
+  if(THONG)thongFront();
   if(o&&o.ro)ctx.restore();
   // torso: shoulders, chest, belly and love handles are ONE mass, drawn after the briefs so the belly overhangs the waistband
   {const wo=o&&o.bo&&o.ro?[(o.bo[0]+o.ro[0])/2,(o.bo[1]+o.ro[1])/2]:[0,0],bM=new DOMMatrix();
@@ -1239,7 +1250,8 @@ function drawBack(pose,t,o){o=jigMerge(o)||{};const bo=o.bo||[0,0],ro=o.ro||[0,0
   ctx.strokeStyle='rgba(100,8,30,.8)';ctx.lineWidth=1.2;ctx.stroke();
   ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*1.4,20);ctx.quadraticCurveTo(bx+q*6,20.4,bx+q*8.6,26.5);ctx.stroke()}   // a pinch of fabric
   {const yc=x=>14+1.5*(1-Math.pow((x-bx)/24.5,2)),xa=bx-24.5,xb=bx+24.5;blob([ribbonPoly(xa,xb,yc,3.9,26,'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(xa,xb,yc,3.9,6.2,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
-  ctx.fillStyle='#f2f2f2';ctx.strokeStyle='#aaa';ctx.lineWidth=.8;ctx.fillRect(bx-4,19,8,5);ctx.strokeRect(bx-4,19,8,5);ctx.fillStyle=BR;ctx.fillRect(bx-2,21,4,1.3);
+  if(THONG)thongBack(bx,cy0);
+  if(!THONG){ctx.fillStyle='#f2f2f2';ctx.strokeStyle='#aaa';ctx.lineWidth=.8;ctx.fillRect(bx-4,19,8,5);ctx.strokeRect(bx-4,19,8,5);ctx.fillStyle=BR;ctx.fillRect(bx-2,21,4,1.3)}
   if(puff){ctx.strokeStyle=BRD;ctx.lineWidth=1.4;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*21,22);ctx.quadraticCurveTo(bx+q*25,28,bx+q*22,36);ctx.stroke()}
     ctx.fillStyle='rgba(150,210,70,.55)';for(const[q,w,r]of[[-14,45,5],[0,48,6],[15,45,4.5],[-5,53,3.5],[9,52,3]]){ctx.beginPath();ctx.arc(bx+q,w+Math.sin(t*10+q)*1.5,r,0,6.3);ctx.fill()}}
   ctx.restore();
@@ -1459,7 +1471,7 @@ function drawSpin(th,o){
   const lo={low:1,ox:oL+ro[0],oy:ro[1]};
   const hipsR=G3(0,21,-2,23.5,12.5,16,lo),chk=[-1,1].map(q=>G3(q*11,23.5,-7,13,12.5,11,Object.assign({},lo,{oy:ro[1]+((q*C2<0)?cl:cr)})));
   const RED={ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'},pe=r=>pEll(r.px,r.py,r.rx,r.b,BR);
-  const logo=()=>dec([hipsR],0,25,()=>{ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-5,4);ctx.lineTo(-5,-4);ctx.lineTo(0,1);ctx.lineTo(5,-4);ctx.lineTo(5,4);ctx.stroke()});
+  const logo=()=>THONG?0:dec([hipsR],0,25,()=>{ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-5,4);ctx.lineTo(-5,-4);ctx.lineTo(0,1);ctx.lineTo(5,-4);ctx.lineTo(5,4);ctx.stroke()});
   const deco=(r,q)=>{dec([r],q*5.2,23.5,()=>{ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-q*3.8,-3.5);ctx.quadraticCurveTo(q*.8,-3.1,q*3.4,3);ctx.stroke()},{back:1});   // a pinch of fabric
     dec([r],q*7,19,()=>{ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(0,0,2.6,5.4,q*.4,0,6.3);ctx.fill()})};
   if(Math.abs(S2)<.45)add(hipsR.d,()=>{blob([pe(hipsR),pe(chk[0]),pe(chk[1])],RED);logo();deco(chk[0],-1);deco(chk[1],1)});        // front or back: one soft mass of cloth
@@ -1467,11 +1479,11 @@ function drawSpin(th,o){
   const bandR=G3(0,15.5,-1,23.8,3.6,17.5,Object.assign({},lo,{bias:3+14*Math.max(0,-C2)}));
   add(bandR.d,()=>{                                                                                                         // the waistband: the visible half of a ring, a rippled ribbon that is lower where it comes toward us
     const pts=[];for(let i=0;i<48;i++){const f=i/48*6.2832,sn=Math.sin(f),cs=Math.cos(f),X=bandR.a*sn*C2+(bandR.z+bandR.c*cs)*S2,Z=-bandR.a*sn*S2+(bandR.z+bandR.c*cs)*C2;if(Z>-1.5)pts.push([X,Z])}
-    pts.sort((u,v)=>u[0]-v[0]);if(pts.length>3){const hw=2.7,T=[],B=[];
+    pts.sort((u,v)=>u[0]-v[0]);if(pts.length>3){const hw=THONG?.9:2.7,T=[],B=[];
       pts.forEach(([X,Z],k)=>{const u=k/(pts.length-1),h=hw*(1-.2*Math.pow(2*u-1,4)),y=bandR.py+2.6*Z/bandR.c+.35*Math.sin(X*.85+1);T.push([bandR.ox+X,y-h]);B.push([bandR.ox+X,y+h*.9])});
-      blob([pPoly(T.concat(B.reverse()),'#fff8f2')],{ow:1.3,shc:'rgba(120,100,140,.38)',hl:0});
+      blob([pPoly(T.concat(B.reverse()),THONG?TG:'#fff8f2')],{ow:1.3,shc:'rgba(120,100,140,.38)',hl:0});
       ctx.save();ctx.strokeStyle='rgba(224,36,58,.85)';ctx.lineWidth=1.25;ctx.lineCap='round';
-      for(let k=1;k<T.length-1;k+=2){const a=T[k],b=B[B.length-1-k];ctx.beginPath();ctx.moveTo(a[0],a[1]+.5);ctx.quadraticCurveTo((a[0]+b[0])/2+.4,(a[1]+b[1])/2,b[0],b[1]-.4);ctx.stroke()}ctx.restore()}
+      for(let k=1;!THONG&&k<T.length-1;k+=2){const a=T[k],b=B[B.length-1-k];ctx.beginPath();ctx.moveTo(a[0],a[1]+.5);ctx.quadraticCurveTo((a[0]+b[0])/2+.4,(a[1]+b[1])/2,b[0],b[1]-.4);ctx.stroke()}ctx.restore()}
     });          // the little tag
   add(-12.9*C2+.02,()=>{if(C2>-.12)return;                                                                          // the crease between the cheeks, only when they face us: a soft line, lighter at the ends
     for(const[w,a]of[[2.4,'rgba(100,8,30,.28)'],[1.2,'rgba(100,8,30,.8)']]){ctx.strokeStyle=a;ctx.lineWidth=w;ctx.lineCap='round';ctx.beginPath();
@@ -2054,6 +2066,7 @@ const OUTFITS=[
  {id:'hotpink', n:'Hot Pink',      br:'#ff4fa3',brd:'#c92a78',tow:'#5ad6ff',tows:'#2bb0e0', h:'beat 10 story levels',         t:()=>storyDone()>=10},
  {id:'gold',    n:'Golden Boy',    br:'#f0b92a',brd:'#b8851a',tow:'#fff0a8',tows:'#e6c34a', h:'three stars on 8 levels',      t:()=>threeStarCount()>=8},
  {id:'bare',    n:'Birthday Suit', br:'#f4b78e',brd:'#e2a077',tow:'#ffffff',tows:'#d8d8e0', h:'unlock 25 achievements',       t:()=>achCount()>=25},
+ {id:'thong',   n:'Cheeky Thong',  br:'#f4b78e',brd:'#e2a077',tow:'#ff7eb0',tows:'#ff4f8f', tg:'#ff2d6f', thong:true, h:'chug sodas with Burpburster 5 times', t:()=>ST().pw_burp>=5},
  {id:'rainbow', n:'Rainbow Rump',  br:'#e0243a',brd:'#a8162a',tow:'#ff7eb0',tows:'#ff4f8f', h:'beat every story level',       t:()=>storyDone()>=LEVELS.length, rainbow:true}
 ];
 const ownedCount=()=>OUTFITS.reduce((n,o)=>n+(PD.own[o.id]?1:0),0);
@@ -2062,6 +2075,7 @@ function paintOutfit(br,brd,tow,tows){BR=br;BRD=brd;TOW=tow;TOWS=tows;const f=he
 const _hx=document.createElement('canvas').getContext('2d');
 const hslHex=s=>{_hx.fillStyle=s;return _hx.fillStyle};
 function applyOutfit(o,tm){
+  THONG=!!o.thong;TG=o.tg||'#ff2d6f';
   if(o.rainbow){const h=(tm*60)%360,c=(hh,l)=>`hsl(${hh},85%,${l}%)`;paintOutfit(hslHex(c(h,52)),hslHex(c(h,36)),hslHex(c((h+180)%360,72)),hslHex(c((h+180)%360,56)))}
   else paintOutfit(o.br,o.brd,o.tow,o.tows)}
 let outfitCur=outfitById(PD.outfit);
@@ -2163,7 +2177,7 @@ function drawOutfits(){
   OUTFITS.forEach((o,i)=>{const c=i%cols,r=(i/cols)|0,x=x0+c*(cw+10),y=y0+r*(ch+6),own=PD.own[o.id],sel=outfitCur===o;
     hits.push({x,y,w:cw,h:ch,fn:()=>{if(own){equip(o);SFX.ding()}else SFX.pop()}});const hov=mouseX>=x&&mouseX<x+cw&&mouseY>=y&&mouseY<y+ch;
     ctx.save();rrect(x,y,cw,ch,10);ctx.fillStyle=sel?'rgba(60,90,40,.9)':hov&&own?'rgba(255,255,255,.28)':'rgba(15,18,30,.78)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=sel?'#7dff5a':'rgba(255,255,255,.3)';ctx.stroke();
-    let c1=o.br,c2=o.tow;if(o.rainbow){c1=`hsl(${(time*60)%360},85%,52%)`;c2=`hsl(${(time*60+180)%360},85%,70%)`}
+    let c1=o.thong?o.tg:o.br,c2=o.tow;if(o.rainbow){c1=`hsl(${(time*60)%360},85%,52%)`;c2=`hsl(${(time*60+180)%360},85%,70%)`}
     ctx.globalAlpha=own?1:.35;ctx.fillStyle=c1;rrect(x+10,y+9,46,46,8);ctx.fill();ctx.fillStyle=c2;rrect(x+36,y+29,26,26,6);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;rrect(x+10,y+9,46,46,8);ctx.stroke();ctx.globalAlpha=1;
     txt(o.n,x+74,y+26,17,own?'#fff':'#889','left');txt(own?(sel?'WEARING':'tap to wear'):'locked: '+o.h,x+74,y+48,12,own?'#cfd':'#aab','left');ctx.restore()})}
 
