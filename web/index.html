@@ -1405,7 +1405,7 @@ let CAPEA=0,CAPET=-9;
 function capeAng(th){if(time-CAPET>.3)CAPEA=th;else CAPEA+=(th-CAPEA)*.1;CAPET=time;return CAPEA}   // the cape swings after the body
 function drawSpin(th,o){
   o=o||{};
-  const hip=o.hip||0,cl=o.cl||0,cr=o.cr||0,psi=(o.psi||0)*Math.PI/180+(o.plant?-.6*th:0),ld=(o.ld||0)*Math.PI/180,hpA=(o.hp||0)*Math.PI/180,pdv=hpA*13,CA=o.arms,fk=o.face||'',FX=FACE3[fk]||FACE3.base,gzv=o.gz||[0,0],spd=o.spd==null?1:o.spd,dir=o.dir||1,tt=o.t||0;
+  const hip=o.hip||0,cl=o.cl||0,cr=o.cr||0,psi=(o.psi||0)*Math.PI/180+(o.plant?-.6*th:0),ld=(o.plant?58*Math.tanh((o.ld||0)/58):(o.ld||0))*Math.PI/180,hpA=(o.hp||0)*Math.PI/180,pdv=hpA*13,CA=o.arms,fk=o.face||'',FX=FACE3[fk]||FACE3.base,gzv=o.gz||[0,0],spd=o.spd==null?1:o.spd,dir=o.dir||1,tt=o.t||0;
   const C=Math.cos(th),S=Math.sin(th),C2=Math.cos(th+psi),S2=Math.sin(th+psi),Ch=Math.cos(th+ld),Sh=Math.sin(th+ld);        // C,S = whole body; C2,S2 = hips (twisted a bit more for the wiggle)
   const oU=-hip*.35,oM=hip*.15,oL=hip*.6;                                              // screen sway of the upper body / belly / hips
   const bo=JIG?JIG.bo:[0,0],ro=JIG?JIG.ro:[0,0],bs=(JIG?JIG.bs:[1,1]).map((v,i)=>v*(o.belly?o.belly[i]:1)),wo=[(bo[0]+ro[0])/2,(bo[1]+ro[1])/2];
@@ -1664,20 +1664,20 @@ function spinLive(Q){
   const A=(L,R)=>({L,R}),up=A([-40,-34,0,-45,-56,0],mir([-40,-34,0,-45,-56,0]));
   tp('IDLE',{});
   // look around, then a double take
-  tp('LKL',{th:-12,ld:-50,gz:[-1,0],hr:-3});tp('LKR',{th:12,ld:50,gz:[1,0],hr:3});tp('TAKE',{th:-6,ld:-14,hp:-6,hr:-4,face:'scream',belly:[.97,.97]});
+  tp('LKL',{th:-24,ld:-40,gz:[-1,0],hr:-3});tp('LKR',{th:24,ld:40,gz:[1,0],hr:3});tp('TAKE',{th:-10,ld:-10,hp:-6,hr:-4,face:'scream',belly:[.97,.97]});
   // belly slap in three quarter view, looking at us
-  const SL={th:-48,ld:46,face:'bliss'};
+  const SL={th:-48,ld:40,face:'bliss'};
   tp('SLI',SL);tp('SLW',{...SL,arms:A(GL,[46,-22,2,50,-40,2])});tp('SLH',{...SL,belly:[1.1,.9],arms:A(GL,[36,-6,10,12,0,26]),ad:[0,12]});tp('SLR',{...SL,belly:[.94,1.07],arms:A(GL,[42,-14,4,40,-26,4])});
   // turns half away and scratches his butt, glancing back at us, then sniffs the hand
-  const SB={th:68,ld:-70,face:'bliss'};
+  const SB={th:68,ld:-56,face:'bliss'};
   tp('SBI',{...SB,arms:A([-32,-12,3,-30,-30,8],HR)});tp('SBa',{...SB,arms:A([-30,0,-8,-16,16,-22],HR)});tp('SBb',{...SB,arms:A([-30,2,-8,-12,21,-24],HR)});
-  tp('SBN',{th:20,ld:-20,hp:8,face:'whiff',arms:A([-38,-14,8,-9,-36,16],HR)});tp('SBQ',{th:14,ld:24,hp:-4,hr:6,face:'queasy',arms:A([-38,-14,8,-9,-36,16],HR)});
+  tp('SBN',{th:24,ld:-16,hp:8,face:'whiff',arms:A([-38,-14,8,-9,-36,16],HR)});tp('SBQ',{th:14,ld:24,hp:-4,hr:6,face:'queasy',arms:A([-38,-14,8,-9,-36,16],HR)});
   // armpit sniff
   const PA=[-43,-37,-2,-24,-58,-8];
-  tp('PS0',{hr:-2,arms:A([-40,-22,2,-38,-42,4],DR)});tp('PSA',{ld:-8,hr:-6,arms:A(PA,DR)});
-  tp('PSB',{th:6,ld:-62,hp:20,hr:-10,hdy:2,face:'whiff',belly:[1.07,1.03],arms:A(PA,DR)});tp('PSB2',{th:6,ld:-60,hp:16,hr:-9,hdy:2,face:'bliss',belly:[.99,1],arms:A(PA,DR)});
-  tp('PSQ',{th:2,ld:-30,hp:8,hr:-5,face:'queasy',belly:[.96,.98],arms:A(PA,DR)});
-  tp('PSC',{th:20,ld:44,hp:-6,hr:8,face:'scream',belly:[.97,.97],arms:A(PA,[41,-17,6,24,-33,10])});tp('PSC2',{th:24,ld:44,hp:-6,hr:8,face:'scream',belly:[.97,.97],arms:A(PA,[43,-11,6,29,-25,10])});
+  tp('PS0',{hr:-2,arms:A([-40,-22,2,-38,-42,4],DR)});tp('PSA',{th:-8,ld:-6,hr:-6,arms:A(PA,DR)});
+  tp('PSB',{th:-18,ld:-44,hp:20,hr:-10,hdy:2,face:'whiff',belly:[1.07,1.03],arms:A(PA,DR)});tp('PSB2',{th:-18,ld:-42,hp:16,hr:-9,hdy:2,face:'bliss',belly:[.99,1],arms:A(PA,DR)});
+  tp('PSQ',{th:-8,ld:-26,hp:8,hr:-5,face:'queasy',belly:[.96,.98],arms:A(PA,DR)});
+  tp('PSC',{th:24,ld:34,hp:-6,hr:8,face:'scream',belly:[.97,.97],arms:A(PA,[41,-17,6,24,-33,10])});tp('PSC2',{th:28,ld:34,hp:-6,hr:8,face:'scream',belly:[.97,.97],arms:A(PA,[43,-11,6,29,-25,10])});
   // brow wipe
   tp('WA',{th:8,ld:-14,hp:8,hr:6,face:'burpo',sweatB:1,arms:A(DL,[40,-33,8,14,-48,18])});tp('WB',{th:10,ld:-14,hp:8,hr:4,face:'burpo',sweatB:1,arms:A(DL,[39,-33,8,8,-47,18])});
   tp('WC',{th:0,ld:-20,arms:A(DL,[41,-24,2,52,-9,2])});tp('WD',{hp:6,face:'bliss',belly:[.98,.98],arms:A(DL,DR)});
@@ -1687,12 +1687,12 @@ function spinLive(Q){
   tp('NB',{th:6,ld:6,hp:8,hr:-4,face:'pick',arms:A([-41,-14,10,-26,-32,16],DR),prop:LP});tp('NC',{th:10,ld:14,hp:6,hr:-8,face:'whiff',arms:A([-38,-18,12,-12,-36,18],DR),prop:LP});
   tp('ND',{th:4,ld:-6,hp:-4,face:'queasy',belly:[.97,.98],arms:A([-40,-18,12,-14,-38,18],DR),prop:LP});tp('NE',{ld:-24,arms:A([-38,-20,2,-50,-36,2],DR)});
   // nose pick: shifty look both ways, then the pick
-  tp('SPL',{th:12,ld:-46,gz:[-1,0]});tp('SPR',{th:-10,ld:42,gz:[1,0]});
-  tp('PKA',{th:10,ld:-6,hp:6,face:'pick',arms:A(GL,[37,-24,10,8,-41,22])});tp('PKB',{th:10,ld:-6,hp:6,face:'pick',arms:A(GL,[37,-24,10,6.5,-38.5,22])});tp('PKF',{th:4,ld:-34,arms:A(GL,[41,-20,4,52,-34,6])});
+  tp('SPL',{th:22,ld:-40,gz:[-1,0]});tp('SPR',{th:-22,ld:40,gz:[1,0]});
+  tp('PKA',{th:10,ld:-6,hp:6,face:'pick',arms:A(GL,[37,-24,10,8,-41,22])});tp('PKB',{th:10,ld:-6,hp:6,face:'pick',arms:A(GL,[37,-24,10,6.5,-38.5,22])});tp('PKF',{th:10,ld:-30,arms:A(GL,[41,-20,4,52,-34,6])});
   // flex in three quarter view, kiss the bicep
   const FA=A([-39,-21,2,-34,-47,2],[39,-21,8,34,-47,8]);
-  tp('FXA',{th:-46,ld:46,arms:FA});tp('FXB',{th:-46,ld:88,hp:10,hr:10,hdx:3,face:'kiss',arms:FA});tp('FXC',{th:-46,ld:46,face:'smirk',arms:FA});
-  tp('FXD',{th:46,ld:-46,arms:A([-39,-21,8,-34,-47,8],[39,-21,2,34,-47,2])});
+  tp('FXA',{th:-46,ld:40,arms:FA});tp('FXB',{th:-30,ld:56,hp:10,hr:8,face:'kiss',arms:FA});tp('FXC',{th:-46,ld:40,face:'smirk',arms:FA});
+  tp('FXD',{th:46,ld:-40,arms:A([-39,-21,8,-34,-47,8],[39,-21,2,34,-47,2])});
   // burp, yawn
   tp('BPA',{hp:-12,face:'burp',belly:[1.07,1.06],arms:A(DL,DR)});tp('BPB',{th:6,hp:16,hdy:2,face:'burpo',belly:[.96,.96],arms:A(DL,DR)});
   tp('YWA',{hp:-14,face:'yawn',belly:[1.04,1.06],arms:up});tp('YWB',{th:12,ld:6,hp:-14,face:'yawn',belly:[1.04,1.06],arms:up});tp('YWC',{th:-12,ld:-6,hp:-14,face:'yawn',belly:[1.04,1.06],arms:up});
