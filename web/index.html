@@ -593,6 +593,18 @@ const STX=88,CHUG_Y=GY-30,BEL_MAX=.3,BEL_SET=.27;
 // ONE stomach for both tools: air from the valve (m.inf, also slows the launch) + soda (m.bel, cosmetic).  stom(m) is how full he is overall.
 // The valve pops him when the stomach is full (1.0); soda keeps going a little further (SODA_BURST).  The two OPTIONS: noBurst (cheat) and burpCharge (a fuller stomach = a bigger burp).
 const SODA_BURST=1.15,SODA_RATE=.25,STOM_MAX=2.2;let sodaHold=false;
+// SPANDEX: the briefs stretch over the belly instead of staying a fixed little patch at the hips.
+function flyBellyGeo(f){const sl=(man&&man.mode==='fly')?Math.min(1,Math.hypot(man.vx||0,man.vy||0)/1100):0;return[12+f*9-sl*f*4,4+f*6+sl*f*2,10+f*11,9+f*9+sl*f*1.5]}
+// front view: stretched cloth over the lower belly, clipped to the belly, with a striped waistband riding its curve
+function stretchBriefs(cy,rx,ry,f){if(f<.05||THONG)return;const k=Math.min(1,f*1.2),yw=x=>cy+ry*(.52+.2*(1-(x/rx)*(x/rx)));
+  ctx.save();ctx.beginPath();ctx.ellipse(0,cy,rx-.6,ry-.6,0,0,6.3);ctx.clip();
+  ctx.beginPath();ctx.moveTo(-rx,yw(-rx));for(let i=1;i<=24;i++){const x=-rx+2*rx*i/24;ctx.lineTo(x,yw(x))}ctx.lineTo(rx,cy+ry+3);ctx.lineTo(-rx,cy+ry+3);ctx.closePath();
+  ctx.fillStyle=BR;ctx.fill();
+  const g=ctx.createLinearGradient(0,cy,0,cy+ry);g.addColorStop(.5,'rgba(100,8,30,0)');g.addColorStop(1,'rgba(100,8,30,'+(.3*k)+')');ctx.fillStyle=g;ctx.fill();
+  ctx.fillStyle='rgba(255,190,200,'+(.26*k)+')';ctx.beginPath();ctx.ellipse(-rx*.35,yw(-rx*.35)+ry*.14,rx*.2,ry*.1,-.3,0,6.3);ctx.fill();     // sheen: the cloth is pulled tight
+  ctx.restore();
+  blob([ribbonPoly(-rx*.97,rx*.97,yw,3.1,24,'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(-rx*.97,rx*.97,yw,3.1,5.4,'rgba(224,36,58,.85)')}
+// SPANDEX
 // FIGURE2
 // BELLYMERGE: the belly is part of the torso's single outline; this adds the underside shadow and the fold where it meets the lap
 function bellyVol(bx,by,rx,ry,f){if(f<.05)return;const k=Math.min(1,f),gr=ctx.createLinearGradient(0,by-ry,0,by+ry);
@@ -871,11 +883,13 @@ function drawFront(pose,fk,t,o){
     if(pose==='flex')parts.push(pEll(s*31,-27,6.4,5.4));                                                                   // the bicep
     blob(parts);pitHair(s*21.5,-20.5,A[0],A[1],s)}
   if(o&&o.ro){ctx.save();ctx.translate(o.ro[0],o.ro[1])}
+  const SQ=Math.min(INF,1.8);if(SQ>.04){ctx.save();ctx.translate(0,11);ctx.scale(1+SQ*.3,1+SQ*.12);ctx.translate(0,-11)}
   {const bp=new Path2D();bp.moveTo(-20,11);bp.bezierCurveTo(-21.6,14.6,-24.6,19,-25,25.4);bp.bezierCurveTo(-25.2,28.6,-23,31,-20.2,32.4);bp.bezierCurveTo(-15.4,29.2,-7,29.6,-3,36);bp.lineTo(3,36);bp.bezierCurveTo(7,29.6,15.4,29.2,20.2,32.4);bp.bezierCurveTo(23,31,25.2,28.6,25,25.4);bp.bezierCurveTo(24.6,19,21.6,14.6,20,11);bp.closePath();   // the hips: flare out from the waist to the widest point, then taper smoothly into the thighs (no wings, no ledge)   // the hips: flare out from the waist to the widest point, then taper smoothly into the thighs (no wings, no ledge)   // the hips: flare out from the waist to the widest point, then taper smoothly into the thighs (no wings, no ledge)
    blob([{p:bp,fill:BR,bb:[-27,10,27,37]}],THONG?{ow:1.8}:{ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});}
   ctx.fillStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.ellipse(-15,23,2.8,6,.3,0,6.3);ctx.ellipse(15,23,2.8,6,-.3,0,6.3);ctx.fill();
   if(!THONG){ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-5,29);ctx.lineTo(-5,21);ctx.lineTo(0,26);ctx.lineTo(5,21);ctx.lineTo(5,29);ctx.stroke();}   // no logo on the thong
   {const yc=x=>13+4.6*(1-(x/21)*(x/21));blob([ribbonPoly(-21,21,yc,3.1,24,'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(-21,21,yc,3.1,5.4,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
+  if(SQ>.04)ctx.restore();
   if(THONG){gluteCreases();thongFront()}
   if(o&&o.ro)ctx.restore();
   // torso: shoulders, chest, belly and love handles are ONE mass, drawn after the briefs so the belly overhangs the waistband
@@ -893,7 +907,7 @@ function drawFront(pose,fk,t,o){
    ctx.strokeStyle='rgba(176,92,52,.8)';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(0,4+INF*16,2.4+INF*2.5,.1,3.1);ctx.stroke();                                                      // navel
    if(INF>.04){const f=INF,cy=-2+f*14,rx=22+f*16,ry=17+f*20;ctx.save();ctx.fillStyle='rgba(255,255,255,'+(.2+f*.25)+')';ctx.beginPath();ctx.ellipse(-rx*.4,cy-ry*.35,rx*.2,ry*.2,-.5,0,6.3);ctx.fill();
      if(f>.3){ctx.strokeStyle='rgba(205,70,60,'+Math.min(.8,(f-.3)*1.4)+')';ctx.lineWidth=1.2;ctx.lineCap='round';for(const q of[-1,1])for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(q*rx*.15,cy+(k-1)*ry*.3,rx*.8,q>0?-.5+Math.PI*0:Math.PI-.5,q>0?.5:Math.PI+.5);ctx.stroke()}}
-     if(f>.65){ctx.globalAlpha=Math.min(.28,(f-.65)*1.2)*(.6+.4*Math.sin(time*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(0,cy,rx*.97,ry*.97,0,0,6.3);ctx.fill()}ctx.globalAlpha=1;strainFX(0,cy,rx,ry,f,0,4+f*16-1.5,time);ctx.restore()}
+     if(f>.65){ctx.globalAlpha=Math.min(.28,(f-.65)*1.2)*(.6+.4*Math.sin(time*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(0,cy,rx*.97,ry*.97,0,0,6.3);ctx.fill()}ctx.globalAlpha=1;ctx.restore();stretchBriefs(cy,rx,ry,f);ctx.save();strainFX(0,cy,rx,ry,f,0,4+f*16-1.5,time);ctx.restore()}
    curls(Array.from({length:6},(_,k)=>[k%2?.9:-.9,-13+k*2.6,k%2?1:-1]));
    if(bgrp)ctx.restore();
    for(const q of[-1,1]){ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(q*10+wo[0],12.4+wo[1]);ctx.quadraticCurveTo(q*19+wo[0],15+wo[1],q*26+wo[0],11.6+wo[1]);ctx.stroke()}}   // the fold under each roll
@@ -932,7 +946,8 @@ function drawSeatSide(f,t){
    ctx.globalAlpha=1;strainFX(bx,by,rx,ry,f,bx+rx*.9,by+ry*.12,t);
    ctx.restore()}
   // boxers: the rear on the nozzle, waistband striped, the belly hangs over it
-  blob([pEll(-4,-8,14,10,BR),pEll(6,-4,12,7,BR)],{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
+  blob([pEll(-4,-8,14,10,BR),pEll(6,-4,12,7,BR)].concat(f>.05?[pEll(C[0]+1,C[1]+C[3]*.2,C[2]*.92,C[3]*1.05,BR)]:[]),{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
+  if(f>.05)bandAlong([B[0]-B[2]*.4,B[1]+B[3]*.78],[B[0]+B[2]*.1,B[1]+B[3]*.98],[B[0]+B[2]*.8,B[1]+B[3]*.5],2.3,2);   // waistband rides the stretched belly
   ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-10,-11,3.2,2.4,-.5,0,6.3);ctx.fill();
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=1.6;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-6,-3);ctx.lineTo(-6,-9);ctx.lineTo(-2,-5);ctx.lineTo(2,-9);ctx.lineTo(2,-3);ctx.stroke();
   // near leg dangling forward, sock and shoe
@@ -981,10 +996,10 @@ function drawSide(t,fk){
      ctx.globalAlpha=1;strainFX(bx,by,rx,ry,f,bx+rx*.85,by+ry*.1,time);
      ctx.restore()}}
   curls(Array.from({length:5},(_,k)=>[16+INF*18+(k%2)*2,-12+INF*6+k*2,k%2?1:-1]));
-  T(ro,()=>{blob([pEll(-13,6,13.5,11.5,BR),pEll(3,10,14,6.5,BR)],{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
+  T(ro,()=>{const BG=INF>.02?flyBellyGeo(INF):null;blob([pEll(-13,6,13.5,11.5,BR),pEll(3,10,14,6.5,BR)].concat(BG?[pEll(BG[0],BG[1]+BG[3]*.5,BG[2]*.82,BG[3]*.55,BR)]:[]),{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
     ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-16,2,3.6,2.6,-.5,0,6.3);ctx.fill();
     ctx.strokeStyle='rgba(110,10,32,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(-6,9,8,2.1,3.7);ctx.stroke();
-    bandAlong([-22,-3],[-2,1],[15,13],2.7,2)});                                                                                         // the waistband: a soft striped strip that follows the body
+    bandAlong([-22,-3],BG?[-2+INF*4,2+INF*6]:[-2,1],BG?[BG[0]+BG[2]*.6,BG[1]+BG[3]*.62]:[15,13],2.7,2)});                                                                                         // the waistband: a soft striped strip that follows the body
   blob([pTap(15,-8,8.4,28,-15,6.6)],{ow:1.8});                                                                       // neck + shoulder line: the head sits ON a body
   blob([pTap(15,-14,6.4,26,-40+fl*2,5.2),pTap(26,-40+fl*2,5.2,46,-41+fl*3,4.6),pEll(26,-40+fl*2,5.4,5.3)],{ow:1.8});     // near arm: up and forward past the head
   blob([pEll(49,-41+fl*3,5.8,5.4),pEll(52.5,-45+fl*3,2.2,3)],{ow:1.6});                                                // open hand + thumb
