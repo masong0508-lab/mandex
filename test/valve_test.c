@@ -2,7 +2,9 @@
    drag off -> fires slower with a bigger radius; beans / towel / splat are one use per level. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "mx.h"
+#include "mx_meta.h"
 static MxWorld W;
 #define DT R(0.0166667)
 static int fails;
@@ -11,9 +13,28 @@ static void run(int n){ for(int i = 0; i < n; i++) mx_update(&W, DT); }
 int main(void){
   mx_load(&W, 0);
   int men0 = W.men;
+  /* 0: the valve is an unlockable and never grabs a pull-back */
+  { MxStats S; mx_meta_init(&S);
+    CHECK(!mx_valve_unlocked(&S), "valve locked on a fresh save");
+    S.stars[0] = 1; S.stars[1] = 1; CHECK(!mx_valve_unlocked(&S), "still locked after 2 levels");
+    S.stars[2] = 1; CHECK(mx_valve_unlocked(&S), "unlocked after beating 3 levels"); }
+  CHECK(!mx_valve_seat(&W) && !W.man.vlv && !W.man.seated, "locked: seating is refused");
+  { int grabbed = 0; double best = 1e9;
+    for(int a = 0; a < 360; a += 3) for(int r = 1; r <= 4; r++){
+      double k = RTOF(MX_PULL_MAX) * r / 4, c = cos(a * 3.14159265 / 180), sn = sin(a * 3.14159265 / 180);
+      mx_set_pull(&W, R(k * c), R(k * sn)); grabbed |= W.man.vlv | W.man.seated; }
+    CHECK(!grabbed, "no pull-back anywhere in the sling's reach grabs the valve");
+    for(int a = 0; a < 360; a++){ double px = RTOF(MX_ANCHOR_X) + RTOF(MX_PULL_MAX) * cos(a * 3.14159265 / 180) - RTOF(MX_VALVE_X),
+                                         py = RTOF(MX_ANCHOR_Y) + RTOF(MX_PULL_MAX) * sin(a * 3.14159265 / 180) - RTOF(MX_VALVE_Y);
+      double d = sqrt(px * px + py * py); if(d < best) best = d; }
+    CHECK(best > 1.5, "a full pull-back stays clear of the valve nozzle"); }
+  mx_set_pull(&W, 0, 0);
+  W.valve_ok = 1;
+  CHECK(mx_valve_seat(&W) && W.man.vlv == 1 && W.man.seated == 1, "unlocked: seating puts him on the valve");
+  mx_load(&W, 0);
+  CHECK(W.valve_ok == 1, "the unlock survives a level reload");
   /* 1: hold on the valve until it bursts */
-  mx_set_pull(&W, MX_VALVE_X - MX_ANCHOR_X, MX_VALVE_Y - MX_ANCHOR_Y);
-  CHECK(W.man.vlv == 1, "dragging onto the valve snaps him there");
+  CHECK(mx_valve_seat(&W) && W.man.vlv == 1, "seated on the valve");
   run(60 * 2);
   CHECK(W.man.inf > R(0.4) && W.man.inf < R(0.7), "about 55% inflated after 2 s");
   run(60 * 3);
@@ -21,7 +42,7 @@ int main(void){
   run(60 * 2);
   CHECK(W.man.mode == MAN_AIM && W.man.inf == 0, "next man arrives deflated");
   /* 2: let go on the valve: stays seated and keeps filling */
-  mx_set_pull(&W, MX_VALVE_X - MX_ANCHOR_X, MX_VALVE_Y - MX_ANCHOR_Y);
+  mx_valve_seat(&W);
   mx_release(&W);
   CHECK(W.man.seated == 1 && W.man.mode == MAN_AIM, "release on the valve = seated, not fired");
   run(60);

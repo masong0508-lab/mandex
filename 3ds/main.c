@@ -211,7 +211,7 @@ static void draw_valve(const View *v){
   const MxMan *m = &world.man; int f = m->mode == MAN_AIM ? (int)(RTOF(m->inf) * 100) : 0;
   rect(v->s, x - p * 2, gy - 2, p * 4, 3, RGB(110, 115, 130));
   rect(v->s, x - p / 2 - 1, y + p, p + 2, gy - y - p, RGB(74, 85, 104));
-  rect(v->s, x - p, y, p * 2, p * 2, RGB(255, 160, 40));                         /* nozzle */
+  rect(v->s, x - p, y, p * 2, p * 2, world.valve_ok ? RGB(255, 160, 40) : RGB(130, 130, 140));                         /* nozzle */
   if(m->mode == MAN_AIM && f > 0){ rect(v->s, x - p * 5, y - p * 9, p * 10, p, RGB(20, 24, 40)); rect(v->s, x - p * 5 + 1, y - p * 9 + 1, f * (p * 10 - 2) / 100, p - 2, f < 50 ? RGB(125, 255, 90) : f < 80 ? RGB(255, 210, 63) : RGB(255, 70, 70)); }
 }
 static void draw_world(const View *v){
@@ -267,7 +267,7 @@ static void draw_end(void){
 
 /* ---------------------------------------------------------------- flow */
 static void load_level(int l){
-  mx_load(&world, l); mx_meta_level_start(&stats, &world);
+  mx_load(&world, l); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats);
   memset(parts, 0, sizeof parts);
   cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1;
   dragging = 0; pad_used = 0; pad_dx = pad_dy = 0;
@@ -309,6 +309,8 @@ int main(void){
           if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel = 0; load_level(0); } else { sel = next; load_level(next); }
         }
       } else if(m->mode == MAN_AIM){
+        world.valve_ok = mx_valve_unlocked(&stats);
+        if((down & KEY_R) && mx_valve_seat(&world)) pad_used = 0;       /* R: sit on the air valve (beat 3 levels) */
         if(down & KEY_TOUCH) dragging = 1;
         if((held & KEY_TOUCH) && dragging){
           float cx = (float)t.px / 4.0f + vb.cx, cy = (float)t.py / 4.0f + vb.cy;

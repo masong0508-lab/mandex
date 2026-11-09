@@ -342,15 +342,18 @@ static void draw_valve(const View *v){
   gfx_rect(v->buf, x - ppc * 2, gy - 2, ppc * 4, 3, C_GRAY);
   gfx_rect(v->buf, x - th / 2, y + ppc, th, gy - y - ppc, C_SUIT);
   gfx_rect(v->buf, x - th / 2, y + ppc, th > 2 ? th / 2 : 1, gy - y - ppc, C_GRAY);
-  gfx_tri(v->buf, x - ppc * 2, y + ppc * 2, x + ppc * 2, y + ppc * 2, x, y + 1, C_FIRE);                    /* nozzle */
-  int gx = x - ppc * 4, gyy = y + ppc * 8;
+  gfx_tri(v->buf, x - ppc * 2, y + ppc * 2, x + ppc * 2, y + ppc * 2, x, y + 1, world.valve_ok ? C_FIRE : C_GRAY);   /* nozzle (grey while locked) */
+  int gx = x + ppc * 4, gyy = y + ppc * 8;
   gfx_ell(v->buf, gx, gyy, ppc * 2 + 1, ppc * 2 + 1, C_BLACK); gfx_ell(v->buf, gx, gyy, ppc * 2, ppc * 2, C_WHITE);
   gfx_line(v->buf, gx, gyy, gx + (f - 50) * ppc / 30, gyy - ppc, f > 75 ? C_RED : C_BLACK);               /* needle */
   if(m->mode == MAN_AIM && f > 0){
-    gfx_rect(v->buf, x - ppc * 5, y - ppc * 9, ppc * 10, ppc + 2, C_UIBG);
-    gfx_rect(v->buf, x - ppc * 5 + 1, y - ppc * 9 + 1, f * (ppc * 10 - 2) / 100, ppc, f < 50 ? C_GOO : f < 80 ? C_GOLD : C_RED);
-    if(f > 70 && (frame & 4)) gfx_text_c(v->buf, x, y - ppc * 12, "DANGER", C_RED, C_BLACK, 1);
-  } else if(m->mode == MAN_AIM && !dragging && (frame & 32)) gfx_text_c(v->buf, x, y + ppc * 12, "AIR", C_WHITE, C_BLACK, 1);
+    gfx_rect(v->buf, x - ppc * 2, y - ppc * 9, ppc * 10, ppc + 2, C_UIBG);
+    gfx_rect(v->buf, x - ppc * 2 + 1, y - ppc * 9 + 1, f * (ppc * 10 - 2) / 100, ppc, f < 50 ? C_GOO : f < 80 ? C_GOLD : C_RED);
+    if(f > 70 && (frame & 4)) gfx_text_c(v->buf, x + ppc * 3, y - ppc * 12, "DANGER", C_RED, C_BLACK, 1);
+  } else if(m->mode == MAN_AIM && !dragging && !m->seated){
+    if(!world.valve_ok) gfx_text_c(v->buf, x + ppc * 2, y - ppc * 5, "LOCKED", C_GRAY, C_BLACK, 1);
+    else if(frame & 32) gfx_text_c(v->buf, x + ppc * 2, y - ppc * 5, "TAP: AIR", C_WHITE, C_BLACK, 1);
+  }
 }
 
 static void draw_man(const View *v){
@@ -572,7 +575,7 @@ static void apply_outfit(int o){
   }
 }
 static void load_level(int l){
-  mx_load(&world, l); mx_meta_level_start(&stats, &world);
+  mx_load(&world, l); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats);
   mx_set_substeps(&world, world.substeps > MX_DS_MAX_SUBSTEPS ? MX_DS_MAX_SUBSTEPS : world.substeps);
   cells0 = mx_cells_left(&world); disp_score = 0; end_t = 0; was_state = MX_PLAY; dragging = 0; pad_used = 0;
   memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops);
@@ -723,14 +726,21 @@ int main(void){
           for(int k = 0; k < 3; k++) if(hit(&t, 96 + k * 52, 172, 50, 16)){ mx_select_power(&world, k + 1); sfx_play(SFX_CLICK, 64); }
         }
         if(down & KEY_X){ int nx = world.pw_sel; for(int tries = 0; tries < 4; tries++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; } if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); sfx_play(SFX_CLICK, 64); }
+        world.valve_ok = mx_valve_unlocked(&stats);                       /* beat 3 levels to unlock the air valve */
+        if((down & KEY_R) && mx_valve_seat(&world)) sfx_play(SFX_CLICK, 64);
         if(down & KEY_TOUCH){
+          int vdx = t.px - vx(&av, MX_VALVE_X), vdy = t.py - vy(&av, MX_VALVE_Y);
           int dx = t.px - vx(&av, m->x), dy = t.py - vy(&av, m->y);
-          dragging = dx * dx + dy * dy < 34 * 34;                         /* grab the man */
+          if(!m->seated && vdx * vdx + vdy * vdy < 20 * 20 && mx_valve_seat(&world)){ dragging = 0; sfx_play(SFX_CLICK, 64); }   /* tap the valve */
+          else dragging = dx * dx + dy * dy < 34 * 34;                   /* grab the man */
         }
         if((held & KEY_TOUCH) && dragging){
+          int vdx = t.px - vx(&av, MX_VALVE_X), vdy = t.py - vy(&av, MX_VALVE_Y);
+          if(!(m->seated && vdx * vdx + vdy * vdy < 20 * 20)){            /* seated: the stylus must leave the valve to pull him off */
           real cx = RI(t.px + av.cx) >> 2, cy = RI(t.py + av.cy) >> 2;    /* stylus px -> cells (4 px per cell) */
           mx_set_pull(&world, cx - MX_ANCHOR_X, cy - MX_ANCHOR_Y);
           if(frame % 6 == 0) sfx_play(SFX_STRETCH, 40);
+          }
         }
         if((up & KEY_TOUCH) && dragging){ dragging = 0; mx_release(&world); }
         if(!dragging){

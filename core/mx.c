@@ -837,9 +837,13 @@ void mx_set_pull(MxWorld *w, real dx, real dy){
   real d = rsqrt(rmul(dx, dx) + rmul(dy, dy));
   if(d > MX_PULL_MAX){ real k = rdiv(MX_PULL_MAX, d); dx = rmul(dx, k); dy = rmul(dy, k); }
   m->x = MX_ANCHOR_X + dx; m->y = MX_ANCHOR_Y + dy;
-  { real vx = m->x - MX_VALVE_X, vy = m->y - MX_VALVE_Y;
-    if(rmul(vx, vx) + rmul(vy, vy) < R(14)){ m->x = MX_VALVE_X; m->y = MX_VALVE_Y; m->vlv = 1; }   /* 3.75 cells */
-    else { m->vlv = 0; m->seated = 0; } }
+  m->vlv = 0; m->seated = 0;                            /* any pull-back leaves the valve; the valve never grabs a pull */
+}
+int mx_valve_seat(MxWorld *w){
+  MxMan *m = &w->man;
+  if(!w->valve_ok || m->mode != MAN_AIM || w->state != MX_PLAY) return 0;
+  m->x = MX_VALVE_X; m->y = MX_VALVE_Y; m->vlv = 1; m->seated = 1;
+  return 1;
 }
 void mx_release(MxWorld *w){
   MxMan *m = &w->man;
@@ -1051,7 +1055,9 @@ static void build(MxWorld *w, int l){
 void mx_load(MxWorld *w, int level){
   init_tables(); init_mats();
   int keep_sub = w->substeps, keep_wob = w->wob_enabled ? 1 : 0, first = !w->substeps;   /* front-end quality choices survive a reload */
+  int keep_valve = w->valve_ok;
   memset(w, 0, sizeof *w);
+  w->valve_ok = keep_valve;
   level %= MX_NUM_LEVELS;
   w->substeps = first ? SUBSTEPS : keep_sub;
   w->wob_enabled = first ? 1 : keep_wob;

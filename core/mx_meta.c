@@ -4,6 +4,7 @@
 static int story_done(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_LEVELS; i++) n += s->stars[i] > 0; return n; }
 static int three_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_LEVELS; i++) n += s->stars[i] >= 3; return n; }
 static int total_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_LEVELS; i++) n += s->stars[i]; return n; }
+int mx_valve_unlocked(const MxStats *s){ return story_done(s) >= MX_VALVE_UNLOCK_LEVELS; }
 int mx_ach_count(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_ACH; i++) n += (s->ach >> i) & 1; return n; }
 
 typedef struct { const char *n, *d; } AchDef;

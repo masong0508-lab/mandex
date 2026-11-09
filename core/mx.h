@@ -129,7 +129,8 @@ typedef struct {
   int mode;            /* MAN_* */
   real x, y, vx, vy, t, gt, hitCd, gooT, ang;
   uint8_t dive;
-  /* air valve: back him onto it (mx_set_pull snaps him there, vlv=1) and he inflates; let go there and he stays seated, still filling.
+  /* air valve (an unlockable, tucked into the far lower-left corner, clear of every pull-back): w->valve_ok must be set, then
+     mx_valve_seat() puts him on it (vlv=1, seated=1) and he inflates; dragging him off (mx_set_pull) fires from the sling as usual.
      inf 0..1: belly size.  At 1 he bursts and the shot is lost.  rad = collision radius, grows with inf. */
   real inf, airT, rad;
   uint8_t vlv, seated, pwr, beaned, splatted, bounces;
@@ -149,6 +150,7 @@ typedef struct {
   MxTarget targets[MX_MAX_TARGETS];
   int ntargets;
   int pw_sel, pw_left[4];        /* armed power-up (PW_*), uses left this level */
+  int valve_ok;                  /* air valve unlocked (front-ends set it from mx_valve_unlocked; survives mx_load) */
   int st_inflated, st_pops, st_pw[4];   /* session counters for achievements */
   MxMan man;
   /* game */
@@ -189,8 +191,9 @@ void mx_set_pull(MxWorld *w, real dx, real dy); /* drag offset from anchor, cell
 void mx_release(MxWorld *w);                  /* let go of the sling */
 void mx_dive(MxWorld *w);                     /* belly flop (or the beans jet when armed) */
 void mx_select_power(MxWorld *w, int pw);      /* PW_*: arm / disarm before launching (only while aiming) */
-#define MX_VALVE_X R(8.5)                      /* the air valve, in cells (his rear goes here) */
-#define MX_VALVE_Y R(49.75)
+#define MX_VALVE_X R(4.5)                      /* the air valve, in cells (his rear goes here): far lower-left, a full pull-back */
+#define MX_VALVE_Y R(52.5)                     /* stays ~1.9 cells clear of it, so no aim can ever touch it */
+int  mx_valve_seat(MxWorld *w);                /* put him on the valve. 0 if locked or not aiming */
 int  mx_targets_alive(const MxWorld *w);
 int  mx_cells_left(const MxWorld *w);
 const char *mx_level_name(int level);

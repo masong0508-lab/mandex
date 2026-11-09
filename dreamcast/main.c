@@ -434,12 +434,12 @@ static void draw_all(void){
     quad(vx - 14, gy - 4, 28, 5, Z_MAN - 0.6f, argb(110, 115, 130, 255));
     quad(vx - 4, vy + 6, 8, gy - vy - 6, Z_MAN - 0.5f, argb(74, 85, 104, 255));
     quad(vx - 4, vy + 6, 3, gy - vy - 6, Z_MAN - 0.45f, argb(150, 160, 175, 255));
-    quad(vx - 7, vy + 2, 14, 8, Z_MAN - 0.4f, argb(255, 160, 40, 255));                                            /* nozzle */
-    puff(vx - 20, vy + 40, 10, Z_MAN - 0.4f, argb(20, 20, 20, 255)); puff(vx - 20, vy + 40, 8.5f, Z_MAN - 0.38f, WHITE);
-    { float a = 3.14159f * (0.85f + 1.3f * f / 100.0f); seg(vx - 20, vy + 40, vx - 20 + cosf(a) * 7, vy + 40 + sinf(a) * 7, 1.6f, Z_MAN - 0.3f, f > 75 ? argb(220, 30, 30, 255) : argb(20, 20, 20, 255)); }
-    if(m->mode == MAN_AIM && f > 0){ quad(vx - 25, vy - 52, 50, 8, Z_HUD, argb(20, 24, 40, 255)); quad(vx - 24, vy - 51, 48.0f * f / 100.0f, 6, Z_HUD + 0.1f, f < 50 ? argb(125, 255, 90, 255) : f < 80 ? argb(255, 210, 63, 255) : argb(255, 70, 70, 255));
+    quad(vx - 7, vy + 2, 14, 8, Z_MAN - 0.4f, world.valve_ok ? argb(255, 160, 40, 255) : argb(130, 130, 140, 255));                                            /* nozzle */
+    puff(vx + 20, vy + 40, 10, Z_MAN - 0.4f, argb(20, 20, 20, 255)); puff(vx + 20, vy + 40, 8.5f, Z_MAN - 0.38f, WHITE);
+    { float a = 3.14159f * (0.85f + 1.3f * f / 100.0f); seg(vx + 20, vy + 40, vx + 20 + cosf(a) * 7, vy + 40 + sinf(a) * 7, 1.6f, Z_MAN - 0.3f, f > 75 ? argb(220, 30, 30, 255) : argb(20, 20, 20, 255)); }
+    if(m->mode == MAN_AIM && f > 0){ quad(vx - 12, vy - 52, 50, 8, Z_HUD, argb(20, 24, 40, 255)); quad(vx - 11, vy - 51, 48.0f * f / 100.0f, 6, Z_HUD + 0.1f, f < 50 ? argb(125, 255, 90, 255) : f < 80 ? argb(255, 210, 63, 255) : argb(255, 70, 70, 255));
       if(f > 70 && ((int)(world.time * 8) & 1)) text("DANGER", vx, vy - 58, 12, argb(255, 70, 70, 255), 1, Z_HUD); }
-    else if(m->mode == MAN_AIM && ((int)(world.time * 2) & 1)) text("AIR", vx, vy + 70, 11, WHITE, 1, Z_HUD); }
+    else if(m->mode == MAN_AIM && ((int)(world.time * 2) & 1)) text(world.valve_ok ? "D-PAD DOWN: AIR" : "AIR: LOCKED", vx + 30, vy - 20, 10, WHITE, 1, Z_HUD); }
   /* the aiming dots */
   if(m->mode == MAN_AIM){
     float dx = m->x - MX_ANCHOR_X, dy = m->y - MX_ANCHOR_Y;
@@ -508,7 +508,7 @@ static void draw_all(void){
     static const char *const PWN[4] = { "NONE", "BEANS", "TOWEL", "SPLAT" };
     snprintf(buf, sizeof buf, "X: POWER-UP  %s%s", PWN[world.pw_sel], world.pw_sel ? "" : " (B/T/S x1)");
     text(buf, 12, 466, 14, world.pw_sel ? argb(255, 210, 63, 255) : argb(255, 255, 255, 200), 0, Z_HUD);
-    snprintf(buf, sizeof buf, "LEFT-DOWN STICK = AIR VALVE: A on it to sit and inflate");
+    snprintf(buf, sizeof buf, "D-PAD DOWN = AIR VALVE (beat 3 levels)");
     if(m->inf <= 0) text(buf, 628, 466, 11, argb(255, 255, 255, 150), 2, Z_HUD);
   }
   toast_tick();
@@ -544,7 +544,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ mx_load(&world, n); mx_meta_level_start(&stats, &world); hint_t = 420; }
+static void load_level(int n){ mx_load(&world, n); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats); hint_t = 420; }
 
 static void gfx_init(void){
   pvr_init_defaults();
@@ -595,12 +595,14 @@ int main(int argc, char **argv){
         if(pressed & CONT_START) paused = 1;
         if(pressed & CONT_Y) load_level(world.level);
         if(world.man.mode == MAN_AIM){
+          world.valve_ok = mx_valve_unlocked(&stats);
           float jx = st->joyx / 127.0f, jy = st->joyy / 127.0f;
           if(fabsf(jx) < 0.12f) jx = 0;
           if(fabsf(jy) < 0.12f) jy = 0;
           if(pressed & CONT_X){ int nx = world.pw_sel; for(int k = 0; k < 4; k++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; }
             if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); }
           if(!(world.man.seated && jx == 0 && jy == 0)) mx_set_pull(&world, jx * MX_PULL_MAX, jy * MX_PULL_MAX);   /* seated on the valve: a centred stick leaves him there */
+          if(pressed & CONT_DPAD_DOWN) mx_valve_seat(&world);
           if(pressed & (CONT_A | CONT_B)){ mx_release(&world); hint_t = 0; }
         } else if(pressed & (CONT_A | CONT_B)) mx_dive(&world);
       }

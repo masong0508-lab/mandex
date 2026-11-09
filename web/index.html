@@ -13,7 +13,7 @@ canvas{max-width:100vw;max-height:100vh;touch-action:none;border-radius:10px;box
 // =====================================================================
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const V=8,COLS=120,ROWS=60,GY=ROWS*V,W=960,H=540,G=900,K=1100,RC=V*.5;
-const SX=128,SY=GY-118,PULL=92,VX=SX-60,VY=SY+36;   // VX,VY: the air valve you back him onto
+const SX=128,SY=GY-118,PULL=92,VX=36,VY=SY+58;   // VX,VY: the air valve, tucked in the far lower-left corner: a full pull-back stops ~15px short of it
 let pw={sel:null,left:{beans:1,towel:1,splat:1}};
 const DX=[1,-1,0,0],DY=[0,0,1,-1];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v,rnd=Math.random;
@@ -450,9 +450,10 @@ function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long 
     if(m.inf>.5){SFX.creak(m.inf)}
     if(m.inf>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
   if(m.inf>=1)explodeMan()}
+function valveOpen(){return PD.unlockAll||storyDone()>=3}   // unlockable: beat 3 story levels (U on the level select unlocks everything)
 function drawValve(){
-  const m=man,f=m.mode==='aim'?m.inf:0,t=time;
-  ctx.save();ctx.lineCap='round';
+  const m=man,f=m.mode==='aim'?m.inf:0,t=time,open=valveOpen();
+  ctx.save();ctx.lineCap='round';if(!open)ctx.globalAlpha=.38;
   ctx.fillStyle='#3d4452';ctx.fillRect(VX-16,GY-6,32,8);                           // base plate
   ctx.strokeStyle='#59627a';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(VX,GY-4);ctx.lineTo(VX,VY+12);ctx.stroke();
   ctx.strokeStyle='#8a94ad';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(VX-2,GY-4);ctx.lineTo(VX-2,VY+12);ctx.stroke();
@@ -461,7 +462,8 @@ function drawValve(){
   ctx.strokeStyle=f>.75?'#e0243a':'#222';ctx.lineWidth=2;const a=Math.PI*(.85+1.3*f);ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(gx+Math.cos(a)*9,gy+Math.sin(a)*9);ctx.stroke();
   ctx.fillStyle='#e0243a';ctx.fillRect(gx+5,gy-9,4,3);
   ctx.save();ctx.translate(VX+16,VY+40);ctx.rotate(f*18+(m.mode==='aim'&&dragging&&m.vlv?t*6:0));ctx.strokeStyle='#e0243a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-9,0);ctx.lineTo(9,0);ctx.moveTo(0,-9);ctx.lineTo(0,9);ctx.stroke();ctx.restore();   // wheel
-  if(m.mode==='aim'&&!dragging&&m.inf===0){ctx.globalAlpha=.6+.4*Math.sin(t*4);txt('AIR VALVE',VX,VY+66,11,'#fff','center');ctx.globalAlpha=1}
+  if(!open){ctx.globalAlpha=.8;txt('LOCKED',VX,VY-12,11,'#aab','center');txt('beat 3 levels',VX,VY-26,10,'#889','center');ctx.globalAlpha=.38}
+  else if(m.mode==='aim'&&!m.seated&&!dragging&&m.inf===0){ctx.globalAlpha=.6+.4*Math.sin(t*4);txt('TAP: AIR VALVE',VX,VY-12,11,'#fff','center');ctx.globalAlpha=1}
   if(m.mode==='aim'&&m.inf>0){const w=44;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(VX-w/2,VY-62,w,7);ctx.fillStyle=f<.5?'#7dff5a':f<.8?'#ffd23f':'#ff4a4a';ctx.fillRect(VX-w/2+1,VY-61,(w-2)*f,5);
     if(f>.7&&Math.sin(t*20)>0)txt('DANGER!',VX,VY-68,13,'#ff4a4a','center')}
   ctx.restore()}
@@ -1815,9 +1817,10 @@ cv.addEventListener('pointerdown',e=>{
   if(hitTest(x,y))return;
   if(state==='win'){nextAfterWin();return}
   if(state==='lose'){retry();return}
+  if(man.mode==='aim'&&valveOpen()&&!man.seated&&Math.hypot(x-VX,y-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.hiss();return}   // tap the valve: he sits and fills; drag him off to fire
   if(man.mode==='aim'&&Math.hypot(x-man.x,y-man.y)<70){dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
-cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[x,y]=pt(e);let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}man.x=SX+dx;man.y=SY+dy;if(Math.hypot(man.x-VX,man.y-VY)<30){man.x=VX;man.y=VY;man.vlv=true}else{man.vlv=false;man.seated=false}});
+cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[x,y]=pt(e);let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}if(man.seated&&Math.hypot(x-VX,y-VY)<38)return;man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false});
 cv.addEventListener('pointerup',()=>{if(state==='edit'){eUp();return}if(dragging){dragging=false;if(man.mode==='aim'){if(man.vlv){man.seated=true;return}man.seated=false;launch()}}});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);
   if(e.code==='Space'){dive();e.preventDefault()}
@@ -2084,7 +2087,8 @@ function drawEditor(){
 function onWin(){
   const st=men>=2?3:men>=1?2:1,sc=Math.round(score);
   if(CL&&CL.custom){if(testing||true)ST().customWins++}
-  else{PD.stars[level]=Math.max(PD.stars[level]||0,st);PD.best[level]=Math.max(PD.best[level]||0,sc);ST().wins++}
+  else{const hadValve=valveOpen();PD.stars[level]=Math.max(PD.stars[level]||0,st);PD.best[level]=Math.max(PD.best[level]||0,sc);ST().wins++;
+    if(!hadValve&&valveOpen())toast('ach','Air valve unlocked!','tap the valve at the lower left of the sling')}
   const used=CL?CL.men-men:0;if(used<=1)ST().oneShots++;
   ST().bestScore=Math.max(ST().bestScore,sc);
   achCheck();pdSave()}

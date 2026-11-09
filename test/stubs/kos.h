@@ -17,6 +17,6 @@ void pvr_poly_cxt_txr(pvr_poly_cxt_t*, int list, int fmt, int w, int h, pvr_ptr_
 pvr_ptr_t pvr_mem_malloc(size_t n); void pvr_mem_free(pvr_ptr_t p); void pvr_txr_load(const void *src, pvr_ptr_t dst, uint32 n);
 int pvr_prim(void*,int); void pvr_wait_ready(void); void pvr_scene_begin(void); void pvr_list_begin(int); void pvr_list_finish(void); void pvr_scene_finish(void);
 typedef struct { int d; } maple_device_t; typedef struct { uint32 buttons; int joyx, joyy, ltrig, rtrig; } cont_state_t;
-enum { MAPLE_FUNC_CONTROLLER = 1, CONT_A = 4, CONT_B = 2, CONT_START = 8, CONT_Y = 512, CONT_X = 1024, CONT_DPAD_LEFT = 128, CONT_DPAD_RIGHT = 64 };
+enum { MAPLE_FUNC_CONTROLLER = 1, CONT_A = 4, CONT_B = 2, CONT_START = 8, CONT_Y = 512, CONT_X = 1024, CONT_DPAD_LEFT = 128, CONT_DPAD_RIGHT = 64, CONT_DPAD_DOWN = 32 };
 maple_device_t *maple_enum_type(int,int); void *maple_dev_status(maple_device_t*);
 #endif
