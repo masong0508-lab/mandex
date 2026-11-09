@@ -150,11 +150,12 @@ const clouds=[{x:100,y:70,s:1,v:6},{x:430,y:48,s:.8,v:4},{x:660,y:110,s:1.1,v:8}
 function set(x,y,m){if(!inb(x,y))return;const i=idx(x,y);grid[i]=m;hp[i]=m?MAT[m].hp:0;anch[i]=0}
 function rect(x,y,w,h,m){for(let j=0;j<h;j++)for(let i=0;i<w;i++)set(x+i,y+j,m)}
 function house(o){
-  const{x,w,floors,fh=9,wall,floor,roof,gable,paper='#e8d3a8',crenel,g=ROWS-1}=o,top=g+1-(floors*fh+1);
-  for(let f=0;f<=floors;f++)rect(x,g-f*fh,w,1,floor);
-  for(let f=0;f<floors;f++){const yb=g-f*fh;interiors.push({x:x+1,y:yb-fh+1,w:w-2,h:fh-1,p:paper});
-    for(let y=yb-fh+1;y<yb;y++){set(x,y,wall);set(x+w-1,y,wall);if(w>13)set(x+(w>>1),y,wall===6?6:1)}
-    for(let y=yb-5;y<yb-3;y++){set(x,y,4);set(x+w-1,y,4)}}
+  // wt = wall thickness (cells), ft = thickness of the upper floor slabs (they grow DOWN so floor tops stay put), fh = floor height
+  const{x,w,floors,fh=9,wt=1,ft=1,wall,floor,roof,gable,paper='#e8d3a8',crenel,g=ROWS-1}=o,top=g+1-(floors*fh+1);
+  for(let f=0;f<=floors;f++)rect(x,g-f*fh,w,f?ft:1,floor);
+  for(let f=0;f<floors;f++){const yb=g-f*fh,y0=yb-fh+ft;interiors.push({x:x+wt,y:y0,w:w-2*wt,h:fh-ft,p:paper});
+    for(let y=y0;y<yb;y++){for(let k=0;k<wt;k++){set(x+k,y,wall);set(x+w-1-k,y,wall)}if(w>13)set(x+(w>>1),y,wall===6?6:1)}
+    for(let y=yb-5;y<yb-3;y++)if(y>=y0){set(x,y,4);set(x+w-1,y,4)}}
   if(gable){for(let k=0;k<7&&w+2-2*k>1;k++)rect(x-1+k,top-1-k,w+2-2*k,1,roof)}
   else rect(x-1,top-2,w+2,2,roof);
   if(crenel){for(let k=0;k<w+2;k+=2)set(x-1+k,top-3,roof)}
@@ -163,25 +164,28 @@ const tnt=(x,y)=>rect(x,y-2,2,2,5);
 function mound(x,width,height){for(let r=0;r<height&&width-2*r>0;r++)rect(x+r,ROWS-1-r,width-2*r,1,SAND)}
 const tgt=(cx,row)=>targets.push({x:cx*V+V/2,y:row*V-7,vy:0,r:7,alive:true,t:rnd()*6});
 const LEVELS=[
- {name:'Suburban Eviction',men:4,build(){
-   house({x:76,w:16,floors:2,wall:2,floor:1,roof:1,gable:true});tgt(81,59);tgt(90,50);tnt(86,59)}},
- {name:'Duplex Dilemma',men:5,build(){
-   house({x:58,w:12,floors:2,wall:1,floor:1,roof:1,gable:true,paper:'#cfe0c0'});
-   house({x:80,w:16,floors:3,wall:2,floor:1,roof:2,gable:true});
-   tgt(63,59);tgt(66,50);tgt(84,59);tgt(90,50);tgt(86,41);tnt(92,59);tnt(62,50)}},
- {name:'Tower Block Tussle',men:6,build(){
-   house({x:62,w:10,floors:2,wall:1,floor:1,roof:1,gable:true,paper:'#f0c9c9'});
-   house({x:82,w:14,floors:6,wall:2,floor:3,roof:3,paper:'#cdd7e6'});
-   tgt(66,59);tgt(67,50);tgt(87,59);tgt(93,41);tgt(86,23);tnt(85,32);tnt(92,50)}},
- {name:'Castle Foreclosure',men:6,build(){
-   house({x:52,w:8,floors:4,wall:3,floor:3,roof:3,gable:true,paper:'#b9b2c8'});
-   house({x:64,w:26,floors:3,wall:3,floor:3,roof:3,crenel:true,paper:'#b9b2c8'});
-   house({x:92,w:8,floors:4,wall:3,floor:3,roof:3,gable:true,paper:'#b9b2c8'});
-   tgt(55,41);tgt(68,59);tgt(73,50);tgt(83,59);tgt(95,32);tnt(84,59);tnt(70,41)}},
- {name:'Corporate Takeover',men:7,build(){
-   house({x:54,w:12,floors:3,wall:2,floor:1,roof:2,gable:true,paper:'#f0e0a8'});
-   house({x:76,w:20,floors:5,wall:6,floor:3,roof:6,paper:'#cfd8e6'});
-   tgt(59,59);tgt(62,50);tgt(80,59);tgt(90,50);tgt(84,41);tgt(92,32);tgt(82,23);tnt(88,59);tnt(80,32);tnt(92,23)}},
+ {name:'Suburban Eviction',men:5,build(){   // wide low house + a little wooden shed (short floors, 18 wide)
+   house({x:74,w:18,floors:2,fh:8,wall:2,floor:1,roof:1,gable:true});
+   house({x:60,w:8,floors:1,fh:8,wall:1,floor:1,roof:1,gable:false,paper:'#cfe0c0'});
+   tgt(64,59);tgt(80,59);tgt(89,51);tnt(85,59)}},
+ {name:'Duplex Dilemma',men:5,build(){   // a tall skinny wooden tower (11-high floors) beside a long low brick block with thick 2-cell walls
+   house({x:55,w:8,floors:3,fh:11,wall:1,floor:1,roof:1,gable:true,paper:'#cfe0c0'});
+   house({x:70,w:26,floors:2,fh:7,wt:2,wall:2,floor:1,roof:2,gable:false});
+   tgt(59,59);tgt(59,48);tgt(59,37);tgt(76,59);tgt(90,52);tnt(84,59);tnt(57,48)}},
+ {name:'Tower Block Tussle',men:6,build(){   // seven squat 7-high floors with double-thick stone slabs
+   house({x:60,w:10,floors:2,fh:9,wall:1,floor:1,roof:1,gable:true,paper:'#f0c9c9'});
+   house({x:80,w:14,floors:7,fh:7,ft:2,wall:2,floor:3,roof:3,paper:'#cdd7e6'});
+   tgt(64,59);tgt(65,50);tgt(85,59);tgt(90,45);tgt(84,31);tgt(90,17);tnt(88,31);tnt(90,52)}},
+ {name:'Castle Foreclosure',men:6,build(){   // 2-cell stone walls, 2-cell slabs, a long 26-wide keep between tall slim towers
+   house({x:52,w:8,floors:5,fh:9,wt:2,ft:2,wall:3,floor:3,roof:3,gable:true,paper:'#b9b2c8'});
+   house({x:64,w:26,floors:3,fh:8,wt:2,ft:2,wall:3,floor:3,roof:3,crenel:true,paper:'#b9b2c8'});
+   house({x:92,w:8,floors:4,fh:9,wt:2,ft:2,wall:3,floor:3,roof:3,gable:true,paper:'#b9b2c8'});
+   tgt(55,41);tgt(68,59);tgt(74,51);tgt(84,59);tgt(95,32);tgt(55,23);tnt(80,59);tnt(70,43)}},
+ {name:'Corporate Takeover',men:7,build(){   // 20-wide steel office on 8-high floors with chunky stone slabs, plus a 6-wide brick annex
+   house({x:50,w:12,floors:3,fh:9,wall:2,floor:1,roof:2,gable:true,paper:'#f0e0a8'});
+   house({x:64,w:6,floors:4,fh:8,wall:2,floor:2,roof:2,gable:false,paper:'#f0d9c0'});
+   house({x:76,w:20,floors:5,fh:8,ft:2,wall:6,floor:3,roof:6,paper:'#cfd8e6'});
+   tgt(55,59);tgt(58,50);tgt(67,43);tgt(80,59);tgt(90,51);tgt(84,43);tgt(92,35);tgt(82,27);tnt(88,59);tnt(80,35);tnt(92,27)}},
  {name:'Bouncy Castle',men:6,build(){   // rubber walls: the man rebounds - come in through the wooden roofs or use TNT
    house({x:54,w:14,floors:3,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f0c9d9'});
    house({x:78,w:14,floors:4,wall:RUBBER,floor:BRICK,roof:WOOD,gable:false,paper:'#cfe0f0'});
@@ -194,22 +198,23 @@ const LEVELS=[
 // ---------- levels 8..20 ----------
 function pyramid(x,w,m,top){for(let r=0;w-2*r>0&&ROWS-1-r>=top;r++)rect(x+r,ROWS-1-r,w-2*r,1,m)}
 LEVELS.push(
- {name:'Glass House Party',men:5,build(){        // glass walls shatter at a touch - the wooden floors are what hold it up
-   house({x:60,w:12,floors:4,wall:GLASS,floor:WOOD,roof:WOOD,gable:false,paper:'#d8ecf5'});
-   house({x:82,w:14,floors:3,wall:GLASS,floor:STONE,roof:STONE,gable:false,paper:'#f0e0f0'});
-   tgt(64,59);tgt(68,50);tgt(65,41);tgt(63,32);tgt(86,59);tgt(92,50);tgt(87,41);tnt(70,59);tnt(90,59)}},
+ {name:'Glass House Party',men:5,build(){        // a slim glass tower of low 6-high floors, and a wide glass hall with 12-high rooms on thick stone slabs
+   house({x:58,w:10,floors:6,fh:6,wall:GLASS,floor:WOOD,roof:WOOD,gable:false,paper:'#d8ecf5'});
+   house({x:80,w:18,floors:2,fh:12,ft:3,wall:GLASS,floor:STONE,roof:STONE,gable:false,paper:'#f0e0f0'});
+   tgt(62,59);tgt(64,53);tgt(62,41);tgt(63,29);tgt(86,59);tgt(92,47);tgt(84,47);tnt(66,59);tnt(90,59)}},
  {name:'Steel Mill Standoff',men:7,build(){      // steel walls shrug off a flop: dive through the wooden roof, or detonate the TNT inside
    house({x:62,w:14,floors:3,wall:STEEL,floor:BRICK,roof:WOOD,gable:false,paper:'#c9ccd4'});
    rect(80,38,6,22,STEEL);rect(80,36,6,2,WOOD);
    tgt(67,59);tgt(72,50);tgt(66,41);tgt(68,30);tgt(83,36);tnt(70,59);tnt(66,50);tnt(72,41)}},
- {name:'Twin Peaks',men:6,build(){               // two towers and a wooden bridge: the bridge falls when either tower goes
-   house({x:56,w:10,floors:5,wall:BRICK,floor:WOOD,roof:BRICK,gable:false,paper:'#f0d9c0'});
-   house({x:86,w:10,floors:5,wall:BRICK,floor:WOOD,roof:BRICK,gable:false,paper:'#d9e4f0'});
-   rect(66,32,20,1,WOOD);
-   tgt(60,59);tgt(61,41);tgt(60,23);tgt(76,32);tgt(90,50);tgt(91,32);tgt(91,23);tnt(76,59);tnt(62,32)}},
- {name:'Domino Drive',men:6,build(){             // five thin wooden towers in a row: topple the first
-   for(let k=0;k<5;k++)house({x:50+k*10,w:6,floors:4,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:k%2?'#f0e0a8':'#cfe0c0'});
-   tgt(53,59);tgt(63,32);tgt(73,50);tgt(83,59);tgt(93,32);tgt(53,41)}},
+ {name:'Twin Peaks',men:6,build(){               // a slim thick-walled brick spire and a broad stone block, joined by a 26-long double-thick wooden bridge
+   house({x:54,w:8,floors:6,fh:8,wt:2,wall:BRICK,floor:WOOD,roof:BRICK,gable:false,paper:'#f0d9c0'});
+   house({x:88,w:12,floors:4,fh:10,wall:STONE,floor:WOOD,roof:STONE,gable:false,paper:'#d9e4f0'});
+   rect(62,27,26,2,WOOD);
+   tgt(58,59);tgt(58,43);tgt(58,19);tgt(75,27);tgt(93,49);tgt(94,29);tnt(76,27);tnt(58,35)}},
+ {name:'Domino Drive',men:6,build(){             // five wooden towers growing in width and height: topple the little one
+   const D=[[48,4,2],[55,5,3],[63,6,4],[72,7,5],[82,8,6]];
+   D.forEach(([x,w,f],k)=>house({x,w,floors:f,fh:8,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:k%2?'#f0e0a8':'#cfe0c0'}));
+   tgt(49,59);tgt(57,43);tgt(66,35);tgt(75,27);tgt(85,59);tgt(85,35)}},
  {name:'Rubber Ducky Resort',men:7,build(){      // sand dunes under bouncy walls: nothing here wants to stay still
    mound(48,36,10);house({x:57,g:49,w:16,floors:3,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f8d4e4'});
    mound(88,24,8);house({x:93,g:51,w:10,floors:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:false,paper:'#cfe0f0'});
