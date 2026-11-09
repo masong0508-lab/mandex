@@ -220,9 +220,10 @@ LEVELS.push(
    mound(46,38,11);house({x:56,g:48,w:16,floors:3,fh:7,wt:2,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f8d4e4'});
    mound(88,26,9);house({x:97,g:50,w:10,floors:3,fh:8,wt:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:false,paper:'#cfe0f0'});
    tgt(60,48);tgt(66,41);tgt(60,34);tgt(101,50);tgt(101,34);tgt(103,42);tnt(66,48);tnt(103,50)}},
- {name:'TNT Pyramid',men:5,build(){              // brick pyramid with a powder keg in the middle
-   pyramid(52,40,BRICK,46);rect(66,55,12,4,TNT);rect(70,50,4,5,TNT);
-   tgt(57,54);tgt(86,54);tgt(72,46);tgt(46,60);tgt(98,60)}},
+ {name:'TNT Pyramid',men:6,build(){              // a four-tier ziggurat, every tier a different width and thickness, with powder kegs buried in the two lower tiers
+   rect(50,54,44,6,BRICK);rect(56,49,32,5,STONE);rect(62,45,20,4,BRICK);rect(68,42,8,3,WOOD);
+   rect(64,56,16,3,TNT);rect(68,51,8,3,TNT);tnt(60,49);
+   tgt(53,54);tgt(91,54);tgt(58,49);tgt(85,49);tgt(64,45);tgt(71,42)}},
  {name:'Skyscraper Special',men:8,build(){       // seven floors of 2-thick stone walls and steel slabs, next to a tall-roomed brick house
    house({x:72,w:16,floors:7,fh:7,wt:2,ft:2,wall:STONE,floor:STEEL,roof:STEEL,gable:false,paper:'#d9dde8'});
    house({x:52,w:10,floors:3,fh:10,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0e0a8'});
@@ -242,10 +243,10 @@ LEVELS.push(
      if(r<8){const ch=5-th-0;const cw=r%2?2:3,xa=r%2?68:64,xb=r%2?85:88;
        rect(xa,y-4,cw,4-(th-1),r%2?WOOD:BRICK);rect(xb,y-4,cw,4-(th-1),r%2?WOOD:BRICK);if(r%3===1)rect(76,y-4,2,3,STONE)}}
    tgt(70,59);tgt(80,49);tgt(72,39);tgt(84,29);tgt(76,19);tnt(78,59);tnt(70,39)}},
- {name:'Moat Madness',men:7,build(){              // a sandcastle moat: knock the keep into the sand
-   mound(46,60,8);house({x:60,g:51,w:12,floors:3,wall:STONE,floor:WOOD,roof:STONE,gable:false,crenel:true,paper:'#cfe0c0'});
-   house({x:80,g:51,w:12,floors:3,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0e0a8'});
-   tgt(64,51);tgt(68,42);tgt(65,33);tgt(84,51);tgt(88,42);tgt(76,52);tnt(70,51);tnt(90,51)}},
+ {name:'Moat Madness',men:7,build(){              // a 64-wide, 10-deep sand moat bank: knock the stone keep and the tall brick hall into the sand
+   mound(44,64,10);house({x:58,g:49,w:14,floors:3,fh:8,wt:2,ft:2,wall:STONE,floor:WOOD,roof:STONE,gable:false,crenel:true,paper:'#cfe0c0'});
+   house({x:78,g:49,w:16,floors:2,fh:10,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0e0a8'});
+   tgt(62,49);tgt(67,41);tgt(62,33);tgt(82,49);tgt(88,39);tgt(75,50);tnt(66,49);tnt(86,49)}},
  {name:'Glass Cannon',men:6,build(){               // a 40-wide glass skyscraper on a 10-tall stone plinth, 2-thick wooden slabs
    rect(56,50,48,10,STONE);house({x:60,g:49,w:40,floors:4,fh:8,ft:2,wall:GLASS,floor:WOOD,roof:STEEL,gable:false,paper:'#e8f0f8'});
    tgt(66,49);tgt(74,49);tgt(94,49);tgt(70,41);tgt(90,33);tgt(88,25);tnt(84,49);tnt(84,41)}},
