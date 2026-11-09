@@ -497,14 +497,34 @@ function drawValve(){
   if(!toolOn('valve'))return;
   const m=man,f=m.mode==='aim'?m.inf:0,t=time,open=valveOpen();
   ctx.save();ctx.lineCap='round';if(!open)ctx.globalAlpha=.38;
-  ctx.fillStyle='#3d4452';ctx.fillRect(VX-16,GY-6,32,8);                           // base plate
-  ctx.strokeStyle='#59627a';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(VX,GY-4);ctx.lineTo(VX,VY+12);ctx.stroke();
-  ctx.strokeStyle='#8a94ad';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(VX-2,GY-4);ctx.lineTo(VX-2,VY+12);ctx.stroke();
-  ctx.fillStyle='#ff9a2e';ctx.beginPath();ctx.moveTo(VX-8,VY+14);ctx.lineTo(VX+8,VY+14);ctx.lineTo(VX+4,VY+2);ctx.lineTo(VX-4,VY+2);ctx.closePath();ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.stroke();   // the nozzle
-  const gx=VX-20,gy=VY+40;ctx.fillStyle='#f4f4f4';ctx.beginPath();ctx.arc(gx,gy,11,0,7);ctx.fill();ctx.stroke();       // pressure gauge
-  ctx.strokeStyle=f>.75?'#e0243a':'#222';ctx.lineWidth=2;const a=Math.PI*(.85+1.3*f);ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(gx+Math.cos(a)*9,gy+Math.sin(a)*9);ctx.stroke();
-  ctx.fillStyle='#e0243a';ctx.fillRect(gx+5,gy-9,4,3);
-  ctx.save();ctx.translate(VX+16,VY+40);ctx.rotate(f*18+(m.mode==='aim'&&dragging&&m.vlv?t*6:0));ctx.strokeStyle='#e0243a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-9,0);ctx.lineTo(9,0);ctx.moveTo(0,-9);ctx.lineTo(0,9);ctx.stroke();ctx.restore();   // wheel
+  // --- sprite: bolted base plate, shaded steel pipe with flanges, brass nozzle with hose clamp, ticked pressure gauge, hand wheel ---
+  const rr=(x,y,w,h,r,fill)=>{ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ctx.rect(x,y,w,h);ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.stroke()};
+  const topY=VY+14,pipe=ctx.createLinearGradient(VX-6,0,VX+6,0);pipe.addColorStop(0,'#4a526a');pipe.addColorStop(.35,'#b4bdd4');pipe.addColorStop(1,'#444b61');
+  rr(VX-20,GY-9,40,9,2,'#3d4452');ctx.fillStyle='#6b7590';ctx.fillRect(VX-18,GY-8,36,2);                  // base plate + top highlight
+  for(const bx of[-14,14]){ctx.fillStyle='#9aa3bb';ctx.beginPath();ctx.arc(VX+bx,GY-4,2,0,7);ctx.fill();ctx.fillStyle='#2a2f3d';ctx.fillRect(VX+bx-1.2,GY-4.4,2.4,.9)}   // bolts
+  ctx.fillStyle=pipe;ctx.fillRect(VX-6,topY,12,GY-9-topY);ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.strokeRect(VX-6,topY,12,GY-9-topY);   // pipe
+  rr(VX-10,GY-22,20,7,2,'#59627a');rr(VX-10,topY+10,20,7,2,'#59627a');                                       // flanges
+  ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(VX-9,GY-21,18,1.5);ctx.fillRect(VX-9,topY+11,18,1.5);
+  const br=ctx.createLinearGradient(VX-8,0,VX+8,0);br.addColorStop(0,'#c9731a');br.addColorStop(.4,'#ffd27a');br.addColorStop(1,'#a85a10');
+  ctx.beginPath();ctx.moveTo(VX-9,topY);ctx.lineTo(VX+9,topY);ctx.lineTo(VX+4,VY+1);ctx.lineTo(VX-4,VY+1);ctx.closePath();ctx.fillStyle=br;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.stroke();   // brass nozzle
+  rr(VX-5.5,VY-2,11,4,1.5,'#8a94ad');ctx.fillStyle='#10131c';ctx.beginPath();ctx.ellipse(VX,VY-1,2.6,1,0,0,7);ctx.fill();   // tip + bore
+  const gx=VX-22,gy=VY+42,gr=12;                                                                               // pressure gauge
+  ctx.fillStyle='#59627a';ctx.fillRect(gx+gr-2,gy-2,10,4);ctx.strokeRect(gx+gr-2,gy-2,10,4);                    // stub to the pipe
+  ctx.fillStyle='#c9ced9';ctx.beginPath();ctx.arc(gx,gy,gr,0,7);ctx.fill();ctx.stroke();                         // bezel
+  ctx.fillStyle='#fbfbf6';ctx.beginPath();ctx.arc(gx,gy,gr-2.5,0,7);ctx.fill();
+  ctx.lineWidth=2.4;ctx.strokeStyle='#7dc84a';ctx.beginPath();ctx.arc(gx,gy,gr-5,Math.PI*.85,Math.PI*1.45);ctx.stroke();   // green / yellow / red zones
+  ctx.strokeStyle='#ffd23f';ctx.beginPath();ctx.arc(gx,gy,gr-5,Math.PI*1.45,Math.PI*1.85);ctx.stroke();
+  ctx.strokeStyle='#e0243a';ctx.beginPath();ctx.arc(gx,gy,gr-5,Math.PI*1.85,Math.PI*2.15);ctx.stroke();
+  const nA=Math.PI*(.85+1.3*f)+(f>.75?Math.sin(t*50)*.05:0);ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(gx+Math.cos(nA)*(gr-4),gy+Math.sin(nA)*(gr-4));ctx.stroke();
+  ctx.fillStyle='#222';ctx.beginPath();ctx.arc(gx,gy,1.8,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.55)';ctx.beginPath();ctx.ellipse(gx-3,gy-5,4,2,-.5,0,7);ctx.fill();            // glass glint
+  ctx.save();ctx.translate(VX+18,VY+42);ctx.rotate(f*18+(m.mode==='aim'&&dragging&&m.vlv?t*6:0));                 // hand wheel
+  ctx.strokeStyle='#8f1424';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-10,0);ctx.lineTo(10,0);ctx.moveTo(0,-10);ctx.lineTo(0,10);ctx.stroke();
+  ctx.strokeStyle='#e0243a';ctx.lineWidth=3.5;ctx.beginPath();ctx.arc(0,0,9,0,7);ctx.stroke();
+  ctx.strokeStyle='#ff8a96';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,9,3.6,5);ctx.stroke();
+  ctx.fillStyle='#c9ced9';ctx.beginPath();ctx.arc(0,0,3,0,7);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();
+  ctx.fillStyle='#59627a';ctx.fillRect(VX+5,VY+40,8,4);ctx.strokeRect(VX+5,VY+40,8,4);   // stub to the wheel
+  if(open&&f>.02){ctx.globalAlpha=Math.min(.7,f);ctx.fillStyle='#cfe9ff';ctx.beginPath();ctx.ellipse(VX,VY-6-(t*40%8),3+f*3,2+f*2,0,0,7);ctx.fill();ctx.globalAlpha=1}   // puff at the tip
   if(!open){ctx.globalAlpha=.8;txt('LOCKED',VX,VY-12,11,'#aab','center');txt('beat 3 levels',VX,VY-26,10,'#889','center');ctx.globalAlpha=.38}
   else if(m.mode==='aim'&&!m.seated&&!dragging&&m.inf===0){ctx.globalAlpha=.6+.4*Math.sin(t*4);txt('TAP: AIR VALVE',VX,VY-12,11,'#fff','center');ctx.globalAlpha=1}
   if(m.mode==='aim'&&m.inf>0){const w=44;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(VX-w/2,VY-62,w,7);ctx.fillStyle=f<.5?'#7dff5a':f<.8?'#ffd23f':'#ff4a4a';ctx.fillRect(VX-w/2+1,VY-61,(w-2)*f,5);
