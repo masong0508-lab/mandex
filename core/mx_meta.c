@@ -68,6 +68,23 @@ static int met(const MxStats *s, int i){
   }
   return 0;
 }
+int mx_ach_progress(const MxStats *s, int i, int *cur, int *target){
+  int c, t;
+  switch(i){
+  case 1:  c = s->kills;  t = 25;    break;   case 2:  c = s->kills;  t = 100;   break;
+  case 3:  c = s->cells;  t = 2000;  break;   case 4:  c = s->cells;  t = 20000; break;
+  case 5:  c = s->booms;  t = 10;    break;   case 6:  c = s->maxChain; t = 5;   break;
+  case 8:  c = s->flops;  t = 10;    break;   case 10: c = s->oneShots; t = 5;   break;
+  case 12: c = three_stars(s); t = 8; break;  case 13: c = three_stars(s); t = MX_NUM_LEVELS; break;
+  case 14: c = story_done(s); t = 5;  break;  case 15: c = story_done(s); t = 10; break;
+  case 16: c = story_done(s); t = MX_NUM_LEVELS; break;
+  case 17: c = s->bestScore; t = 60000; break; case 18: c = s->shots; t = 100;   break;
+  case 19: c = owned(s);  t = 3;     break;   case 20: c = owned(s);  t = MX_NUM_OUTFITS; break;
+  case 24: c = mx_ach_count(s); t = 10; break;
+  default: return 0;
+  }
+  *cur = c; *target = t; return 1;
+}
 int mx_meta_next_unlock(MxStats *s){
   for(int i = 0; i < MX_NUM_ACH; i++) if(!((s->ach >> i) & 1) && met(s, i)){ s->ach |= 1u << i; return i; }
   return -1;

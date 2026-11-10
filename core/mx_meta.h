@@ -35,6 +35,9 @@ typedef struct { const char *name, *hint; uint8_t br[3], brd[3], tow[3], tows[3]
 const MxOutfit *mx_outfit(int i);
 int mx_outfit_unlocked(const MxStats *s, int i);
 int mx_ach_count(const MxStats *s);
+/* 1 if achievement i is a counter (fills *cur / *target for a progress bar such as 12/25), 0 if it is a one-off.  Mirrors met() in mx_meta.c. */
+int mx_ach_progress(const MxStats *s, int i, int *cur, int *target);
+static inline int mx_ach_unlocked(const MxStats *s, int i){ return (int)((s->ach >> i) & 1); }
 /* the air valve is an unlockable: beat MX_VALVE_UNLOCK_LEVELS levels.  Front-ends copy this into world.valve_ok. */
 #define MX_VALVE_UNLOCK_LEVELS 3
 int mx_valve_unlocked(const MxStats *s);

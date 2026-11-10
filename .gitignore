@@ -31,3 +31,5 @@ test/stars_float
 test/stars_fixed
 test/meta_locks
 test/meta_open
+test/ach_float
+test/ach_fixed

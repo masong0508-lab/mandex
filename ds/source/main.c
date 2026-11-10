@@ -40,6 +40,7 @@ enum { ST_TITLE, ST_PLAY, ST_PAUSE };
 static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
 static int disp_score, cells0 = 1, end_t, was_state, best[MX_NUM_LEVELS];
 static MxStats stats;                 /* achievements / outfits for this session (the DS has no save) */
+static int ach_open, ach_page;       /* achievements list shown on the title's bottom screen */
 static int outfit_sel, toast_t = -1, toast_id, toast_q[4], toast_nq;
 static void toast_push(int id){ if(toast_nq < 4) toast_q[toast_nq++] = id; }
 static void toast_tick(void){
@@ -611,7 +612,38 @@ static void title_top(View *v){
   gfx_text_o(v->buf, 12, 174, "DRAG + LIFT: FLING   TAP: FLOP", C_WHITE, C_BLACK, 1);
 }
 
+#define ACH_PER_PAGE 5
+#define ACH_PAGES ((MX_NUM_ACH + ACH_PER_PAGE - 1) / ACH_PER_PAGE)
+static void ach_bottom(u8 *b){
+  gfx_rect(b, 0, 0, 256, 192, C_BLACK);
+  gfx_text_c(b, 128, 5, "ACHIEVEMENTS", C_GOLD, C_BLACK, 1);
+  for(int k = 0; k < ACH_PER_PAGE; k++){
+    int i = ach_page * ACH_PER_PAGE + k; if(i >= MX_NUM_ACH) break;
+    int y = 17 + k * 29, un = mx_ach_unlocked(&stats, i), cur, tg;
+    gfx_rect(b, 6, y, 244, 27, C_UIBG); gfx_rect(b, 6, y, 244, 1, C_UILINE);
+    gfx_text(b, 12, y + 4, mx_ach_name(i), un ? C_GOLD : C_GRAY, 1);
+    gfx_text(b, 12, y + 15, mx_ach_desc(i), un ? C_WHITE : C_GRAY, 1);
+    if(mx_ach_progress(&stats, i, &cur, &tg)){
+      if(cur > tg) cur = tg;
+      const char *ts = gfx_int(tg); int tw = gfx_text_w(ts, 1);
+      gfx_text(b, 244 - tw, y + 4, ts, un ? C_GOLD : C_GRAY, 1);
+      gfx_text(b, 244 - tw - gfx_text_w("/", 1), y + 4, "/", C_UILINE, 1);
+      const char *cs = gfx_int(cur);
+      gfx_text(b, 244 - tw - gfx_text_w("/", 1) - gfx_text_w(cs, 1), y + 4, cs, un ? C_GOLD : C_WHITE, 1);
+      gfx_rect(b, 190, y + 15, 54, 5, C_DARK);
+      gfx_rect(b, 190, y + 15, (int)((long long)54 * cur / tg), 5, un ? C_GOLD : C_UILINE);
+    }
+  }
+  gfx_rect(b, 0, 164, 256, 28, C_UIBG); gfx_rect(b, 0, 164, 256, 1, C_UILINE);
+  gfx_text(b, 10, 174, "< BACK (B)", C_WHITE, 1);
+  gfx_text(b, 100, 174, "<", C_WHITE, 2); gfx_text(b, 146, 174, ">", C_WHITE, 2);
+  gfx_text(b, 116, 177, gfx_int(ach_page + 1), C_GOLD, 1);
+  gfx_text(b, 224 - gfx_text_w("00/25", 1) / 2, 174, gfx_int(mx_ach_count(&stats)), C_GOLD, 1);
+  gfx_text(b, 224 + 2, 174, "/25", C_UILINE, 1);
+}
+
 static void title_bottom(View *v){
+  if(ach_open){ ach_bottom(v->buf); return; }
   draw_world(v, 0);
   panel(v->buf, 8, 6, 240, 38);
   gfx_text_c(v->buf, 128, 11, "SELECT LEVEL", C_UILINE, C_UIBG, 1);
@@ -691,7 +723,12 @@ int main(void){
     if(down & KEY_L) debug_on = !debug_on;
 
     /* ---------------- input ---------------- */
-    if(app == ST_TITLE){
+    if(app == ST_TITLE && ach_open){
+      if((down & KEY_B) || ((down & KEY_TOUCH) && hit(&t, 0, 168, 70, 24))){ ach_open = 0; sfx_play(SFX_CLICK, 64); }
+      if((down & KEY_RIGHT) || ((down & KEY_TOUCH) && hit(&t, 140, 168, 30, 24))){ ach_page = (ach_page + 1) % ACH_PAGES; sfx_play(SFX_CLICK, 64); }
+      if((down & KEY_LEFT) || ((down & KEY_TOUCH) && hit(&t, 90, 168, 30, 24))){ ach_page = (ach_page + ACH_PAGES - 1) % ACH_PAGES; sfx_play(SFX_CLICK, 64); }
+    } else if(app == ST_TITLE){
+      if((down & KEY_TOUCH) && hit(&t, 190, 176, 66, 16)){ ach_open = 1; ach_page = 0; sfx_play(SFX_CLICK, 64); down &= ~KEY_TOUCH; }
       int ch = 0;
       if(down & KEY_LEFT) ch = -1;
       if(down & KEY_RIGHT) ch = 1;
