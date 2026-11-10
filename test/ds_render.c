@@ -65,6 +65,7 @@ void cpuStartTiming(int t){(void)t;} u32 cpuEndTiming(void){ return g_ticks; }
 #define main ds_main
 #include "../ds/source/main.c"
 #undef main
+#include "intro.h"
 
 static void dump(const u8 *buf, const u16 *pal, const char *fn){
   FILE *f = fopen(fn, "wb"); fprintf(f, "P6\n256 192\n255\n");
@@ -118,6 +119,7 @@ void swiWaitForVBlank(void){
   vf++;
   g_keys = 0; /* default: nothing held; script sets below */
   int mode = world.man.mode;
+  if(vf == 1 && !getenv("INTRO_TEST") && !getenv("INTRO_SKIP")) intro_seen = 1;                  /* the other scripted runs press A on the title and expect level 1 at once */
   if(getenv("OPTIONS_LOAD")){                                      /* second boot after OPTIONS_TEST: the options come back from the chip (collapse off, splat) */
     if(vf == 3){ int ok = opt.collapse == 0 && opt.tool == MX_TOOL_SPLAT; printf(ok ? "ok: options loaded from the chip at boot\n" : "FAIL: options not loaded (collapse=%d tool=%d)\n", opt.collapse, opt.tool); exit(!ok); }
   } else if(getenv("OPTIONS_TEST")){                                       /* port 13: the options screen, the start tool, the speed safety net, saving */
@@ -175,6 +177,49 @@ void swiWaitForVBlank(void){
       opt_change(OPT_COLLAPSE, 1); opt_change(OPT_COLLAPSE, 1); PCHECK(opt.collapse == 1 && coll_shed == 0 && world.collapse == 1, "changing the option clears the shed flag (a fresh chance)");
       opt.collapse = 0; opt.tool = MX_TOOL_SPLAT; save_off = 0; save_sync(); st = 10;                       /* leave a recognisable option set on the chip */
       printf(fails ? "options: %d FAILED\n" : "options: all passed\n", fails); save_report(); exit(fails != 0); }
+  } else if(getenv("INTRO_TEST")){                                         /* the opening cutscene played start to finish with no input, photographed as it goes */
+    static int fails, lf, last_sc = -1, played;
+#define ICHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
+    uint8_t sh0[6][3], shw[6][3]; mx_outfit_shades(0, sh0); mx_outfit_shades(2, shw);
+    u16 classic = RGB15(sh0[0][0] >> 3, sh0[0][1] >> 3, sh0[0][2] >> 3), worn = RGB15(shw[0][0] >> 3, shw[0][1] >> 3, shw[0][2] >> 3);
+    if(vf == 1){ outfit_sel = 2; apply_outfit(2); }                                                      /* he wears Banana on the title, so the restore is visible */
+    if(vf == 2){ int ok = 1; for(int s = 0; s < INTRO_SCENES; s++) if(intro_text_rows(s) >= 9) ok = 0;
+      ICHECK(ok, "the narration of every scene fits the bottom screen (under 9 rows)");
+      ICHECK(app == ST_TITLE && !intro_seen && sel_level == 0 && classic != worn, "fresh boot: on the title at level 1, cutscene not seen yet"); g_keys |= KEY_A; }
+    if(vf == 5){ ICHECK(app == ST_INTRO && intro_seen && intro_scene() == 0, "A on the title at level 1 starts the cutscene instead of the level"); ICHECK(BG_PALETTE[C_MAN0 + 5] == classic, "...and the story is told in the classic outfit"); }
+    if(app == ST_INTRO){
+      if(intro_scene() != last_sc){ last_sc = intro_scene(); lf = 0; }
+      lf++; played++;
+      static const int LFS[] = { 15, 70, 130, 200, 260, 320, 380, 430 };
+      for(unsigned i = 0; i < sizeof LFS / sizeof LFS[0]; i++) if(lf == LFS[i]){ char nm[32]; snprintf(nm, sizeof nm, "intro_s%d_%03d", last_sc, lf); shot(nm); }
+    }
+    if(vf > 10 && app == ST_PLAY){
+      ICHECK(last_sc == INTRO_SCENES - 1 && played > 2400, "all eight scenes played out on their own");
+      ICHECK(world.level == 0 && world.state == MX_PLAY && world.man.mode == MAN_AIM, "...and handed over to level 1, ready to aim");
+      ICHECK(BG_PALETTE[C_MAN0 + 5] == worn, "...with the worn outfit's colours back");
+      printf(fails ? "intro: %d FAILED\n" : "intro: all passed\n", fails); exit(fails != 0); }
+  } else if(getenv("INTRO_SKIP")){                                         /* A, SKIP, START, and when the cutscene does NOT play */
+    static int fails;
+    if(vf == 2) g_keys |= KEY_A;
+    if(vf == 5) ICHECK(app == ST_INTRO && intro_scene() == 0, "the cutscene starts");
+    if(vf == 20) g_keys |= KEY_A;
+    if(vf == 23) ICHECK(app == ST_INTRO && intro_scene() == 0, "first A only finishes the typing, still scene 1");
+    if(vf == 25) g_keys |= KEY_A;
+    if(vf == 28) ICHECK(app == ST_INTRO && intro_scene() == 1, "second A goes on to scene 2");
+    if(vf == 30){ g_keys |= KEY_TOUCH; g_touch.px = 200; g_touch.py = 180; }                                  /* the SKIP >> button */
+    if(vf == 33) ICHECK(app == ST_PLAY && world.level == 0 && world.state == MX_PLAY, "SKIP goes straight to level 1");
+    if(vf == 35){ app = ST_TITLE; sel_level = 0; load_level(0); }
+    if(vf == 38) g_keys |= KEY_A;
+    if(vf == 41) ICHECK(app == ST_PLAY && world.level == 0, "starting level 1 again in the same session skips the story");
+    if(vf == 43){ app = ST_TITLE; sel_level = 0; load_level(0); intro_seen = 0; }
+    if(vf == 46) g_keys |= KEY_A;
+    if(vf == 49) ICHECK(app == ST_INTRO, "(forced replay) the cutscene starts again");
+    if(vf == 50) g_keys |= KEY_START;
+    if(vf == 53) ICHECK(app == ST_PLAY && world.level == 0, "START skips straight to level 1");
+    if(vf == 55){ app = ST_TITLE; sel_level = 1; load_level(1); intro_seen = 0; }
+    if(vf == 58) g_keys |= KEY_A;
+    if(vf == 61){ ICHECK(app == ST_PLAY && world.level == 1 && !intro_seen, "starting any other level never plays the cutscene");
+      printf(fails ? "intro skip: %d FAILED\n" : "intro skip: all passed\n", fails); exit(fails != 0); }
   } else if((app == ST_TITLE) && getenv("CHEAT_TEST")){                    /* L+R+SELECT: unlock-all toggles, whatever order the keys go down in, without tripping the profiler or the outfit cycle */
     static int fails;
 #define KCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)

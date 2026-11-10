@@ -22,6 +22,7 @@
 #include "mx_meta.h"
 #include "gfx.h"
 #include "sfx.h"
+#include "intro.h"
 #define MS_ENUM_ONLY
 #include "manspr.h"
 #include "manidle.h"
@@ -36,8 +37,9 @@
 static MxWorld world;                         /* ~320 KB, lives in main RAM */
 static u8 buf_top[256 * 192], buf_bot[256 * 192];
 
-enum { ST_TITLE, ST_PLAY, ST_PAUSE };
+enum { ST_TITLE, ST_PLAY, ST_PAUSE, ST_INTRO };
 static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
+static int intro_seen;               /* the opening cutscene (ds/source/intro.c) plays once per power-on, the first time level 1 is started from the title */
 static int disp_score, cells0 = 1, end_t, was_state;      /* best scores live in stats.best[] (core, saved by port 5) */
 static MxStats stats;                 /* achievements / outfits / best scores; loaded from the cartridge backup chip at boot, written by save_sync() */
 static int ach_open, ach_page;       /* achievements list shown on the title's bottom screen */
@@ -932,8 +934,11 @@ int main(void){
       else if(((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)) && !mx_level_unlocked(&stats, sel_level)) sfx_play(SFX_CLICK, 24);
       else if((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)){
         save_sync();                                               /* an outfit chosen on the title is kept */
-        app = ST_PLAY; load_level(sel_level); sfx_play(SFX_CLICK, 64); music_set(music_pref);
+        if(sel_level == 0 && !intro_seen){ intro_seen = 1; app = ST_INTRO; intro_start(); apply_outfit(0); sfx_play(SFX_CLICK, 64); }   /* the origin story is told in the classic outfit */
+        else { app = ST_PLAY; load_level(sel_level); sfx_play(SFX_CLICK, 64); music_set(music_pref); }
       }
+    } else if(app == ST_INTRO){
+      if(intro_tick(down, t.px, t.py)){ app = ST_PLAY; apply_outfit(outfit_sel); load_level(0); music_set(music_pref); sfx_play(SFX_CLICK, 64); }   /* finished or skipped: straight into level 1 */
     } else if(app == ST_PAUSE){
       if(down & KEY_START) app = ST_PLAY;
       if(down & KEY_SELECT){ load_level(world.level); app = ST_PLAY; music_set(music_pref); }
@@ -1071,6 +1076,8 @@ int main(void){
     if(app == ST_TITLE){
       title_top(&top);
       title_bottom(&bot);
+    } else if(app == ST_INTRO){
+      intro_draw(buf_top, buf_bot);
     } else {
       draw_world(&top, 1);
       draw_popups(&top, 2);

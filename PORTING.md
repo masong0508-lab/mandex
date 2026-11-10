@@ -8,6 +8,7 @@ core/cloth.h, cloth.c      the towel: small cloth simulation shared by both cons
 ds/source/main.c           DS game loop: dual-screen cameras, input, particles, HUD, title/pause/win/lose
 ds/source/gfx.c, gfx.h     DS software renderer toolkit: palette, material tiles, parallax sky, font, sprites
 ds/source/sfx.c, sfx.h     DS sound: glide/arpeggio effects on PSG + noise channels, small chiptune loop
+ds/source/intro.c, intro.h DS opening cutscene (port 12): the Gerald Fitzgerald -> MANDEX origin story, 8 scenes drawn live, typed narration
 dreamcast/main.c           Dreamcast front-end (KallistiOS PVR) - still the first-cut one
 art/manspr.h               GENERATED man pixel art shared by both consoles (tools/gen_manspr.py)
 tools/gen_manspr.py        builds art/manspr.h from the HTML prototype (needs Playwright, only for this step)
@@ -51,6 +52,15 @@ DS notes for the next person:
 - `hw9.c` SPI constants (AUXSPICNT 0xA000 = enable + SPI mode, bit 6 hold, bit 7 busy, EXMEMCNT bit 11 clear = ARM9 owns the slot) were re-read against GBATEK from memory and agree with it.  That is a second read by the same memory, not a hardware check.
 - Odd but passing: in `crumble_test` the fixed build prints "blocks lost within 2 s" as -117 and -118 for two cases (float prints -5 and so on).  It is `cells_end` minus cells left, so it goes negative when the count rises; the test passes on its loose-chunks leg.  Treat that figure as unreliable.
 - Still to push: `mandex-ds-collapse` (commit 50cec72).
+
+## OPENING CUTSCENE (DS, port 12)
+The origin story from the browser version (`web/index.html`, "OPENING CUTSCENE"), same 8 scenes, same narration, same order: the suburb, the divorce decree, Dennis the lawyer, the couch, the landlord, the snap, MANDEX is born, the mission.
+- **Where it plays:** `ST_INTRO` in `ds/source/main.c`. Pressing A / START / touch on the title with level 1 selected starts it **once per power-on** (`intro_seen`, deliberately not in the save blob, so blob v2 is untouched); any other level, and level 1 a second time in the same session, go straight to the game. To play it every time, drop the `!intro_seen` test in the title's start branch.
+- **Controls:** A / B / touch = next (the first press finishes the typing, the second goes on), START or the SKIP >> button (bottom right) = straight to level 1. Each scene also moves on by itself after the text is typed plus a short hold.
+- **Screens:** top = the picture (shots cut inside a scene, wipe / iris / white / fade transitions, shake on scenes 6 to 8, letterbox bars), bottom = the narration typed out at about 58 characters a second, one line in gold, a dot per scene.
+- **Art:** no image data. Everything is drawn with the `gfx.c` primitives and the existing man and landlord sprites, so it costs only code and text in the ROM. Gerald (tie, khaki shorts, boxers) is drawn in `intro.c`; MANDEX is the normal flex sprite, shown in the **classic** outfit (the worn outfit is put back when the intro ends).
+- **Sound:** cues on exact frames from the existing effects (knocks, decree stamps, cash ticks, snap, boom, the win jingle). The music loop keeps playing underneath if it is on.
+- **Test:** `INTRO_TEST=1` plays all 8 scenes with no input and photographs them (`/tmp/dsintro_intro_s<scene>_<frame>_top|bot.ppm`), `INTRO_SKIP=1` checks A, SKIP, START and when the cutscene must NOT play. Both are in `test/run_tests.sh`. Not run on a DS, melonDS or DraStic; frame cost of the scenes on hardware is unmeasured (they are small rectangles and sprites, no physics).
 
 ## SOFTER MUSIC pass (DS)
 The soundtrack was one voice on a PSG 50% square wave (8 samples a cycle: buzzy, loud in the harmonics) and every note was cut off dead (a click).  Now:
