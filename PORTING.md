@@ -40,6 +40,18 @@ DS notes for the next person:
   screenshot `docs/ds_outfits.png`.  Nothing has been run on a DS, an emulator, or looked at on a real screen.
 - Still stale below: the older passes talk about 7 levels and "both consoles"; the game now has 20 levels, 25 achievements, 11 outfits, the air valve and three power-ups (beans, towel, splat).
 
+## TEST RUN, Nov 9 2026 evening (roadmap next-step 1, plus a first ARM compile)
+**Full `sh test/run_tests.sh` on the host (gcc, Linux): exit 0, 347 s, every section passed.**  Applies to the tree with `mandex-ds-collapse` (options, port 13C) in it.
+- Core: float and fixed shot tests, libnds-math hooks identical to software fixed point, valve, stars, unlock (locks on and off), save blob (352 bit-flips), outfits, achievements, crumble, wobble, cloth (float and fixed) all passed.
+- Robustness sweeps, 1600 runs each, **0 hangs** in all seven configurations (float, fixed, wobble off, collapse on with the DS pool of 16 float and fixed, collapse on with the 48-body pool).  The 48-body pool peaked at 31 bodies, 30 asleep; the 16-body DS pool hits 16 of 16, so the DS speed safety net is what keeps collapse affordable there.
+- DS front-end on the stub libnds: levels 1, 4, 6, 7 played by script (L1 win, L4 lose, L6 win, L7 lose; peak 128/128 particles and up to 62 events/frame on L7), cartridge save (write, reboot, reload, garbage chip starts clean), outfits screen, options screen (saved and reloaded), L+R+SELECT cheat.  3DS harness: all checks passed at slider 0 and 1.0.  Dreamcast host render and idle-gag tests passed.
+- These runs all have collapse OFF in the DS front-end (the default), so **DS frame time with collapse on is still unmeasured.**
+
+**First ARM compile of the DS ROM code** (not the host stubs): `arm-none-eabi-gcc` 13.2.1 (Ubuntu package, not devkitARM), the exact flags and file list of `tools/build_ds_bare.sh`.  All ARM9 sources, including `ds/bare/hw9.c` (the cartridge SPI save code), compiled, and `arm9.elf` and `arm7.elf` linked.  One warning only: `mi_active` unused in `art/manidle.h`.  `arm9.bin` was 231,800 bytes, ARM7 1,744 bytes, ARM9 BSS about 1.07 MB inside the 3.5 MB region of `arm9.ld`.  **Not done:** the `ndstool` step (no .nds was made), and nothing was run.
+- `hw9.c` SPI constants (AUXSPICNT 0xA000 = enable + SPI mode, bit 6 hold, bit 7 busy, EXMEMCNT bit 11 clear = ARM9 owns the slot) were re-read against GBATEK from memory and agree with it.  That is a second read by the same memory, not a hardware check.
+- Odd but passing: in `crumble_test` the fixed build prints "blocks lost within 2 s" as -117 and -118 for two cases (float prints -5 and so on).  It is `cells_end` minus cells left, so it goes negative when the count rises; the test passes on its loose-chunks leg.  Treat that figure as unreliable.
+- Still to push: `mandex-ds-collapse` (commit 50cec72).
+
 ## IDLE / GROSS-OUT / JIGGLE pass (DS + Dreamcast + HTML)
 New man frames (27 in all, `art/manspr.h`, made by `tools/gen_manspr.py` from the HTML art): belly bounce A/B, belly
 scratch A/B, burp A/B, nose pick A/B, yawn, sleep A/B (snot bubble), sad, back view centre/left/right (butt wiggle),
