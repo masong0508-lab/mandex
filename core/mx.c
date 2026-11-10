@@ -115,6 +115,15 @@ static void clear_links(MxWorld *w, int i){
     if(INB(nx, ny)) w->brk[IDX(nx, ny)] &= (uint8_t)~(1 << (d ^ 1));
   }
 }
+static void dz_touch(MxWorld *w, int i){ if(i < w->dz_lo) w->dz_lo = i; if(i > w->dz_hi) w->dz_hi = i; }
+/* a block died at x,y: its four neighbours are "damaged" and will crumble when the run ends (see aftershock) */
+static void mark_dmg(MxWorld *w, int x, int y){
+  static const int DX4[4] = {1, -1, 0, 0}, DY4[4] = {0, 0, 1, -1};
+  for(int d = 0; d < 4; d++){
+    int nx = x + DX4[d], ny = y + DY4[d];
+    if(INB(nx, ny)){ int j = IDX(nx, ny); w->dmg[j] = 1; dz_touch(w, j); }
+  }
+}
 static void wob_zero(MxWorld *w, int i){ w->ox[i] = w->oy[i] = w->ovx[i] = w->ovy[i] = 0; }
 
 static real kill(MxWorld *w, int x, int y, real bvx, real bvy){
@@ -122,7 +131,7 @@ static real kill(MxWorld *w, int x, int y, real bvx, real bvy){
   if(!m) return 0;
   real h = w->hp[i];
   w->grid[i] = 0; w->hp[i] = 0; w->anch[i] = 0; w->need_support = 1; w->score += 10;
-  wob_zero(w, i); clear_links(w, i); w->sand_on = 1;
+  wob_zero(w, i); clear_links(w, i); w->sand_on = 1; mark_dmg(w, x, y);
   ev(w, EV_CELL, RI(x) + R(0.5), RI(y) + R(0.5), m, rmul(bvx, R(0.25)), rmul(bvy, R(0.25)));
   if(m == MX_TNT && w->nexpl < 64){ w->expl[w->nexpl][0] = (int16_t)x; w->expl[w->nexpl][1] = (int16_t)y; w->nexpl++; }
   return h;
@@ -298,6 +307,7 @@ static void wobble_check(MxWorld *w){
       real lim = MATS[m].ymax < MATS[mj].ymax ? MATS[m].ymax : MATS[mj].ymax;
       if(s > lim){
         w->brk[i] |= (uint8_t)(1 << d); w->brk[j] |= (uint8_t)(1 << (d ^ 1));
+        dz_touch(w, i); dz_touch(w, j);
         w->need_support = 1;
         if(w->crack_ev < 4){ int y = i / MX_COLS; w->crack_ev++; ev(w, EV_CRACK, RI(x) + R(0.5) + (d == 0 ? R(0.5) : 0), RI(y) + R(0.5) + (d == 2 ? R(0.5) : 0), m, s, 0); }
       }
@@ -400,6 +410,7 @@ static MX_HOT void support_pass(MxWorld *w){
   for(int i = 0; i < MX_ROWS * MX_COLS; i++){
     if(!w->grid[i] || w->grid[i] == MX_SAND || w->hb[i] != 255 || w->vis[i]) continue;
     MxChunk *ch = chunk_slot(w);
+    if(!ch) w->retry_cd = 20;            /* no free body right now: stay standing, but look again in a third of a second (a slab must not hang in the air for good) */
     int sp = 0, n = 0, overflow = ch ? 0 : 1;
     w->stack[sp++] = (uint16_t)i; w->vis[i] = 1;
     while(sp){
@@ -669,6 +680,84 @@ static void clean_chunks(MxWorld *w, real dt){
       ch->wt = 0;
       if(mv < R(0.75) && ch->age > RI(1)){ settle(w, ch, 0); continue; }
     }
+  }
+}
+
+/* ============================================================ aftershock
+   When the man's run is over the walls he damaged crumble, as in the browser (aftershock()): every block next to a destroyed one (dmg[])
+   and every block with a snapped joint opens a zone (Manhattan distance <= 3 inside a 5x5 window); zone blocks lose their anchor; of those,
+   the ones below 70% health (sand excluded) are ranked weakest first and the weakest 80 get all four joints snapped, on both sides of each
+   joint.  The support pass then drops whatever is left hanging.  Integer maths on the health ratio, no sort, no malloc: a 70-bucket counting
+   pass finds the cut-off health, a second pass takes everything below it (ties come out in scan order, so they may differ from the browser). */
+#define CR_REACH 3
+#define CR_MAX   80
+static int hp_bucket(real h, int mh){                /* -1 if the block is above 70% health, else its health in percent (0..69) */
+#ifdef MX_FIXED
+  if(h * 10 >= (mh * 7) << 12) return -1;
+  int p = (int)((h * 100) / (mh << 12));
+#else
+  if(h * 10.0f >= mh * 7.0f) return -1;
+  int p = (int)(h * 100.0f / mh);
+#endif
+  return p < 0 ? 0 : p > 69 ? 69 : p;
+}
+static int aftershock(MxWorld *w, real *cxo, real *cyo){
+  static const int DX4[4] = {1, -1, 0, 0}, DY4[4] = {0, 0, 1, -1};
+  const int N = MX_ROWS * MX_COLS;
+  if(w->dz_hi < w->dz_lo) return 0;
+  int lo = w->dz_lo, hi = w->dz_hi, any = 0;
+  w->dz_lo = N; w->dz_hi = -1;
+  memset(w->vis, 0, sizeof w->vis);                  /* the zone map (vis is scratch: support_pass clears it before it uses it) */
+  for(int i = lo; i <= hi; i++){
+    if(!w->dmg[i] && !w->brk[i]) continue;
+    int x = i % MX_COLS, y = i / MX_COLS;
+    for(int j = -2; j <= 2; j++) for(int k = -2; k <= 2; k++){
+      if((j < 0 ? -j : j) + (k < 0 ? -k : k) > CR_REACH) continue;
+      if(INB(x + k, y + j)){ w->vis[IDX(x + k, y + j)] = 1; any = 1; }
+    }
+  }
+  memset(w->dmg + lo, 0, (size_t)(hi - lo + 1));
+  if(!any) return 0;
+  int zlo = lo - 2 * MX_COLS - 2, zhi = hi + 2 * MX_COLS + 2;
+  if(zlo < 0) zlo = 0;
+  if(zhi > N - 1) zhi = N - 1;
+  int cnt[70]; memset(cnt, 0, sizeof cnt);
+  for(int i = zlo; i <= zhi; i++){
+    int m = w->grid[i];
+    if(!w->vis[i] || !m || m == MX_SAND) continue;
+    w->anch[i] = 0;                                  /* the weld to the ground is gone */
+    int b = hp_bucket(w->hp[i], MATS[m].hp);
+    if(b >= 0) cnt[b]++;
+  }
+  int cut = -1, acc = 0;                             /* everything below bucket `cut` is taken; bucket `cut` supplies the rest */
+  for(int b = 0; b < 70; b++){ if(acc + cnt[b] >= CR_MAX){ cut = b; break; } acc += cnt[b]; }
+  int room = cut >= 0 ? CR_MAX - acc : 0, n = 0, sx = 0, sy = 0;
+  for(int i = zlo; i <= zhi; i++){
+    int m = w->grid[i];
+    if(!w->vis[i] || !m || m == MX_SAND) continue;
+    int b = hp_bucket(w->hp[i], MATS[m].hp);
+    if(b < 0) continue;
+    if(cut >= 0 && (b > cut || (b == cut && room-- <= 0))) continue;
+    int x = i % MX_COLS, y = i / MX_COLS;
+    for(int d = 0; d < 4; d++){
+      int nx = x + DX4[d], ny = y + DY4[d];
+      w->brk[i] |= (uint8_t)(1 << d);
+      if(INB(nx, ny)) w->brk[IDX(nx, ny)] |= (uint8_t)(1 << (d ^ 1));
+    }
+    sx += x; sy += y; n++;
+  }
+  w->need_support = 1;
+  if(n){ *cxo = rdiv(RI(sx), RI(n)) + R(0.5); *cyo = rdiv(RI(sy), RI(n)) + R(0.5); }
+  return n;
+}
+/* every real end of a run (he stuck and popped, or flew off the map) comes through here.  Bursting on the air valve is not a run: nothing was hit. */
+static void end_run(MxWorld *w){
+  w->man.mode = MAN_WAIT; w->waitT = 0;
+  real cx = 0, cy = 0;
+  int n = aftershock(w, &cx, &cy);
+  if(n){
+    if(w->shake < R(3)) w->shake = R(3);
+    ev(w, EV_CRUMBLE, cx, cy, 0, RI(n), 0);
   }
 }
 
@@ -1057,6 +1146,7 @@ void mx_load(MxWorld *w, int level){
   int keep_sub = w->substeps, keep_wob = w->wob_enabled ? 1 : 0, first = !w->substeps;   /* front-end quality choices survive a reload */
   int keep_valve = w->valve_ok;
   memset(w, 0, sizeof *w);
+  w->dz_lo = MX_ROWS * MX_COLS; w->dz_hi = -1;
   w->valve_ok = keep_valve;
   level %= MX_NUM_LEVELS;
   w->substeps = first ? SUBSTEPS : keep_sub;
@@ -1147,7 +1237,7 @@ void mx_update(MxWorld *w, real dt){
       man_step(w, sub);
     }
     if(m->mode == MAN_FLY){
-      if(m->x > RI(MX_COLS + 12) || m->x < RI(-12) || m->gt > RI(9)) m->mode = MAN_WAIT, w->waitT = 0;
+      if(m->x > RI(MX_COLS + 12) || m->x < RI(-12) || m->gt > RI(9)) end_run(w);
     }
   } else if(m->mode == MAN_STUCK){
     m->t += dt; m->gooT += dt;
@@ -1164,7 +1254,7 @@ void mx_update(MxWorld *w, real dt){
       real dx = t->x - m->x, dy = t->y - m->y, r = MAN_R + R(0.875) + R(0.75);
       if(t->alive && rmul(dx, dx) + rmul(dy, dy) < rmul(r, r)) kill_target(w, t);
     }
-    if(m->t > R(2.6)){ ev(w, EV_POP, m->x, m->y, 0, 0, 0); m->mode = MAN_WAIT; w->waitT = 0; }
+    if(m->t > R(2.6)){ ev(w, EV_POP, m->x, m->y, 0, 0, 0); end_run(w); }
   } else if(m->mode == MAN_WAIT){
     int nch = 0;
     for(int c = 0; c < MX_MAX_CHUNKS; c++) nch += w->chunks[c].active;
@@ -1172,6 +1262,7 @@ void mx_update(MxWorld *w, real dt){
     if(w->waitT > R(0.7) && (nch == 0 || w->waitT > R(3.5))) next_man(w);
   }
 
+  if(w->retry_cd > 0 && --w->retry_cd == 0) w->need_support = 1;
   process_expl(w);
   if(w->need_support && w->support_cd <= 0){ support_pass(w); w->support_cd = MX_SUPPORT_INTERVAL; }
   int ns = w->substeps < 2 ? 2 : w->substeps > 4 ? 4 : w->substeps;

@@ -28,6 +28,9 @@ gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c outfi
 echo "--- achievement progress bars agree with the unlock rules ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c ach_test.c -lm -o ach_float && ./ach_float | tail -n 3
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c ach_test.c -lm -o ach_fixed && ./ach_fixed | tail -n 3
+echo "--- post-run crumble (aftershock): rules, cap of 80, sand untouched, blasted wood tower comes apart (float and fixed) ---"
+gcc -std=c99 -O2 -Wall -Wno-unused-function -I../core crumble_test.c -lm -o crumble_float && ./crumble_float | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -Wno-unused-function -DMX_FIXED -I../core crumble_test.c -lm -o crumble_fixed && ./crumble_fixed | grep -v "^ok:"
 echo "--- wobble / block-kind physics (fixed point): sway, snaps, topple, sand, rubber ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DKICKV=10 -I../core wobble_test.c -lm -o wobble_test && ./wobble_test
 echo "--- robustness sweep (560 random shot sequences per math mode; must never hang) ---"

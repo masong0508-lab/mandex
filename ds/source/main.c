@@ -210,6 +210,12 @@ static void on_events(void){
       for(int k = 0; k < 24; k++) spawn(PT_GOO, e->x, e->y, rnd(51) - 25, -rnd(30), 0, 80 + rnd(40));
       sfx_play(SFX_SPLAT, pan); popup(e->x, e->y - RI(4), "SPLOOSH!", C_GOO); ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
       break;
+    case EV_CRUMBLE: {                                      /* the run is over and the damaged walls give way (core aftershock) */
+      for(int k = 0; k < 8; k++) spawn(PT_DUST, e->x + RI(rnd(9) - 4), e->y + RI(rnd(7) - 3), rnd(11) - 5, -rnd(6), 0, 24 + rnd(14));
+      sfx_play(SFX_THUD, pan); sfx_play(SFX_CRACK, pan);
+      popup(e->x, e->y - RI(4), "CRUMBLE!", C_GOLD);
+      ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
+      break; }
     case EV_WIN:    sfx_play(SFX_WIN, 64); music_set(0); break;
     case EV_LOSE:   sfx_play(SFX_LOSE, 64); music_set(0); break;
     }

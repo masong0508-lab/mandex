@@ -99,7 +99,8 @@ enum {
   EV_AIR,      /* hiss of the air valve at x,y, a = inflation 0..1 */
   EV_AIRPOP,   /* he over-inflated and burst at x,y (a man is lost) */
   EV_FART,     /* beans power-up jet at x,y */
-  EV_SPLOOSH   /* splat power-up blast at x,y */
+  EV_SPLOOSH,  /* splat power-up blast at x,y */
+  EV_CRUMBLE   /* the run ended and the damaged walls crumbled: x,y = centre of the cracked blocks, a = how many (<= 80) */
 };
 /* power-ups: one use of each per level */
 enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT };
@@ -162,6 +163,11 @@ typedef struct {
   real    ox [MX_ROWS * MX_COLS], oy [MX_ROWS * MX_COLS];
   real    ovx[MX_ROWS * MX_COLS], ovy[MX_ROWS * MX_COLS];
   uint8_t brk[MX_ROWS * MX_COLS];
+  /* post-run crumble: dmg[i] = a block next to i was destroyed this run.  dz_lo..dz_hi (inclusive cell indices) bounds every cell that may carry a
+     dmg flag or a snapped joint, so the once-per-run aftershock scan only walks the rows that matter (empty: dz_lo > dz_hi). */
+  uint8_t dmg[MX_ROWS * MX_COLS];
+  int dz_lo, dz_hi;
+  int retry_cd;                  /* frames until the support pass is tried again after it ran out of free chunks (0 = none pending) */
   int wob_enabled, wob_on, wob_quiet, sand_on, sand_t, crack_ev;
   uint32_t stat_cells;          /* chunk voxels processed by the solver (profiling) */
   MxRoom rooms[MX_MAX_ROOMS];

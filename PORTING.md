@@ -322,3 +322,16 @@ body yaw with planted feet and lagging hips (`th`, `plant`), free 3D arms (`arms
 gaze, and 11 face expressions (`FACE3`).  Key poses are `T_*` entries of `SPIN_POSE`; `spinLive` glides between them.  Gags: look around + double take,
 belly slap in 3/4 view, butt scratch + sniff, armpit sniff, brow wipe, belly-button lint, nose pick, bicep kiss, flex show, burp, yawn; fart and butt wiggle
 now step-turn round first.  The console sprites (`art/manspr.h`, `art/manidle.h`) are unchanged and would need `tools/gen_manspr.py` support for the `T_*` frames.
+
+
+## PORT 13 step A: post-run crumble (core, all front-ends; DS popup)
+- After every real end of a run (he stuck and popped, or flew off the map) the damaged walls crumble, as in the browser's `aftershock()`.  Core: `dmg[]` marks the four
+  neighbours of every destroyed block; `aftershock()` opens a zone (Manhattan <= 3 in a 5x5 window) around each damaged block or snapped joint, clears the anchor of zone blocks,
+  and snaps all four joints (both sides) of the weakest 80 blocks below 70% health (sand excluded; integer maths, counting buckets, no sort, no malloc).  `end_run()` calls it and
+  emits `EV_CRUMBLE` (x,y = centre, a = how many).  Bursting on the air valve is not a run, so it does not crumble.  `dz_lo/dz_hi` bound the scan to the rows that matter.
+- Also: when the support pass has no free chunk it now retries 20 frames later (`retry_cd`) instead of leaving a loose slab hanging in the air for good.
+- DS: `CRUMBLE!` popup, dust, thud + crack sound, camera lingers.  3DS and Dreamcast ignore the new event for now.
+- Cost: +7,200 bytes in `MxWorld`.  Plow hits alone rarely crumble anything (neighbours only lose 18%); blasts and chunk impacts do.
+- Tests: `test/crumble_test.c` (float + fixed).  Win rates and the 35 scripted shots will differ from before: re-baseline.
+- NOT verified: no DS or emulator run; sweep and scripted-shot re-baseline not recorded yet.
+- Still to do for port 13: B collapsible buildings (`MX_MAX_CHUNKS` stays 16 on the DS), C options screen + save blob v2.
