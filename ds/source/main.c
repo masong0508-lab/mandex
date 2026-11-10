@@ -38,7 +38,7 @@ static u8 buf_top[256 * 192], buf_bot[256 * 192];
 
 enum { ST_TITLE, ST_PLAY, ST_PAUSE };
 static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
-static int disp_score, cells0 = 1, end_t, was_state, best[MX_NUM_LEVELS];
+static int disp_score, cells0 = 1, end_t, was_state;      /* best scores live in stats.best[] (core, saved by port 5) */
 static MxStats stats;                 /* achievements / outfits for this session (the DS has no save) */
 static int ach_open, ach_page;       /* achievements list shown on the title's bottom screen */
 static int combo_held, cheat_t;      /* L+R+SELECT on the title = unlock every level for this session: latch (set while the three are held) and the on-screen message timer */
@@ -527,7 +527,7 @@ static void end_panel(u8 *b){
   } else if(!win){
     gfx_text_c(b, 128, 144, "DAMAGE IS NEVER ENOUGH", C_UILINE, C_UIBG, 1);
   }
-  if(win && best[world.level] >= world.score && end_t > 60 && (frame & 16)) gfx_text_c(b, 128, 150, "NEW BEST!", C_PINK, C_BLACK, 1);
+  if(win && (int)stats.best[world.level] >= world.score && end_t > 60 && (frame & 16)) gfx_text_c(b, 128, 150, "NEW BEST!", C_PINK, C_BLACK, 1);
 }
 
 /* the 2 px/cell overview + HUD strip on the touch screen */
@@ -732,8 +732,8 @@ static void title_bottom(View *v){
   gfx_text(v->buf, 14, 20, "<", C_WHITE, 2);
   gfx_text(v->buf, 232, 20, ">", C_WHITE, 2);
   if(!mx_level_unlocked(&stats, sel_level)){ gfx_text_c(v->buf, 128, 36, "LOCKED - BEAT THE LEVEL BEFORE", C_GRAY, C_UIBG, 1); }
-  else gfx_text_c(v->buf, 128, 36, best[sel_level] ? "BEST $" : "NOT PLAYED YET", C_UILINE, C_UIBG, 1);
-  if(best[sel_level] && mx_level_unlocked(&stats, sel_level)) gfx_text(v->buf, 128 + 12, 36, gfx_int(best[sel_level]), C_GOLD, 1);
+  else gfx_text_c(v->buf, 128, 36, stats.best[sel_level] ? "BEST $" : "NOT PLAYED YET", C_UILINE, C_UIBG, 1);
+  if(stats.best[sel_level] && mx_level_unlocked(&stats, sel_level)) gfx_text(v->buf, 128 + 12, 36, gfx_int((int)stats.best[sel_level]), C_GOLD, 1);
   gfx_rect(v->buf, 0, 164, 256, 28, C_UIBG); gfx_rect(v->buf, 0, 164, 256, 1, C_UILINE);
   if(frame & 32) gfx_text_c(v->buf, 128, 174, "TOUCH SCREEN OR PRESS A", C_WHITE, C_UIBG, 1);
   else           gfx_text_c(v->buf, 128, 174, "TO START", C_GOLD, C_UIBG, 1);
@@ -935,7 +935,7 @@ int main(void){
       for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a);
       update_parts();
       if(world.state != MX_PLAY){
-        if(was_state == MX_PLAY){ end_t = 0; if(world.state == MX_WIN){ if(world.score > best[world.level]) best[world.level] = world.score; mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); } }
+        if(was_state == MX_PLAY){ end_t = 0; if(world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); } }
         end_t++;
       }
       was_state = world.state;

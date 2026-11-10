@@ -24,7 +24,6 @@ enum { ST_TITLE, ST_PLAY, ST_PAUSE };
 static float g_dim = 1.0f;                      /* 1 = normal; <1 draws the dark back layer that gives blocks thickness in 3D */
 static int app = ST_TITLE, sel = 0, frame, dragging, pad_used, cells0 = 1;
 static float pad_dx, pad_dy;
-static int best[MX_NUM_LEVELS];
 static MxStats stats;                                   /* session achievements / outfits (no save on the 3DS yet) */
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
 static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
@@ -338,7 +337,7 @@ int main(void){
       if(toast_t > 0){ if(++toast_t > 150){ toast_t = 0; toast_id = -1; } }
       if(toast_t == 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i-1] = toast_q[i]; toast_nq--; toast_t = 1; }
       tick_parts();
-      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); if(world.score > best[world.level]) best[world.level] = world.score; }
+      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); }
       was_state = world.state;
     }
 
