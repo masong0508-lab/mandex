@@ -47,7 +47,15 @@ int soundPlayNoise(u16 f,u8 v,u8 p){
   }
   return -1;
 }
-void soundKill(int id){ if(id >= 100) noise_used[id-100] = 0; else if(id >= 0) psg_used[id] = 0; }
+static int wave_used[8], wave_peak, wave_vol_calls, wave_bad_vol;
+int soundPlayWave(const signed char *t,u16 f,u8 v,u8 p){                 /* PCM channels 0..7 (the music) */
+  (void)p; sound_calls++;
+  if(!t || ((unsigned long)t & 3) || f < 100 || f > 1200 || v == 0 || v > 127){ wave_bad_vol++; }
+  for(int i = 0; i < 8; i++){ if(wave_used[i]) continue; wave_used[i] = 1; int n = 0; for(int k = 0; k < 8; k++) n += wave_used[k]; if(n > wave_peak) wave_peak = n; return 200 + i; }
+  sound_dropped++; return -1;
+}
+void soundSetVol(int id,u8 v){ if(id < 200 || id >= 208 || !wave_used[id-200] || v > 127) wave_bad_vol++; wave_vol_calls++; }
+void soundKill(int id){ if(id >= 200) wave_used[id-200] = 0; else if(id >= 100) noise_used[id-100] = 0; else if(id >= 0) psg_used[id] = 0; }
 void soundSetFreq(int id,int f){(void)id;(void)f;}
 void dmaCopy(const void*a,void*b,u32 n){memcpy(b,a,n);} void DC_FlushRange(const void*a,u32 n){(void)a;(void)n;}
 static u32 g_ticks = 100000;      /* what the stub profiler reports for the physics step (a test raises it to look slow) */
@@ -103,7 +111,7 @@ static void summary(void){
   printf("play frames=%d  max events/frame=%d  max live particles=%d/%d\n", stat_frames_play, stat_max_nev, stat_max_parts, NPART);
   printf("final: level=%d state=%d men=%d manmode=%d launches=%d aim_phase=%d targets=%d/%d\n", world.level + 1, world.state, world.men, world.man.mode, launches, aim_phase, mx_targets_alive(&world), world.ntargets);
   for(int c = 0; c < MX_MAX_CHUNKS; c++) if(world.chunks[c].active){ const MxChunk *k = &world.chunks[c]; printf("  chunk %d: cells=%d x=%.1f y=%.1f vx=%.3f vy=%.3f w=%.3f sleep=%.2f age=%.1f ang=%.2f\n", c, k->count, RTOF(k->x), RTOF(k->y), RTOF(k->vx), RTOF(k->vy), RTOF(k->w), RTOF(k->sleep), RTOF(k->age), RTOF(k->ang)); }
-  printf("sound calls=%d dropped(no free channel)=%d  peak PSG=%d/6  peak noise=%d/2  substeps=%d\n", sound_calls, sound_dropped, psg_peak, noise_peak, world.substeps);
+  printf("sound calls=%d dropped(no free channel)=%d  peak PSG=%d/6  peak noise=%d/2  music wave channels peak=%d (fades=%d, bad=%d)  substeps=%d\n", sound_calls, sound_dropped, psg_peak, noise_peak, wave_peak, wave_vol_calls, wave_bad_vol, world.substeps);
   save_report();
 }
 void swiWaitForVBlank(void){

@@ -59,6 +59,8 @@ rm -f /tmp/mx_save.sav; MX_SAVE_PATH=/tmp/mx_save.sav ./ds_render /tmp/dssave1 1
 MX_SAVE_PATH=/tmp/mx_save.sav ./ds_render /tmp/dssave2 400 0 | grep "^save:" | grep "file_valid=1" > /dev/null && echo "ok: second boot reads the first boot's progress"
 head -c 100 /dev/urandom > /tmp/mx_bad.sav; MX_SAVE_PATH=/tmp/mx_bad.sav ./ds_render /tmp/dssave3 400 0 | grep -c "^final" > /dev/null && echo "ok: a garbage chip starts fresh"
 for L in 0 3 5 6; do ./ds_render /tmp/dsL$L 12000 $L | grep -v "^  chunk"; done
+echo "--- DS music: one soft PCM note at a time, every note fades, no leaked channel (a looping note that is never killed would drone forever) ---"
+for L in 3 6; do ./ds_render /tmp/dsM$L 12000 $L | grep -q "music wave channels peak=1 (fades=[0-9][0-9]*, bad=0)" && echo "ok: level index $L: one music channel, volumes and frequencies in range" || { echo "FAIL: music channel leak or bad wave parameters (level index $L)"; exit 1; }; done
 echo "--- DS outfits screen: open, walk, wear, locked swatches, back (scripted stylus + d-pad) ---"
 OUTFIT_SHOTS=1 ./ds_render /tmp/dsout 400 0 | grep -v "^ok:"
 echo "--- DS options screen (port 13): open, tap + d-pad, start tool pre-armed, valve hidden, collapse dropped FIRST when the solver is slow and restored LAST, saved and reloaded ---"

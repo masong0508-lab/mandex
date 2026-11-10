@@ -84,5 +84,7 @@ void soundEnable(void);
 int soundPlayPSG(DutyCycle duty, u16 freq, u8 volume, u8 pan);
 int soundPlayNoise(u16 freq, u8 volume, u8 pan);
 void soundSetFreq(int handle, u16 freq);
+int soundPlayWave(const signed char *cycle32, u16 freq, u8 volume, u8 pan);   /* looped 32-sample PCM8 cycle (4-byte aligned, main RAM): a soft tone instead of a PSG square */
+void soundSetVol(int handle, u8 volume);                                       /* 0..127, wave channels only */
 void soundKill(int handle);
 #endif

@@ -20,7 +20,7 @@ void lcdMainOnBottom(void); void videoSetMode(int); void videoSetModeSub(int); v
 int bgInit(int, int, int, int, int); int bgInitSub(int, int, int, int, int);
 void soundEnable(void); void scanKeys(void); int keysDown(void), keysHeld(void), keysUp(void);
 void touchRead(touchPosition *);
-int soundPlayPSG(int, u16, u8, u8); int soundPlayNoise(u16, u8, u8); void soundKill(int); void soundSetFreq(int, int);
+int soundPlayPSG(int, u16, u8, u8); int soundPlayNoise(u16, u8, u8); void soundKill(int); void soundSetFreq(int, int); int soundPlayWave(const signed char *, u16, u8, u8); void soundSetVol(int, u8);
 int card_save_read(u8 *, int); int card_save_write(const u8 *, int);
 void swiWaitForVBlank(void); void dmaCopy(const void *, void *, u32); void DC_FlushRange(const void *, u32);
 void cpuStartTiming(int); u32 cpuEndTiming(void);

@@ -80,7 +80,7 @@ u32 cpuEndTiming(void){
 }
 
 /* ------------------------------------------------------------- sound (ARM7 does the register writes) */
-enum { C_PLAY_PSG = 1, C_PLAY_NOISE = 2, C_FREQ = 3, C_KILL = 4 };
+enum { C_PLAY_PSG = 1, C_PLAY_NOISE = 2, C_FREQ = 3, C_KILL = 4, C_WAVE_SRC = 5, C_PLAY_WAVE = 6, C_VOL = 7 };
 static u8 busy[16];
 static void push(u32 cmd){
   MxIpc *p = MX_IPC;
@@ -103,8 +103,16 @@ int soundPlayNoise(u16 f, u8 v, u8 pan){
   push((C_PLAY_NOISE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
   return c;
 }
-void soundSetFreq(int h, u16 f){ if(h >= 8 && h < 16) push((C_FREQ << 28) | (h << 24) | f); }
-void soundKill(int h){ if(h >= 8 && h < 16){ push((C_KILL << 28) | (h << 24)); busy[h] = 0; } }
+int soundPlayWave(const signed char *cyc, u16 f, u8 v, u8 pan){   /* PCM channels 0..7 loop a 32-byte cycle: no square-wave buzz.  The ARM9 has no data cache here, so the ARM7 reads the table straight from RAM. */
+  int c = grab(0, 7); if(c < 0) return -1;
+  push((C_WAVE_SRC << 28) | ((u32)cyc & 0xFFFFFC));   /* main RAM is 0x02xxxxxx: only the low 24 bits travel */
+  push((C_FREQ << 28) | (c << 24) | f);               /* timer first, then start the channel */
+  push((C_PLAY_WAVE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
+  return c;
+}
+void soundSetVol(int h, u8 v){ if(h >= 0 && h < 8) push((C_VOL << 28) | (h << 24) | (v & 127)); }
+void soundSetFreq(int h, u16 f){ if(h >= 0 && h < 16) push((C_FREQ << 28) | (h << 24) | f); }
+void soundKill(int h){ if(h >= 0 && h < 16){ push((C_KILL << 28) | (h << 24)); busy[h] = 0; } }
 
 /* ------------------------------------------------------------- cartridge backup chip (8 KB / 64 kbit EEPROM, 2-byte address, 32-byte pages)
    Register values are from memory of GBATEK ("DS Cartridge Backup") and libnds' cardEeprom code: check them on the first emulator run.

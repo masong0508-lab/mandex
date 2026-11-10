@@ -49,18 +49,26 @@ static void load_calibration(void){
 static int clampi(int v, int lo, int hi){ return v < lo ? lo : v > hi ? hi : v; }
 
 /* sound */
+static u32 wave_src = 0x02000000u;                 /* where the looped 32-byte cycle for PCM channels lives (set by op 5) */
 static void snd_cmd(u32 c){
   u32 op = c >> 28, ch = (c >> 24) & 15;
   u32 base = 0x04000400 + ch * 16;
   if(op == 3){                                      /* frequency */
     u32 f = c & 0xFFFF; if(f < 20) f = 20;
-    if(ch < 14) f *= 8;                             /* square wave has 8 samples per cycle */
+    if(ch < 8) f *= 32;                             /* PCM wave channels: 32 samples per cycle */
+    else if(ch < 14) f *= 8;                        /* square wave has 8 samples per cycle */
     R16(base + 8) = (u16)(0x10000 - 33513982u / 2 / f);   /* timer reload: ARM7 sound clock = 16.756 MHz */
   } else if(op == 1){                               /* PSG */
     R32(base) = 0x80000000u | (3u << 29) | (((c >> 21) & 7) << 24) | ((c >> 14) & 127) | ((((c >> 7) & 127)) << 16);
   } else if(op == 2){                               /* noise */
     R32(base) = 0x80000000u | (3u << 29) | ((c >> 14) & 127) | ((((c >> 7) & 127)) << 16);
-  } else if(op == 4){ R32(base) = 0; }
+  } else if(op == 4){ R32(base) = 0;
+  } else if(op == 5){ wave_src = 0x02000000u | (c & 0xFFFFFC);          /* remember the wave table address */
+  } else if(op == 6 && ch < 8){                     /* PCM8 loop: SAD, PNT 0, LEN 8 words (32 bytes), repeat = loop forever */
+    R32(base + 4) = wave_src; R16(base + 10) = 0; R32(base + 12) = 8;
+    R32(base) = 0x80000000u | (1u << 27) | ((c >> 14) & 127) | ((((c >> 7) & 127)) << 16);
+  } else if(op == 7 && ch < 8){ R8(base) = (u8)(c & 127);   /* volume only: a byte write cannot restart the channel */
+  }
 }
 
 void arm7_main(void){
