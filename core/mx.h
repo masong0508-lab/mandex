@@ -121,6 +121,8 @@ typedef struct {
   real px, py, pa;     /* pose at the previous frame, for sleep detection */
   real rx, ry, ra, wt; /* pose at the start of a 1 s window: net displacement catches resting jitter */
   int cn;
+  uint8_t rest;        /* collapsible buildings: asleep as a solid body (not integrated, still collides) until something wakes it */
+  real restT;          /* seconds asleep; re-checked every 2.4 s + a stagger */
   MxCell cells[MX_CHUNK_CELLS];
 } MxChunk;
 
@@ -167,6 +169,8 @@ typedef struct {
      dmg flag or a snapped joint, so the once-per-run aftershock scan only walks the rows that matter (empty: dz_lo > dz_hi). */
   uint8_t dmg[MX_ROWS * MX_COLS];
   int dz_lo, dz_hi;
+  int collapse;                  /* option: rubble that comes to rest stays a loose solid body until the level ends (see mx_set_collapse) */
+  real act_x, act_y;             /* where the last block died: the farthest sleeper is the first to be welded when chunks run short */
   int retry_cd;                  /* frames until the support pass is tried again after it ran out of free chunks (0 = none pending) */
   int wob_enabled, wob_on, wob_quiet, sand_on, sand_t, crack_ev;
   uint32_t stat_cells;          /* chunk voxels processed by the solver (profiling) */
@@ -212,6 +216,9 @@ int  mx_material_hp(int m);                   /* full health of a block of this 
 /* how far the floor under a landlord has wobbled (so he rides it) */
 /* wobble quality switch: 0 = lattice off (cheaper; buildings stay rigid until they break), 1 = on (default) */
 void mx_set_wobble(MxWorld *w, int on);
+/* collapsible buildings: 1 = fallen rubble stays physical (sleeps as a solid, wakes when something nearby breaks or hits it) until the level ends;
+   0 = it welds back into the walls as soon as it stops (the default).  Switching off wakes every sleeper, so it settles the normal way. */
+void mx_set_collapse(MxWorld *w, int on);
 void mx_target_offset(const MxWorld *w, const MxTarget *t, real *ox, real *oy);
 static inline int mx_cell_cracked(const MxWorld *w, int i){ return w->brk[i] != 0; }
 

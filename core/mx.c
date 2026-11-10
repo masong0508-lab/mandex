@@ -126,12 +126,14 @@ static void mark_dmg(MxWorld *w, int x, int y){
 }
 static void wob_zero(MxWorld *w, int i){ w->ox[i] = w->oy[i] = w->ovx[i] = w->ovy[i] = 0; }
 
+static void wake_at(MxWorld *w, real px, real py, real r);
 static real kill(MxWorld *w, int x, int y, real bvx, real bvy){
   int i = IDX(x, y), m = w->grid[i];
   if(!m) return 0;
   real h = w->hp[i];
   w->grid[i] = 0; w->hp[i] = 0; w->anch[i] = 0; w->need_support = 1; w->score += 10;
   wob_zero(w, i); clear_links(w, i); w->sand_on = 1; mark_dmg(w, x, y);
+  if(w->collapse){ w->act_x = RI(x); w->act_y = RI(y); wake_at(w, RI(x) + R(0.5), RI(y) + R(0.5), RI(3)); }
   ev(w, EV_CELL, RI(x) + R(0.5), RI(y) + R(0.5), m, rmul(bvx, R(0.25)), rmul(bvy, R(0.25)));
   if(m == MX_TNT && w->nexpl < 64){ w->expl[w->nexpl][0] = (int16_t)x; w->expl[w->nexpl][1] = (int16_t)y; w->nexpl++; }
   return h;
@@ -157,7 +159,18 @@ static real blast(MxWorld *w, int cx, int cy, int r, real power){
   return spent;
 }
 
+static void wake_chunk(MxChunk *ch){ ch->rest = 0; ch->sleep = 0; ch->restT = 0; if(ch->age < R(0.2)) ch->age = R(0.2); }
+static void wake_at(MxWorld *w, real px, real py, real r){
+  for(int c = 0; c < MX_MAX_CHUNKS; c++){
+    MxChunk *ch = &w->chunks[c];
+    if(!ch->active || !ch->rest) continue;
+    real dx = ch->x - px, dy = ch->y - py, reach = ch->rad + r;
+    if(rmul(dx, dx) + rmul(dy, dy) < rmul(reach, reach)) wake_chunk(ch);
+  }
+}
+static int live(const MxWorld *w){ return w->collapse && w->state == MX_PLAY; }
 static void apply_impulse(MxChunk *ch, real px, real py, real jx, real jy){
+  if(ch->rest) wake_chunk(ch);
   ch->vx += rdiv(jx, ch->m); ch->vy += rdiv(jy, ch->m);
   ch->w  += rdiv(rmul(px - ch->x, jy) - rmul(py - ch->y, jx), ch->I);
   ch->sleep = 0;
@@ -378,9 +391,21 @@ static void recompute(MxChunk *ch){
   ch->m = M; ch->I = I;
 }
 
+static void settle(MxWorld *w, MxChunk *ch, int keep_upright);
 static MxChunk *chunk_slot(MxWorld *w){
   for(int c = 0; c < MX_MAX_CHUNKS; c++) if(!w->chunks[c].active) return &w->chunks[c];
-  return 0;
+  if(!w->collapse) return 0;
+  /* every body is in use: weld the smallest sleeper (the one farthest from the action if two tie) back into the walls and reuse its slot */
+  MxChunk *v = 0; real vd = 0;
+  for(int c = 0; c < MX_MAX_CHUNKS; c++){
+    MxChunk *ch = &w->chunks[c];
+    if(!ch->rest) continue;
+    real dx = ch->x - w->act_x, dy = ch->y - w->act_y, d = rmul(dx, dx) + rmul(dy, dy);
+    if(!v || ch->count < v->count || (ch->count == v->count && d > vd)){ v = ch; vd = d; }
+  }
+  if(!v) return 0;
+  settle(w, v, 0);
+  return v;
 }
 
 static MX_HOT void support_pass(MxWorld *w){
@@ -464,6 +489,7 @@ static MX_HOT void support_pass(MxWorld *w){
       real r = rsqrt(rmul(c->lx, c->lx) + rmul(c->ly, c->ly));
       if(r > rad) rad = r;
     }
+    ch->rest = 0; ch->restT = 0;
     ch->active = 1; ch->count = n; ch->x = cx; ch->y = cy; ch->ang = 0;
     ch->vx = rclamp(cvx, -WOB_VMAX, WOB_VMAX); ch->vy = rclamp(cvy, -WOB_VMAX, WOB_VMAX);
     ch->w = ti > R(1) ? rclamp(rdiv(tq, ti), -RI(6), RI(6)) : 0;   /* the sway becomes a topple */
@@ -521,14 +547,19 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
     MxChunk *ch = &w->chunks[c];
     if(!ch->active) continue;
-    ch->vy += rmul(GRAV, dt);
-    ch->vx = rmul(ch->vx, R(0.9995)); ch->w = rmul(ch->w, R(0.998));
-    ch->x += rmul(ch->vx, dt); ch->y += rmul(ch->vy, dt); ch->ang += rmul(ch->w, dt);
-    ch->cs = rcos(ch->ang); ch->sn = rsin(ch->ang); ch->cx = ch->cy = 0; ch->cn = 0;
+    if(!ch->rest){
+      ch->vy += rmul(GRAV, dt);
+      ch->vx = rmul(ch->vx, R(0.9995)); ch->w = rmul(ch->w, R(0.998));
+      ch->x += rmul(ch->vx, dt); ch->y += rmul(ch->vy, dt); ch->ang += rmul(ch->w, dt);
+      ch->cs = rcos(ch->ang); ch->sn = rsin(ch->ang);
+    }
+    ch->cx = ch->cy = 0; ch->cn = 0;
     for(int i = 0; i < ch->count; i++){
       MxCell *a = &ch->cells[i];
-      a->wx = ch->x + rmul(ch->cs, a->lx) - rmul(ch->sn, a->ly);
-      a->wy = ch->y + rmul(ch->sn, a->lx) + rmul(ch->cs, a->ly);
+      if(!ch->rest){
+        a->wx = ch->x + rmul(ch->cs, a->lx) - rmul(ch->sn, a->ly);
+        a->wy = ch->y + rmul(ch->sn, a->lx) + rmul(ch->cs, a->ly);
+      }
       if(!a->edge) continue;
       int gx = rfloor(a->wx) + 2, gy = rfloor(a->wy) + 2;
       if(gx < 0) gx = 0;
@@ -541,7 +572,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
   }
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
     MxChunk *ch = &w->chunks[c];
-    if(!ch->active) continue;
+    if(!ch->active || ch->rest) continue;      /* sleepers do no work of their own: moving bodies test against them through the buckets */
     for(int i = 0; i < ch->count; i++){
       MxCell *a = &ch->cells[i];
       if(a->dead || !a->edge) continue;
@@ -574,8 +605,9 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         if(bx < 0 || bx > MX_COLS + 3 || by < 0 || by > MX_ROWS + 3) continue;
         for(int id = w->bhead[by * (MX_COLS + 4) + bx]; id >= 0; id = w->bnext[id]){
           int oc = id / MX_CHUNK_CELLS;
-          if(oc <= c) continue;
+          if(oc == c) continue;
           MxChunk *och = &w->chunks[oc];
+          if(oc < c && !och->rest) continue;     /* moving pairs are tested once (from the lower index); a sleeper is tested from whichever moving body reaches it */
           MxCell *o = &och->cells[id % MX_CHUNK_CELLS];
           if(o->dead) continue;
           real dx = a->wx - o->wx, dy = a->wy - o->wy, d2 = rmul(dx, dx) + rmul(dy, dy);
@@ -587,10 +619,17 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
           real vn = rmul(vax - vbx, nx) + rmul(vay - vby, ny);
           if(vn < 0){
             real rna = rmul(rax, ny) - rmul(ray, nx), rnb = rmul(rbx, ny) - rmul(rby, nx);
-            real den = rdiv(RI(1), ch->m) + rdiv(RI(1), och->m) + rdiv(rmul(rna, rna), ch->I) + rdiv(rmul(rnb, rnb), och->I);
-            real jj = rdiv(rmul(-vn, R(1.1)), den);
-            ch->vx += rdiv(rmul(jj, nx), ch->m); ch->vy += rdiv(rmul(jj, ny), ch->m); ch->w += rdiv(rmul(rna, jj), ch->I);
-            och->vx -= rdiv(rmul(jj, nx), och->m); och->vy -= rdiv(rmul(jj, ny), och->m); och->w -= rdiv(rmul(rnb, jj), och->I);
+            real den, jj;
+            if(och->rest){                       /* a sleeper is immovable for a gentle touch (hard ones woke it already) */
+              den = rdiv(RI(1), ch->m) + rdiv(rmul(rna, rna), ch->I);
+              jj = rdiv(rmul(-vn, R(1.1)), den);
+              ch->vx += rdiv(rmul(jj, nx), ch->m); ch->vy += rdiv(rmul(jj, ny), ch->m); ch->w += rdiv(rmul(rna, jj), ch->I);
+            } else {
+              den = rdiv(RI(1), ch->m) + rdiv(RI(1), och->m) + rdiv(rmul(rna, rna), ch->I) + rdiv(rmul(rnb, rnb), och->I);
+              jj = rdiv(rmul(-vn, R(1.1)), den);
+              ch->vx += rdiv(rmul(jj, nx), ch->m); ch->vy += rdiv(rmul(jj, ny), ch->m); ch->w += rdiv(rmul(rna, jj), ch->I);
+              och->vx -= rdiv(rmul(jj, nx), och->m); och->vy -= rdiv(rmul(jj, ny), och->m); och->w -= rdiv(rmul(rnb, jj), och->I);
+            }
             if(-vn > R(25)){
               real dm = rmul(-vn - R(22.5), R(0.04));
               a->h -= dm; o->h -= dm;
@@ -600,8 +639,11 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
           }
           real tm = ch->m + och->m;
           real fa = rmul(R(0.5), rmul(pen, rdiv(och->m, tm))), fb = rmul(R(0.5), rmul(pen, rdiv(ch->m, tm)));
-          ch->cx += rmul(nx, fa); ch->cy += rmul(ny, fa); ch->cn++;
-          och->cx -= rmul(nx, fb); och->cy -= rmul(ny, fb); och->cn++;
+          if(och->rest){ real full = rmul(R(0.5), pen); ch->cx += rmul(nx, full); ch->cy += rmul(ny, full); ch->cn++; }
+          else {
+            ch->cx += rmul(nx, fa); ch->cy += rmul(ny, fa); ch->cn++;
+            och->cx -= rmul(nx, fb); och->cy -= rmul(ny, fb); och->cn++;
+          }
         }
       }
     }
@@ -632,12 +674,12 @@ static void settle(MxWorld *w, MxChunk *ch, int keep_upright){
     for(int o = 0; o < 9 && !ok; o++){
       int X = gx + OFFS[o][0], Y = gy + OFFS[o][1];
       if(INB(X, Y) && !w->grid[IDX(X, Y)]){
-        int j = IDX(X, Y); w->grid[j] = a->m; w->hp[j] = a->h; w->anch[j] = 1; ok = 1;
+        int j = IDX(X, Y); w->grid[j] = a->m; w->hp[j] = a->h; w->anch[j] = 1; w->vis[j] = 1; ok = 1;
         wob_zero(w, j); clear_links(w, j); if(a->m == MX_SAND) w->sand_on = 1;
       }
     }
   }
-  ch->active = 0;
+  ch->active = 0; ch->rest = 0;
   w->need_support = 1;
 }
 
@@ -658,6 +700,19 @@ static void clean_chunks(MxWorld *w, real dt){
     }
     if(ch->hitCd > 0) ch->hitCd -= dt;
     if(ch->x < RI(-30) || ch->x > RI(150) || ch->y > RI(90)){ ch->active = 0; continue; }
+    if(ch->rest){                                       /* collapsible buildings: a sleeper stays solid until something wakes it */
+      real spr = rabs(ch->vx) + rabs(ch->vy) + rmul(rabs(ch->w), R(2.25));
+      ch->restT += dt;
+      if(!live(w) || spr > R(3.75) || ch->restT > R(2.4) + rmul(RI(c % 7), R(0.3))) wake_chunk(ch);
+      else { ch->vx = ch->vy = ch->w = 0; ch->px = ch->x; ch->py = ch->y; ch->pa = ch->ang; continue; }
+    }
+    if(live(w) && rabs(ch->vx) + rabs(ch->vy) > RI(5))     /* a fast body wakes sleepers it is about to hit */
+      for(int o = 0; o < MX_MAX_CHUNKS; o++){
+        MxChunk *oc = &w->chunks[o];
+        if(!oc->active || !oc->rest) continue;
+        real dx = oc->x - ch->x, dy = oc->y - ch->y, reach = oc->rad + ch->rad + RI(2);
+        if(rmul(dx, dx) + rmul(dy, dy) < rmul(reach, reach)) wake_chunk(oc);
+      }
     /* asleep = barely moved this frame (judge displacement, not velocity: resting contacts
        keep a small residual velocity, especially in fixed point) */
     real moved = rabs(ch->x - ch->px) + rabs(ch->y - ch->py) + rmul(rabs(ch->ang - ch->pa), R(2.25));
@@ -669,7 +724,7 @@ static void clean_chunks(MxWorld *w, real dt){
     if(thr > RI(5)) thr = RI(5);
     if(sp < thr && ch->age > R(0.15)){
       ch->sleep += dt;
-      if(ch->sleep > R(0.5)){ settle(w, ch, 0); continue; }
+      if(ch->sleep > R(0.5)){ if(live(w)){ ch->rest = 1; ch->restT = 0; ch->wt = 0; ch->vx = ch->vy = ch->w = 0; } else settle(w, ch, 0); continue; }
     } else ch->sleep = 0;
     /* second test over a whole second: a resting stack can jitter by +-0.1 cell every frame (never
        "slow" frame to frame, e.g. in fixed point with few substeps) yet go nowhere */
@@ -678,7 +733,7 @@ static void clean_chunks(MxWorld *w, real dt){
     if(ch->wt >= RI(1)){
       real mv = rabs(ch->x - ch->rx) + rabs(ch->y - ch->ry) + rmul(rabs(ch->ang - ch->ra), R(2.25));
       ch->wt = 0;
-      if(mv < R(0.75) && ch->age > RI(1)){ settle(w, ch, 0); continue; }
+      if(mv < R(0.75) && ch->age > RI(1)){ if(live(w)){ ch->rest = 1; ch->restT = 0; ch->vx = ch->vy = ch->w = 0; } else settle(w, ch, 0); continue; }
     }
   }
 }
@@ -759,6 +814,17 @@ static void end_run(MxWorld *w){
     if(w->shake < R(3)) w->shake = R(3);
     ev(w, EV_CRUMBLE, cx, cy, 0, RI(n), 0);
   }
+}
+
+/* bodies that are really moving: every active one, except that with collapsible buildings sleepers and bodies idling in a re-check do not count */
+static int busy_count(const MxWorld *w){
+  int n = 0;
+  for(int c = 0; c < MX_MAX_CHUNKS; c++){ const MxChunk *ch = &w->chunks[c]; if(ch->active && !ch->rest && (!w->collapse || ch->sleep <= 0)) n++; }
+  return n;
+}
+void mx_set_collapse(MxWorld *w, int on){
+  w->collapse = on != 0;
+  if(!on) for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active && w->chunks[c].rest) wake_chunk(&w->chunks[c]);
 }
 
 /* ============================================================ the man */
@@ -1144,10 +1210,10 @@ static void build(MxWorld *w, int l){
 void mx_load(MxWorld *w, int level){
   init_tables(); init_mats();
   int keep_sub = w->substeps, keep_wob = w->wob_enabled ? 1 : 0, first = !w->substeps;   /* front-end quality choices survive a reload */
-  int keep_valve = w->valve_ok;
+  int keep_valve = w->valve_ok, keep_collapse = w->collapse;
   memset(w, 0, sizeof *w);
   w->dz_lo = MX_ROWS * MX_COLS; w->dz_hi = -1;
-  w->valve_ok = keep_valve;
+  w->valve_ok = keep_valve; w->collapse = keep_collapse;
   level %= MX_NUM_LEVELS;
   w->substeps = first ? SUBSTEPS : keep_sub;
   w->wob_enabled = first ? 1 : keep_wob;
@@ -1256,8 +1322,7 @@ void mx_update(MxWorld *w, real dt){
     }
     if(m->t > R(2.6)){ ev(w, EV_POP, m->x, m->y, 0, 0, 0); end_run(w); }
   } else if(m->mode == MAN_WAIT){
-    int nch = 0;
-    for(int c = 0; c < MX_MAX_CHUNKS; c++) nch += w->chunks[c].active;
+    int nch = busy_count(w);
     w->waitT += dt;
     if(w->waitT > R(0.7) && (nch == 0 || w->waitT > R(3.5))) next_man(w);
   }
@@ -1287,8 +1352,7 @@ void mx_update(MxWorld *w, real dt){
   man_jiggle(w, dt);
 
   if(w->state == MX_PLAY){
-    int nch = 0;
-    for(int c = 0; c < MX_MAX_CHUNKS; c++) nch += w->chunks[c].active;
+    int nch = busy_count(w);
     if(mx_targets_alive(w) == 0){
       w->winT += dt;
       if(w->winT > R(1.6)){ w->state = MX_WIN; w->score += w->men * 3000; ev(w, EV_WIN, 0, 0, 0, 0, 0); }

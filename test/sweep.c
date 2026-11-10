@@ -15,6 +15,9 @@ int main(void){
   int hang=0, runs=0, wins=0, maxf=0;
   for(int L=0; L<MX_NUM_LEVELS; L++) for(int seq=0; seq<80; seq++){
     memset(&w,0,sizeof w); mx_load(&w,L);
+#ifdef SWEEP_COLLAPSE
+    mx_set_collapse(&w,1);
+#endif
 #ifdef SWEEP_NOWOB
     mx_set_wobble(&w,0);
 #endif
