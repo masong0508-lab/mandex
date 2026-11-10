@@ -55,6 +55,24 @@ int main(void){
   printf("wobble worst error vs browser %.3f\n", worstw);
   CHECK(worstw < 0.05, "wobble error %.3f", worstw);
   m.mode = MAN_FLY; CHECK(F(mx_man_wobble(&m)) == 0, "no wobble in flight");
+  /* landing: every ground touch emits EV_LAND (m = 1 for a skip); a skip also shakes the screen; the last one is the sticking landing */
+  mx_load(&w, 0); w.state = MX_PLAY;
+  for(int shot = 0; shot < 3; shot++){
+    mx_load(&w, 0); w.state = MX_PLAY; w.men = 3;
+    w.man.mode = MAN_AIM; w.man.x = MX_ANCHOR_X - RI(10) + RI(shot); w.man.y = MX_ANCHOR_Y + RI(7 - shot * 3);
+    mx_release(&w);
+    int lands = 0, skips = 0, last_m = -1; double shake_at_skip = 0;
+    for(int f = 0; f < 60 * 8 && w.man.mode == MAN_FLY; f++){
+      mx_update(&w, R(1.0 / 60.0));
+      for(int i = 0; i < w.nev; i++) if(w.ev[i].type == EV_LAND){ lands++; last_m = w.ev[i].m; if(w.ev[i].m){ skips++; shake_at_skip = (double)F(w.shake); } }
+    }
+    printf("landing test %d: %d ground touches, %d skips, man mode %d\n", shot, lands, skips, w.man.mode);
+    CHECK(w.man.mode != MAN_FLY, "shot %d never came down", shot);
+    if(lands == 0) continue;                                    /* it hit a building and stuck without touching the ground: fine */
+    CHECK(lands >= skips && lands <= skips + 1, "shot %d: %d touches but %d skips (only the last touch may be a non-skip)", shot, lands, skips);
+    if(lands == skips + 1) CHECK(last_m == 0, "shot %d: the final touch must be the sticking one", shot);
+    if(skips) CHECK(shake_at_skip >= 3.0, "shot %d: skip shake %.2f, want >= 4", shot, shake_at_skip);
+  }
   printf(fails ? "pose_test: %d FAILED\n" : "pose_test: all ok\n", fails);
   return fails != 0;
 }

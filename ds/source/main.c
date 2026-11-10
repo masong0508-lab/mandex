@@ -62,15 +62,23 @@ static u32 rng = 0x2545F491u;
 static int rnd(int n){ rng = rng * 1664525u + 1013904223u; return (int)((rng >> 16) % (u32)n); }
 
 /* ------------------------------------------------------------ particles/popups */
-enum { PT_DEBRIS, PT_SMOKE, PT_SPARK, PT_GOO, PT_HAT, PT_DUST, PT_STAR, PT_STINK, PT_FLY, PT_ZZZ, PT_SWEAT };
-typedef struct { int x, y, vx, vy; short life, max; u8 type, col; } Part;      /* positions in 1/64 cell */
+enum { PT_DEBRIS, PT_SMOKE, PT_SPARK, PT_GOO, PT_HAT, PT_DUST, PT_STAR, PT_STINK, PT_FLY, PT_ZZZ, PT_SWEAT, PT_RING };
+typedef struct { int x, y, vx, vy; short life, max; u8 type, col; short r; } Part;      /* positions in 1/64 cell; r = a ring's final radius in 1/64 cell */
 #define NPART 128
 static Part parts[NPART];
 
 static void spawn(int type, real wx, real wy, int vx, int vy, int col, int life){
   for(int i = 0; i < NPART; i++) if(parts[i].life <= 0){
     Part *p = &parts[i];
-    p->x = wx >> 6; p->y = wy >> 6; p->vx = vx; p->vy = vy; p->life = p->max = (short)life; p->type = (u8)type; p->col = (u8)col;
+    p->x = wx >> 6; p->y = wy >> 6; p->vx = vx; p->vy = vy; p->life = p->max = (short)life; p->type = (u8)type; p->col = (u8)col; p->r = 0;
+    return;
+  }
+}
+/* the browser's ring(): an outline that swells to rcells and fades */
+static void spawn_ring(real wx, real wy, int rcells, int col){
+  for(int i = 0; i < NPART; i++) if(parts[i].life <= 0){
+    spawn(PT_RING, wx, wy, 0, 0, col, 27);
+    parts[i].r = (short)(rcells * 64);
     return;
   }
 }
@@ -176,6 +184,10 @@ static void on_events(void){
       popup(e->x, e->y - RI(3), "BOING!", C_PINK);
       break;
     case EV_THUD:   if(e->b > R(0.3)) sfx_play(SFX_THUD, pan); break;
+    case EV_LAND:                                           /* ground touch: a puff of dust, and a hard landing adds a ring */
+      for(int k = 0, n = e->m ? 8 : 5; k < n; k++) spawn(PT_DUST, e->x + RI(rnd(5) - 2) / 4, e->y - R(0.5), rnd(15) - 7, -rnd(5) - 1, 0, 22 + rnd(10));
+      if(e->m) spawn_ring(e->x, e->y - R(0.5), 4, C_SMOKE);       /* browser: 30 px at 8 px a cell */
+      break;
     case EV_BOOM:
       for(int k = 0; k < 9; k++) spawn(PT_SMOKE, e->x, e->y, rnd(25) - 12, rnd(20) - 14, 0, 26 + rnd(14));
       for(int k = 0; k < 12; k++) spawn(PT_SPARK, e->x, e->y, rnd(41) - 20, rnd(31) - 22, k & 1 ? C_GOLD : C_WHITE, 14 + rnd(12));
@@ -185,6 +197,7 @@ static void on_events(void){
       break;
     case EV_SPLAT:
       for(int k = 0; k < 14; k++) spawn(PT_GOO, e->x, e->y, rnd(25) - 12, -rnd(17), 0, 70 + rnd(40));
+      spawn_ring(e->x, e->y, 5, C_GOO);
       sfx_play(SFX_SPLAT, pan);
       break;
     case EV_TARGET: {
@@ -213,6 +226,7 @@ static void on_events(void){
       break;
     case EV_SPLOOSH:
       for(int k = 0; k < 24; k++) spawn(PT_GOO, e->x, e->y, rnd(51) - 25, -rnd(30), 0, 80 + rnd(40));
+      spawn_ring(e->x, e->y, 11, C_GOO); spawn_ring(e->x, e->y, 8, C_WHITE);
       sfx_play(SFX_SPLAT, pan); popup(e->x, e->y - RI(4), "SPLOOSH!", C_GOO); ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
       break;
     case EV_CRUMBLE: {                                      /* the run is over and the damaged walls give way (core aftershock) */
@@ -423,6 +437,15 @@ static void draw_parts(const View *v){
     case PT_FLY: { int a = age * 5; gfx_px(v->buf, px + ((a * 7) & 7) - 3, py + ((a * 5) & 7) - 3, C_BLACK); if(big) gfx_px(v->buf, px + ((a * 7) & 7) - 2, py + ((a * 5) & 7) - 3, C_GRAY); break; }
     case PT_ZZZ:   gfx_text_o(v->buf, px, py, age > p->max / 2 ? "z" : "Z", C_WHITE, C_BLACK, 1); break;
     case PT_SWEAT: gfx_rect(v->buf, px, py, 1, big ? 2 : 1, C_CLOUD2); break;
+    case PT_RING: {                                                        /* swells fast, then slows (ease out), thins out over the last third */
+      if(age * 3 > p->max * 2 && (frame & 1)) break;
+      int u = 256 - (256 - age * 256 / p->max) * (256 - age * 256 / p->max) / 256;
+      int rad = (p->r * v->ppc >> 6) * u >> 8, n = 8 + rad * 2; if(n > 64) n = 64;                /* about a dot every 3 px */
+      for(int k = 0; k < n; k++){
+        real a = rdiv(RI(k) * 6283 / n, RI(1000));
+        gfx_px(v->buf, px + (int)((rcos(a) * rad) >> 12), py + (int)((rsin(a) * rad) >> 12), p->col);
+      }
+      break; }
     case PT_SMOKE: {
       int r = 2 + age * (big ? 7 : 4) / p->max, q = age * 4 / p->max;
       u8 c = q == 0 ? C_WHITE : q == 1 ? C_FIRE : q == 2 ? C_FIRE2 : C_SMOKE2;

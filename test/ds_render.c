@@ -316,6 +316,11 @@ void swiWaitForVBlank(void){
     static int dd[8]; (void)dd;
     /* grab interesting moments */
     static int boom_shot, tgt_shot;
+    { static int land_wait, land_done, ring_peak;                       /* a hard landing: dust puffs now, the ring a few frames later */
+      for(int i = 0; i < world.nev; i++) if(world.ev[i].type == EV_LAND && world.ev[i].m && !land_done && !land_wait) land_wait = 7;
+      if(land_wait && --land_wait == 0){ land_done = 1; shot("land"); }
+      int rings = 0; for(int i = 0; i < NPART; i++) rings += parts[i].life > 0 && parts[i].type == PT_RING;
+      if(rings > ring_peak){ ring_peak = rings; printf("  rings alive: %d (land shot %s)\n", rings, land_done ? "taken" : "pending"); } }
     for(int i = 0; i < world.nev; i++){
       if(world.ev[i].type == EV_BOOM && !boom_shot){ boom_shot = 1; shot("boom"); }
       if(world.ev[i].type == EV_TARGET && !tgt_shot){ tgt_shot = 1; shot("target"); }

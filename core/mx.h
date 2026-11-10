@@ -106,7 +106,8 @@ enum {
   EV_AIRPOP,   /* he over-inflated and burst at x,y (a man is lost) */
   EV_FART,     /* beans power-up jet at x,y */
   EV_SPLOOSH,  /* splat power-up blast at x,y */
-  EV_CRUMBLE   /* the run ended and the damaged walls crumbled: x,y = centre of the cracked blocks, a = how many (<= 80) */
+  EV_CRUMBLE,  /* the run ended and the damaged walls crumbled: x,y = centre of the cracked blocks, a = how many (<= 80) */
+  EV_LAND      /* the man touched the ground at x,y: a = speed (cells/s), m = 1 if it was a hard landing that skips (browser: dust, ring, shake) */
 };
 /* power-ups: one use of each per level */
 enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT };

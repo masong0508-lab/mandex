@@ -981,7 +981,10 @@ static void man_step(MxWorld *w, real dt){
   if(m->y + MAN_R >= RI(MX_ROWS)){
     m->y = RI(MX_ROWS) - MAN_R;
     real sp2 = rmul(m->vx, m->vx) + rmul(m->vy, m->vy);
-    if(sp2 > RI(2756) && m->vy > RI(15) && m->bounces < 2){       /* a hard landing skips once or twice before he sticks (52 cells/s) */
+    int skip = sp2 > RI(2756) && m->vy > RI(15) && m->bounces < 2;   /* a hard landing skips once or twice before he sticks (52 cells/s) */
+    ev(w, EV_LAND, m->x, RI(MX_ROWS), skip, rsqrt(sp2), 0);
+    if(sp2 > RI(1056) && w->shake < R(4)) w->shake = R(4);          /* over 32.5 cells/s (the browser's 260 px/s at 8 px a cell) shakes the screen, skip or stick */
+    if(skip){
       m->bounces++; m->vy = -rmul(m->vy, R(0.34)); m->vx = rmul(m->vx, R(0.72));
       ev(w, EV_THUD, m->x, m->y, 0, R(0.5), 0);
       return;
