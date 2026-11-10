@@ -24,6 +24,8 @@ enum { ST_TITLE, ST_PLAY, ST_PAUSE };
 static float g_dim = 1.0f;                      /* 1 = normal; <1 draws the dark back layer that gives blocks thickness in 3D */
 static int app = ST_TITLE, sel = 0, frame, dragging, pad_used, cells0 = 1;
 static float pad_dx, pad_dy;
+static int new_best;                                     /* this win beat the level's old best score */
+static uint32_t prev_best;                              /* best[level] just before the win was recorded */
 static MxStats stats;                                   /* session achievements / outfits (no save on the 3DS yet) */
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
 static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
@@ -34,9 +36,9 @@ static Scr top, bot;
 static inline void px(Scr *s, int x, int y, u32 rgb){
   if((unsigned)x >= (unsigned)s->w || (unsigned)y >= (unsigned)s->h) return;
   u8 *p = s->fb + ((x * s->h) + (s->h - 1 - y)) * 3;
-  p[0] = rgb & 255; p[1] = (rgb >> 8) & 255; p[2] = (rgb >> 16) & 255;   /* BGR: rgb is 0xBBGGRR so callers use RGB() */
+  p[0] = rgb & 255; p[1] = (rgb >> 8) & 255; p[2] = (rgb >> 16) & 255;   /* the 3DS framebuffer is BGR8: byte 0 = blue, so a colour is 0xRRGGBB and callers use RGB() */
 }
-#define RGB(r, g, b) ((u32)(b) << 16 | (u32)(g) << 8 | (u32)(r))
+#define RGB(r, g, b) ((u32)(r) << 16 | (u32)(g) << 8 | (u32)(b))   /* low byte = blue = framebuffer byte 0 (was r in the low byte, which showed red and blue swapped) */
 static void rect(Scr *s, int x, int y, int w, int h, u32 c){
   int x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y, x1 = x + w > s->w ? s->w : x + w, y1 = y + h > s->h ? s->h : y + h;
   for(int i = x0; i < x1; i++){
@@ -255,13 +257,23 @@ static void draw_hud(void){
   sprintf(b, "%06d", world.score); text(&top, 394 - tw(b, 2), 224, b, 2, RGB(255, 255, 255));
   if(toast_t > 0 && toast_id >= 0){ rect(&top, 100, 30, 200, 30, RGB(20, 24, 40)); textc(&top, 200, 33, "ACHIEVEMENT", 1, RGB(255, 210, 63)); textc(&top, 200, 45, mx_ach_name(toast_id), 2, RGB(255, 255, 255)); }
 }
+/* 4-point sparkle star built from rows: half-width (r-|dy|)^2 / r gives the concave points */
+static void star(Scr *s, int cx, int cy, int r, u32 c){
+  for(int dy = -r; dy <= r; dy++){ int a = r - abs(dy), hw = a * a / r; rect(s, cx - hw, cy + dy, hw * 2 + 1, 1, c); }
+  disc(s, cx, cy, r / 2, c);
+}
 static void draw_end(void){
   if(world.state == MX_PLAY) return;
   int win = world.state == MX_WIN;
-  rect(&top, 90, 70, 220, 100, RGB(15, 18, 30));
-  textc(&top, 200, 82, win ? "LEVEL CLEAR!" : "OUT OF MEN", 3, win ? RGB(125, 255, 90) : RGB(255, 90, 90));
-  char b[32]; sprintf(b, "SCORE %d", world.score); textc(&top, 200, 118, b, 2, RGB(255, 255, 255));
-  textc(&top, 200, 146, win ? "A = NEXT LEVEL" : "A = TRY AGAIN", 2, RGB(255, 210, 63));
+  rect(&top, 90, 64, 220, 114, RGB(15, 18, 30));
+  textc(&top, 200, 74, win ? "LEVEL CLEAR!" : "OUT OF MEN", 3, win ? RGB(125, 255, 90) : RGB(255, 90, 90));
+  char b[32]; sprintf(b, "SCORE %d", world.score); textc(&top, 200, 98, b, 2, RGB(255, 255, 255));
+  if(win){
+    int n = mx_stars_for(&world);
+    for(int i = 0; i < 3; i++) star(&top, 200 + (i - 1) * 30, 128, 10, i < n ? RGB(255, 210, 63) : RGB(60, 64, 78));
+    if(new_best && (frame & 16)) textc(&top, 200, 146, "NEW BEST!", 2, RGB(255, 126, 176));
+  }
+  textc(&top, 200, 162, win ? "A = NEXT LEVEL" : "A = TRY AGAIN", 2, RGB(255, 210, 63));
 }
 
 /* ---------------------------------------------------------------- flow */
@@ -269,7 +281,7 @@ static void load_level(int l){
   mx_load(&world, l); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats);
   memset(parts, 0, sizeof parts);
   cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1;
-  dragging = 0; pad_used = 0; pad_dx = pad_dy = 0;
+  dragging = 0; pad_used = 0; pad_dx = pad_dy = 0; new_best = 0;
 }
 static int was_state;
 
@@ -337,7 +349,7 @@ int main(void){
       if(toast_t > 0){ if(++toast_t > 150){ toast_t = 0; toast_id = -1; } }
       if(toast_t == 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i-1] = toast_q[i]; toast_nq--; toast_t = 1; }
       tick_parts();
-      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); }
+      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ prev_best = stats.best[world.level]; mx_meta_win(&stats, &world); new_best = world.score > 0 && (uint32_t)world.score > prev_best; for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); }
       was_state = world.state;
     }
 
@@ -353,6 +365,8 @@ int main(void){
       textc(&top, 200, 52, "MANDEX", 6, RGB(255, 210, 63));
       textc(&top, 200, 100, "THE LANDLORD SMASHER", 2, RGB(255, 255, 255));
       char b[48]; sprintf(b, "< LEVEL %d  %s >", sel + 1, mx_level_name(sel)); textc(&top, 200, 150, b, 2, RGB(255, 255, 255));
+      rect(&top, 140, 161, 120, 9, RGB(15, 18, 30));
+      if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
       { char ob[64]; sprintf(ob, "L/R: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {

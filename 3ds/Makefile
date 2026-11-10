@@ -8,7 +8,7 @@ include $(DEVKITARM)/3ds_rules
 TARGET   := mandex
 BUILD    := build
 SOURCES  := . ../core
-INCLUDES := ../core
+INCLUDES := ../core ../art
 APP_TITLE       := Mandex
 APP_DESCRIPTION := Landlord smasher
 APP_AUTHOR      := Mandex
@@ -24,7 +24,7 @@ export OUTPUT  := $(CURDIR)/$(TARGET)
 export TOPDIR  := $(CURDIR)
 export VPATH   := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR := $(CURDIR)/$(BUILD)
-export CFILES  := main.c mx.c mx_meta.c
+export CFILES  := main.c mx.c mx_meta.c cloth.c
 export LD      := $(CC)
 export OFILES  := $(CFILES:.c=.o)
 export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) $(foreach dir,$(LIBDIRS),-I$(dir)/include) -I$(CURDIR)/$(BUILD)

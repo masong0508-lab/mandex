@@ -53,3 +53,7 @@ echo "--- idle gags: every step valid, every gag ends and plays, he falls asleep
 gcc -std=c99 -O2 -Wall -Wno-unused-function -I../art idle_test.c -o idle_test && ./idle_test
 echo "--- Dreamcast front-end drawing on the host (software rasteriser instead of the PVR): jiggle, gags, win/lose ---"
 gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -Istubs -I../core -I../art ../core/mx.c ../core/mx_meta.c ../core/cloth.c dc_render.c -lm -o dc_render && ./dc_render
+echo "--- 3DS front-end drawing on the host (real 3ds/main.c loop, stub libctru): win-panel stars, NEW BEST!, best score on the title; slider flat and full 3D ---"
+gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -Istubs -I../core -I../art n3ds_render.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o n3ds_render
+./n3ds_render /tmp/n3r0 0 | grep -v "^ok:"
+./n3ds_render /tmp/n3r1 1.0 | grep -v "^ok:"
