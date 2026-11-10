@@ -74,6 +74,10 @@ static inline void DC_FlushRange(const void *p, u32 n){ (void)p; (void)n; }   /*
 void cpuStartTiming(int t);
 u32 cpuEndTiming(void);
 
+/* cartridge backup chip (8 KB EEPROM): 1 = ok, 0 = no chip / failed.  len <= 8192 */
+int card_save_read(u8 *dst, int len);
+int card_save_write(const u8 *src, int len);
+
 /* sound: commands go to the ARM7 */
 typedef enum { DutyCycle_50 = 3 } DutyCycle;
 void soundEnable(void);

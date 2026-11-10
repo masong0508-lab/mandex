@@ -39,7 +39,7 @@ static u8 buf_top[256 * 192], buf_bot[256 * 192];
 enum { ST_TITLE, ST_PLAY, ST_PAUSE };
 static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
 static int disp_score, cells0 = 1, end_t, was_state;      /* best scores live in stats.best[] (core, saved by port 5) */
-static MxStats stats;                 /* achievements / outfits for this session (the DS has no save) */
+static MxStats stats;                 /* achievements / outfits / best scores; loaded from the cartridge backup chip at boot, written by save_sync() */
 static int ach_open, ach_page;       /* achievements list shown on the title's bottom screen */
 static int combo_held, cheat_t;      /* L+R+SELECT on the title = unlock every level for this session: latch (set while the three are held) and the on-screen message timer */
 static int out_open, out_cur;        /* outfits screen shown on the title's bottom screen; out_cur = the highlighted outfit (outfit_sel = the one worn) */
@@ -569,6 +569,22 @@ static void bottom_aim(View *v){
 
 /* ------------------------------------------------------------------ title */
 /* outfit: recolour the man's boxers and towel palette entries (MS_PAL 5,6,7 boxers; 13,14,15 towel) */
+/* ---- cartridge save (port 11): the blob is ~175 bytes.  save_sync() packs the stats and writes only when the bytes differ from what the chip holds, so it is
+   safe to call at every calm moment: after a level ends, on the way back to the title and when leaving it for a level.  Never during play (a page write takes
+   milliseconds and the bare runtime has no interrupts to hide it).  A missing or unwritable chip turns saving off for the session without a message. */
+static u8 saved_blob[MX_SAVE_MAX]; static int saved_n, save_off;
+static void save_load(void){
+  u8 b[MX_SAVE_MAX];
+  if(!card_save_read(b, MX_SAVE_MAX)) return;
+  int o = 0;
+  if(mx_meta_unpack(&stats, &o, b, MX_SAVE_MAX)){ outfit_sel = o; saved_n = mx_meta_pack(&stats, outfit_sel, saved_blob, sizeof saved_blob); }
+}
+static void save_sync(void){
+  if(save_off) return;
+  u8 b[MX_SAVE_MAX]; int n = mx_meta_pack(&stats, outfit_sel, b, sizeof b);
+  if(n <= 0 || (n == saved_n && memcmp(b, saved_blob, n) == 0)) return;
+  if(card_save_write(b, n)){ memcpy(saved_blob, b, n); saved_n = n; } else save_off = 1;
+}
 static void apply_outfit(int o){
   uint8_t sh[6][3]; mx_outfit_shades(o, sh);
   static const int idx[6] = { 5, 6, 7, 13, 14, 15 };
@@ -793,12 +809,13 @@ int main(void){
   music_set(music_pref);
   STAGE(3, RGB15(0,0,31));                             /* blue */
 
-  mx_meta_init(&stats); apply_outfit(0); outfit_swatches();
+  mx_meta_init(&stats); save_load(); apply_outfit(outfit_sel); outfit_swatches();   /* load before the first load_level(), as mx_meta_unpack asks */
   load_level(sel_level);
   STAGE(4, RGB15(31,31,0));                            /* yellow */
   int slow_frames = 0, fast_frames = 0, phys_ticks = 0;
 
   for(;;){
+    { static int last_app = ST_TITLE; if(app == ST_TITLE && last_app != ST_TITLE) save_sync(); last_app = app; }   /* back on the title: flush anything earned in a lost run */
     frame++;
     scanKeys();
     int down = keysDown(), held = keysHeld(), up = keysUp();
@@ -840,6 +857,7 @@ int main(void){
       if(ch){ sel_level = (sel_level + ch + MX_NUM_LEVELS) % MX_NUM_LEVELS; load_level(sel_level); sfx_play(SFX_CLICK, 64); }
       else if(((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)) && !mx_level_unlocked(&stats, sel_level)) sfx_play(SFX_CLICK, 24);
       else if((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)){
+        save_sync();                                               /* an outfit chosen on the title is kept */
         app = ST_PLAY; load_level(sel_level); sfx_play(SFX_CLICK, 64); music_set(music_pref);
       }
     } else if(app == ST_PAUSE){
@@ -936,6 +954,7 @@ int main(void){
       update_parts();
       if(world.state != MX_PLAY){
         if(was_state == MX_PLAY){ end_t = 0; if(world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); } }
+        if(was_state == MX_PLAY) save_sync();                      /* win or lose: the one moment a short stall is harmless */
         end_t++;
       }
       was_state = world.state;

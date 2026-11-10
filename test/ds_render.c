@@ -77,11 +77,32 @@ static int aim_phase = -1, aim_t;    /* stylus drag state machine */
 static const struct { double dx, dy; } SHOTS[] = { POL(18), POL(26), POL(34), POL(22), POL(44), POL(30) };
 static int start_clicks;
 
+
+/* ---- stub cartridge chip: a file named by MX_SAVE_PATH (8192 bytes, erased = 0xFF); no variable = no chip ---- */
+#include "mx_meta.h"
+static int sv_reads, sv_writes;
+int card_save_read(u8 *d, int n){
+  const char *p = getenv("MX_SAVE_PATH"); if(!p) return 0;
+  memset(d, 0xFF, n); FILE *f = fopen(p, "rb"); if(f){ size_t r = fread(d, 1, n, f); (void)r; fclose(f); }
+  sv_reads++; return 1;
+}
+int card_save_write(const u8 *s, int n){
+  const char *p = getenv("MX_SAVE_PATH"); if(!p) return 0;
+  u8 chip[8192]; memset(chip, 0xFF, sizeof chip); FILE *f = fopen(p, "rb"); if(f){ size_t r = fread(chip, 1, sizeof chip, f); (void)r; fclose(f); }
+  memcpy(chip, s, n); f = fopen(p, "wb"); if(!f) return 0; fwrite(chip, 1, sizeof chip, f); fclose(f); sv_writes++; return 1;
+}
+static void save_report(void){
+  const char *p = getenv("MX_SAVE_PATH"); if(!p) return;
+  u8 b[MX_SAVE_MAX]; MxStats s; int o = 0; mx_meta_init(&s); card_save_read(b, MX_SAVE_MAX); sv_reads--;
+  int ok = mx_meta_unpack(&s, &o, b, MX_SAVE_MAX);
+  printf("save: chip reads=%d writes=%d file_valid=%d wins=%d best[0]=%u stars[0]=%d\n", sv_reads, sv_writes, ok, ok ? s.wins : -1, ok ? (unsigned)s.best[0] : 0u, ok ? s.stars[0] : -1);
+}
 static void summary(void){
   printf("play frames=%d  max events/frame=%d  max live particles=%d/%d\n", stat_frames_play, stat_max_nev, stat_max_parts, NPART);
   printf("final: level=%d state=%d men=%d manmode=%d launches=%d aim_phase=%d targets=%d/%d\n", world.level + 1, world.state, world.men, world.man.mode, launches, aim_phase, mx_targets_alive(&world), world.ntargets);
   for(int c = 0; c < MX_MAX_CHUNKS; c++) if(world.chunks[c].active){ const MxChunk *k = &world.chunks[c]; printf("  chunk %d: cells=%d x=%.1f y=%.1f vx=%.3f vy=%.3f w=%.3f sleep=%.2f age=%.1f ang=%.2f\n", c, k->count, RTOF(k->x), RTOF(k->y), RTOF(k->vx), RTOF(k->vy), RTOF(k->w), RTOF(k->sleep), RTOF(k->age), RTOF(k->ang)); }
   printf("sound calls=%d dropped(no free channel)=%d  peak PSG=%d/6  peak noise=%d/2  substeps=%d\n", sound_calls, sound_dropped, psg_peak, noise_peak, world.substeps);
+  save_report();
 }
 void swiWaitForVBlank(void){
   vf++;

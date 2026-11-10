@@ -105,3 +105,49 @@ int soundPlayNoise(u16 f, u8 v, u8 pan){
 }
 void soundSetFreq(int h, u16 f){ if(h >= 8 && h < 16) push((C_FREQ << 28) | (h << 24) | f); }
 void soundKill(int h){ if(h >= 8 && h < 16){ push((C_KILL << 28) | (h << 24)); busy[h] = 0; } }
+
+/* ------------------------------------------------------------- cartridge backup chip (8 KB / 64 kbit EEPROM, 2-byte address, 32-byte pages)
+   Register values are from memory of GBATEK ("DS Cartridge Backup") and libnds' cardEeprom code: check them on the first emulator run.
+   AUXSPICNT 0x040001A0: bit 0-1 baud, bit 6 chip-select hold, bit 7 busy, bit 13 SPI mode, bit 15 enable.   AUXSPIDATA 0x040001A2.
+   EXMEMCNT 0x04000204 bit 11: card slot owner (0 = ARM9).  The ARM7's touch/firmware SPI is a different bus and is not touched. */
+#define CARD_CNT  R16(0x040001A0)
+#define CARD_DATA R16(0x040001A2)
+static u8 card_xfer(u8 d, int hold){
+  CARD_CNT = 0xA000 | (hold ? 0x40 : 0);           /* enable + SPI mode, 4 MHz */
+  CARD_DATA = d;
+  while(CARD_CNT & 0x80) ;
+  return (u8)CARD_DATA;
+}
+static void card_begin(void){ R16(0x04000204) &= (u16)~0x0800; }     /* the card slot belongs to the ARM9 */
+static void card_end(void){ CARD_CNT = 0; }
+static u8 card_status(void){ card_xfer(0x05, 1); u8 s = card_xfer(0, 0); return s; }
+static int card_wait_idle(void){                    /* 1 once the write-in-progress bit clears; 0 on timeout or a missing chip */
+  for(int i = 0; i < 400000; i++){ u8 s = card_status(); if(s == 0xFF) return 0; if(!(s & 1)) return 1; }
+  return 0;
+}
+int card_save_read(u8 *dst, int len){
+  if(len <= 0 || len > 8192) return 0;
+  card_begin();
+  u8 st = card_status();
+  if(st == 0xFF){ card_end(); return 0; }           /* nothing answering on the bus */
+  card_xfer(0x03, 1); card_xfer(0, 1); card_xfer(0, 1);     /* READ, address 0 */
+  for(int i = 0; i < len; i++) dst[i] = card_xfer(0, i < len - 1);
+  card_end();
+  return 1;
+}
+int card_save_write(const u8 *src, int len){
+  if(len <= 0 || len > 8192) return 0;
+  card_begin();
+  if(!card_wait_idle()){ card_end(); return 0; }
+  for(int a = 0; a < len; ){
+    int n = 32 - (a & 31); if(n > len - a) n = len - a;      /* never cross a 32-byte page */
+    card_xfer(0x06, 0);                                       /* write enable */
+    if(!(card_status() & 2)){ card_end(); return 0; }         /* WEL did not latch: no writable EEPROM (FLASH, 512 B chip, or none) */
+    card_xfer(0x02, 1); card_xfer((u8)(a >> 8), 1); card_xfer((u8)a, 1);
+    for(int i = 0; i < n; i++) card_xfer(src[a + i], i < n - 1);
+    if(!card_wait_idle()){ card_end(); return 0; }
+    a += n;
+  }
+  card_end();
+  return 1;
+}
