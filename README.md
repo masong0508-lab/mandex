@@ -5,16 +5,17 @@ wrecks them with sandbox-style destruction physics, to evict the landlords insid
 
 ![poses](docs/man_sprites.png)
 
-One game, three front-ends sharing the same physics idea:
+One game, four builds: a browser version with its own JS physics, and three consoles sharing one C core:
 
 | Port | Where | State |
 | --- | --- | --- |
 | Browser | `web/index.html` (single file, open it in any browser) | playable, has its own JS physics |
 | Nintendo DS | `ds/` (devkitPro / libnds, 20.12 fixed point) | written and tested on the host with stub libnds, **never built or run on a real DS or emulator** |
+| Nintendo 3DS | `3ds/` (devkitARM + libctru, float, software-drawn) | furthest behind: circles-and-rectangles man, no sound; **never built or run on a 3DS or emulator** |
 | Sega Dreamcast | `dreamcast/` (KallistiOS, float) | same: host-tested with a software rasteriser, **never built for real** |
 
-`core/mx.c` is the shared C game core for the two consoles (a 120x60 voxel grid, rigid chunks, a wobble lattice with
-8 block kinds and 7 levels), `art/` holds the generated pixel art and the idle-gag player, `tools/` the sprite generator,
+`core/mx.c` is the shared C game core for the three consoles (a 120x60 voxel grid, rigid chunks, a wobble lattice with
+8 block kinds and 20 levels; `core/mx_meta.c` holds the stars, achievements and outfits rules), `art/` holds the generated pixel art and the idle-gag player, `tools/` the sprite generator,
 `test/` the host tests.  See [PORTING.md](PORTING.md) for the full status, design notes and what is not verified.
 
 ## What is in it
@@ -26,6 +27,9 @@ One game, three front-ends sharing the same physics idea:
   boogers, sweat), a sleep with snot bubble after 20 s, a victory butt-wiggle dance and a sad slump on defeat.
 - **The towel** is a small cloth simulation (`core/cloth.c`, recipe in `docs/CLOTH.md`): it flutters, folds and turns edge-on
   with his body, the same in the browser, on the DS and on the Dreamcast.
+- **Progress** (all consoles, this session only until save data lands): 1-3 stars per level, 25 achievements, outfits.  The DS has an
+  achievements list with progress bars and an outfits screen (swatches, padlocks, how to unlock).  Level locks (first 3 open, then in
+  order) are built but switched off (`-DMX_LEVEL_LOCKS`) until saving exists; on the DS title L+R+SELECT is the unlock-all cheat.
 - **Options** (browser): a simple OPTIONS screen from the main menu.  *Collapsible buildings* keeps fallen rubble physical (it keeps slumping and
   toppling) until the level ends; off, rubble settles and locks solid.  Either way, damaged walls crumble after each run.
 - **Body jiggle**: his belly and rear are damped springs, kicked while he flies, hits something or drops, plus an
@@ -43,7 +47,7 @@ pip install numpy pillow playwright && python -m playwright install chromium
 python tools/gen_manspr.py      # re-render art/manspr.h from web/index.html's own drawing code
 ```
 
-Controls: DS stylus drag-and-release to fling, tap in flight to belly-flop; Dreamcast analog stick to pull, A to launch
+Controls: DS stylus drag-and-release to fling, tap in flight to belly-flop; 3DS the same on the bottom screen; Dreamcast analog stick to pull, A to launch
 or flop.  Full list in [PORTING.md](PORTING.md).
 
 ## Workflows (`.github/workflows`)

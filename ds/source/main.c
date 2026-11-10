@@ -41,6 +41,7 @@ static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
 static int disp_score, cells0 = 1, end_t, was_state, best[MX_NUM_LEVELS];
 static MxStats stats;                 /* achievements / outfits for this session (the DS has no save) */
 static int ach_open, ach_page;       /* achievements list shown on the title's bottom screen */
+static int combo_held, cheat_t;      /* L+R+SELECT on the title = unlock every level for this session: latch (set while the three are held) and the on-screen message timer */
 static int out_open, out_cur;        /* outfits screen shown on the title's bottom screen; out_cur = the highlighted outfit (outfit_sel = the one worn) */
 static int outfit_sel, toast_t = -1, toast_id, toast_q[4], toast_nq;
 static void toast_push(int id){ if(toast_nq < 4) toast_q[toast_nq++] = id; }
@@ -746,6 +747,7 @@ static void title_bottom(View *v){
   gfx_text(v->buf, 256 - 4 - gfx_text_w("00/25", 1), 183, gfx_int(mx_ach_count(&stats)), C_GOLD, 1);
   gfx_text(v->buf, 256 - 4 - gfx_text_w("/25", 1), 183, "/25", C_UILINE, 1);
   gfx_text_c(v->buf, 128, 46, mx_outfit(outfit_sel)->name, C_PINK, C_BLACK, 1);
+  if(cheat_t > 0) gfx_text_c(v->buf, 128, 56, stats.unlock_all ? "CHEAT: ALL LEVELS OPEN" : "CHEAT OFF", C_GOLD, C_BLACK, 1);
 }
 
 /* ---------------------------------------------------------------------- main */
@@ -803,7 +805,11 @@ int main(void){
     touchPosition t = { 0, 0 };
     if(held & KEY_TOUCH) touchRead(&t);
     if(down & KEY_Y){ music_pref = !music_pref; music_set(music_pref && app != ST_PAUSE && world.state == MX_PLAY); }
-    if(down & KEY_L) debug_on = !debug_on;
+    if(app == ST_TITLE && !ach_open && !out_open && (held & (KEY_L | KEY_R | KEY_SELECT)) == (KEY_L | KEY_R | KEY_SELECT) && !combo_held){
+      combo_held = 1; stats.unlock_all = !stats.unlock_all; cheat_t = 120; sfx_play(SFX_TARGET, 64);       /* never saved (port 5 must leave unlock_all out) */
+    }
+    if(app == ST_TITLE){ if((up & KEY_L) && !combo_held) debug_on = !debug_on; }      /* on the title L and R act on release, so a held L+R+SELECT never trips the profiler or the outfit cycle first */
+    else if(down & KEY_L) debug_on = !debug_on;
 
     /* ---------------- input ---------------- */
     if(app == ST_TITLE && ach_open){
@@ -827,7 +833,7 @@ int main(void){
       if(down & KEY_RIGHT) ch = 1;
       if((down & KEY_TOUCH) && hit(&t, 0, 0, 48, 48)) ch = -1;
       if((down & KEY_TOUCH) && hit(&t, 208, 0, 48, 48)) ch = 1;
-      if(down & KEY_R){                                          /* next unlocked outfit; locked ones are skipped */
+      if((up & KEY_R) && !combo_held){                           /* next unlocked outfit; locked ones are skipped */
         for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
         apply_outfit(outfit_sel); sfx_play(SFX_CLICK, 64);
       }
@@ -939,6 +945,9 @@ int main(void){
       update_parts();
     }
     sfx_tick();
+
+    if(!(held & (KEY_L | KEY_R | KEY_SELECT))) combo_held = 0;
+    if(cheat_t > 0) cheat_t--;
 
     /* ---------------- camera ---------------- */
     real tx = RI(88), ty = RI(38), rate = R(0.10);

@@ -87,7 +87,24 @@ void swiWaitForVBlank(void){
   vf++;
   g_keys = 0; /* default: nothing held; script sets below */
   int mode = world.man.mode;
-  if((app == ST_TITLE) && getenv("OUTFIT_SHOTS")){                  /* the outfits screen: open it, walk the cursor, wear, tap a locked one, go back */
+  if((app == ST_TITLE) && getenv("CHEAT_TEST")){                    /* L+R+SELECT: unlock-all toggles, whatever order the keys go down in, without tripping the profiler or the outfit cycle */
+    static int fails;
+#define KCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
+    if(vf == 2) stats.kills = 25;                                                   /* owns outfits 0 and 2, so the R cycle is visible */
+    if(vf == 3) g_keys |= KEY_L | KEY_R | KEY_SELECT;
+    if(vf == 6){ KCHECK(stats.unlock_all == 1 && cheat_t > 0, "L+R+SELECT together: unlock_all on, message up"); KCHECK(!debug_on && outfit_sel == 0, "...profiler and outfit untouched"); shot("cheat"); }
+    if(vf == 7) g_keys |= KEY_L | KEY_R | KEY_SELECT;
+    if(vf == 10){ KCHECK(stats.unlock_all == 0, "the combo again: unlock_all off"); }
+    if(vf == 11) g_keys |= KEY_L;                                                   /* staggered: L, then R, then SELECT */
+    if(vf == 12) g_keys |= KEY_L | KEY_R;
+    if(vf == 13) g_keys |= KEY_L | KEY_R | KEY_SELECT;
+    if(vf == 17){ KCHECK(stats.unlock_all == 1, "staggered L, R, SELECT: unlock_all on"); KCHECK(!debug_on && outfit_sel == 0, "...and no profiler toggle or outfit change from the earlier presses"); }
+    if(vf == 18) g_keys |= KEY_L;
+    if(vf == 21){ KCHECK(debug_on == 1 && stats.unlock_all == 1, "a plain L tap still toggles the profiler"); debug_on = 0; }
+    if(vf == 22) g_keys |= KEY_R;
+    if(vf == 25){ KCHECK(outfit_sel == 2, "a plain R tap still cycles to the next owned outfit");
+      printf(fails ? "cheat combo: %d FAILED\n" : "cheat combo: all passed\n", fails); exit(fails != 0); }
+  } else if((app == ST_TITLE) && getenv("OUTFIT_SHOTS")){                  /* the outfits screen: open it, walk the cursor, wear, tap a locked one, go back */
     static int fails;
 #define OCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
     if(vf == 2){ stats.kills = 25; stats.stars[0] = 3; stats.pops = 1; outfit_sel = 2; apply_outfit(2);   /* Navy, Banana and Mint owned, Banana worn */

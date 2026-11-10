@@ -1,6 +1,6 @@
 # MANDEX console ports - status
 
-One shared C core, two front-ends.
+One shared C core, three console front-ends (DS, 3DS, Dreamcast) plus the browser build, which has its own JS physics and is the reference.
 
 ```
 core/mx.h, mx.c            portable game + physics (no platform calls, no malloc)
@@ -16,6 +16,26 @@ tools/gen_title.py         builds art/title.h + docs/title_art.png from the HTML
 test/                      host regression tests, robustness sweep, DS/DC host harnesses
 docs/                      screenshots rendered by the host harness (real DS drawing code)
 ```
+
+## ROADMAP PROGRESS (Nov 2026): DS first
+Work follows the "Mandex Porting Roadmap" (16 ports) and its status update.  Done so far, with the patch that did it (apply in this order):
+
+| Port | State | Patch / where |
+| --- | --- | --- |
+| 1 Stars, best scores, build plumbing | step 1 only: `mx_stars_for()` in `core/mx_meta.c`, used by `mx_meta_win` and the DS end panel (`test/stars_test.c`).  3DS stars / NEW BEST! / best score line, Makefile plumbing and the `n3ds_render` harness are still to do | `mandex-stars1` |
+| 2 Level unlock order | DS done: `mx_level_unlocked()` + `unlock_all` in core, the DS picker shows LOCKED and refuses to start; all behind `-DMX_LEVEL_LOCKS` (off by default, turn it on when port 5 saves).  DS cheat: **L+R+SELECT on the title** toggles `stats.unlock_all` for the session (never saved).  3DS and Dreamcast pickers still to do | `mandex-ds-unlock`, `mandex-ds-cheat` |
+| 4 Achievements and outfits screens | DS done.  Core: `mx_ach_progress()`, `mx_ach_unlocked()`.  Achievements: a paged list with progress bars (tap the ACH counter on the title).  Outfits: a 4x3 swatch grid with padlocks and the unlock hint of the highlighted outfit, worn one marked WORN (tap the OUTFITS counter on the title; tap or A wears, B or BACK returns).  3DS and Dreamcast screens still to do | `mandex-ds-ach`, `mandex-ds-outfits` |
+
+DS notes for the next person:
+- The achievements and outfits screens are sub-screens of the title (`ach_open`, `out_open`), not new `app` states.  Both draw on the bottom screen only;
+  the top screen keeps the title picture (the title swaps the top engine's palette, so a live man preview is not possible there).
+- Outfit swatch colours use main-engine palette slots 224..255 (two per outfit, `C_SW0`).  The man owns 160..198 (port 10 wants 199 for the logo); the
+  title only touches the sub engine.  The grid holds 12 outfits: a 13th breaks the build on purpose (`out_grid_fits` in `ds/source/main.c`), so paging has to be designed then.
+- Outfit hints come from `mx_outfit(i)->hint` only.  Rainbow Rump is flagged `rainbow` in core, but the DS `apply_outfit` does not implement it: wearing it gives plain red.
+- On the title, L and R act on **release** (L = profiler, R = next outfit) so the L+R+SELECT cheat can latch first.  Elsewhere L still toggles the profiler on press.
+- Host checks: `test/meta_test.c`, `test/ach_test.c`, `test/stars_test.c`, and in `ds_render` the scripted `OUTFIT_SHOTS=1` and `CHEAT_TEST=1` runs (both in `run_tests.sh`);
+  screenshot `docs/ds_outfits.png`.  Nothing has been run on a DS, an emulator, or looked at on a real screen.
+- Still stale below: the older passes talk about 7 levels and "both consoles"; the game now has 20 levels, 25 achievements, 11 outfits, the air valve and three power-ups (beans, towel, splat).
 
 ## IDLE / GROSS-OUT / JIGGLE pass (DS + Dreamcast + HTML)
 New man frames (27 in all, `art/manspr.h`, made by `tools/gen_manspr.py` from the HTML art): belly bounce A/B, belly
@@ -217,7 +237,8 @@ Host tests: `sh test/run_tests.sh`     (also regenerates PPM screen dumps via `t
 ## Controls
 DS:  stylus - drag the man back, lift to fling; tap in flight = belly flop.
      D-pad moves the man in the sling, A flings / flops.  START pause / next / retry.  SELECT restart.
-     Y music.  L profiler.  B (when paused or after a level) back to the menu.
+     Y music.  L profiler (on the title it acts on release).  B (when paused or after a level) back to the menu.
+     Title: touch OUTFITS (or R) for outfits, touch ACH for achievements, L+R+SELECT = unlock every level (session only).
 DC:  analog stick pulls the man back, A launches / belly flops; START next/retry; Y restart.
 
 ## Next steps (suggested order)
@@ -268,7 +289,7 @@ there is no ITCM use.  NOT verified on any emulator or hardware.  `tools/ntr_pat
 
 Homebrew `.3dsx` (devkitARM + libctru, no citro2d/citro3d): the shared core in float mode, drawn in software straight into the two framebuffers.
 Top screen = the whole level at 3 px per voxel; bottom screen = the sling at 4 px per voxel (touch to drag the man back, lift to fling, tap in flight to belly flop).
-D-pad / circle pad + A also work. No sound, no save, no outfits/achievements/power-ups yet. CI job `n3ds` uploads the artifact `mandex-3ds` (mandex.3dsx + mandex.elf).
+D-pad / circle pad + A also work. No sound and no save yet; the man is still drawn as circles and rectangles.  Outfits cycle on the title (L/R) and achievements show as a toast only, with no screens for either; the end-panel stars, level locks and best-score line are still to do (see ROADMAP PROGRESS). CI job `n3ds` uploads the artifact `mandex-3ds` (mandex.3dsx + mandex.elf).
 Nothing has been run on a real 3DS or in an emulator (Citra / Lime3DS): it is only known to compile.
 
 ## Uniform controls + 3DS stereo 3D
@@ -281,7 +302,9 @@ Nothing has been run on a real 3DS or in an emulator (Citra / Lime3DS): it is on
 | Pause / resume | START | START | START |
 | Restart level | SELECT | SELECT | Y (no SELECT on the pad) |
 | Title: level | D-pad left/right | D-pad left/right | D-pad left/right |
-| Title: outfit | L / R | L / R | left / right trigger |
+| Title: outfit | R cycles, or touch OUTFITS for the picker (L is the profiler) | L / R | left / right trigger |
+| Title: achievements | touch the ACH counter | no screen yet | no screen yet |
+| Title: unlock-all cheat | L+R+SELECT | not yet | not yet |
 | Play | A or START | A, START or touch | A or START |
 | End screen: back to title | B | B | not available (title art is freed to save VRAM) |
 
