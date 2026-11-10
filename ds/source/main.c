@@ -724,7 +724,8 @@ static void outfits_bottom(u8 *b){
       draw_lock(b, x + OUT_CW / 2, y + 5);
     }
     gfx_text(b, x + (OUT_CW - gfx_text_w(o->name, 1)) / 2, y + 30, o->name, un ? C_WHITE : C_GRAY, 1);
-    if(i == outfit_sel) gfx_text(b, x + (OUT_CW - gfx_text_w("WORN", 1)) / 2, y + 37, "WORN", C_GOLD, 1);
+    if(o->work) gfx_text(b, x + 3, y + 37, "WORK", C_GRAY, 1);                              /* intentionally plain */
+    if(i == outfit_sel) gfx_text(b, o->work ? x + OUT_CW - 3 - gfx_text_w("WORN", 1) : x + (OUT_CW - gfx_text_w("WORN", 1)) / 2, y + 37, "WORN", C_GOLD, 1);
   }
   gfx_rect(b, 0, 160, 256, 32, C_UIBG); gfx_rect(b, 0, 160, 256, 1, C_UILINE);
   int un = mx_outfit_unlocked(&stats, out_cur);

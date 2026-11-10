@@ -31,8 +31,8 @@ int  mx_meta_next_unlock(MxStats *s);                  /* newly met achievement 
 const char *mx_ach_name(int i);
 const char *mx_ach_desc(int i);
 
-#define MX_NUM_OUTFITS 11
-typedef struct { const char *name, *hint; uint8_t br[3], brd[3], tow[3], tows[3]; uint8_t rainbow; } MxOutfit;
+#define MX_NUM_OUTFITS 12     /* appended, never inserted: the save blob stores the outfit as an index */
+typedef struct { const char *name, *hint; uint8_t br[3], brd[3], tow[3], tows[3]; uint8_t rainbow, work; } MxOutfit;   /* work: the plain Working Man look (blue briefs; the browser also drops the gold logo, the console sprites cannot yet) */
 const MxOutfit *mx_outfit(int i);
 int mx_outfit_unlocked(const MxStats *s, int i);
 int mx_ach_count(const MxStats *s);

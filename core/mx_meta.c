@@ -32,7 +32,8 @@ static const MxOutfit OUT[MX_NUM_OUTFITS] = {
   {"Hot Pink",       "beat 10 levels",         {255,79,163},  {201,42,120},  {90,214,255},  {43,176,224},  0},
   {"Golden Boy",     "three stars on 8 levels",{240,185,42},  {184,133,26},  {255,240,168}, {230,195,74},  0},
   {"Birthday Suit",  "unlock 20 achievements", {244,183,142}, {226,160,119}, {255,255,255}, {216,216,224}, 0},
-  {"Rainbow Rump",   "beat every level",       {224,36,58},   {168,22,42},   {255,126,176}, {255,79,143},  1}};
+  {"Rainbow Rump",   "beat every level",       {224,36,58},   {168,22,42},   {255,126,176}, {255,79,143},  1, 0},
+  {"Working Man",    "always yours",           {63,95,143},   {43,68,104},   {201,206,214}, {143,152,166}, 0, 1}};
 const MxOutfit *mx_outfit(int i){ return &OUT[(unsigned)i % MX_NUM_OUTFITS]; }
 int mx_outfit_unlocked(const MxStats *s, int i){
   switch(i){
@@ -47,6 +48,7 @@ int mx_outfit_unlocked(const MxStats *s, int i){
   case 8: return three_stars(s) >= 8;
   case 9: return mx_ach_count(s) >= 20;
   case 10: return story_done(s) >= MX_NUM_LEVELS;
+  case 11: return 1;                 /* Working Man */
   }
   return 0;
 }

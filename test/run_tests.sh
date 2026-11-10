@@ -22,6 +22,9 @@ gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c meta_test.c -lm 
 echo "--- save blob: layout, round trip, corruption, truncation, other level counts (float and fixed) ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c save_test.c -lm -o save_float && ./save_float | grep -v "^ok:"
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c save_test.c -lm -o save_fixed && ./save_fixed | grep -v "^ok:"
+echo "--- outfits: unlock rules, Working Man (index 11), no Walk-in Closet / Birthday Suit deadlock ---"
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c outfit_test.c -lm -o outfit_float && ./outfit_float | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c outfit_test.c -lm -o outfit_fixed && ./outfit_fixed | grep -v "^ok:"
 echo "--- achievement progress bars agree with the unlock rules ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c ach_test.c -lm -o ach_float && ./ach_float | tail -n 3
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c ach_test.c -lm -o ach_fixed && ./ach_fixed | tail -n 3
