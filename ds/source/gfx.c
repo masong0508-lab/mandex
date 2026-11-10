@@ -443,6 +443,56 @@ static void blit_frame(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, i
   }
 }
 
+/* The same frame turned about its anchor by an angle (sn, cs = sin / cos in 1/4096), nearest-neighbour inverse mapping.  This is what the browser's
+   ctx.rotate(m.ang) does to the flying man.  The jiggle is applied in screen space (blob centres are rotated with the figure, offsets are not), as
+   are the hit squash and the order: displace, un-squash, un-rotate, sample. */
+static void blit_frame_rot(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, const ManJig *jg, int sn, int cs){
+  int w = fr->w, h = fr->h;
+  int ax = (f > 0 ? fr->ax : w - 1 - fr->ax) * ppc / 4, ay = fr->ay * ppc / 4;      /* anchor, in dest px from the frame's top left */
+  int dw = w * ppc / 4, dh = h * ppc / 4;
+  if(dw < 1 || dh < 1) return;
+  int r = 0;                                                                         /* farthest corner from the anchor = radius of the turned box */
+  { int cx[2] = { ax, dw - ax }, cy[2] = { ay, dh - ay };
+    for(int i = 0; i < 2; i++) for(int j = 0; j < 2; j++){ int d2 = cx[i] * cx[i] + cy[j] * cy[j]; if(d2 > r) r = d2; } }
+  int rad = 1; while(rad * rad < r) rad++;
+  rad += JM;
+  if(x + rad < 0 || x - rad >= 256 || y + rad < 0 || y - rad >= 192) return;
+  int ss = jg && jg->sx ? 256 + jg->sx : 256, st = jg && jg->sy ? 256 + jg->sy : 256;
+  int jl = jg && (jg->bx | jg->by | jg->rx | jg->ry);
+  int br = fr->brad * ppc / 4, rr = fr->rrad * ppc / 4; if(br < 2) br = 2; if(rr < 2) rr = 2;
+  /* blob centres in screen space relative to the anchor (rotated with the figure) */
+  int bdx = ((f > 0 ? fr->bcx : w - 1 - fr->bcx) * ppc / 4) - ax, bdy = fr->bcy * ppc / 4 - ay;
+  int rdx = ((f > 0 ? fr->rcx : w - 1 - fr->rcx) * ppc / 4) - ax, rdy = fr->rcy * ppc / 4 - ay;
+  int bcx = (bdx * cs - bdy * sn) >> 12, bcy = (bdx * sn + bdy * cs) >> 12;
+  int rcx = (rdx * cs - rdy * sn) >> 12, rcy = (rdx * sn + rdy * cs) >> 12;
+  int binv = 65536 / (br * br), rinv = 65536 / (rr * rr), b2 = br * br, r2 = rr * rr;
+  int inv = 16384 / ppc;                                                             /* dest px -> source px: * 4 / ppc as a multiply (scaled 4096) */
+  for(int j = -rad; j <= rad; j++){
+    int py = y + j;
+    if((unsigned)py >= 192u) continue;
+    u8 *d = &b[py * 256];
+    for(int i = -rad; i <= rad; i++){
+      int px = x + i;
+      if((unsigned)px >= 256u) continue;
+      int dx = i, dy = j;
+      if(jl){
+        int ex = dx - bcx, ey = dy - bcy, d2 = ex * ex + ey * ey;
+        if(d2 < b2){ int wg = 256 - ((d2 * binv) >> 8); dx -= (jg->bx * wg) >> 8; dy -= (jg->by * wg) >> 8; }
+        ex = i - rcx; ey = j - rcy; d2 = ex * ex + ey * ey;
+        if(d2 < r2){ int wg = 256 - ((d2 * rinv) >> 8); dx -= (jg->rx * wg) >> 8; dy -= (jg->ry * wg) >> 8; }
+      }
+      if(ss != 256) dx = dx * 256 / ss;
+      if(st != 256) dy = dy * 256 / st;
+      int u = ((dx * cs + dy * sn) >> 12) + ax, v = ((dy * cs - dx * sn) >> 12) + ay;   /* un-rotate */
+      if(u < 0 || v < 0) continue;
+      int sx = (u * inv) >> 12, sy = (v * inv) >> 12;
+      if(sx >= w || sy >= h) continue;
+      u8 c = fr->px[sy * w + (f > 0 ? sx : w - 1 - sx)];
+      if(c) d[px] = (u8)(C_MAN0 + c - 1);
+    }
+  }
+}
+
 /* design units (20.12) -> pixels at this zoom: the sprites are drawn at 0.36 px per unit at 4 px per cell, so 0.09 px per unit per ppc */
 static int cpx(real v, int ppc){ return (int)((((int64_t)v * (ppc * 369)) + (1LL << 23)) >> 24); }
 
@@ -474,6 +524,10 @@ void spr_man_frame(u8 *b, int x, int y, int ppc, int f, int frame, const ManJig 
 void spr_man(u8 *b, int x, int y, int ppc, int f, int pose, int ph){ spr_man_j(b, x, y, ppc, f, pose, ph, 0); }
 
 void spr_man_j(u8 *b, int x, int y, int ppc, int f, int pose, int ph, const ManJig *jg){
+  spr_man_jr(b, x, y, ppc, f, pose, ph, jg, 0, 4096);
+}
+
+void spr_man_jr(u8 *b, int x, int y, int ppc, int f, int pose, int ph, const ManJig *jg, int sn, int cs){
   int sw = (ph >> 2) & 1, slow = (ph >> 4) & 1, fr;
   switch(pose){
   case POSE_FLY:   fr = sw ? MSF_FLY_A : MSF_FLY_B; break;
@@ -493,7 +547,8 @@ void spr_man_j(u8 *b, int x, int y, int ppc, int f, int pose, int ph, const ManJ
       gfx_px(b, x + S(-18 + k * 9) + (SM(3) > 1 ? 1 : 0), y + S(16 + len), C_GOO2);
     }
   }
-  blit_frame(b, &MS_FRAMES[fr], x, y, ppc, f, 0, jg);
+  if(sn > 40 || sn < -40 || cs < 0) blit_frame_rot(b, &MS_FRAMES[fr], x, y, ppc, f, jg, sn, cs);   /* turned more than ~0.6 degrees */
+  else blit_frame(b, &MS_FRAMES[fr], x, y, ppc, f, 0, jg);
 }
 
 void spr_man_bust(u8 *b, int x, int y, int ppc){         /* head + shoulders only, for the HUD strip */

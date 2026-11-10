@@ -48,6 +48,7 @@ static inline real rclamp(real v, real lo, real hi){ return v < lo ? lo : v > hi
 real rsqrt(real a);
 real rsin(real a);
 real rcos(real a);
+real ratan2(real y, real x);                 /* radians, about 0.005 rad accurate, same polynomial in float and fixed so every port agrees */
 
 /* --------------------------------------------------------------- sizes */
 #define MX_COLS          120
@@ -146,6 +147,10 @@ typedef struct {
      Front-ends shift the belly / rear parts of the sprite by (bx,by) / (rx,ry) and squash by sq along (sqx,sqy). */
   real bx, by, bvx, bvy, rx, ry, rvx, rvy;
   real sq, sqx, sqy;
+  /* body pose (cosmetic, like the jiggle): in flight ang eases toward 0.6 x the path angle measured as if he faced +x (front-ends mirror
+     it when he flies left); spin is the belly-flop's tumble in radians.  Both are 0 outside flight.  mx_man_wobble() is the side-to-side
+     rock after he sticks (about +-0.17 rad at first, gone in a second). */
+  real spin;
   real j_px, j_py, j_vx, j_vy;       /* previous position / estimated velocity */
 } MxMan;
 
@@ -204,6 +209,7 @@ void mx_load(MxWorld *w, int level);
 void mx_update(MxWorld *w, real dt);          /* dt ~ 1/60 s */
 void mx_set_pull(MxWorld *w, real dx, real dy); /* drag offset from anchor, cells */
 void mx_release(MxWorld *w);                  /* let go of the sling */
+real mx_man_wobble(const MxMan *m);          /* stuck man's rock, -1..1: sin(26 t) x exp(-3.2 t), the browser's curve */
 void mx_dive(MxWorld *w);                     /* belly flop (or the beans jet when armed) */
 void mx_select_power(MxWorld *w, int pw);      /* PW_*: arm / disarm before launching (only while aiming) */
 #define MX_VALVE_X R(4.5)                      /* the air valve, in cells (his rear goes here): far lower-left, a full pull-back */

@@ -78,6 +78,8 @@ const short *spr_man_hand(int frame);          /* where the raised hand is in th
 void gfx_cloth(u8 *b, const Cloth *c, int x, int y, int ppc, int face, int pass);
 void spr_man(u8 *b, int x, int y, int ppc, int face, int pose, int ph);
 void spr_man_j(u8 *b, int x, int y, int ppc, int face, int pose, int ph, const ManJig *jg);
+/* the same, turned about his centre by sn / cs = sin / cos of the angle in 1/4096 (clockwise on screen); jiggle and squash still apply */
+void spr_man_jr(u8 *b, int x, int y, int ppc, int face, int pose, int ph, const ManJig *jg, int sn, int cs);
 void spr_man_bust(u8 *b, int x, int y, int ppc);   /* x = centre, y = top */
 void spr_landlord(u8 *b, int x, int y, int ppc, int ph, int scared);
 void spr_hat(u8 *b, int x, int y, int sc, int mode); /* 0 = real black hat, 1 = HUD icon alive, 2 = HUD icon evicted */

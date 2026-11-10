@@ -31,6 +31,9 @@ gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c ach_t
 echo "--- post-run crumble (aftershock): rules, cap of 80, sand untouched, blasted wood tower comes apart (float and fixed) ---"
 gcc -std=c99 -O2 -Wall -Wno-unused-function -I../core crumble_test.c -lm -o crumble_float && ./crumble_float | grep -v "^ok:"
 gcc -std=c99 -O2 -Wall -Wno-unused-function -DMX_FIXED -I../core crumble_test.c -lm -o crumble_fixed && ./crumble_fixed | grep -v "^ok:"
+echo "--- man pose (core): atan2 accuracy, flight pitch follows the path, belly-flop spin, stuck wobble matches the browser (float and fixed) ---"
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c pose_test.c -lm -o pose_float && ./pose_float | tail -n 1
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c pose_test.c -lm -o pose_fixed && ./pose_fixed | tail -n 1
 echo "--- wobble / block-kind physics (fixed point): sway, snaps, topple, sand, rubber ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DKICKV=10 -I../core wobble_test.c -lm -o wobble_test && ./wobble_test
 echo "--- robustness sweep (560 random shot sequences per math mode; must never hang) ---"

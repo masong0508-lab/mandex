@@ -381,7 +381,15 @@ static void draw_man(const View *v){
   else if(m->mode == MAN_AIM && dragging) pose = POSE_DRAG;
   if(m->mode == MAN_AIM) gfx_ell(v->buf, x, y + v->ppc, v->ppc * 2, v->ppc * 3 / 2, C_HAIR2);        /* sling pouch */
   if(m->mode == MAN_AIM && !dragging) man_with_towel(v->buf, &tow_play, x, y, v->ppc, face, mi_frame(&mi, frame), &jg);   /* idle gags */
-  else spr_man_j(v->buf, x, y, v->ppc, face, pose, frame, &jg);
+  else {
+    /* body angle, as the browser's ctx.rotate: flight pitches toward the path (core: ang), the belly flop tumbles (spin), a stuck man rocks,
+       and a man being dragged leans a quarter of the way toward the sling.  Flying left is the mirror image, so the turn flips with the sprite. */
+    real a = 0;
+    if(m->mode == MAN_FLY) a = m->dive ? m->spin * face : m->ang * face;
+    else if(m->mode == MAN_STUCK) a = rmul(mx_man_wobble(m), R(0.17));
+    else if(m->mode == MAN_AIM && dragging) a = rmul(ratan2(MX_ANCHOR_Y - m->y, MX_ANCHOR_X - m->x), R(0.25));
+    spr_man_jr(v->buf, x, y, v->ppc, face, pose, frame, &jg, (int)rsin(a), (int)rcos(a));
+  }
   if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){                 /* only the belly swells; the face flushes red near the end */
     int f = (int)((m->inf * 100) >> 12), p = v->ppc, rx = p * (2 + f * 5 / 40), ry = p * (2 + f * 4 / 40);
     int bx = x + face * p * f / 60, by = y + p + p * f / 80;

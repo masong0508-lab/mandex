@@ -91,6 +91,19 @@ real rsin(real a){ return sinf(a); }
 real rcos(real a){ return cosf(a); }
 #endif
 
+/* atan2 from one polynomial, built only from rmul / rdiv so float, fixed and the libnds hardware path agree.
+   atan(z) ~ z (0.9724 - 0.1919 z^2) on |z| <= 1 (error < 0.005 rad), octant folding for the rest. */
+real ratan2(real y, real x){
+  real ax = rabs(x), ay = rabs(y);
+  if(ax == 0 && ay == 0) return 0;
+  int swap = ay > ax;
+  real z = swap ? rdiv(ax, ay) : rdiv(ay, ax);
+  real a = rmul(z, R(0.9724) - rmul(R(0.1919), rmul(z, z)));
+  if(swap) a = R(1.5708) - a;
+  if(x < 0) a = R(3.14159) - a;
+  return y < 0 ? -a : a;
+}
+
 /* ============================================================== events */
 static void ev(MxWorld *w, int type, real x, real y, int m, real a, real b){
   if(w->nev >= MX_MAX_EVENTS) return;
@@ -1012,6 +1025,7 @@ void mx_release(MxWorld *w){
     if(m->inf > R(0.6)) w->st_inflated++;
     if(w->pw_sel){ m->pwr = (uint8_t)w->pw_sel; w->pw_left[w->pw_sel]--; w->st_pw[w->pw_sel]++; w->pw_sel = 0; } }
   m->mode = MAN_FLY; m->gt = 0; w->men--;
+  m->spin = 0; m->ang = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
   ev(w, EV_LAUNCH, m->x, m->y, 0, 0, 0);
 }
 void mx_select_power(MxWorld *w, int pw){
@@ -1270,6 +1284,21 @@ static void man_jiggle(MxWorld *w, real dt){
   m->sq = rmul(m->sq, R(0.88));
 }
 
+real mx_man_wobble(const MxMan *m){
+  if(m->mode != MAN_STUCK) return 0;
+  real x = rmul(m->t, R(3.2));                                   /* exp(-x) ~ 1 / (1 + x + x^2/2 + x^3/6) */
+  real x2 = rmul(x, x), den = RI(1) + x + rmul(x2, R(0.5)) + rdiv(rmul(x2, x), RI(6));
+  return rmul(rsin(rmul(m->t, RI(26))), rdiv(RI(1), den));
+}
+
+/* flight pose: pitch toward the path (eased like the browser's 15 % a frame), belly-flop spin */
+static void man_pose(MxMan *m, real dt){
+  if(m->mode != MAN_FLY){ m->ang = m->spin = 0; return; }
+  if(m->dive){ m->spin += rmul(dt, RI(14)); return; }
+  real tgt = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
+  m->ang += rmul(tgt - m->ang, rclamp(rmul(dt, RI(9)), 0, RI(1)));
+}
+
 /* ============================================================== update */
 void mx_update(MxWorld *w, real dt){
   w->nev = 0; w->crack_ev = 0; w->time += dt;
@@ -1350,6 +1379,7 @@ void mx_update(MxWorld *w, real dt){
   if(w->need_support && w->support_cd <= 0){ support_pass(w); w->support_cd = MX_SUPPORT_INTERVAL; }
   upd_targets(w, dt);
   man_jiggle(w, dt);
+  man_pose(m, dt);
 
   if(w->state == MX_PLAY){
     int nch = busy_count(w);
