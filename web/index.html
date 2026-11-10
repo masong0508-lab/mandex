@@ -501,7 +501,7 @@ function explodeMan(){const m=man;ST().pops++;pdTouch();men--;
   for(let i=0;i<16;i++)P({k:6,x:m.x,y:m.y,vx:(rnd()-.5)*300,vy:(rnd()-.5)*300,l:.8,l0:.8,s:8+rnd()*8,c:'#cfe9ff'});
   shake=16;flash=.55;SFX.boom();popText(Math.max(110,m.x),m.y-56,'POP!!','#ff5a5a',50);popText(Math.max(110,m.x),m.y-18,'-1 MAN','#fff',24);m.mode='done'}
 function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long and he goes pop
-  {const add=dt/3.6;if(OPT().noBurst&&m.inf>=1)m.bel=Math.max(0,Math.min(STOM_MAX-m.inf,(m.bel||0)+add));else m.inf=Math.min(1,m.inf+add)}m.airT+=dt;
+  {const add=dt/3.6;if(OPT().noBurst&&m.inf>=1)m.bel=Math.max(0,Math.min(stomCap()-m.inf,(m.bel||0)+add));else m.inf=Math.min(1,m.inf+add)}m.airT+=dt;
   if(m.airT>.07){m.airT=0;SFX.hiss();P({k:6,x:VX+(rnd()-.5)*10,y:VY+16,vx:(rnd()-.5)*70,vy:-30-rnd()*50,l:.5,l0:.5,s:3+rnd()*3,c:'#cfe9ff'});
     if(stom(m)>.5){SFX.creak(Math.min(1,stom(m)))}
     if(stom(m)>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
@@ -594,6 +594,7 @@ const STX=88,CHUG_Y=GY-30,BEL_MAX=.3,BEL_SET=.27;
 // ONE stomach for both tools: air from the valve (m.inf, also slows the launch) + soda (m.bel, cosmetic).  stom(m) is how full he is overall.
 // The valve pops him when the stomach is full (1.0); soda keeps going a little further (SODA_BURST).  The two OPTIONS: noBurst (cheat) and burpCharge (a fuller stomach = a bigger burp).
 const SODA_BURST=1.15,SODA_RATE=.25,STOM_MAX=2.2;let sodaHold=false;
+const stomCap=()=>OPT().noBurst?1e9:STOM_MAX;   // cheat on (stomach never bursts): the stomach has no upper limit
 // SPANDEX: the briefs stretch over the belly instead of staying a fixed little patch at the hips.
 function flyBellyGeo(f){const sl=(man&&man.mode==='fly')?Math.min(1,Math.hypot(man.vx||0,man.vy||0)/1100):0;return[12+f*9-sl*f*4,4+f*6+sl*f*2,10+f*11,9+f*9+sl*f*1.5]}
 // front view: stretched cloth over the lower belly, clipped to the belly, with a striped waistband riding its curve
@@ -621,7 +622,7 @@ const easeIO=u=>{u=clamp(u,0,1);return u*u*(3-2*u)};
 function startChug(){const m=man;if(m.mode!=='aim'||m.chug||m.seated||m.vlv||dragging||pw.left.burp<=0)return;pw.sel=null;m.chug={t:0,ph:0,th:0,gt:0,b0:m.bel||0,extra:0,keep:0,rel:false};SFX.pop()}
 function updChug(dt){const m=man,c=m.chug;
   if(!sodaHold)c.rel=true;                                   // let go: finish the trip back to the sling
-  if(!c.rel&&c.t+dt>=CT_D){c.t=CT_D-.0001;c.keep+=dt;c.extra=Math.min(STOM_MAX,c.extra+SODA_RATE*dt)}   // still holding after bottle two: he keeps guzzling and the stomach keeps growing
+  if(!c.rel&&c.t+dt>=CT_D){c.t=CT_D-.0001;c.keep+=dt;c.extra=Math.min(stomCap(),c.extra+SODA_RATE*dt)}   // still holding after bottle two: he keeps guzzling and the stomach keeps growing
   else c.t+=dt;
   const t=c.t;
   const ph=t<CT_A?0:t<CT_BK?1:t<CT_C?2:t<CT_TB?3:t<CT_D?4:5;
@@ -629,11 +630,11 @@ function updChug(dt){const m=man,c=m.chug;
   c.th=ph===1?Math.PI*easeIO((t-CT_A)/(CT_BK-CT_A)):ph===2?Math.PI:ph===3?Math.PI+Math.PI*easeIO((t-CT_C)/(CT_TB-CT_C)):0;
   if(ph===2||ph===4){c.gt-=dt;if(c.gt<=0){c.gt=.12;SFX.gulp();if(stom(m)>.6)SFX.creak(Math.min(1,stom(m)));if(stom(m)>.5&&rnd()<.3)sweat(m.x,m.y-20);if(parts.length<1200)P({k:6,x:STX+8,y:CHUG_Y-24,vx:(rnd()-.5)*30,vy:-30-rnd()*30,l:.5,l0:.5,s:2,c:'#dff3ff'})}}
   const fl=ph===5?BEL_MAX+(BEL_SET-BEL_MAX)*easeIO((t-CT_D)/(CT_END-CT_D)):.15*clamp((t-CT_BK)/(CT_TB-CT_BK),0,1)+(BEL_MAX-.15)*clamp((t-CT_TB)/(CT_D-CT_TB),0,1);
-  m.bel=Math.max(0,Math.min(STOM_MAX-m.inf,c.b0+c.extra+fl));if(!OPT().noBurst&&stom(m)>=SODA_BURST){m.chug=null;sodaHold=false;explodeMan();return}   // half the belly is hidden behind his back; the rest is revealed on the turn
+  m.bel=Math.max(0,Math.min(stomCap()-m.inf,c.b0+c.extra+fl));if(!OPT().noBurst&&stom(m)>=SODA_BURST){m.chug=null;sodaHold=false;explodeMan();return}   // half the belly is hidden behind his back; the rest is revealed on the turn
   if(ph===0){const u=t/CT_A;m.x=SX+(STX-SX)*u;m.y=SY+(CHUG_Y-SY)*u-Math.sin(u*Math.PI)*34}
   else if(ph<5){m.x=STX;m.y=CHUG_Y+((ph===2||ph===4)?Math.sin(time*34)*.7:0)}
   else{const u=clamp((t-CT_D)/(CT_END-CT_D),0,1);m.x=STX+(SX-STX)*u;m.y=CHUG_Y+(SY-CHUG_Y)*u-Math.sin(u*Math.PI)*40}
-  if(t>=CT_END){m.x=SX;m.y=SY;m.chug=null;m.bel=Math.max(0,Math.min(STOM_MAX-m.inf,c.b0+c.extra+BEL_SET));pw.sel='burp';ring(SX,SY,40,'#ffd23f');popText(SX,SY-64,'LOADED!','#ffd23f',24)}}
+  if(t>=CT_END){m.x=SX;m.y=SY;m.chug=null;m.bel=Math.max(0,Math.min(stomCap()-m.inf,c.b0+c.extra+BEL_SET));pw.sel='burp';ring(SX,SY,40,'#ffd23f');popText(SX,SY-64,'LOADED!','#ffd23f',24)}}
 // ---- POWER-UP TOOL SPRITES: shaded, outlined props in the air valve's style (bean tin, towel rack, goo bucket, soda crate) plus their in-flight bits.
 const pwRR=(x,y,w,h,r,fill,lw)=>{ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);if(fill){ctx.fillStyle=fill;ctx.fill()}ctx.lineWidth=lw==null?2:lw;ctx.strokeStyle='#000';ctx.stroke()};
 const pwQ=i=>{const v=Math.sin(i*127.1+311.7)*43758.5453;return v-Math.floor(v)};
