@@ -20,6 +20,7 @@ void mx_meta_level_start(MxStats *s, const MxWorld *w);
 /* call once per frame after mx_update: reads the world's events/counters.  Returns the index of a newly unlocked achievement, or -1;
    call again until -1 to drain several. */
 void mx_meta_events(MxStats *s, const MxWorld *w);
+int  mx_stars_for(const MxWorld *w);                   /* 3 stars with 2+ men left, 2 with one, else 1: the one formula every front-end uses */
 void mx_meta_win(MxStats *s, const MxWorld *w);        /* when state becomes MX_WIN (once) */
 int  mx_meta_next_unlock(MxStats *s);                  /* newly met achievement index or -1 */
 

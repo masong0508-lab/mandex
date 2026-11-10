@@ -92,8 +92,9 @@ void mx_meta_events(MxStats *s, const MxWorld *w){
   s->pops += w->st_pops - s->seen_st_pops;             s->seen_st_pops = w->st_pops;
   for(int i = 1; i < 4; i++){ s->pw[i] += w->st_pw[i] - s->seen_pw[i]; s->seen_pw[i] = w->st_pw[i]; }
 }
+int mx_stars_for(const MxWorld *w){ return w->men >= 2 ? 3 : w->men >= 1 ? 2 : 1; }
 void mx_meta_win(MxStats *s, const MxWorld *w){
-  int st = w->men >= 2 ? 3 : w->men >= 1 ? 2 : 1;
+  int st = mx_stars_for(w);
   if(w->level >= 0 && w->level < MX_NUM_LEVELS && st > s->stars[w->level]) s->stars[w->level] = (uint8_t)st;
   s->wins++; if(s->lv_shots == 1) s->oneShots++;
   if(w->score > s->bestScore) s->bestScore = w->score;

@@ -509,7 +509,7 @@ static void end_panel(u8 *b){
   if(win){
     man_with_towel(b, &tow_win[0], 52, 98, 3, 1, mi_dance_frame(frame), 0);          /* victory butt-wiggle, one on each side */
     man_with_towel(b, &tow_win[1], 204, 98, 3, -1, mi_dance_frame(frame + 14), 0);
-    int stars = 1 + (world.men >= 1) + (world.men >= 2);
+    int stars = mx_stars_for(&world);
     for(int k = 0; k < 3; k++){
       int on = k < stars && end_t > 24 + k * 18;
       spr_star(b, 128 + (k - 1) * 34, 84, on ? 4 : 3, on ? C_STAR : C_UIHI, on ? C_STAR2 : C_UIBG);
