@@ -38,6 +38,14 @@ gcc -std=gnu99 -O2 -I../core ../core/mx.c sweep.c -lm -o sweep_float && ./sweep_
 gcc -std=gnu99 -O2 -DMX_FIXED -I../core ../core/mx.c sweep.c -lm -o sweep_fixed && ./sweep_fixed
 echo "--- same sweep with the wobble lattice switched off (the DS falls back to this under load) ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DSWEEP_NOWOB -I../core ../core/mx.c sweep.c -lm -o sweep_nowob && ./sweep_nowob
+echo "--- same sweep with collapsible buildings ON (rubble sleeps as solids until the level ends; peak bodies must stay within MX_MAX_CHUNKS): DS pool of 16 in fixed point, 3DS/Dreamcast pool of 48 in float ---"
+gcc -std=gnu99 -O2 -DSWEEP_COLLAPSE -I../core ../core/mx.c sweep.c -lm -o sweep_collapse_float && ./sweep_collapse_float
+gcc -std=gnu99 -O2 -DMX_FIXED -DSWEEP_COLLAPSE -I../core ../core/mx.c sweep.c -lm -o sweep_collapse_fixed && ./sweep_collapse_fixed
+gcc -std=gnu99 -O2 -DMX_MAX_CHUNKS=48 -DSWEEP_COLLAPSE -I../core ../core/mx.c sweep.c -lm -o sweep_collapse_48 && ./sweep_collapse_48
+echo "--- collapsible buildings: off = nothing sleeps, on = rubble sleeps, set_collapse(0) wakes it, level end welds everything back (float, fixed, 48-body pool) ---"
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c collapse_test.c -lm -o collapse_float && ./collapse_float | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c collapse_test.c -lm -o collapse_fixed && ./collapse_fixed | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -DMX_MAX_CHUNKS=48 -I../core ../core/mx.c collapse_test.c -lm -o collapse_48 && ./collapse_48 | grep -v "^ok:"
 echo "--- solver work with / without interior-voxel contact culling (fixed point) ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -I../core ../core/mx.c profile_contacts.c -lm -o prof_edge && ./prof_edge
 gcc -std=gnu99 -O2 -DMX_FIXED -DMX_NO_EDGE -I../core ../core/mx.c profile_contacts.c -lm -o prof_noedge && ./prof_noedge
@@ -53,6 +61,9 @@ head -c 100 /dev/urandom > /tmp/mx_bad.sav; MX_SAVE_PATH=/tmp/mx_bad.sav ./ds_re
 for L in 0 3 5 6; do ./ds_render /tmp/dsL$L 12000 $L | grep -v "^  chunk"; done
 echo "--- DS outfits screen: open, walk, wear, locked swatches, back (scripted stylus + d-pad) ---"
 OUTFIT_SHOTS=1 ./ds_render /tmp/dsout 400 0 | grep -v "^ok:"
+echo "--- DS options screen (port 13): open, tap + d-pad, start tool pre-armed, valve hidden, collapse dropped FIRST when the solver is slow and restored LAST, saved and reloaded ---"
+rm -f /tmp/mx_opt.sav; MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_TEST=1 ./ds_render /tmp/dsopt 3000 0 | grep -v "^ok:"
+MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_LOAD=1 ./ds_render /tmp/dsopt2 400 0
 echo "--- DS title cheat: L+R+SELECT unlocks every level for the session, in any key order ---"
 CHEAT_TEST=1 ./ds_render /tmp/dscheat 400 0 | grep -v "^ok:"
 echo "--- idle gags: every step valid, every gag ends and plays, he falls asleep, input wakes him ---"

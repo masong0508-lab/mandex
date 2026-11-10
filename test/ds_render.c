@@ -50,7 +50,8 @@ int soundPlayNoise(u16 f,u8 v,u8 p){
 void soundKill(int id){ if(id >= 100) noise_used[id-100] = 0; else if(id >= 0) psg_used[id] = 0; }
 void soundSetFreq(int id,int f){(void)id;(void)f;}
 void dmaCopy(const void*a,void*b,u32 n){memcpy(b,a,n);} void DC_FlushRange(const void*a,u32 n){(void)a;(void)n;}
-void cpuStartTiming(int t){(void)t;} u32 cpuEndTiming(void){ return 100000; }
+static u32 g_ticks = 100000;      /* what the stub profiler reports for the physics step (a test raises it to look slow) */
+void cpuStartTiming(int t){(void)t;} u32 cpuEndTiming(void){ return g_ticks; }
 
 /* ---- the real game ---- */
 #define main ds_main
@@ -94,8 +95,9 @@ int card_save_write(const u8 *s, int n){
 static void save_report(void){
   const char *p = getenv("MX_SAVE_PATH"); if(!p) return;
   u8 b[MX_SAVE_MAX]; MxStats s; int o = 0; mx_meta_init(&s); card_save_read(b, MX_SAVE_MAX); sv_reads--;
-  int ok = mx_meta_unpack(&s, &o, b, MX_SAVE_MAX);
-  printf("save: chip reads=%d writes=%d file_valid=%d wins=%d best[0]=%u stars[0]=%d\n", sv_reads, sv_writes, ok, ok ? s.wins : -1, ok ? (unsigned)s.best[0] : 0u, ok ? s.stars[0] : -1);
+  MxOptions op = { 9, 9 };
+  int ok = mx_meta_unpack_opt(&s, &o, &op, b, MX_SAVE_MAX);
+  printf("save: chip reads=%d writes=%d file_valid=%d wins=%d best[0]=%u stars[0]=%d opt_collapse=%d opt_tool=%d\n", sv_reads, sv_writes, ok, ok ? s.wins : -1, ok ? (unsigned)s.best[0] : 0u, ok ? s.stars[0] : -1, ok ? op.collapse : -1, ok ? op.tool : -1);
 }
 static void summary(void){
   printf("play frames=%d  max events/frame=%d  max live particles=%d/%d\n", stat_frames_play, stat_max_nev, stat_max_parts, NPART);
@@ -108,7 +110,64 @@ void swiWaitForVBlank(void){
   vf++;
   g_keys = 0; /* default: nothing held; script sets below */
   int mode = world.man.mode;
-  if((app == ST_TITLE) && getenv("CHEAT_TEST")){                    /* L+R+SELECT: unlock-all toggles, whatever order the keys go down in, without tripping the profiler or the outfit cycle */
+  if(getenv("OPTIONS_LOAD")){                                      /* second boot after OPTIONS_TEST: the options come back from the chip (collapse off, splat) */
+    if(vf == 3){ int ok = opt.collapse == 0 && opt.tool == MX_TOOL_SPLAT; printf(ok ? "ok: options loaded from the chip at boot\n" : "FAIL: options not loaded (collapse=%d tool=%d)\n", opt.collapse, opt.tool); exit(!ok); }
+  } else if(getenv("OPTIONS_TEST")){                                       /* port 13: the options screen, the start tool, the speed safety net, saving */
+    static int fails, st, men0, f0;
+#define PCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
+    if(vf == 2){ stats.stars[0] = stats.stars[1] = stats.stars[2] = 1; PCHECK(opt.collapse == 0 && opt.tool == MX_TOOL_VALVE && !opt_open, "fresh boot: collapse off, air valve, screen closed"); }
+    if(vf == 4){ g_keys |= KEY_TOUCH; g_touch.px = 130; g_touch.py = 180; }                              /* the OPTIONS button on the title */
+    if(vf == 7){ PCHECK(opt_open && opt_cur == 0 && app == ST_TITLE, "the OPTIONS button opens the screen without starting a level"); shot("opt1"); }
+    if(vf == 8){ g_keys |= KEY_TOUCH; g_touch.px = 100; g_touch.py = 30; }                                /* tap the collapse row */
+    if(vf == 10){ PCHECK(opt.collapse == 1 && world.collapse == 1, "tapping the collapse row turns it on (and the world follows)"); shot("opt2"); }
+    if(vf == 11) g_keys |= KEY_DOWN;
+    if(vf == 13) PCHECK(opt_cur == 1, "d-pad down moves to the tool row");
+    if(vf == 14) g_keys |= KEY_A;
+    if(vf == 16) PCHECK(opt.tool == MX_TOOL_BEANS, "A steps the tool on (air valve -> beans)");
+    if(vf == 17) g_keys |= KEY_RIGHT;
+    if(vf == 19) PCHECK(opt.tool == MX_TOOL_TOWEL, "d-pad right steps it on (towel)");
+    if(vf == 20){ g_keys |= KEY_TOUCH; g_touch.px = 12; g_touch.py = 86; }                                /* the left arrow */
+    if(vf == 22) PCHECK(opt.tool == MX_TOOL_BEANS, "tapping the left end of the tool row steps back");
+    if(vf == 23){ g_keys |= KEY_TOUCH; g_touch.px = 180; g_touch.py = 90; }
+    if(vf == 25){ PCHECK(opt.tool == MX_TOOL_TOWEL, "tapping elsewhere on the row steps forward"); shot("opt3"); }
+    if(vf == 26) g_keys |= KEY_LEFT; if(vf == 28) PCHECK(opt.tool == MX_TOOL_BEANS, "d-pad left steps back");
+    if(vf == 29) g_keys |= KEY_LEFT; if(vf == 31) PCHECK(opt.tool == MX_TOOL_VALVE, "...to the air valve");
+    if(vf == 32) g_keys |= KEY_LEFT; if(vf == 34) PCHECK(opt.tool == MX_TOOL_NONE, "...to none");
+    if(vf == 35) g_keys |= KEY_LEFT; if(vf == 37) PCHECK(opt.tool == MX_TOOL_SPLAT, "...and the list wraps round to splat");
+    if(vf == 38) g_keys |= KEY_DOWN; if(vf == 40) PCHECK(opt_cur == 2, "d-pad down to the music row");
+    if(vf == 41) g_keys |= KEY_A; if(vf == 43){ PCHECK(music_pref == 0, "A on the music row switches it off"); shot("opt4"); }
+    if(vf == 44) g_keys |= KEY_A; if(vf == 46) PCHECK(music_pref == 1, "...and back on");
+    if(vf == 47) g_keys |= KEY_DOWN; if(vf == 49) PCHECK(opt_cur == 0, "the cursor wraps from the bottom row to the top");
+    if(vf == 50){ opt.tool = MX_TOOL_TOWEL; }                                                             /* the start tool for the play test */
+    if(vf == 51){ g_keys |= KEY_TOUCH; g_touch.px = 20; g_touch.py = 175; }                               /* BACK */
+    if(vf == 53) PCHECK(!opt_open && app == ST_TITLE, "BACK closes the screen and stays on the title");
+    if(vf == 54) g_keys |= KEY_A;                                                                         /* play */
+    if(vf == 58){
+      PCHECK(app == ST_PLAY && world.collapse == 1, "the level starts with collapsible buildings on");
+      PCHECK(world.valve_ok == 0, "a power-up start tool hides the air valve (valve locked out even though the stub save has it unlocked)");
+      PCHECK(world.pw_sel == PW_TOWEL, "the start tool (towel) is pre-armed when he is in the sling"); st = 1; }
+    if(st == 1 && vf == 60){ mx_set_pull(&world, -RI(8), RI(4)); men0 = world.men; mx_release(&world); }
+    if(st == 1 && vf == 62){ PCHECK(world.man.mode == MAN_FLY && world.man.pwr == PW_TOWEL && world.pw_left[PW_TOWEL] == 0, "the launch used the pre-armed towel"); st = 2; }
+    if(st == 2 && world.man.mode == MAN_AIM && world.state == MX_PLAY && world.men < men0 && vf > 62){
+      PCHECK(world.pw_sel == 0, "back in the sling with no towel left: nothing is armed again"); st = 3; f0 = vf; }
+    if(st == 3 && vf == f0 + 2){                                                                          /* apply_options(): the valve is only there when it is the start tool */
+      opt.tool = MX_TOOL_VALVE; apply_options(); PCHECK(world.valve_ok == 1, "air valve as the start tool and 3 levels beaten: the valve is usable");
+      opt.tool = MX_TOOL_NONE; apply_options(); PCHECK(world.valve_ok == 0, "tool NONE: no valve");
+      opt.tool = MX_TOOL_VALVE; apply_options();
+      st = 4; f0 = vf; g_ticks = 400000; }                                                                /* the solver now looks slow */
+    if(st == 4 && vf == f0 + 5){ PCHECK(world.collapse == 0 && coll_shed == 1 && opt.collapse == 1, "slow solver: collapse is the FIRST thing dropped, the preference stays on");
+      PCHECK(world.substeps == MX_DS_MAX_SUBSTEPS && world.wob_enabled, "...before substeps or the wobble lattice are touched"); st = 5; f0 = vf; }
+    if(st == 5 && vf == f0 + 2){ PCHECK(world.substeps == 2 && world.wob_enabled, "still slow: substeps go next"); st = 6; f0 = vf; }
+    if(st == 6 && vf == f0 + 3){ PCHECK(!world.wob_enabled && world.collapse == 0, "still slow: the wobble lattice goes last"); st = 7; f0 = vf; g_ticks = 100000; }
+    if(st == 7 && vf == f0 + 130){ PCHECK(world.wob_enabled && world.substeps == 2 && !world.collapse, "headroom: the wobble lattice comes back first"); st = 8; f0 = vf; }
+    if(st == 8 && vf == f0 + 125){ PCHECK(world.substeps == MX_DS_MAX_SUBSTEPS && !world.collapse, "...then the substeps"); st = 9; f0 = vf; }
+    if(st == 9 && vf == f0 + 125){ PCHECK(world.collapse == 1 && coll_shed == 0, "...and collapsible buildings last");
+      load_level(world.level); PCHECK(world.collapse == 1, "a reloaded level keeps the preference");
+      coll_shed = 1; load_level(world.level); PCHECK(world.collapse == 0, "...but not while the safety net has it shed");
+      opt_change(OPT_COLLAPSE, 1); opt_change(OPT_COLLAPSE, 1); PCHECK(opt.collapse == 1 && coll_shed == 0 && world.collapse == 1, "changing the option clears the shed flag (a fresh chance)");
+      opt.collapse = 0; opt.tool = MX_TOOL_SPLAT; save_off = 0; save_sync(); st = 10;                       /* leave a recognisable option set on the chip */
+      printf(fails ? "options: %d FAILED\n" : "options: all passed\n", fails); save_report(); exit(fails != 0); }
+  } else if((app == ST_TITLE) && getenv("CHEAT_TEST")){                    /* L+R+SELECT: unlock-all toggles, whatever order the keys go down in, without tripping the profiler or the outfit cycle */
     static int fails;
 #define KCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
     if(vf == 2) stats.kills = 25;                                                   /* owns outfits 0 and 2, so the R cycle is visible */

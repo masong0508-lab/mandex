@@ -148,10 +148,18 @@ static uint32_t get32(const uint8_t *p){ return (uint32_t)p[0] | (uint32_t)p[1] 
 #define SAVE_HDR 6
 #define SAVE_PW (SAVE_HDR + 4 * SAVE_NCOUNT)       /* 50 */
 #define SAVE_STARS (SAVE_PW + 16)                  /* 66 */
-static int save_size(int nlev){ return SAVE_STARS + nlev + 4 + 1 + 4 * nlev + 4; }
+static int save_size(int nlev, int ver){ return SAVE_STARS + nlev + 4 + 1 + 4 * nlev + (ver >= 2 ? 1 : 0) + 4; }
 
-int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap){
-  const int n = save_size(MX_NUM_LEVELS);
+void mx_options_default(MxOptions *o){ o->collapse = 0; o->tool = MX_TOOL_VALVE; }
+const char *mx_tool_name(int t){
+  static const char *const N[MX_NUM_TOOLS] = { "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT" };
+  return t >= 0 && t < MX_NUM_TOOLS ? N[t] : "?";
+}
+int mx_tool_power(int t){ return t == MX_TOOL_BEANS ? PW_BEANS : t == MX_TOOL_TOWEL ? PW_TOWEL : t == MX_TOOL_SPLAT ? PW_SPLAT : PW_NONE; }
+
+int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap){ return mx_meta_pack_opt(s, outfit, 0, out, cap); }
+int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t *out, int cap){
+  const int n = save_size(MX_NUM_LEVELS, MX_SAVE_VERSION);
   if(!s || !out || cap < n) return 0;
   const int *cnt[SAVE_NCOUNT] = { &s->kills, &s->cells, &s->booms, &s->maxChain, &s->shots, &s->flops, &s->wins, &s->oneShots, &s->bestScore, &s->inflated, &s->pops };
   memcpy(out, "MXS1", 4); out[4] = MX_SAVE_VERSION; out[5] = (uint8_t)MX_NUM_LEVELS;
@@ -162,14 +170,17 @@ int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap){
   put32(p, s->ach); p += 4;
   *p++ = (uint8_t)(outfit >= 0 && outfit < MX_NUM_OUTFITS ? outfit : 0);
   for(int i = 0; i < MX_NUM_LEVELS; i++){ put32(p, s->best[i]); p += 4; }
+  { MxOptions o; mx_options_default(&o); if(opt) o = *opt;
+    *p++ = (uint8_t)((o.collapse ? 1 : 0) | ((o.tool < MX_NUM_TOOLS ? o.tool : MX_TOOL_VALVE) << 1)); }
   put32(p, mx_crc32(out, (int)(p - out)));
   return n;
 }
 
-int mx_meta_unpack(MxStats *s, int *outfit, const uint8_t *in, int len){
+int mx_meta_unpack(MxStats *s, int *outfit, const uint8_t *in, int len){ return mx_meta_unpack_opt(s, outfit, 0, in, len); }
+int mx_meta_unpack_opt(MxStats *s, int *outfit, MxOptions *opt, const uint8_t *in, int len){
   if(!s || !outfit || !in || len < SAVE_HDR) return 0;
-  if(memcmp(in, "MXS1", 4) != 0 || in[4] != MX_SAVE_VERSION) return 0;
-  const int nl = in[5], n = save_size(nl);
+  if(memcmp(in, "MXS1", 4) != 0 || in[4] < 1 || in[4] > MX_SAVE_VERSION) return 0;
+  const int ver = in[4], nl = in[5], n = save_size(nl, ver);
   if(len < n) return 0;
   if(mx_crc32(in, n - 4) != get32(in + n - 4)) return 0;
   /* everything below is validated: nothing can fail from here, so *s is only ever written whole */
@@ -181,6 +192,11 @@ int mx_meta_unpack(MxStats *s, int *outfit, const uint8_t *in, int len){
   s->ach = get32(p) & ((1u << MX_NUM_ACH) - 1u); p += 4;
   *outfit = *p < MX_NUM_OUTFITS ? *p : 0; p++;
   for(int i = 0; i < MX_NUM_LEVELS; i++){ uint32_t v = i < nl ? get32(p + 4 * i) : 0; s->best[i] = v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v; }
+  p += 4 * nl;
+  if(opt){
+    mx_options_default(opt);
+    if(ver >= 2){ int b = *p; opt->collapse = (uint8_t)(b & 1); int t = (b >> 1) & 7; opt->tool = (uint8_t)(t < MX_NUM_TOOLS ? t : MX_TOOL_VALVE); }
+  }
   s->lv_booms = s->lv_shots = 0; s->seen_st_inflated = s->seen_st_pops = 0;
   for(int i = 0; i < 4; i++) s->seen_pw[i] = 0;
   return 1;

@@ -334,4 +334,12 @@ now step-turn round first.  The console sprites (`art/manspr.h`, `art/manidle.h`
 - Cost: +7,200 bytes in `MxWorld`.  Plow hits alone rarely crumble anything (neighbours only lose 18%); blasts and chunk impacts do.
 - Tests: `test/crumble_test.c` (float + fixed).  Win rates and the 35 scripted shots will differ from before: re-baseline.
 - NOT verified: no DS or emulator run; sweep and scripted-shot re-baseline not recorded yet.
-- Still to do for port 13: B collapsible buildings (`MX_MAX_CHUNKS` stays 16 on the DS), C options screen + save blob v2.
+
+## PORT 13 steps B + C: collapsible buildings and the DS options screen
+- Core (B): `mx_set_collapse()`, sleeping solid rubble, `MX_MAX_CHUNKS` is now `#ifndef` (16 default = DS; build the 3DS / Dreamcast with `-DMX_MAX_CHUNKS=48` when their options screens land, not set yet).  `test/collapse_test.c` (float, fixed, 48 pool) and the sweep with `-DSWEEP_COLLAPSE` are in `run_tests.sh`.
+- Save blob **version 2** (176 bytes): one options byte before the CRC (bit 0 collapse, bits 1-3 start tool).  Version 1 blobs still load with default options.  `MxOptions`, `mx_meta_pack_opt` / `mx_meta_unpack_opt`, `mx_tool_name`, `mx_tool_power` in `core/mx_meta.[ch]`; the old `mx_meta_pack` / `mx_meta_unpack` still work (default options).
+- DS options screen: touch **OPTIONS (X)** on the title (or press X).  Rows: collapsible buildings on/off, start tool (none, air valve, beans, towel, splat), music.  Tap a row or d-pad up/down + A / left / right, B or BACK saves.  A power-up start tool is pre-armed once each time he is in the sling and hides the air valve; none also hides it; default is air valve (unchanged behaviour).
+- Speed safety net: collapse is now the FIRST thing dropped when the solver is slow, then substeps, then the wobble lattice; restored in reverse.  The profiler (L) shows `COL ON / OFF / SHED`.  The saved preference is never changed by the net.
+- Tests: `OPTIONS_TEST=1` and `OPTIONS_LOAD=1` in `ds_render`; screenshots `/tmp/dsopt_opt*_bot.ppm`.
+- NOT verified: nothing run on a DS or emulator; DS physics time with collapse on (level 6) not measured; 3DS and Dreamcast have no options screen yet.
+- Still to do for port 13: options screens on 3DS and Dreamcast.

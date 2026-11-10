@@ -52,8 +52,13 @@ real rcos(real a);
 /* --------------------------------------------------------------- sizes */
 #define MX_COLS          120
 #define MX_ROWS          60
+#ifndef MX_MAX_CHUNKS                    /* rigid bodies at once.  ~12 KB each: the DS keeps 16; with collapsible buildings the 3DS and Dreamcast can afford more (-DMX_MAX_CHUNKS=48) */
 #define MX_MAX_CHUNKS    16
+#endif
 #define MX_CHUNK_CELLS   512
+#if MX_MAX_CHUNKS < 4 || MX_MAX_CHUNKS > 63
+#error "MX_MAX_CHUNKS must be 4..63 (bnext[] holds int16 cell indexes)"
+#endif
 #define MX_MAX_TARGETS   12
 #define MX_MAX_EVENTS    96
 #define MX_NUM_LEVELS    20

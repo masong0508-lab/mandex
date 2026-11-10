@@ -45,10 +45,17 @@ int mx_valve_unlocked(const MxStats *s);
 /* the six palette colours an outfit changes: boxers, boxers dark, boxers highlight, towel, towel stripes, towel shade */
 void mx_outfit_shades(int i, uint8_t out[6][3]);
 
+/* ---- options (port 13): kept by each front-end, saved in the blob (version 2).  Default = off / air valve, the browser's defaults. ---- */
+enum { MX_TOOL_NONE, MX_TOOL_VALVE, MX_TOOL_BEANS, MX_TOOL_TOWEL, MX_TOOL_SPLAT, MX_NUM_TOOLS };   /* appended, never inserted (stored as an index); Burpbuster is slot 5 when port 14 lands */
+typedef struct { uint8_t collapse, tool; } MxOptions;   /* collapse: collapsible buildings; tool: the start tool (MX_TOOL_*) */
+void mx_options_default(MxOptions *o);
+const char *mx_tool_name(int tool);                      /* "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT" */
+int mx_tool_power(int tool);                             /* the PW_* a start tool pre-arms before every launch, or PW_NONE (none / air valve) */
+
 /* ---- save blob (port 5): identical bytes from the float and fixed builds, no struct memcpy, no malloc ----
    all fields little-endian:
      0   "MXS1"                       magic
-     4   version (1)
+     4   version (2; version 1 blobs are still read: they have no options byte and load the default options)
      5   nlev                         number of levels the writer had (stars[] and best[] have this many entries)
      6   11 x u32  kills cells booms maxChain shots flops wins oneShots bestScore inflated pops
      50  4 x u32   pw[0..3]
@@ -56,17 +63,21 @@ void mx_outfit_shades(int i, uint8_t out[6][3]);
          u32       ach
          u8        outfit index
          nlev x u32 best[]
+         u8        options (version 2 only): bit 0 collapse, bits 1-3 start tool (MX_TOOL_*), bits 4-7 reserved (written 0, ignored)
          u32       CRC32 (IEEE) of every byte before it
-   20 levels = 175 bytes.  Not saved: unlock_all and the per-level transients (lv_*, seen_*).  A save with fewer or more levels than this build
+   20 levels = 176 bytes (175 for a version 1 blob).  Not saved: unlock_all and the per-level transients (lv_*, seen_*).  A save with fewer or more levels than this build
    still loads (missing levels read as 0, extra ones are dropped); any other layout change must bump the version byte. */
-#define MX_SAVE_VERSION 1
-#define MX_SAVE_MAX (66 + MX_NUM_LEVELS + 4 + 1 + 4 * MX_NUM_LEVELS + 4)
+#define MX_SAVE_VERSION 2
+#define MX_SAVE_MAX (66 + MX_NUM_LEVELS + 4 + 1 + 4 * MX_NUM_LEVELS + 1 + 4)
 uint32_t mx_crc32(const uint8_t *p, int n);
 /* returns the number of bytes written, or 0 if cap is too small */
-int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap);
+int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap);                                  /* = mx_meta_pack_opt with the default options */
+int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t *out, int cap);       /* opt NULL = defaults; a tool index out of range is written as the air valve */
 /* returns 1 and fills *s and *outfit, or returns 0 and leaves both untouched (wrong magic, unknown version, short buffer, CRC mismatch).  len may be longer than the
    blob (a chip read of a fixed size); bytes after it are ignored.  Counters are clamped to INT_MAX, stars to 3, achievement bits to the ones that exist and an
    outfit index this build does not have becomes 0.  The transients are cleared and unlock_all is left alone.  Call it BEFORE the first load_level(): that call
    (mx_meta_level_start) is what re-bases the seen_* deltas, so a loaded game cannot count old inflations or pops twice. */
-int mx_meta_unpack(MxStats *s, int *outfit, const uint8_t *in, int len);
+int mx_meta_unpack(MxStats *s, int *outfit, const uint8_t *in, int len);                                /* = mx_meta_unpack_opt, options ignored */
+/* opt may be NULL.  On success *opt is the saved options (version 2) or the defaults (version 1); on failure it is untouched like the rest. */
+int mx_meta_unpack_opt(MxStats *s, int *outfit, MxOptions *opt, const uint8_t *in, int len);
 #endif

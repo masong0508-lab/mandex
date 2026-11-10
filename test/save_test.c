@@ -45,14 +45,15 @@ int main(void){
   fill(&S);
   CHECK(mx_meta_pack(&S, 5, buf, MX_SAVE_MAX - 1) == 0, "pack into a too-small buffer returns 0");
   int n = mx_meta_pack(&S, 5, buf, (int)sizeof buf);
-  CHECK(n == MX_SAVE_MAX && n == 175, "20 levels pack to 175 bytes");
+  CHECK(n == MX_SAVE_MAX && n == 176, "20 levels pack to 176 bytes (version 2: one options byte)");
 
   /* the documented layout, byte by byte */
-  CHECK(memcmp(buf, "MXS1", 4) == 0 && buf[4] == 1 && buf[5] == MX_NUM_LEVELS, "header: magic, version 1, level count");
+  CHECK(memcmp(buf, "MXS1", 4) == 0 && buf[4] == 2 && buf[5] == MX_NUM_LEVELS, "header: magic, version 2, level count");
   CHECK(buf[6] == (101 & 255) && buf[7] == 0 && buf[8] == 0 && buf[9] == 0, "first counter (kills) is little-endian at offset 6");
   CHECK(buf[6 + 4 * 8] == (61234 & 255) && buf[7 + 4 * 8] == ((61234 >> 8) & 255) && buf[8 + 4 * 8] == 0, "bestScore is the 9th counter");
   CHECK(buf[50] == 10 && buf[66] == S.stars[0] && buf[66 + 3] == S.stars[3], "pw[] at 50, stars[] at 66");
   CHECK(buf[66 + 20 + 4] == 5, "outfit index byte follows stars and ach");
+  CHECK(buf[n - 5] == (0 | (MX_TOOL_VALVE << 1)), "options byte (default: collapse off, air valve) sits just before the CRC");
   { uint32_t crc = mx_crc32(buf, n - 4); CHECK(buf[n - 4] == (uint8_t)crc && buf[n - 1] == (uint8_t)(crc >> 24), "CRC is the last four bytes, little-endian"); }
 
   /* round trip */
@@ -78,8 +79,10 @@ int main(void){
     printf("    (%d flips tried)\n", flips);
     for(int l = 0; l < n; l++){ MxStats X = sentinel; int ox = osent; if(mx_meta_unpack(&X, &ox, buf, l) != 0 || memcmp(&X, &sentinel, sizeof X) != 0 || ox != osent) badlen++; }
     CHECK(badlen == 0, "every truncation (0 .. n-1 bytes) fails and leaves stats untouched");
-    { uint8_t b2[MX_SAVE_MAX]; memcpy(b2, buf, n); b2[4] = 2; reseal(b2, n); MxStats X = sentinel; int ox = osent;
-      CHECK(mx_meta_unpack(&X, &ox, b2, n) == 0 && memcmp(&X, &sentinel, sizeof X) == 0, "version 2 (CRC valid) is refused"); }
+    { uint8_t b2[MX_SAVE_MAX]; memcpy(b2, buf, n); b2[4] = 3; reseal(b2, n); MxStats X = sentinel; int ox = osent;
+      CHECK(mx_meta_unpack(&X, &ox, b2, n) == 0 && memcmp(&X, &sentinel, sizeof X) == 0, "version 3 (CRC valid) is refused"); }
+    { uint8_t b2[MX_SAVE_MAX]; memcpy(b2, buf, n); b2[4] = 0; reseal(b2, n); MxStats X = sentinel; int ox = osent;
+      CHECK(mx_meta_unpack(&X, &ox, b2, n) == 0 && memcmp(&X, &sentinel, sizeof X) == 0, "version 0 (CRC valid) is refused"); }
     { uint8_t b2[MX_SAVE_MAX]; memcpy(b2, buf, n); b2[3] = '2'; reseal(b2, n); MxStats X = sentinel; int ox = osent;
       CHECK(mx_meta_unpack(&X, &ox, b2, n) == 0 && memcmp(&X, &sentinel, sizeof X) == 0, "wrong magic (CRC valid) is refused"); }
     { uint8_t erased[256]; memset(erased, 0xFF, sizeof erased); MxStats X = sentinel; int ox = osent;
@@ -101,7 +104,7 @@ int main(void){
 
   /* saves written by a build with a different number of levels */
   { uint8_t c[400]; int cn = craft(c, MX_NUM_LEVELS); mx_meta_init(&T);
-    CHECK(cn == MX_SAVE_MAX && mx_meta_unpack(&T, &of, c, cn) == 1, "the independent writer's 20-level blob is accepted (layout agrees with the documentation)");
+    CHECK(cn == MX_SAVE_MAX - 1 && mx_meta_unpack(&T, &of, c, cn) == 1, "the independent writer's 20-level version 1 blob is accepted (layout agrees with the documentation)");
     CHECK(T.kills == 1000 && T.pops == 1010 && T.pw[3] == 23 && T.ach == 0x15 && of == 2 && T.stars[0] == 1 && T.stars[1] == 2 && T.stars[2] == 3 && T.best[19] == 519, "...and every field lands where the layout says"); }
   { uint8_t c[400]; int cn = craft(c, 5); mx_meta_init(&T); for(int i = 0; i < MX_NUM_LEVELS; i++){ T.stars[i] = 3; T.best[i] = 99; }
     CHECK(mx_meta_unpack(&T, &of, c, cn) == 1 && T.stars[4] == 2 && T.best[4] == 504 && T.stars[5] == 0 && T.best[5] == 0 && T.best[19] == 0, "a save from a 5-level build loads: the new levels read as not played"); }
@@ -114,6 +117,30 @@ int main(void){
     W.score = 300; mx_meta_win(&B, &W); CHECK(B.best[3] == 500, "a lower score does not replace it");
     W.score = 900; mx_meta_win(&B, &W); CHECK(B.best[3] == 900 && B.bestScore == 900, "a higher one does");
     W.level = MX_NUM_LEVELS; W.score = 5; mx_meta_win(&B, &W); CHECK(B.best[3] == 900, "an out-of-range level is ignored, not written"); }
+
+  /* ---- options (port 13): saved in version 2, version 1 blobs still load with the defaults ---- */
+  { MxOptions d; mx_options_default(&d); CHECK(d.collapse == 0 && d.tool == MX_TOOL_VALVE, "default options: collapse off, air valve (the browser's defaults)"); }
+  { MxStats A; fill(&A); MxOptions o = { 1, MX_TOOL_SPLAT }, r = { 0, 0 }; uint8_t b[MX_SAVE_MAX]; int of2 = -1; MxStats B; mx_meta_init(&B);
+    int n1 = mx_meta_pack_opt(&A, 7, &o, b, (int)sizeof b);
+    CHECK(n1 == MX_SAVE_MAX && b[n1 - 5] == (1 | (MX_TOOL_SPLAT << 1)), "collapse on + splat packs into the options byte");
+    CHECK(mx_meta_unpack_opt(&B, &of2, &r, b, n1) == 1 && r.collapse == 1 && r.tool == MX_TOOL_SPLAT && of2 == 7 && same_saved(&A, &B), "options round trip, stats and outfit unharmed");
+    { uint8_t b2[MX_SAVE_MAX]; int n2 = mx_meta_pack_opt(&B, of2, &r, b2, (int)sizeof b2); CHECK(n2 == n1 && memcmp(b, b2, n1) == 0, "repack is byte-identical with options too"); }
+    for(int t = 0; t < MX_NUM_TOOLS; t++) for(int c = 0; c < 2; c++){ MxOptions i2 = { (uint8_t)c, (uint8_t)t }, o2 = { 9, 9 }; uint8_t bb[MX_SAVE_MAX]; int nn = mx_meta_pack_opt(&A, 0, &i2, bb, (int)sizeof bb);
+      if(!mx_meta_unpack_opt(&B, &of2, &o2, bb, nn) || o2.collapse != c || o2.tool != t){ CHECK(0, "every collapse x tool combination round trips"); t = 99; break; } }
+    CHECK(mx_tool_power(MX_TOOL_NONE) == PW_NONE && mx_tool_power(MX_TOOL_VALVE) == PW_NONE && mx_tool_power(MX_TOOL_BEANS) == PW_BEANS && mx_tool_power(MX_TOOL_TOWEL) == PW_TOWEL && mx_tool_power(MX_TOOL_SPLAT) == PW_SPLAT, "start tools map to the right power-ups (valve / none arm nothing)");
+    CHECK(strcmp(mx_tool_name(MX_TOOL_VALVE), "AIR VALVE") == 0 && strcmp(mx_tool_name(MX_TOOL_NONE), "NONE") == 0 && strcmp(mx_tool_name(99), "?") == 0, "tool names");
+    { MxOptions bad = { 5, 200 }; uint8_t bb[MX_SAVE_MAX]; MxOptions r2 = { 0, 0 }; int nn = mx_meta_pack_opt(&A, 0, &bad, bb, (int)sizeof bb);
+      CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, nn) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_VALVE, "an out-of-range tool packs as the air valve, any non-zero collapse as on"); }
+    { uint8_t bb[MX_SAVE_MAX]; memcpy(bb, b, n1); bb[n1 - 5] = 0xFF; reseal(bb, n1); MxOptions r2 = { 0, 0 };
+      CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, n1) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_VALVE, "an options byte with a tool index this build lacks (and reserved bits set) loads as air valve, never trusted"); }
+    { MxOptions sent = { 1, MX_TOOL_BEANS }; uint8_t bb[MX_SAVE_MAX]; memcpy(bb, b, n1); bb[0] ^= 1; MxStats X; fill(&X);
+      CHECK(mx_meta_unpack_opt(&X, &of2, &sent, bb, n1) == 0 && sent.collapse == 1 && sent.tool == MX_TOOL_BEANS, "a failed unpack leaves the options untouched"); }
+    CHECK(mx_meta_unpack_opt(&B, &of2, 0, b, n1) == 1, "options pointer may be NULL"); }
+  { uint8_t c[MX_SAVE_MAX + 8]; int cn = craft(c, MX_NUM_LEVELS); MxOptions r = { 1, MX_TOOL_SPLAT }; MxStats B; mx_meta_init(&B); int of2 = -1;
+    CHECK(cn == 175 && c[4] == 1, "(the independent writer still produces a 175-byte version 1 blob)");
+    CHECK(mx_meta_unpack_opt(&B, &of2, &r, c, cn) == 1 && r.collapse == 0 && r.tool == MX_TOOL_VALVE && B.best[4] == 504 && of2 == 2, "a version 1 save still loads: progress kept, options = defaults");
+    CHECK(mx_meta_unpack(&B, &of2, c, cn) == 1, "...also through the old entry point");
+    CHECK(mx_meta_unpack_opt(&B, &of2, &r, c, cn - 1) == 0, "a version 1 blob one byte short is refused (the size check follows the version)"); }
 
   printf(fails ? "save_test: %d FAILED\n" : "save_test: all passed\n", fails);
   return fails != 0;
