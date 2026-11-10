@@ -9,6 +9,7 @@
 typedef struct {
   int kills, cells, booms, maxChain, shots, flops, wins, oneShots, bestScore, inflated, pops, pw[4];
   uint8_t stars[MX_NUM_LEVELS];     /* best stars per level, 0 = not beaten */
+  int unlock_all;                   /* cheat, session only: every level open (never saved) */
   uint32_t ach;                     /* bit i = achievement i unlocked */
   /* per-level, reset by mx_meta_level_start */
   int lv_booms, lv_shots;
@@ -20,6 +21,7 @@ void mx_meta_level_start(MxStats *s, const MxWorld *w);
 /* call once per frame after mx_update: reads the world's events/counters.  Returns the index of a newly unlocked achievement, or -1;
    call again until -1 to drain several. */
 void mx_meta_events(MxStats *s, const MxWorld *w);
+int  mx_level_unlocked(const MxStats *s, int level);   /* levels 1-3 open, then each opens when the one before is beaten; always 1 unless built with -DMX_LEVEL_LOCKS */
 int  mx_stars_for(const MxWorld *w);                   /* 3 stars with 2+ men left, 2 with one, else 1: the one formula every front-end uses */
 void mx_meta_win(MxStats *s, const MxWorld *w);        /* when state becomes MX_WIN (once) */
 int  mx_meta_next_unlock(MxStats *s);                  /* newly met achievement index or -1 */

@@ -92,6 +92,13 @@ void mx_meta_events(MxStats *s, const MxWorld *w){
   s->pops += w->st_pops - s->seen_st_pops;             s->seen_st_pops = w->st_pops;
   for(int i = 1; i < 4; i++){ s->pw[i] += w->st_pw[i] - s->seen_pw[i]; s->seen_pw[i] = w->st_pw[i]; }
 }
+int mx_level_unlocked(const MxStats *s, int level){
+#ifdef MX_LEVEL_LOCKS
+  return s->unlock_all || level < 3 || (level < MX_NUM_LEVELS && s->stars[level - 1] > 0);
+#else
+  (void)s; (void)level; return 1;
+#endif
+}
 int mx_stars_for(const MxWorld *w){ return w->men >= 2 ? 3 : w->men >= 1 ? 2 : 1; }
 void mx_meta_win(MxStats *s, const MxWorld *w){
   int st = mx_stars_for(w);

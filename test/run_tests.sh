@@ -16,6 +16,9 @@ gcc -std=c99 -O2 -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c valve_test.
 echo "--- star rating helper (shared by all front-ends) ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c stars_test.c -lm -o stars_float && ./stars_float | tail -n 1
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c stars_test.c -lm -o stars_fixed && ./stars_fixed | tail -n 1
+echo "--- level unlock order (rules on / default off) ---"
+gcc -std=c99 -O2 -Wall -DMX_LEVEL_LOCKS -I../core ../core/mx.c ../core/mx_meta.c meta_test.c -lm -o meta_locks && ./meta_locks | tail -n 1
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c meta_test.c -lm -o meta_open && ./meta_open | tail -n 1
 echo "--- wobble / block-kind physics (fixed point): sway, snaps, topple, sand, rubber ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DKICKV=10 -I../core wobble_test.c -lm -o wobble_test && ./wobble_test
 echo "--- robustness sweep (560 random shot sequences per math mode; must never hang) ---"

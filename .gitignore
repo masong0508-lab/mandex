@@ -29,3 +29,5 @@ test/cloth_fixed
 tools/__pycache__/
 test/stars_float
 test/stars_fixed
+test/meta_locks
+test/meta_open

@@ -619,8 +619,9 @@ static void title_bottom(View *v){
   gfx_text_c(v->buf, 128, 21, nm, C_GOLD, C_BLACK, 2);
   gfx_text(v->buf, 14, 20, "<", C_WHITE, 2);
   gfx_text(v->buf, 232, 20, ">", C_WHITE, 2);
-  gfx_text_c(v->buf, 128, 36, best[sel_level] ? "BEST $" : "NOT PLAYED YET", C_UILINE, C_UIBG, 1);
-  if(best[sel_level]) gfx_text(v->buf, 128 + 12, 36, gfx_int(best[sel_level]), C_GOLD, 1);
+  if(!mx_level_unlocked(&stats, sel_level)){ gfx_text_c(v->buf, 128, 36, "LOCKED - BEAT THE LEVEL BEFORE", C_GRAY, C_UIBG, 1); }
+  else gfx_text_c(v->buf, 128, 36, best[sel_level] ? "BEST $" : "NOT PLAYED YET", C_UILINE, C_UIBG, 1);
+  if(best[sel_level] && mx_level_unlocked(&stats, sel_level)) gfx_text(v->buf, 128 + 12, 36, gfx_int(best[sel_level]), C_GOLD, 1);
   gfx_rect(v->buf, 0, 164, 256, 28, C_UIBG); gfx_rect(v->buf, 0, 164, 256, 1, C_UILINE);
   if(frame & 32) gfx_text_c(v->buf, 128, 174, "TOUCH SCREEN OR PRESS A", C_WHITE, C_UIBG, 1);
   else           gfx_text_c(v->buf, 128, 174, "TO START", C_GOLD, C_UIBG, 1);
@@ -701,6 +702,7 @@ int main(void){
         apply_outfit(outfit_sel); sfx_play(SFX_CLICK, 64);
       }
       if(ch){ sel_level = (sel_level + ch + MX_NUM_LEVELS) % MX_NUM_LEVELS; load_level(sel_level); sfx_play(SFX_CLICK, 64); }
+      else if(((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)) && !mx_level_unlocked(&stats, sel_level)) sfx_play(SFX_CLICK, 24);
       else if((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)){
         app = ST_PLAY; load_level(sel_level); sfx_play(SFX_CLICK, 64); music_set(music_pref);
       }
