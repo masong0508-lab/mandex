@@ -41,6 +41,7 @@ static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
 static int disp_score, cells0 = 1, end_t, was_state, best[MX_NUM_LEVELS];
 static MxStats stats;                 /* achievements / outfits for this session (the DS has no save) */
 static int ach_open, ach_page;       /* achievements list shown on the title's bottom screen */
+static int out_open, out_cur;        /* outfits screen shown on the title's bottom screen; out_cur = the highlighted outfit (outfit_sel = the one worn) */
 static int outfit_sel, toast_t = -1, toast_id, toast_q[4], toast_nq;
 static void toast_push(int id){ if(toast_nq < 4) toast_q[toast_nq++] = id; }
 static void toast_tick(void){
@@ -642,8 +643,86 @@ static void ach_bottom(u8 *b){
   gfx_text(b, 224 + 2, 174, "/25", C_UILINE, 1);
 }
 
+/* ---- outfits screen: a grid of swatches (boxers colour + towel colour); locked ones show a padlock and, when highlighted, how to unlock them (the hint text comes
+   from mx_outfit(i)->hint only, so it can never drift from the unlock rules).  4 columns x 3 rows holds 12 outfits; a 13th needs paging (see the check below). */
+#define OUT_COLS 4
+#define OUT_ROWS ((MX_NUM_OUTFITS + OUT_COLS - 1) / OUT_COLS)
+#define OUT_X0 8
+#define OUT_Y0 18
+#define OUT_CW 58
+#define OUT_CH 43
+#define OUT_DX (OUT_CW + 3)
+#define OUT_DY (OUT_CH + 4)
+#define C_SW0 224                      /* swatch colours: palette slots 224.. (two per outfit), main engine only; the man owns 160-198, the title is sub-engine */
+typedef char out_grid_fits[(OUT_ROWS <= 3 && MX_NUM_OUTFITS <= 16) ? 1 : -1];   /* breaks the build if the grid overflows the screen or the palette block */
+static void outfit_swatches(void){
+  for(int i = 0; i < MX_NUM_OUTFITS; i++){
+    const MxOutfit *o = mx_outfit(i);
+    const u8 *c2[2] = { o->br, o->tow };
+    for(int k = 0; k < 2; k++){
+      u16 c = RGB15(c2[k][0] >> 3, c2[k][1] >> 3, c2[k][2] >> 3);
+      gfx_pal[C_SW0 + i * 2 + k] = c; BG_PALETTE[C_SW0 + i * 2 + k] = c;
+    }
+  }
+}
+static int outfits_owned(void){ int n = 0; for(int i = 0; i < MX_NUM_OUTFITS; i++) n += mx_outfit_unlocked(&stats, i); return n; }
+static void out_cell_xy(int i, int *x, int *y){ *x = OUT_X0 + (i % OUT_COLS) * OUT_DX; *y = OUT_Y0 + (i / OUT_COLS) * OUT_DY; }
+static int out_cell_at(const touchPosition *t){           /* the outfit under the stylus, or -1 */
+  for(int i = 0; i < MX_NUM_OUTFITS; i++){ int x, y; out_cell_xy(i, &x, &y); if(hit(t, x, y, OUT_CW, OUT_CH)) return i; }
+  return -1;
+}
+static int out_move(int c, int dx, int dy){                /* d-pad: left/right walk the list, up/down walk a column; both wrap */
+  int n = MX_NUM_OUTFITS;
+  if(dx) return (c + dx + n) % n;
+  c += dy * OUT_COLS;
+  if(c < 0){ c += OUT_ROWS * OUT_COLS; if(c >= n) c -= OUT_COLS; }
+  else if(c >= n) c %= OUT_COLS;
+  return c;
+}
+static void out_wear(int i){                               /* wear it if it is unlocked, otherwise just the quiet click */
+  if(!mx_outfit_unlocked(&stats, i)){ sfx_play(SFX_CLICK, 24); return; }
+  outfit_sel = i; apply_outfit(i); sfx_play(SFX_CLICK, 64);
+}
+static void draw_lock(u8 *b, int cx, int y){               /* 12 x 15 padlock */
+  gfx_rect(b, cx - 4, y, 8, 2, C_GRAY);
+  gfx_rect(b, cx - 4, y, 2, 7, C_GRAY); gfx_rect(b, cx + 2, y, 2, 7, C_GRAY);
+  gfx_rect(b, cx - 6, y + 6, 12, 9, C_GRAY);
+  gfx_rect(b, cx - 1, y + 9, 2, 4, C_UIBG);
+}
+static void outfits_bottom(u8 *b){
+  gfx_rect(b, 0, 0, 256, 192, C_BLACK);
+  gfx_text_c(b, 128, 6, "OUTFITS", C_GOLD, C_BLACK, 1);
+  for(int i = 0; i < MX_NUM_OUTFITS; i++){
+    int x, y; out_cell_xy(i, &x, &y);
+    const MxOutfit *o = mx_outfit(i); int un = mx_outfit_unlocked(&stats, i);
+    u8 bc = i == out_cur ? C_GOLD : C_UILINE;
+    gfx_rect(b, x, y, OUT_CW, OUT_CH, C_UIBG);
+    gfx_rect(b, x, y, OUT_CW, 1, bc); gfx_rect(b, x, y + OUT_CH - 1, OUT_CW, 1, bc);
+    gfx_rect(b, x, y, 1, OUT_CH, bc); gfx_rect(b, x + OUT_CW - 1, y, 1, OUT_CH, bc);
+    if(un){
+      gfx_rect(b, x + 7, y + 6, 20, 16, (u8)(C_SW0 + i * 2));
+      gfx_rect(b, x + 31, y + 6, 20, 16, (u8)(C_SW0 + i * 2 + 1));
+    } else {
+      gfx_rect(b, x + 7, y + 6, 44, 16, C_BLACK);
+      draw_lock(b, x + OUT_CW / 2, y + 5);
+    }
+    gfx_text(b, x + (OUT_CW - gfx_text_w(o->name, 1)) / 2, y + 30, o->name, un ? C_WHITE : C_GRAY, 1);
+    if(i == outfit_sel) gfx_text(b, x + (OUT_CW - gfx_text_w("WORN", 1)) / 2, y + 37, "WORN", C_GOLD, 1);
+  }
+  gfx_rect(b, 0, 160, 256, 32, C_UIBG); gfx_rect(b, 0, 160, 256, 1, C_UILINE);
+  int un = mx_outfit_unlocked(&stats, out_cur);
+  if(un) gfx_text(b, 8, 165, "UNLOCKED", C_GOLD, 1);
+  else {
+    gfx_text(b, 8, 165, "LOCKED:", C_GRAY, 1);
+    gfx_text(b, 8 + gfx_text_w("LOCKED: ", 1), 165, mx_outfit(out_cur)->hint, C_WHITE, 1);
+  }
+  gfx_text(b, 8, 179, "< BACK", C_WHITE, 1); gfx_text(b, 39, 179, "B", C_UILINE, 1);
+  gfx_text(b, 217, 179, "A", un ? C_UILINE : C_GRAY, 1); gfx_text(b, 233, 179, "WEAR", un ? C_UILINE : C_GRAY, 1);
+}
+
 static void title_bottom(View *v){
   if(ach_open){ ach_bottom(v->buf); return; }
+  if(out_open){ outfits_bottom(v->buf); return; }
   draw_world(v, 0);
   panel(v->buf, 8, 6, 240, 38);
   gfx_text_c(v->buf, 128, 11, "SELECT LEVEL", C_UILINE, C_UIBG, 1);
@@ -658,7 +737,11 @@ static void title_bottom(View *v){
   if(frame & 32) gfx_text_c(v->buf, 128, 174, "TOUCH SCREEN OR PRESS A", C_WHITE, C_UIBG, 1);
   else           gfx_text_c(v->buf, 128, 174, "TO START", C_GOLD, C_UIBG, 1);
   gfx_text_c(v->buf, 128, 183, "Y = MUSIC", C_UILINE, C_UIBG, 1);
-  gfx_text(v->buf, 4, 183, "R: OUTFIT", C_UILINE, 1);
+  { int ox = 4; const char *own = gfx_int(outfits_owned());                  /* OUTFITS 4/11: the stylus button that opens the outfits screen */
+    gfx_text(v->buf, ox, 183, "OUTFITS", C_UILINE, 1); ox += 7 * 4 + 4;
+    gfx_text(v->buf, ox, 183, own, C_GOLD, 1);         ox += gfx_text_w(own, 1) + 1;
+    gfx_text(v->buf, ox, 183, "/", C_UILINE, 1);       ox += 4;
+    gfx_text(v->buf, ox, 183, gfx_int(MX_NUM_OUTFITS), C_UILINE, 1); }
   gfx_text(v->buf, 256 - 4 - gfx_text_w("ACH 00/25", 1), 183, "ACH", C_UILINE, 1);
   gfx_text(v->buf, 256 - 4 - gfx_text_w("00/25", 1), 183, gfx_int(mx_ach_count(&stats)), C_GOLD, 1);
   gfx_text(v->buf, 256 - 4 - gfx_text_w("/25", 1), 183, "/25", C_UILINE, 1);
@@ -708,7 +791,7 @@ int main(void){
   music_set(music_pref);
   STAGE(3, RGB15(0,0,31));                             /* blue */
 
-  mx_meta_init(&stats); apply_outfit(0);
+  mx_meta_init(&stats); apply_outfit(0); outfit_swatches();
   load_level(sel_level);
   STAGE(4, RGB15(31,31,0));                            /* yellow */
   int slow_frames = 0, fast_frames = 0, phys_ticks = 0;
@@ -727,8 +810,18 @@ int main(void){
       if((down & KEY_B) || ((down & KEY_TOUCH) && hit(&t, 0, 168, 70, 24))){ ach_open = 0; sfx_play(SFX_CLICK, 64); }
       if((down & KEY_RIGHT) || ((down & KEY_TOUCH) && hit(&t, 140, 168, 30, 24))){ ach_page = (ach_page + 1) % ACH_PAGES; sfx_play(SFX_CLICK, 64); }
       if((down & KEY_LEFT) || ((down & KEY_TOUCH) && hit(&t, 90, 168, 30, 24))){ ach_page = (ach_page + ACH_PAGES - 1) % ACH_PAGES; sfx_play(SFX_CLICK, 64); }
+    } else if(app == ST_TITLE && out_open){
+      int c = (down & KEY_TOUCH) ? out_cell_at(&t) : -1;
+      if((down & KEY_B) || ((down & KEY_TOUCH) && hit(&t, 0, 160, 80, 32))){ out_open = 0; sfx_play(SFX_CLICK, 64); }
+      else if(c >= 0){ out_cur = c; out_wear(c); }                                      /* tap a swatch: highlight it, and wear it if it is yours */
+      else if((down & KEY_A) || ((down & KEY_TOUCH) && hit(&t, 176, 160, 80, 32))) out_wear(out_cur);
+      else {
+        int dx = ((down & KEY_RIGHT) ? 1 : 0) - ((down & KEY_LEFT) ? 1 : 0), dy = ((down & KEY_DOWN) ? 1 : 0) - ((down & KEY_UP) ? 1 : 0);
+        if(dx || dy){ out_cur = out_move(out_cur, dx, dy); sfx_play(SFX_CLICK, 40); }
+      }
     } else if(app == ST_TITLE){
       if((down & KEY_TOUCH) && hit(&t, 190, 176, 66, 16)){ ach_open = 1; ach_page = 0; sfx_play(SFX_CLICK, 64); down &= ~KEY_TOUCH; }
+      if((down & KEY_TOUCH) && hit(&t, 0, 176, 64, 16)){ out_open = 1; out_cur = outfit_sel; sfx_play(SFX_CLICK, 64); down &= ~KEY_TOUCH; }
       int ch = 0;
       if(down & KEY_LEFT) ch = -1;
       if(down & KEY_RIGHT) ch = 1;

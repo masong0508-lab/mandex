@@ -87,7 +87,35 @@ void swiWaitForVBlank(void){
   vf++;
   g_keys = 0; /* default: nothing held; script sets below */
   int mode = world.man.mode;
-  if(app == ST_TITLE && getenv("TITLE_SHOTS")){                    /* just sit on the title and photograph the pan: logo end, mid glide, the man */
+  if((app == ST_TITLE) && getenv("OUTFIT_SHOTS")){                  /* the outfits screen: open it, walk the cursor, wear, tap a locked one, go back */
+    static int fails;
+#define OCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
+    if(vf == 2){ stats.kills = 25; stats.stars[0] = 3; stats.pops = 1; outfit_sel = 2; apply_outfit(2);   /* Navy, Banana and Mint owned, Banana worn */
+      OCHECK(mx_outfit_unlocked(&stats, 1) && mx_outfit_unlocked(&stats, 2) && mx_outfit_unlocked(&stats, 3) && !mx_outfit_unlocked(&stats, 4), "test stats own outfits 0-3 only"); }
+    if(vf == 4){ g_keys |= KEY_TOUCH; g_touch.px = 10; g_touch.py = 180; }                              /* the OUTFITS button on the title */
+    if(vf == 7){ shot("out1"); OCHECK(out_open && out_cur == 2, "OUTFITS button opens the screen on the worn outfit"); }
+    if(vf == 8) g_keys |= KEY_DOWN;
+    if(vf == 10){ shot("out2"); OCHECK(out_cur == 6 && !mx_outfit_unlocked(&stats, out_cur), "d-pad down moves a row, onto a locked outfit"); }
+    if(vf == 11) g_keys |= KEY_A;
+    if(vf == 13){ OCHECK(outfit_sel == 2, "A on a locked outfit does not wear it"); }
+    if(vf == 14) g_keys |= KEY_LEFT | 0;
+    if(vf == 16){ OCHECK(out_cur == 5, "d-pad left moves along the list"); }
+    if(vf == 17){ g_keys |= KEY_TOUCH; g_touch.px = 69 + 10; g_touch.py = 18 + 20; }                    /* tap Navy Stripes */
+    if(vf == 19){ shot("out3"); OCHECK(out_cur == 1 && outfit_sel == 1, "tapping an owned swatch wears it"); OCHECK(BG_PALETTE[C_MAN0 + 5] == RGB15(47 >> 3, 79 >> 3, 168 >> 3), "...and the man's boxers palette entry changed to navy"); }
+    if(vf == 20){ g_keys |= KEY_TOUCH; g_touch.px = 8 + 10; g_touch.py = 65 + 20; }                     /* tap Camo Dad (locked) */
+    if(vf == 22){ shot("out4"); OCHECK(out_cur == 4 && outfit_sel == 1, "tapping a locked swatch highlights it but does not wear it"); }
+    if(vf == 23) g_keys |= KEY_UP;                                                                       /* up from row 1 col 0 -> row 0 col 0 */
+    if(vf == 25){ OCHECK(out_cur == 0, "d-pad up moves a row"); }
+    if(vf == 26) g_keys |= KEY_UP;
+    if(vf == 28){ OCHECK(out_cur == 8, "d-pad up from the top row wraps to the bottom row"); }
+    if(vf == 29){ g_keys |= KEY_TOUCH; g_touch.px = 20; g_touch.py = 175; }                              /* BACK */
+    if(vf == 31){ OCHECK(!out_open && app == ST_TITLE, "BACK returns to the title without starting a level");
+      OCHECK(gfx_pal[C_SW0 + 2] == RGB15(47 >> 3, 79 >> 3, 168 >> 3) && gfx_pal[C_SW0 + 3] == RGB15(242 >> 3, 242 >> 3, 242 >> 3), "swatch palette holds the outfit colours (Navy boxers + towel)"); }
+    if(vf == 32) g_keys |= KEY_TOUCH, g_touch.px = 10, g_touch.py = 180;
+    if(vf == 34) g_keys |= KEY_B;
+    if(vf == 36){ OCHECK(!out_open, "B closes the screen"); shot("out5");
+      printf(fails ? "outfits screen: %d FAILED\n" : "outfits screen: all passed\n", fails); exit(fails != 0); }
+  } else if(app == ST_TITLE && getenv("TITLE_SHOTS")){                    /* just sit on the title and photograph the pan: logo end, mid glide, the man */
     if(title_t == 30) shot("tpan0");
     if(title_t == 170) shot("tpan1");
     if(title_t == 330){ shot("tpan2"); printf("title pan shots taken\n"); exit(0); }
