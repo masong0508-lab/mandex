@@ -293,11 +293,11 @@ LEVELS.push(
    for(let k=0;k<Wd+2;k+=2)set(X-1+k,g-F*fh-1,BRICK);
    for(let f=0;f<F;f++){const yb=g-f*fh,y0=yb-fh+ft,wm=f?WOOD:BRICK;
      rect(X,y0,2,fh-ft,wm);rect(X+Wd-2,y0,2,fh-ft,wm);interiors.push({x:X+2,y:y0,w:Wd-4,h:fh-ft,p:pap[f]});
-     PT.forEach((p,pi)=>{rect(p,y0,1,fh-ft,BRICK);rect(p,yb-6,1,6,0);if((f+pi)%2===0)rect(p,yb-6,1,6,WOOD)});   // a doorway in every partition; some have a wooden door in them
+     PT.forEach((p,pi)=>{rect(p,y0,1,fh-ft,BRICK);rect(p,yb-7,1,7,0);if((f+pi)%2===0&&!(f===1&&pi===1))rect(p,yb-7,1,7,WOOD)});   // a doorway in every partition; some have a wooden door in them
      if(f===0){rect(X,y0,2,8,0);rect(X+Wd-2,y0,2,8,0);rect(X+Wd-2,yb-8,1,8,WOOD);rect(X+Wd-1,yb-8,1,8,WOOD)}   // front door open, back door shut
      else{rect(X,yb-6,2,3,GLASS);rect(X+Wd-2,yb-6,2,3,GLASS)}   // windows
      rect(X,yb-6,2,0,0)}
-   for(let f=0;f<F-1;f++){const yb=g-f*fh,sx=STR[f];rect(sx+2,g-(f+1)*fh,8,ft,0);interiors.push({x:sx+2,y:g-(f+1)*fh,w:8,h:ft,p:pap[f+1]});
+   for(let f=0;f<F-1;f++){const yb=g-f*fh,sx=STR[f];rect(sx+1,g-(f+1)*fh,9,ft,0);interiors.push({x:sx+1,y:g-(f+1)*fh,w:9,h:ft,p:pap[f+1]});
      for(let k=0;k<10;k++)rect(sx+k,yb-1-k,1,k+1,WOOD)}   // stairs: a one-cell rise per column, a stairwell cut in the slab above
    rect(85,56,3,3,WOOD);rect(97,36,3,3,WOOD);
    for(const[c,r]of[[75,59],[99,59],[76,49],[99,49],[60,49],[77,39],[100,39],[84,39],[76,29],[88,29],[99,29]])tgt(c,r);
