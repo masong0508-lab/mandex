@@ -38,6 +38,7 @@ let grid,hp,anch,hb=new Uint8Array(COLS*ROWS),dmg=new Uint8Array(COLS*ROWS);
 let ox,oy,ovx,ovy,brk,wobOn=false,wobQuiet=0,sandOn=false,sandT=0,crackEv=0;   // wobble lattice (cells, cells/s)
 let chunks=[],parts=[],texts=[],targets=[],interiors=[],explQ=[],man,men=0;
 let tubes=[];   // pneumatic tubes of the current level (chapter 2): see tubeStep / drawTubes
+let pads=[];    // bounce pads of the current level (walk levels): pink rubber strips that boing the man up a shaft, see padCheck / drawPads
 let level=0,state='title',shake=0,freeze=0,slow=0,needSupport=false,dragging=false;
 let score=0,shownScore=0,time=0,winT=0,loseT=0,banner=0,hint=1,waitT=0,chunkId=0,flash=0;
 
@@ -286,22 +287,24 @@ LEVELS.push(
 );
 // ---- level 23: the walk-up building (CL.walk): after the flight the man lands on his feet and you drive him around on foot ----
 LEVELS.push(
- {name:'Walk-Up Wreckage',men:4,walk:true,tip:'Land, then walk!  A/D move, W jump, X punch, S stomp.',build(){   // a 4-storey block with doors, windows and two staircases, plus a hut in front
-   const g=59,fh=10,ft=2,X=58,Wd=48,F=4,PT=[70,82,94],STR=[60,83,60],pap=['#f0e0a8','#cfe0c0','#f0c9c9','#cdd7e6'];
+ {name:'Walk-Up Wreckage',men:4,walk:true,tip:'Land, then walk!  A/D move, W jump, X punch, S stomp.  Pink pads boing you up!',build(){   // a 4-storey block you clear on foot, zig-zag: in at the front door, then a pink bounce pad at the far end of each floor boings you up its shaft
+   // (solid stairs cannot make the U-turns a zig-zag needs: the top step walls off the far end, so the floors are linked by pads instead; every landlord is reachable on foot, only the wooden doors need a punch)
+   const g=59,fh=10,ft=2,X=58,Wd=48,F=4,PT=[71,83,95],pap=['#f0e0a8','#cfe0c0','#f0c9c9','#cdd7e6'],
+     DR=[[0,1,0],[1,0,1],[0,1,1],[1,0,1]],   // which partition doorways have a wooden door in them, per floor
+     PADS=[[100,0],[60,1],[100,2]];            // [first column, floor]: a 4-wide pad on that floor, with a shaft in the slab above it: right end, left end, right end
    rect(X,g,Wd,1,STONE);
    for(let f=1;f<=F;f++)rect(X-(f===F?1:0),g-f*fh,Wd+(f===F?2:0),ft,f===F?BRICK:WOOD);
    for(let k=0;k<Wd+2;k+=2)set(X-1+k,g-F*fh-1,BRICK);
    for(let f=0;f<F;f++){const yb=g-f*fh,y0=yb-fh+ft,wm=f?WOOD:BRICK;
      rect(X,y0,2,fh-ft,wm);rect(X+Wd-2,y0,2,fh-ft,wm);interiors.push({x:X+2,y:y0,w:Wd-4,h:fh-ft,p:pap[f]});
-     PT.forEach((p,pi)=>{rect(p,y0,1,fh-ft,BRICK);rect(p,yb-7,1,7,0);if((f+pi)%2===0&&!(f===1&&pi===1))rect(p,yb-7,1,7,WOOD)});   // a doorway in every partition; some have a wooden door in them
-     if(f===0){rect(X,y0,2,8,0);rect(X+Wd-2,y0,2,8,0);rect(X+Wd-2,yb-8,1,8,WOOD);rect(X+Wd-1,yb-8,1,8,WOOD)}   // front door open, back door shut
-     else{rect(X,yb-6,2,3,GLASS);rect(X+Wd-2,yb-6,2,3,GLASS)}   // windows
-     rect(X,yb-6,2,0,0)}
-   for(let f=0;f<F-1;f++){const yb=g-f*fh,sx=STR[f];rect(sx+1,g-(f+1)*fh,9,ft,0);interiors.push({x:sx+1,y:g-(f+1)*fh,w:9,h:ft,p:pap[f+1]});
-     for(let k=0;k<10;k++)rect(sx+k,yb-1-k,1,k+1,WOOD)}   // stairs: a one-cell rise per column, a stairwell cut in the slab above
-   rect(85,56,3,3,WOOD);rect(97,36,3,3,WOOD);
-   for(const[c,r]of[[75,59],[99,59],[76,49],[99,49],[60,49],[77,39],[100,39],[84,39],[76,29],[88,29],[99,29]])tgt(c,r);
-   tnt(78,59);tnt(97,49);tnt(78,39);tnt(96,29);
+     PT.forEach((p,pi)=>{rect(p,y0,1,fh-ft,BRICK);rect(p,yb-7,1,7,DR[f][pi]?WOOD:0)});   // a 7-high doorway in every partition (a brick lintel above it); some have a wooden door in them
+     if(f===0)rect(X,y0,2,8,0);else rect(X,yb-6,2,3,GLASS);   // the front door is open; the other floors have windows
+     rect(X+Wd-2,yb-6,2,3,GLASS)}
+   for(const[c,f]of PADS){const yb=g-f*fh,ys=g-(f+1)*fh;
+     rect(c,ys,4,ft,0);interiors.push({x:c,y:ys,w:4,h:ft,p:pap[f+1]});   // the shaft through the slab above
+     rect(c,yb-1,4,1,RUBBER);pads.push({x:c*V,y:(yb-1)*V,w:4*V})}      // and the pad under it
+   for(const[c,r]of[[77,59],[89,59],[89,49],[77,49],[67,49],[67,39],[80,39],[90,39],[90,29],[77,29],[65,29]])tgt(c,r);
+   tnt(82,59);tnt(84,49);tnt(86,39);tnt(70,29);
    }}
 );
 const chEnd=l=>l<CH1?CH1:LEVELS.length;   // the last level of the chapter that level l belongs to
@@ -313,6 +316,7 @@ function tubeStep(m,dt){
     ring(tb.ax,tb.ay,50,tb.col);SFX.whoosh();popText(tb.ax,tb.ay-34,'FWOOMP!',tb.col,24);
     m.x=tb.bx;m.y=tb.by;m.vx=Math.cos(tb.ang)*tb.sp;m.vy=Math.sin(tb.ang)*tb.sp;m.ang=tb.ang;
     m.tubeT=.55;m.tubeCd=.35;ring(tb.bx,tb.by,50,tb.col);SFX.pop();shake=Math.max(shake,3);break}}
+function drawPads(){for(const p of pads){const cx=p.x+p.w/2,bob=Math.sin(time*5)*3;ctx.save();ctx.strokeStyle='#fff';ctx.lineWidth=3;for(let k=0;k<3;k++){ctx.globalAlpha=.9-k*.25;const y=p.y-16-k*14-bob;ctx.beginPath();ctx.moveTo(cx-10,y+6);ctx.lineTo(cx,y-6);ctx.lineTo(cx+10,y+6);ctx.stroke()}ctx.restore()}}
 function drawTubes(){
   tubes.forEach((tb,i)=>{
     const sw=Math.sin(time*1.3+i*2)*3,bx=tb.ax+sw,by=tb.ay-62+Math.sin(time*1.9+i)*3;
@@ -341,7 +345,7 @@ function load(l,custom){
   CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
   pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1}};chunks=[];parts=[];texts=[];targets=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;banner=2.4;waitT=0;
-  tubes=[];CL.build();
+  tubes=[];pads=[];CL.build();
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
   man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};nextMan();
 }
@@ -670,12 +674,12 @@ function wBlocked(x,y){const xs=[x-WHW,x,x+WHW],ys=[y-WHH,y-WHH*.5,y,y+WHH*.5,y+
   return false}
 function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.vx=m.vy=0;m.gr=false;m.wt=WALK_T;m.pT=0;m.pCd=0;m.stomp=false;m.R=14;m.pwr=m.pwr;
   let ok=!wBlocked(m.x,m.y);for(let u=1;u<=110&&!ok;u++){if(!wBlocked(m.x,m.y-u)){m.y-=u;ok=true}}
-  for(let u=1;u<=40&&!ok;u++)for(const sg of[-1,1])if(!ok&&!wBlocked(m.x+sg*u,m.y-20)){m.x+=sg*u;m.y-=20;ok=true}
+  for(let r=4;r<=200&&!ok;r+=4)for(let a=0;a<16&&!ok;a++){const an=-Math.PI/2+(a%2?1:-1)*Math.ceil(a/2)*.4,qx=m.x+Math.cos(an)*r,qy=m.y+Math.sin(an)*r;if(!wBlocked(qx,qy)){m.x=qx;m.y=qy;ok=true}}   // nearest free spot, preferring up
   goo(m.x,m.y,22,260);SFX.splat();ring(m.x,m.y,50,'#7dff5a');popText(m.x,m.y-50,'ON YOUR FEET!','#7dff5a',26);shake=Math.max(shake,4)}
 function walkQuit(){const m=man;if(m.mode!=='walk')return;goo(m.x,m.y,20,240);SFX.pop();m.mode='done'}
 // hit everything in a box: cells, loose chunk cells and landlords.  returns the damage actually dealt
 function walkHit(cx,cy,hw,hh,dmg){let dealt=0;const x0=Math.floor((cx-hw)/V),x1=Math.floor((cx+hw)/V),y0=Math.floor((cy-hh)/V),y1=Math.floor((cy+hh)/V);
-  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)dealt+=damageCell(x,y,dmg);
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(inb(x,y)&&grid[idx(x,y)]===RUBBER)continue;dealt+=damageCell(x,y,dmg)}   // bounce pads shrug off fists
   for(const ch of chunks){if(Math.hypot(ch.x-cx,ch.y-cy)>ch.rad+hw+hh)continue;let hit=false;
     for(const a of ch.cells)if(!a.dead&&Math.abs(a.wx-cx)<hw+RC&&Math.abs(a.wy-cy)<hh+RC){hit=true;dealt+=Math.min(a.h,dmg);a.h-=dmg;if(a.h<=0){a.dead=true;chip(a.wx,a.wy,MAT[a.m].c,(rnd()-.5)*200,-rnd()*150)}}
     if(hit)wake(ch)}
@@ -687,6 +691,7 @@ function walkSlam(){const m=man,cx=m.x,cy=m.y+WHH+4;let d=0;for(const[hw,dm]of[[
   m.stomp=false;shake=Math.max(shake,9);ring(cx,cy,70,'#fff');ring(cx,cy,45,'#ffd23f');dust(cx,cy,10,14);SFX.boom&&SFX.crunch(1);wobKick(Math.floor(cx/V),Math.floor(cy/V),6,0,.9);popText(cx,cy-34,'BELLY SLAM!','#ff8a3a',24);return d}
 function walkStep(dt){const m=man;
   m.wt-=dt;if(m.wt<=0){popText(m.x,m.y-40,'TIME!','#ff6b6b',26);walkQuit();return}
+  if(wBlocked(m.x,m.y)){let f=false;for(let u=2;u<=80&&!f;u+=2)for(const sg of[0,-1,1])if(!wBlocked(m.x+sg*u,m.y-u)){m.x+=sg*u;m.y-=u;f=true;break}}   // rubble fell on him: pop him out
   const L=KEYS.KeyA||KEYS.ArrowLeft||KEYS.TL,R=KEYS.KeyD||KEYS.ArrowRight||KEYS.TR,UP=KEYS.KeyW||KEYS.ArrowUp||KEYS.Space||KEYS.TJ,DN=KEYS.KeyS||KEYS.ArrowDown||KEYS.TS,PU=KEYS.KeyX||KEYS.KeyZ||KEYS.KeyJ||KEYS.KeyK||KEYS.Enter||KEYS.TP;
   const ax=(R?1:0)-(L?1:0);if(ax)m.face=ax;
   m.vx+=(ax*135-m.vx)*Math.min(1,dt*(m.gr?14:5));
@@ -696,7 +701,8 @@ function walkStep(dt){const m=man;
   const dx=m.vx*dt,nx=Math.max(1,Math.ceil(Math.abs(dx)/2));
   for(let i=0;i<nx;i++){const sx=dx/nx;
     if(!wBlocked(m.x+sx,m.y))m.x+=sx;
-    else{let ok=false;if(m.gr)for(let u=1;u<=9;u++)if(!wBlocked(m.x+sx,m.y-u)){m.x+=sx;m.y-=u;ok=true;break}   // a stair is one cell (8px): he steps up it
+    else{let ok=false;if(!m.gr&&m.vy>-380)for(let u=1;u<=10;u++)if(!wBlocked(m.x+sx,m.y-u)){m.x+=sx;m.y-=u;if(m.vy>-120)m.vy=-120;ok=true;break}   // airborne next to a ledge: hop up onto it
+      if(!ok&&m.gr)for(let u=1;u<=9;u++)if(!wBlocked(m.x+sx,m.y-u)){m.x+=sx;m.y-=u;ok=true;break}   // a stair is one cell (8px): he steps up it
       if(!ok){m.vx=0;break}}}
   m.x=clamp(m.x,WHW+2,WW-WHW-2);
   m.vy+=G*.9*dt;const dy=m.vy*dt,ny=Math.max(1,Math.ceil(Math.abs(dy)/2));
@@ -706,6 +712,8 @@ function walkStep(dt){const m=man;
         if(m.vy>380){dust(m.x,m.y+WHH,6,10);SFX.thud&&SFX.thud(.5)}m.vy=0}else{m.vy=0;if(Math.abs(dy)>2)SFX.thud&&SFX.thud(.3)}
       break}}
   m.gr=wBlocked(m.x,m.y+1.5);if(m.gr)m.stomp=false;
+  if(m.padCd>0)m.padCd-=dt;
+  if(m.gr&&!(m.padCd>0)){const by=Math.floor((m.y+WHH+2)/V);for(const o of[-4,0,4]){const bx=Math.floor((m.x+o)/V);if(inb(bx,by)&&grid[idx(bx,by)]===RUBBER){m.vy=m.stomp?-540:-470;m.gr=false;m.stomp=false;m.padCd=.3;SFX.boing();popText(m.x,m.y-34,'BOING!','#ff7eb0',26);ring(m.x,m.y+WHH,40,'#ff9ec8');dust(m.x,m.y+WHH,5,8);break}}}
   if(m.gr&&Math.abs(m.vx)>60&&((time*9)|0)%2===0&&rnd()<.25)dust(m.x,m.y+WHH,1,6);
   for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<WHH+t.r-4)killTarget(t)}   // bump into a landlord and he is done for
 function drawWalkMan(m){ctx.save();ctx.translate(m.x,m.y+WHH);
@@ -923,7 +931,7 @@ function dive(){
 //  TARGETS: grumpy landlords
 // =====================================================================
 function solidAt(px,py){if(!grid)return false;const gx=Math.floor(px/V),gy=Math.floor(py/V);if(gy>=ROWS)return true;return inb(gx,gy)&&grid[idx(gx,gy)]>0}
-function killTarget(t){if(!t.alive)return;t.alive=false;onLandlord();score+=5000;SFX.ding();slow=Math.max(slow,.25);
+function killTarget(t){if(!t.alive)return;t.alive=false;if(man&&man.mode==='walk'){man.wt=Math.min(man.wt+3,WALK_T+15);popText(t.x,t.y-38,'+3s','#7dff5a',18)}onLandlord();score+=5000;SFX.ding();slow=Math.max(slow,.25);
   popText(t.x,t.y-14,'+5000','#ffd23f',24);
   for(let i=0;i<14;i++)parts.push({k:4,x:t.x,y:t.y,vx:(rnd()-.5)*300,vy:-rnd()*300-60,l:1.6,l0:1.6,s:3+rnd()*3,r:rnd()*6});
   for(let i=0;i<10;i++)chip(t.x,t.y,['#4a5568','#f2c7a1','#111'][i%3],(rnd()-.5)*260,-rnd()*260);dust(t.x,t.y,4,9)}
@@ -2480,6 +2488,7 @@ function draw(){
   for(const ch of chunks){ctx.save();ctx.translate(ch.x,ch.y);ctx.rotate(ch.ang);for(const a of ch.cells){const r=a.h/MAT[a.m].hp;ctx.drawImage(SPR[a.m][(a.lx*7+a.ly*3|0)&3][r>.66?0:r>.33?1:2],-V/2+a.lx,-V/2+a.ly)}ctx.restore()}
   for(const t of targets)if(t.alive){const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);ctx.restore()}
   if(tubes.length)drawTubes();
+  if(pads.length)drawPads();
   // sling band behind man
   if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX+13,SY+24);ctx.lineTo(man.x+4,man.y+6);ctx.stroke()}
   if(man.mode==='aim'&&dragging){const vx=(SX-man.x)*9.2,vy=(SY-man.y)*9.2;for(let t=.06,i=0;t<1.7;t+=.075,i++){ctx.fillStyle=`rgba(255,255,255,${.9-i*.035})`;ctx.beginPath();ctx.arc(man.x+vx*t,man.y+vy*t+450*t*t,3.4-i*.07,0,7);ctx.fill()}}
