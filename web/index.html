@@ -307,6 +307,19 @@ LEVELS.push(
    tnt(82,59);tnt(84,49);tnt(86,39);tnt(70,29);
    }}
 );
+// ---- levels 24-25: pure slingshot (no tubes, no pads, no walking): all that matters is how hard and how high you pull ----
+LEVELS.push(
+ {name:'Over the Top',men:6,tip:'Steel wall!  No flat shot gets through: pull back and UP, and lob him over.',build(){   // a 27-tall steel wall with a stepped foot (so it cannot topple), and a wooden hut + a wooden tower behind it: only a high arc drops in
+   rect(50,33,5,27,STEEL);rect(46,48,4,12,STEEL);rect(43,54,3,6,STEEL);
+   house({x:60,w:12,floors:2,fh:8,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:'#cfe0c0'});
+   house({x:84,w:9,floors:4,fh:8,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:'#f0e0a8'});
+   tgt(64,59);tgt(68,59);tgt(65,51);tgt(88,59);tgt(88,43);tgt(88,35);tnt(70,59);tnt(90,43)}},
+ {name:'Needle Threader',men:6,tip:'A solid steel curtain with three slots: pick a pull that threads each one.',build(){   // a full-height steel curtain wall with a 7-high window slot per floor, and a wooden house behind with two landlords on each floor
+   rect(62,8,5,52,STEEL);rect(58,50,4,10,STEEL);
+   house({x:67,w:26,floors:3,fh:12,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:'#e8d3a8'});
+   for(let f=0;f<3;f++){const yb=59-f*12;rect(62,yb-9,5,7,0);tgt(73,yb);tgt(86,yb);tnt(90,yb)}   // cut the slot: seven rows, sitting a little above each floor
+   }}
+);
 const chEnd=l=>l<CH1?CH1:LEVELS.length;   // the last level of the chapter that level l belongs to
 // ---- pneumatic tubes ----
 function tubeStep(m,dt){
@@ -3057,10 +3070,11 @@ function drawSelect(){
   if(selTab===2){   // chapter 2 (work in progress): its own screen, its stars stay out of the story achievements
     const cols=5,tw=164,th=80,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n2=LEVELS.length-CH1;
     txt('CHAPTER 2  -  WORK IN PROGRESS',W/2,134,24,'#ffb03a','center','#5a2a00');
-    for(let k=0;k<cols;k++){const x=x0+k*(tw+gx);
-      if(k<n2){const i=CH1+k;tile(x,y0,tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!ch2Unlocked(i),()=>startStory(i))}
-      else tile('?','COMING SOON',0,true,()=>{},false)}
-    txt('New mechanics: pneumatic tubes, sand floods.  More levels are on the way.',W/2,274,16,'#fff','center');
+    const rows=Math.ceil(Math.max(n2,cols)/cols);   // a new row every 5 levels
+    for(let k=0;k<rows*cols;k++){const x=x0+(k%cols)*(tw+gx),y=y0+((k/cols)|0)*(th+10);
+      if(k<n2){const i=CH1+k;tile(x,y,tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!ch2Unlocked(i),()=>startStory(i))}
+      else tile(x,y,tw,th,'?','COMING SOON',0,true,()=>{},false)}
+    txt('New mechanics: pneumatic tubes, sand floods, walking.  Plus pure slingshot levels.  More on the way.',W/2,274+(rows-1)*(th+10),16,'#fff','center');
     txt('Chapter 2 stars do not count towards story achievements yet.',W/2,H-14,13,'#fff','center')}
   else if(selTab===0){
     const cols=5,tw=164,th=80,gx=10,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=112;
