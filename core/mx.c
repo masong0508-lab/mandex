@@ -1131,8 +1131,10 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   "Suburban Eviction", "Duplex Dilemma", "Tower Block Tussle", "Castle Foreclosure", "Corporate Takeover",
   "Bouncy Castle", "Sandcastle Shakedown",
   "Glass House Party", "Steel Mill Standoff", "Twin Peaks", "Domino Drive", "Rubber Ducky Resort", "TNT Pyramid",
-  "Skyscraper Special", "Bridge Troll", "Fort Knoxed", "Jenga Joe", "Moat Madness", "Glass Cannon", "Mandex Manor"};
-static const int MEN[MX_NUM_LEVELS] = {4, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 5, 8, 8, 8, 7, 7, 6, 10};
+  "Skyscraper Special", "Bridge Troll", "Fort Knoxed", "Jenga Joe", "Moat Madness", "Glass Cannon", "Mandex Manor",
+  "Leaning Loft", "Powder Keg Plaza", "Rubber Room", "Stairway to Eviction", "Sand Trap", "The Vault", "Triple Decker",
+  "Glass Menagerie", "Penthouse Panic", "Landlord HQ"};
+static const int MEN[MX_NUM_LEVELS] = {4, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 5, 8, 8, 8, 7, 7, 6, 10,  6, 6, 8, 8, 6, 7, 8, 6, 8, 12};
 const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
 
 static void build(MxWorld *w, int l){
@@ -1216,6 +1218,43 @@ static void build(MxWorld *w, int l){
     rect_fill(w, 58, 41, 4, 1, W_); rect_fill(w, 88, 32, 4, 1, W_);
     tgt(w, 52, 59); tgt(w, 55, 41); tgt(w, 68, 59); tgt(w, 80, 59); tgt(w, 70, 50); tgt(w, 84, 41); tgt(w, 79, 32);
     tgt(w, 96, 50); tgt(w, 99, 32); tgt(w, 97, 23); tnt(w, 75, 50); tnt(w, 94, 59); tnt(w, 66, 41); break;
+  case 20:      /* a six-floor wooden beanpole next to a brick cottage */
+    house(w, 66, 8, 6, W_, W_, W_, 0, 0); house(w, 82, 12, 2, B, W_, W_, 1, 0);
+    tgt(w, 70, 59); tgt(w, 70, 41); tgt(w, 70, 23); tgt(w, 70, 14); tgt(w, 86, 59); tgt(w, 90, 50); tnt(w, 72, 50); tnt(w, 88, 59); break;
+  case 21:      /* three cottages with two towers of TNT between them */
+    for(int k = 0; k < 3; k++) house(w, 50 + k * 18, 10, 2, B, W_, W_, 1, 0);
+    rect_fill(w, 62, 52, 4, 8, MX_TNT); rect_fill(w, 80, 52, 4, 8, MX_TNT);
+    tgt(w, 54, 59); tgt(w, 56, 50); tgt(w, 72, 59); tgt(w, 74, 50); tgt(w, 90, 59); tgt(w, 92, 50); tgt(w, 102, 60); break;
+  case 22:      /* a big bouncy hall: come in through the wooden roof */
+    house(w, 60, 30, 3, RU, W_, W_, 0, 0);
+    tgt(w, 66, 59); tgt(w, 84, 59); tgt(w, 70, 50); tgt(w, 82, 50); tgt(w, 68, 41); tgt(w, 80, 41); tnt(w, 78, 59); tnt(w, 64, 50); tnt(w, 86, 41); break;
+  case 23:      /* a landlord on every step */
+    for(int k = 0; k < 6; k++){ rect_fill(w, 52 + k * 8, 60 - (k + 1) * 5, 8, (k + 1) * 5, (k & 1) ? B : W_); tgt(w, 56 + k * 8, 60 - (k + 1) * 5); if(k > 1) rect_fill(w, 55 + k * 8, 56, 2, 4, MX_TNT); }
+    tnt(w, 102, 60); tnt(w, 48, 60); break;
+  case 24:      /* a glass villa on top of a dune */
+    mound(w, 50, 50, 14); house_at(w, 67, 45, 16, 3, MX_GLASS, W_, W_, 1, 0);
+    tgt(w, 71, 45); tgt(w, 79, 45); tgt(w, 72, 36); tgt(w, 78, 27); tgt(w, 46, 60); tgt(w, 104, 60); tnt(w, 75, 45); break;
+  case 25:      /* steel walls, wooden lid, fireworks inside */
+    house(w, 64, 22, 2, ST, W_, W_, 0, 0); house(w, 92, 8, 1, W_, W_, W_, 1, 0);
+    tgt(w, 68, 59); tgt(w, 82, 59); tgt(w, 72, 50); tgt(w, 80, 50); tgt(w, 96, 59); tnt(w, 70, 59); tnt(w, 80, 59); tnt(w, 77, 50); break;
+  case 26:      /* three wooden decks between two stone pillars */
+    rect_fill(w, 58, 24, 5, 36, S); rect_fill(w, 97, 24, 5, 36, S);
+    rect_fill(w, 58, 46, 44, 2, W_); rect_fill(w, 58, 34, 44, 2, W_); rect_fill(w, 58, 22, 44, 2, W_);
+    tgt(w, 70, 46); tgt(w, 88, 46); tgt(w, 74, 34); tgt(w, 84, 34); tgt(w, 80, 22); tgt(w, 66, 22); tgt(w, 80, 60);
+    tnt(w, 79, 46); tnt(w, 92, 34); tnt(w, 70, 22); break;
+  case 27:      /* four glass towers */
+    for(int k = 0; k < 4; k++) house(w, 50 + k * 13, 9, 3 + (k & 1), MX_GLASS, MX_GLASS, MX_GLASS, 0, 0);
+    tgt(w, 54, 59); tgt(w, 54, 41); tgt(w, 67, 50); tgt(w, 67, 32); tgt(w, 80, 59); tgt(w, 80, 41); tgt(w, 93, 50); tgt(w, 93, 32);
+    tnt(w, 56, 50); tnt(w, 82, 50); break;
+  case 28:      /* a brick penthouse on a steel tray on one stone column */
+    rect_fill(w, 72, 30, 8, 30, S); rect_fill(w, 62, 28, 28, 2, ST);
+    house_at(w, 64, 27, 24, 2, B, W_, W_, 1, 0); house(w, 96, 10, 1, W_, W_, W_, 0, 0);
+    tgt(w, 69, 27); tgt(w, 84, 27); tgt(w, 72, 18); tgt(w, 82, 18); tgt(w, 100, 59); tgt(w, 54, 60); tnt(w, 78, 27); tnt(w, 79, 18); break;
+  case 29:      /* the real finale: head office */
+    house(w, 46, 10, 4, B, W_, W_, 1, 0); house(w, 60, 18, 5, S, ST, ST, 0, 1); house(w, 82, 12, 6, MX_GLASS, S, ST, 0, 0); house(w, 98, 10, 3, RU, W_, W_, 1, 0);
+    tgt(w, 50, 59); tgt(w, 52, 32); tgt(w, 66, 59); tgt(w, 72, 50); tgt(w, 66, 41); tgt(w, 72, 32); tgt(w, 68, 23); tgt(w, 86, 59); tgt(w, 90, 41);
+    tgt(w, 86, 23); tgt(w, 88, 14); tgt(w, 102, 59);
+    tnt(w, 70, 59); tnt(w, 74, 41); tnt(w, 88, 50); tnt(w, 90, 32); tnt(w, 100, 50); tnt(w, 48, 50); break;
   default:      /* houses perched on sand: dig out the foundations and everything slumps */
     mound(w, 46, 30, 9); house_at(w, 56, 50, 10, 2, S, W_, S, 1, 0);
     mound(w, 86, 28, 9); house_at(w, 95, 50, 10, 2, B, W_, W_, 1, 0);

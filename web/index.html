@@ -91,6 +91,9 @@ const SFX={
  eek(){if(!can('ek',400))return;tone(1000,1700,.16,.2,'square');setTimeout(()=>tone(1700,1150,.24,.18,'square'),110)},
  whew(){if(!can('wh',400))return;tone(560,300,.5,.14,'sine')},
  slap(){if(!can('sl',90))return;noise(.07,3200,700,.4,'bandpass');tone(220,90,.07,.22,'square')},
+ kiss(){tone(900,1500,.07,.14,'sine');setTimeout(()=>tone(1500,700,.12,.1,'sine'),80)},
+ sparkle(){tone(1800,2600,.08,.07,'triangle');setTimeout(()=>tone(2400,3200,.1,.05,'triangle'),70)},
+ disco(){if(!can('dc',150))return;tone(196,196,.09,.14,'square');setTimeout(()=>tone(392,392,.07,.1,'square'),110)},
  wig(){if(!can('wg',110))return;tone(140,330,.1,.16,'sine');setTimeout(()=>tone(330,150,.1,.14,'sine'),60)},
  snore(){if(!can('sn',900))return;tone(78,52,.6,.2,'sawtooth');noise(.6,400,110,.12,'lowpass')},
  booger(){if(!can('bg',120))return;tone(340,90,.1,.2,'sine');noise(.1,2400,500,.14,'bandpass')},
@@ -338,6 +341,48 @@ LEVELS.push(
    house({x:66,w:26,floors:3,fh:12,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:'#e8d3a8'});
    rect(66,38,1,7,0);rect(66,26,1,7,0);
    tgt(61,59,'bat');tgt(64,59,'bat');tgt(78,59);tgt(72,47,'thrower');tgt(72,35,'thrower');tgt(86,35);tnt(88,47);tnt(86,59)}}
+);
+// ten more pure-slingshot levels (also levels 21-30 on the consoles, same layouts in core/mx.c)
+LEVELS.push(
+ {name:'Leaning Loft',men:6,build(){                 // a six-floor wooden beanpole next to a brick cottage
+   house({x:66,w:8,floors:6,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:'#f0e0a8'});
+   house({x:82,w:12,floors:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0d9c0'});
+   tgt(70,59);tgt(70,41);tgt(70,23);tgt(70,14);tgt(86,59);tgt(90,50);tnt(72,50);tnt(88,59)}},
+ {name:'Powder Keg Plaza',men:6,build(){             // three cottages with two towers of TNT between them
+   for(let k=0;k<3;k++)house({x:50+k*18,w:10,floors:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:k%2?'#cfe0c0':'#f0d9c0'});
+   rect(62,52,4,8,TNT);rect(80,52,4,8,TNT);
+   tgt(54,59);tgt(56,50);tgt(72,59);tgt(74,50);tgt(90,59);tgt(92,50);tgt(102,60)}},
+ {name:'Rubber Room',men:8,build(){                  // a big bouncy hall: come in through the wooden roof
+   house({x:60,w:30,floors:3,wall:RUBBER,floor:WOOD,roof:WOOD,gable:false,paper:'#f8d4e4'});
+   tgt(66,59);tgt(84,59);tgt(70,50);tgt(82,50);tgt(68,41);tgt(80,41);tnt(78,59);tnt(64,50);tnt(86,41)}},
+ {name:'Stairway to Eviction',men:8,build(){         // a landlord on every step
+   for(let k=0;k<6;k++){rect(52+k*8,60-(k+1)*5,8,(k+1)*5,k%2?BRICK:WOOD);tgt(56+k*8,60-(k+1)*5);if(k>1)rect(55+k*8,56,2,4,TNT)}
+   tnt(102,60);tnt(48,60)}},
+ {name:'Sand Trap',men:6,build(){                    // a glass villa on top of a dune
+   mound(50,50,14);house({x:67,g:45,w:16,floors:3,wall:GLASS,floor:WOOD,roof:WOOD,gable:true,paper:'#d8ecf5'});
+   tgt(71,45);tgt(79,45);tgt(72,36);tgt(78,27);tgt(46,60);tgt(104,60);tnt(75,45)}},
+ {name:'The Vault',men:7,build(){                    // steel walls, wooden lid, and somebody stored the fireworks inside
+   house({x:64,w:22,floors:2,wall:STEEL,floor:WOOD,roof:WOOD,gable:false,paper:'#c9ccd4'});
+   house({x:92,w:8,floors:1,wall:WOOD,floor:WOOD,roof:WOOD,gable:true,paper:'#f0e0a8'});
+   tgt(68,59);tgt(82,59);tgt(72,50);tgt(80,50);tgt(96,59);tnt(70,59);tnt(80,59);tnt(77,50)}},
+ {name:'Triple Decker',men:8,build(){                // three wooden decks between two stone pillars
+   rect(58,24,5,36,STONE);rect(97,24,5,36,STONE);rect(58,46,44,2,WOOD);rect(58,34,44,2,WOOD);rect(58,22,44,2,WOOD);
+   tgt(70,46);tgt(88,46);tgt(74,34);tgt(84,34);tgt(80,22);tgt(66,22);tgt(80,60);tnt(79,46);tnt(92,34);tnt(70,22)}},
+ {name:'Glass Menagerie',men:6,build(){              // four glass towers: mind the splinters
+   for(let k=0;k<4;k++)house({x:50+k*13,w:9,floors:3+(k%2),wall:GLASS,floor:GLASS,roof:GLASS,gable:false,paper:'#e8f0f8'});
+   tgt(54,59);tgt(54,41);tgt(67,50);tgt(67,32);tgt(80,59);tgt(80,41);tgt(93,50);tgt(93,32);tnt(56,50);tnt(82,50)}},
+ {name:'Penthouse Panic',men:8,build(){              // a brick penthouse on a steel tray on one stone column
+   rect(72,30,8,30,STONE);rect(62,28,28,2,STEEL);
+   house({x:64,g:27,w:24,floors:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0d9c0'});
+   house({x:96,w:10,floors:1,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:'#cfe0c0'});
+   tgt(69,27);tgt(84,27);tgt(72,18);tgt(82,18);tgt(100,59);tgt(54,60);tnt(78,27);tnt(79,18)}},
+ {name:'Landlord HQ',men:12,build(){                 // the real finale: head office
+   house({x:46,w:10,floors:4,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0d9c0'});
+   house({x:60,w:18,floors:5,wall:STONE,floor:STEEL,roof:STEEL,crenel:true,paper:'#b9b2c8'});
+   house({x:82,w:12,floors:6,wall:GLASS,floor:STONE,roof:STEEL,gable:false,paper:'#e8f0f8'});
+   house({x:98,w:10,floors:3,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f8d4e4'});
+   tgt(50,59);tgt(52,32);tgt(66,59);tgt(72,50);tgt(66,41);tgt(72,32);tgt(68,23);tgt(86,59);tgt(90,41);tgt(86,23);tgt(88,14);tgt(102,59);
+   tnt(70,59);tnt(74,41);tnt(88,50);tnt(90,32);tnt(100,50);tnt(48,50)}}
 );
 const chEnd=l=>l<CH1?CH1:LEVELS.length;   // the last level of the chapter that level l belongs to
 // ---- pneumatic tubes ----
@@ -1534,7 +1579,7 @@ function drawGooSplat(t,x,y){
 // =====================================================================
 //  EXTRA POSES: gross-out + idle gags (front variants, back view) and the frame table the console sprite generator reuses
 // =====================================================================
-const NEWFACE={smirk:1,cool:1,scream:1,dizzy:1,bliss:1,burp:1,burpo:1,pick:1,yawn:1,sleep:1,sad:1};
+const NEWFACE={kiss:1,flirt:1,smirk:1,cool:1,scream:1,dizzy:1,bliss:1,burp:1,burpo:1,pick:1,yawn:1,sleep:1,sad:1};
 // face is drawn in a local frame: head centre (0,-1), eyes y~-1, nose y~3, soft mustache y 5-9, mouth y 10-14
 function nose(){ell(0,3.3,3.2,2.7,'#f3a784',1.2);ctx.fillStyle='rgba(255,255,255,.7)';ctx.beginPath();ctx.ellipse(-1,2.4,1.1,.7,-.4,0,6.3);ctx.fill()}
 function blush(a){ctx.fillStyle='rgba(255,105,110,'+(a||.34)+')';for(const s of[-1,1]){ctx.beginPath();ctx.ellipse(s*10.4,6,3.3,2.2,0,0,6.3);ctx.fill()}}
@@ -1571,6 +1616,15 @@ function newFace(k,t,x){
     eye(1,-1,4.8,5.4,.7,-.2,2.4);brow(-1,9.5,-7.4,2.8,-8.6);brow(1,9.5,-10.6,2.8,-8.6);
     blush(.38);nose();mustache(0);ell(2.6,14,2.3,1.7,'#ff7b97',1.1);
     ctx.strokeStyle=OUT;ctx.lineWidth=1.7;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-4.6,12.4);ctx.quadraticCurveTo(.6,14.8,5.8,10.4);ctx.stroke();ctx.beginPath();ctx.arc(6.8,10.9,1.2,-1.2,1.4);ctx.stroke()}
+  else if(k==='kiss'){                          // one eye winking, long lashes on the other, puckered lips
+    ctx.strokeStyle=OUT;ctx.lineWidth=2.4;ctx.lineCap='round';ctx.beginPath();ctx.arc(-6,.6,3.8,Math.PI*1.1,Math.PI*1.9);ctx.stroke();
+    eye(1,-1,4.6,4.4,.6,.4,2.3);ctx.strokeStyle=OUT;ctx.lineWidth=1.2;for(let q=0;q<3;q++){ctx.beginPath();ctx.moveTo(8+q*1.7,-4.6+q*.5);ctx.lineTo(9.6+q*2.2,-7+q*.9);ctx.stroke()}
+    brow(-1,9.5,-7.6,2.8,-8.4);brow(1,9.5,-10.2,2.8,-8.8);blush(.55);nose();mustache(-.4);
+    ell(0,12.6,2.5,3,'#e0405a',1.2);ctx.fillStyle='rgba(255,255,255,.6)';ctx.fillRect(-1.2,10.8,1.2,1)}
+  else if(k==='flirt'){                         // half-lidded bedroom eyes, one brow cocked, smug closed smile
+    for(const s of[-1,1]){eye(s,-.4,4.6,4.2,s*.5,.8,2.2);ctx.fillStyle=SK;ctx.beginPath();ctx.ellipse(s*6,-3.2,5.3,3,0,0,6.3);ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(s*6-4.8,-1.4);ctx.lineTo(s*6+4.8,-1.4);ctx.stroke()}
+    brow(-1,9.5,-7,2.8,-7.6);brow(1,9.5,-10.8,2.8,-8.4);blush(.5);nose();mustache(0);
+    ctx.strokeStyle=OUT;ctx.lineWidth=1.8;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-5,11.6);ctx.quadraticCurveTo(0,15.4,6,10.8);ctx.stroke()}
   else if(k==='bliss'){happy(-1);happy(1);brow(-1,9.5,-7.8,2.8,-8.8);brow(1,9.5,-7.8,2.8,-8.8);blush(.4);nose();mustache(0);grin(5.4,4.9)}
   else if(k==='burp'){                        // eyes bulging, cheeks puffed out like a frog
     for(const s of[-1,1])eye(s,-1,4.6,5.6,0,-.8,2.1);
@@ -2213,6 +2267,16 @@ function drawManFrame(n){
   case 'BACK_R':drawBack(null,.3,{hip:6,cl:2.5,cr:-2.5});break;
   case 'FART_A':drawBack(null,.3,{lean:.8,hip:-1.5});break;
   case 'FART_B':drawBack(null,.3,{lean:1,puff:1,hip:1.5});break;
+  case 'BK_A':drawFront('up','kiss',.3,{armL:[-33,-6,-31,16],armR:[36,-26,9,-31],head:[0,0,.06]});break;                 // fingers to the lips...
+  case 'BK_B':drawFront('up','kiss',.3,{armL:[-33,-6,-31,16],armR:[40,-30,52,-45],head:[0,-1,-.08],belly:[1.03,.98]});break;  // ...and the kiss is thrown
+  case 'POSE_A':case 'POSE_B':{const a=n==='POSE_A',sg=a?1:-1;                                                              // pin-up pose: hand behind the head, fist on the hip, hip popped
+    drawFront('up','flirt',.3,{armL:a?[-40,-6,-23,7]:[-36,-38,-13,-52],armR:a?[36,-38,13,-52]:[40,-6,23,7],head:[sg*1.5,0,sg*.1],belly:[1.02,.99],bdy:0,bo:[-sg*3,0]});break}
+  case 'DANCE_A':case 'DANCE_B':{const a=n==='DANCE_A',sg=a?1:-1;                                                           // disco: one finger to the sky, the other hand low, belly thrown the other way
+    drawFront('up','bliss',.3,{armL:a?[-40,-34,-52,-56]:[-38,-8,-22,10],armR:a?[38,-8,22,10]:[40,-34,52,-56],head:[0,0,-sg*.12],belly:[1.05,.97],bo:[sg*4,1]});break}
+  case 'PEC_A':case 'PEC_B':{const a=n==='PEC_A';                                                                           // flexing, and the pecs take turns
+    drawFront('flex','flirt',a?.3927:1.1781,{after(){ctx.strokeStyle=SKD;ctx.lineWidth=1.8;ctx.lineCap='round';
+      for(const sd of[-1,1]){const up=(sd<0)===a?-2.6:.6;ctx.beginPath();ctx.arc(sd*9.5,-17+up,7.4,sd<0?.25:.55,sd<0?Math.PI-.55:Math.PI-.25);ctx.stroke();
+        if(up<0){ctx.strokeStyle='rgba(90,47,27,.55)';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(sd*18,-27);ctx.lineTo(sd*21,-30);ctx.moveTo(sd*14,-28.5);ctx.lineTo(sd*15,-32);ctx.stroke();ctx.strokeStyle=SKD;ctx.lineWidth=1.8}}}});break}
   case 'CAPE_A':drawFront('up','smirk',.3,{armL:[-40,-6,-23,7],armR:[34,-32,9,-29],after(){
       ell(0,-28,3.6,3.2,'#e2b53c',1.4);ctx.fillStyle='rgba(255,255,255,.65)';ctx.fillRect(-1.8,-29.4,1.6,1.2);                      // gold clasp at the neck
       blob([pTap(-40,-6,5.8,-23,7,4.9),pEll(-23,7,6.8,6.6)]);ctx.strokeStyle=SKD;ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-26,5);ctx.lineTo(-20,9);ctx.stroke();   // fist on hip
@@ -2221,6 +2285,7 @@ function drawManFrame(n){
   }}
 const _F=(ppu,head)=>({ppu,head});
 const MAN_FRAMES={
+  BK_A:_F(.36,[0,-44]),BK_B:_F(.36,[0,-44]),POSE_A:_F(.36,[0,-44]),POSE_B:_F(.36,[0,-44]),DANCE_A:_F(.36,[0,-44]),DANCE_B:_F(.36,[0,-44]),PEC_A:_F(.36,[0,-44]),PEC_B:_F(.36,[0,-44]),
   IDLE_A:_F(.36,[0,-44]),IDLE_B:_F(.36,[0,-44]),DRAG:_F(.36,[0,-44]),FLEX_A:_F(.36,[0,-44]),FLEX_B:_F(.36,[0,-44]),
   FLY_A:_F(.40,[31,-17]),FLY_B:_F(.40,[31,-17]),DIVE:_F(.40,[18,-14]),STUCK_A:_F(.27,[0,-44]),STUCK_B:_F(.27,[0,-44]),
   BELLY_A:_F(.36,[0,-44]),BELLY_B:_F(.36,[0,-44]),SCRATCH_A:_F(.36,[0,-44]),SCRATCH_B:_F(.36,[0,-44]),
@@ -2259,6 +2324,9 @@ function drawParts(){
     else if(p.k===10){ctx.globalAlpha=Math.min(1,a*1.5);txt('Z',p.x+Math.sin(time*3+p.ph)*4,p.y,p.s*(1.3-a*.3),'#fff','center','#3b4f9a')}
     else if(p.k===11){const r=p.s*(1+(1-a)*.6);ctx.globalAlpha=Math.min(1,a*1.6);ctx.fillStyle='rgba(190,255,150,.28)';ctx.strokeStyle='rgba(120,200,70,.95)';ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fill();ctx.stroke();
       ctx.fillStyle='rgba(255,255,255,.8)';ctx.fillRect(p.x-r*.5,p.y-r*.55,r*.35,r*.25)}
+    else if(p.k===12){ctx.globalAlpha=Math.min(1,a*1.8);const r=p.s*(1+.15*Math.sin(time*9+p.ph)),hx=p.x+Math.sin(time*4+p.ph)*5;ctx.fillStyle='#ff5f93';ctx.strokeStyle='#a3154a';ctx.lineWidth=1.2;ctx.beginPath();
+      ctx.moveTo(hx,p.y+r);ctx.bezierCurveTo(hx-r*1.9,p.y-r*.3,hx-r*.8,p.y-r*1.5,hx,p.y-r*.45);ctx.bezierCurveTo(hx+r*.8,p.y-r*1.5,hx+r*1.9,p.y-r*.3,hx,p.y+r);ctx.fill();ctx.stroke();ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(hx-r*.6,p.y-r*.6,r*.3,r*.3)}
+    else if(p.k===13){const r=p.s*Math.sin(Math.min(1,a)*Math.PI);ctx.globalAlpha=.95;ctx.fillStyle='#fff7c2';ctx.beginPath();for(let q=0;q<8;q++){const an=q*Math.PI/4,rr=q%2?r*.28:r;ctx.lineTo(p.x+Math.cos(an)*rr,p.y+Math.sin(an)*rr)}ctx.fill()}
     ctx.globalAlpha=1}
 }
 function drawTexts(){for(const t of texts){ctx.globalAlpha=Math.min(1,(t.l-t.t)*2);txt(t.s,t.x,t.y,t.z,t.c,'center');ctx.globalAlpha=1}}
@@ -2411,6 +2479,11 @@ const MAN_GAGS=[
    {name:'yawn',steps:[I(.15),S('YWA',.5),S('YWA',.2,'yawn'),S('YWB',.55),S('YWC',.55),S('YWC',.3),I(.4)]},
    {name:'fart',steps:[...turnIn,['BACK_C',.4,''],['FART_A',.5,'grunt'],['FART_B',.7,'fart'],['FART_B',.5,''],['BACK_C',.4,''],...turnOut]},
    {name:'butt_wiggle',steps:[...turnIn,['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_C',.3,''],...turnOut]}];
+  fresh.push(   // the cheeky set: thrown kisses, a pin-up pose, disco, pec pops
+   {name:'blow_kiss',steps:[I(.15),['BK_A',.45,''],['BK_B',.5,'kiss'],['BK_A',.3,''],['BK_B',.55,'kiss'],I(.25)]},
+   {name:'pin_up',steps:[I(.15),['POSE_A',.55,'sparkle'],['POSE_B',.55,'sparkle'],['POSE_A',.55,'sparkle'],['BK_A',.3,''],['BK_B',.5,'kiss'],I(.2)]},
+   {name:'disco',steps:[I(.1),['DANCE_A',.24,'disco'],['DANCE_B',.24,'disco'],['DANCE_A',.24,'disco'],['DANCE_B',.24,'disco'],['DANCE_A',.24,'disco'],['DANCE_B',.24,'disco'],['POSE_A',.5,'sparkle'],I(.2)]},
+   {name:'pec_pop',steps:[I(.1,'grunt'),['PEC_A',.15,'pec'],['PEC_B',.15,'pec'],['PEC_A',.15,'pec'],['PEC_B',.15,'pec'],['PEC_A',.15,'pec'],['PEC_B',.15,'pec'],['PEC_A',.15,'pec'],['PEC_B',.4,'pec'],I(.2)]});
   MAN_GAGS.length=0;MAN_GAGS.push(...fresh,...keep);
   for(const g of MAN_GAGS){const l=g.steps[g.steps.length-1];if(/^IDLE_/.test(l[0]))l[0]='T_IDLE'}      // gags end on the same rig pose that he stands in
 })();
@@ -2447,6 +2520,10 @@ const GAGFX={
  fart(Q){SFX.fart();gagKick(Q,0,-10,0,22);const[x,y]=gw(Q,0,40),k=Math.max(1,Q.sc*.8);
   for(let i=0;i<8;i++)P({k:6,x:x+(rnd()-.5)*26*k,y:y+(rnd()-.5)*10*k,vx:(rnd()-.5)*110,vy:-10-rnd()*42,l:1.3+rnd()*.5,l0:1.8,s:(7+rnd()*5)*k,c:i%2?'#a6d63c':'#8fbf2e'});
   for(let i=0;i<4;i++)P({k:9,x:x+(i-1.5)*14*k,y:y-14*k,vx:(rnd()-.5)*10,vy:-34-rnd()*22,l:1.4,l0:1.4,ph:rnd()*6});popText(x+46*k,y+2*k,'PFFFT!','#b6e05a',24)},
+ kiss(Q){SFX.kiss();const[x,y]=gw(Q,44,-46);for(let i=0;i<3;i++)P({k:12,x:x+i*6,y:y-i*5,vx:70+rnd()*60,vy:-50-rnd()*40,l:1.5+rnd()*.4,l0:1.9,s:(5+rnd()*3)*Math.max(.8,Q.sc*.6),ph:rnd()*6});popText(x+26,y-22*Q.sc,'MWAH!','#ff7eb0',20)},
+ sparkle(Q){SFX.sparkle();Q.ws=-Q.ws;gagKick(Q,Q.ws*16,4,Q.ws*10,4);for(let i=0;i<5;i++){const[x,y]=gw(Q,(rnd()-.5)*70,-60+rnd()*90);P({k:13,x,y,vx:0,vy:-8,l:.6+rnd()*.4,l0:1,s:(4+rnd()*4)*Math.max(.8,Q.sc*.6),ph:rnd()*6})}},
+ disco(Q){SFX.disco();Q.ws=-Q.ws;gagKick(Q,Q.ws*30,18,Q.ws*14,8);const[x,y]=gw(Q,Q.ws*50,-52);popText(x,y,rnd()<.5?'\u266a':'\u266b','#ffd23f',22)},
+ pec(Q){SFX.wig();gagKick(Q,0,-8,0,0);Q.ws=-Q.ws;if(rnd()<.4){const[x,y]=gw(Q,Q.ws*14,-22);popText(x,y-16*Q.sc,'POP!','#ffd23f',16)}},
  wig(Q){SFX.wig();Q.ws=-Q.ws;gagKick(Q,0,0,Q.ws*38,10)},
  booger(Q){const[x,y]=gw(Q,3,-40);P({k:8,x,y,vx:150+rnd()*70,vy:-150-rnd()*40,l:2.4,l0:2.4,s:3.4,sp:0});SFX.booger()},
  yawn(Q){SFX.yawn()},
@@ -2572,6 +2649,7 @@ function draw(){
   for(const c of clouds)drawCloud(c);ctx.drawImage(bgB,0,0);
   if(state==='cutscene'){drawCutscene();return}
   if(state==='title'){drawTitle();return}
+  if(state==='ending'){drawEnding();drawToasts(frameDt);return}
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='edit'){
     (state==='menu'?drawMenu:state==='options'?drawOptions:state==='select'?drawSelect:state==='ach'?drawAch:state==='outfit'?drawOutfits:drawEditor)();drawToasts(frameDt);return}
   ctx.save();ctx.translate((Math.random()-.5)*shake*shakeScale(),(Math.random()-.5)*shake*shakeScale());
@@ -2627,7 +2705,10 @@ function drawEnd(){
   if(win){const ph=time*14,sw=Math.sin(ph);                 // butt-wiggle victory dance, with a little hop
     ctx.translate(0,-Math.abs(Math.sin(time*7))*10);
     JIG={bo:[-Math.sin(ph-1.2)*2.5,Math.cos(ph*.5)*1.5],ro:[sw*5.5,-Math.abs(Math.cos(ph))*2],bs:[1,1]};
-    drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');JIG=null}
+    const vd=(level+(score|0))%3;   // which victory dance: butt wiggle, disco, or pin-up kisses
+    if(vd===1){JIG={bo:[sw*4,1],ro:[0,0],bs:[1,1]};drawManFrame(sw>0?'DANCE_A':'DANCE_B')}
+    else if(vd===2){JIG={bo:[sw*2,0],ro:[0,0],bs:[1,1]};drawManFrame(Math.sin(time*3)>.5?'BK_B':sw>0?'POSE_A':'POSE_B')}
+    else drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');JIG=null}
   else{drawManFrame('SAD');                                  // sad pose, tears running down
     for(const sd of[-1,1])for(let k=0;k<2;k++){const f=(time*.9+k*.5+(sd>0?.17:0))%1;ctx.globalAlpha=1-f;ctx.fillStyle='#7fd4ff';ctx.beginPath();ctx.arc(sd*9.4,-18+f*30,2.3,0,7);ctx.fill();ctx.globalAlpha=1}}
   ctx.restore();
@@ -2635,7 +2716,7 @@ function drawEnd(){
   if(win){const st=men>=2?3:men>=1?2:1;for(let i=0;i<3;i++)star(P?tx-70+i*70:W/2-10+i*70,y0+70,28,i<st)}
   txt('SCORE  '+Math.round(score),tx,P?y0+330:330,28,'#fff','center');
   const bh=40,by=P?y0+370:366,cx=tx;
-  if(win){btn(cx-190,by,120,bh,'RETRY',retry,{size:16});btn(cx-60,by,120,bh,CL.custom?(testing?'EDITOR':'LEVELS'):(level+1<chEnd(level)?'NEXT >':'LEVELS'),nextAfterWin,{size:16,on:true,col:'#7dff5a'});btn(cx+70,by,120,bh,'MENU',()=>{testing=false;goMenu()},{size:16})}
+  if(win){btn(cx-190,by,120,bh,'RETRY',retry,{size:16});btn(cx-60,by,120,bh,CL.custom?(testing?'EDITOR':'LEVELS'):(level+1<chEnd(level)?'NEXT >':'THE END'),nextAfterWin,{size:16,on:true,col:'#7dff5a'});btn(cx+70,by,120,bh,'MENU',()=>{testing=false;goMenu()},{size:16})}
   else{btn(cx-125,by,120,bh,'RETRY',retry,{size:16,on:true});btn(cx+5,by,120,bh,testing?'EDITOR':'LEVELS',backFromPlay,{size:16})}}
 // the WHOLE title picture (the full backdrop, no text but the logo) for the consoles: tools/gen_title.py draws it into a w x h canvas and the small screens pan across it; words = bake the logo in (the Dreamcast has no font)
 function drawTitlePicture(w,h,t,words){
@@ -2656,13 +2737,21 @@ function drawTitle(){
 // =====================================================================
 function pt(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
 function retry(){load(level,CL&&CL.custom?CL:undefined)}
-function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else goSelect()}
+function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else{state='ending';endScroll=0;hits=[]}}
+let endScroll=0;
+const CREDITS=['MANDEX','THE LANDLORD SMASHER','','Every landlord has been evicted.','The neighbourhood is free.','Rent is cancelled.','','STARRING','The Man  -  as himself','His Towel  -  as the cape','The Belly  -  stunts and special effects','','LANDLORDS HARMED','all of them','','Thank you for playing!'];
+function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);endScroll+=frameDt*26;const PT=W<700,cx=PT?W/2:W/2+190;
+  ctx.save();ctx.beginPath();ctx.rect(0,PT?H*.5:60,W,PT?H*.5-80:H-150);ctx.clip();CREDITS.forEach((l,i)=>{const y=H-80+i*34-endScroll%(CREDITS.length*34+H-140);txt(l,cx,y,i<2?(PT?24:30):(l===l.toUpperCase()?20:17),i<2?'#ffd23f':(l===l.toUpperCase()?'#ff7eb0':'#fff'),'center')});ctx.restore();
+  ctx.save();ctx.translate(PT?W/2:W/2-260,PT?H*.3:H/2+40);ctx.scale(1.5,1.5);const ph=time*10,sw=Math.sin(ph),seg=Math.floor(time/4)%3;ctx.translate(0,-Math.abs(Math.sin(time*5))*8);
+  JIG={bo:[sw*4,Math.cos(ph)*1.5],ro:[sw*5,0],bs:[1,1]};drawManFrame(seg===0?(sw>0?'DANCE_A':'DANCE_B'):seg===1?(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C'):(Math.sin(time*3)>.4?'BK_B':sw>0?'POSE_A':'POSE_B'));JIG=null;ctx.restore();
+  if(rnd()<.25)P({k:rnd()<.5?12:13,x:rnd()*W,y:H+10,vx:(rnd()-.5)*30,vy:-60-rnd()*60,l:3,l0:3,s:5+rnd()*5,ph:rnd()*6});if(rnd()<.3)P({k:13,x:rnd()*W,y:rnd()*H,vx:0,vy:0,l:.7,l0:1,s:5+rnd()*6,ph:0});
+  drawParts();btn(W-150,H-56,130,40,'MENU',goMenu,{size:16,on:true})}
 function backFromPlay(){if(testing){openEditor(true);return}goSelect()}
 cv.addEventListener('pointerdown',e=>{
   audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
   if(state==='cutscene'){cutClick(x,y);return}
   if(state==='title'){goMenu();return}
-  if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'){hitTest(x,y);return}
+  if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending'){hitTest(x,y);return}
   if(state==='edit'){if(!hitTest(x,y)){eDown(x,y);try{cv.setPointerCapture(e.pointerId)}catch(_){}}return}
   if(hitTest(x,y))return;
   if(state==='play'&&man.mode==='walk'){walkTouch(x,y,e.pointerId);return}
@@ -2682,7 +2771,7 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.
   if(e.code==='Space'){dive();e.preventDefault()}
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
   if(state==='title')return;
-  if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options')goMenu();return}
+  if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending')goMenu();return}
   if(state==='select'&&(e.key==='u'||e.key==='U')){PD.unlockAll=!PD.unlockAll;pdTouch();toast('ach',PD.unlockAll?'All levels unlocked':'Levels locked again','');return}
   if(state==='edit'){const k=e.key.toLowerCase();if(k>='1'&&k<='8'){E.tool='mat';E.mat=+k}else if(k==='e')E.tool='erase';else if(k==='l')E.tool='lord';else if(k==='r')E.shape=E.shape==='pen'?'rect':'pen';else if(k==='z')eUndo();else if(k==='b')eSize(e.shiftKey?-1:1);else if(k==='v')eKind(1);else if(k==='t')eThick();return}
   if(state!=='play'&&state!=='win'&&state!=='lose')return;
@@ -2802,7 +2891,7 @@ function drawToasts(dt){
     txt(q.title,W/2-155,y+22,18,'#fff','left');txt(q.sub||'',W/2-155,y+42,13,'#aab','left');ctx.restore()})}
 
 // ---------- screens ----------
-const UISTATES=['menu','select','ach','outfit','options'];
+const UISTATES=['menu','select','ach','outfit','options','ending'];
 let selTab=0;
 function goMenu(){state='menu';hits=[]}
 function goSelect(){state='select';hits=[]}
@@ -3185,13 +3274,13 @@ function drawSelect(){
   btn(W/2-81,66,160,34,'CHAPTER 2 (WIP)',()=>{selTab=2},{on:selTab===2,size:14,col:'#ffb03a'});
   btn(W/2+89,66,160,34,'MY LEVELS',()=>{selTab=1},{on:selTab===1,size:16});
   if(selTab===2){   // chapter 2 (work in progress): its own screen, its stars stay out of the story achievements
-    const cols=5,tw=164,th=80,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n2=LEVELS.length-CH1;
+    const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n2=LEVELS.length-CH1,th=n2>15?60:80;
     txt('CHAPTER 2  -  WORK IN PROGRESS',W/2,134,24,'#ffb03a','center','#5a2a00');
     const rows=Math.ceil(Math.max(n2,cols)/cols);   // a new row every 5 levels
     for(let k=0;k<rows*cols;k++){const x=x0+(k%cols)*(tw+gx),y=y0+((k/cols)|0)*(th+10);
       if(k<n2){const i=CH1+k;tile(x,y,tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!ch2Unlocked(i),()=>startStory(i))}
       else tile(x,y,tw,th,'?','COMING SOON',0,true,()=>{},false)}
-    txt('New mechanics: pneumatic tubes, sand floods, walking.  Plus pure slingshot levels.  More on the way.',W/2,274+(rows-1)*(th+10),16,'#fff','center');
+    txt('New mechanics: pneumatic tubes, sand floods, walking.  Plus pure slingshot levels.  More on the way.',W/2,Math.min(H-34,y0+rows*(th+10)+24),14,'#fff','center');
     txt('Chapter 2 stars do not count towards story achievements yet.',W/2,H-14,13,'#fff','center')}
   else if(selTab===0){
     const cols=5,tw=164,th=80,gx=10,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=112;

@@ -388,3 +388,18 @@ now step-turn round first.  The console sprites (`art/manspr.h`, `art/manidle.h`
 
 
 **Landlords fight back (browser).**  `tgt(cx,row,kind,range)` takes an optional kind; plain landlords behave as before but now face the man, blink, panic ("EEK!") when a man flies close and hold papers.  `'walker'` patrols his own deck (never walks off an edge or into a wall), scatters from a man in flight, and, if the man is on foot (walk mode), stops just out of bump range, winds up and clubs him for -3 s.  `'thrower'` lobs briefcases at the man waiting in the sling (aimed with a clear-arc check, 0.6 s telegraph, one every ~5 s): a hit dazes him for 1.4 s, drops his pull and costs 2000 points.  `'bat'` swats away any man arriving slower than `BAT_BREAK` (560 px/s) and is dazed for a second; a harder shot ploughs straight through.  OPTIONS > LANDLORDS FIGHT BACK (default on) switches all of it off: the kinds then stand still like ordinary landlords.  Levels 26 *Collection Day* (walkers) and 27 *Batter Up* (bats + throwers) show them off; `tools/ch2_check.py` covers the AI.
+
+## Ten more levels, ending, depth touches, new animations (rebuilt on top of the chapter 2 work)
+
+- Ten pure-slingshot levels, same layouts in the HTML game (chapter 2, levels 28-37) and in the shared core
+  (`core/mx.c`, levels 21-30 on the consoles). `MX_NUM_LEVELS` is 30; `MX_STORY_LEVELS` (20) is what the story
+  achievements and outfits count, so nothing already earned moves. The save blob grows by 5 bytes per level and the
+  loader already accepts saves with fewer levels. The HTML chapter 2 levels 21-27 (tubes, sand flood, walking,
+  patrolling landlords) are still HTML only.
+- Ending: the HTML game plays a credits screen after the last level of a chapter. The consoles show a "the end"
+  message on the last win panel.
+- Depth: Dreamcast has cloud drift against a camera pan, a ground shadow and foreground grass. DS has the ground
+  shadow. The HTML backdrop was left alone in this pass (it now has its own camera).
+- Animations: HTML has four new idle gags (blow kiss, pin-up pose, disco, pec pop), hearts and sparkles, and three
+  victory dances. DS and Dreamcast have three new gags (flex, belly shimmy, disco) and a longer victory dance built
+  from frames already in the sprite atlas; the atlas was not regenerated, so the new HTML drawings are HTML only.

@@ -1,8 +1,8 @@
 #include <string.h>
 #include "mx_meta.h"
 
-static int story_done(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_LEVELS; i++) n += s->stars[i] > 0; return n; }
-static int three_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_LEVELS; i++) n += s->stars[i] >= 3; return n; }
+static int story_done(const MxStats *s){ int n = 0; for(int i = 0; i < MX_STORY_LEVELS; i++) n += s->stars[i] > 0; return n; }
+static int three_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_STORY_LEVELS; i++) n += s->stars[i] >= 3; return n; }
 static int total_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_LEVELS; i++) n += s->stars[i]; return n; }
 int mx_valve_unlocked(const MxStats *s){ return story_done(s) >= MX_VALVE_UNLOCK_LEVELS; }
 int mx_ach_count(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_ACH; i++) n += (s->ach >> i) & 1; return n; }
@@ -47,7 +47,7 @@ int mx_outfit_unlocked(const MxStats *s, int i){
   case 7: return story_done(s) >= 10;
   case 8: return three_stars(s) >= 8;
   case 9: return mx_ach_count(s) >= 20;
-  case 10: return story_done(s) >= MX_NUM_LEVELS;
+  case 10: return story_done(s) >= MX_STORY_LEVELS;
   case 11: return 1;                 /* Working Man */
   }
   return 0;
@@ -60,8 +60,8 @@ static int met(const MxStats *s, int i){
   case 3: return s->cells >= 2000;   case 4: return s->cells >= 20000;  case 5: return s->booms >= 10;
   case 6: return s->maxChain >= 5;   case 7: return s->flops >= 1;      case 8: return s->flops >= 10;
   case 9: return s->oneShots >= 1;   case 10: return s->oneShots >= 5;  case 11: return three_stars(s) >= 1;
-  case 12: return three_stars(s) >= 8; case 13: return three_stars(s) >= MX_NUM_LEVELS;
-  case 14: return story_done(s) >= 5; case 15: return story_done(s) >= 10; case 16: return story_done(s) >= MX_NUM_LEVELS;
+  case 12: return three_stars(s) >= 8; case 13: return three_stars(s) >= MX_STORY_LEVELS;
+  case 14: return story_done(s) >= 5; case 15: return story_done(s) >= 10; case 16: return story_done(s) >= MX_STORY_LEVELS;
   case 17: return s->bestScore >= 60000; case 18: return s->shots >= 100;
   case 19: return owned(s) >= 3;     case 20: return owned(s) >= MX_NUM_OUTFITS;
   case 21: return s->inflated >= 1;  case 22: return s->pops >= 1;
@@ -77,9 +77,9 @@ int mx_ach_progress(const MxStats *s, int i, int *cur, int *target){
   case 3:  c = s->cells;  t = 2000;  break;   case 4:  c = s->cells;  t = 20000; break;
   case 5:  c = s->booms;  t = 10;    break;   case 6:  c = s->maxChain; t = 5;   break;
   case 8:  c = s->flops;  t = 10;    break;   case 10: c = s->oneShots; t = 5;   break;
-  case 12: c = three_stars(s); t = 8; break;  case 13: c = three_stars(s); t = MX_NUM_LEVELS; break;
+  case 12: c = three_stars(s); t = 8; break;  case 13: c = three_stars(s); t = MX_STORY_LEVELS; break;
   case 14: c = story_done(s); t = 5;  break;  case 15: c = story_done(s); t = 10; break;
-  case 16: c = story_done(s); t = MX_NUM_LEVELS; break;
+  case 16: c = story_done(s); t = MX_STORY_LEVELS; break;
   case 17: c = s->bestScore; t = 60000; break; case 18: c = s->shots; t = 100;   break;
   case 19: c = owned(s);  t = 3;     break;   case 20: c = owned(s);  t = MX_NUM_OUTFITS; break;
   case 24: c = mx_ach_count(s); t = 10; break;

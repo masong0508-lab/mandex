@@ -378,12 +378,13 @@ static void draw_rooms(void){
   }
 }
 
+static float cam_pan;                        /* camera drift (px): follows the man in flight; only the clouds and the near grass react */
 typedef struct { float x, y, s, v; } Cloud;
 static void draw_clouds(void){
   static const Cloud C[4] = { { 100, 90, 1.0f, 6 }, { 430, 60, 0.8f, 4 }, { 660, 130, 1.1f, 8 }, { -120, 170, 0.9f, 5 } };
   const short *r = DCA_CLOUD;
   for(int i = 0; i < 4; i++){
-    float x = fmodf(C[i].x + world.time * C[i].v + 400.0f, 1000.0f) - 250.0f;
+    float x = fmodf(C[i].x + world.time * C[i].v + 400.0f - cam_pan * 0.25f * C[i].s + 1000.0f, 1000.0f) - 250.0f;     /* clouds also slide against the camera drift */
     atl(x, C[i].y, r[2] * C[i].s, r[3] * C[i].s, r, Z_CLOUD + i * 0.001f, argb(255, 255, 255, 235));
   }
 }
@@ -463,6 +464,10 @@ static void draw_all(void){
     }
     else if(m->mode == MAN_STUCK){ puff(x, y + 6, 30, Z_MAN - 0.2f, argb(111, 227, 74, 200)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
     else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
+    if(m->mode == MAN_AIM || m->mode == MAN_FLY){                         /* his shadow on the ground: smaller and fainter the higher he is */
+      float hgt = (MX_ROWS - m->y) / 40.0f; if(hgt < 0) hgt = 0; if(hgt > 1) hgt = 1;
+      float rw = 30.0f * (1.0f - 0.55f * hgt); quad(XB(m->x) - rw, YB(MX_ROWS) + 1, rw * 2, 4, Z_SLING + 0.05f, argb(0, 0, 0, (int)(90 - 60 * hgt)));
+    }
     man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
     if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){               /* only the belly swells; the face flushes as the pressure builds */
       float f = m->inf, rx = 11 + f * 28, ry = 10 + f * 24, bx = x + face * f * 10, by = y + 6 + f * 4;
@@ -520,6 +525,12 @@ static void draw_all(void){
     text("EVICT EVERY LANDLORD!", 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
   }
 
+  { float tp = (m->mode == MAN_FLY || m->mode == MAN_STUCK) ? (m->x - MX_ANCHOR_X) * 3.0f : 0; cam_pan += (tp - cam_pan) * 0.06f;
+    for(int i = -1; i < 46; i++){                                            /* near grass in front of everything, sliding the most */
+      float gx = i * 15.0f - fmodf(cam_pan * 0.5f, 15.0f), h = 10 + ((i * 7 + 3) & 7) * 2, sw = sinf(world.time * 3.0f + i) * 2.0f;
+      float xs[4] = { gx, gx + sw + 2, gx + sw + 4, gx + 6 }, ys[4] = { 480, 480 - h, 480 - h, 480 };
+      quad4(xs, ys, Z_FX + 0.5f, (i & 1) ? argb(47, 122, 42, 255) : argb(68, 152, 58, 255));
+    } }
   if(world.state != MX_PLAY){
     quad(0, 0, 640, 480, Z_END, argb(8, 10, 20, 184));
     int win = world.state == MX_WIN;
@@ -534,13 +545,13 @@ static void draw_all(void){
         puff(110 + sd * 22.0f, 284 + f * 60, 4.5f, Z_END + 2, argb(127, 212, 255, (int)(230 * (1 - f))));
       }
     }
-    text(win ? "EVICTION COMPLETE!" : "THE LANDLORDS LIVE...", 320, 190, 46, win ? argb(125, 255, 90, 255) : argb(255, 106, 106, 255), 1, Z_END + 2);
+    text(win ? (world.level == MX_NUM_LEVELS - 1 ? "EVERY LANDLORD EVICTED!" : "EVICTION COMPLETE!") : "THE LANDLORDS LIVE...", 320, 190, 46, win ? argb(125, 255, 90, 255) : argb(255, 106, 106, 255), 1, Z_END + 2);
     if(win){ int st = world.men >= 2 ? 3 : world.men >= 1 ? 2 : 1;
       for(int i = 0; i < 3; i++) atl(320 - 105 + i * 70 - 31, 215, 62, 62, &DCA_STARS[i < st ? 0 : 4], Z_END + 2, WHITE); }
     man_zoom = 1.0f;
     snprintf(buf, sizeof buf, "SCORE  %d", world.score);
     text(buf, 320, 330, 34, WHITE, 1, Z_END + 2);
-    if(((fcount >> 5) & 1) == 0 || fcount > 0) text(win ? "PRESS START: NEXT LEVEL" : "PRESS START: TRY AGAIN", 320, 390, 24, argb(255, 210, 63, 120 + (int)(120 * (0.5f + 0.5f * sinf(fcount * 0.1f)))), 1, Z_END + 2);
+    if(((fcount >> 5) & 1) == 0 || fcount > 0) text(win ? (world.level == MX_NUM_LEVELS - 1 ? "THE END - THANKS FOR PLAYING!" : "PRESS START: NEXT LEVEL") : "PRESS START: TRY AGAIN", 320, 390, 24, argb(255, 210, 63, 120 + (int)(120 * (0.5f + 0.5f * sinf(fcount * 0.1f)))), 1, Z_END + 2);
   }
 }
 

@@ -477,6 +477,9 @@ static void draw_world(const View *v, int parallax){
   draw_chunks(v);
   draw_targets(v);
   if(opt.tool == MX_TOOL_VALVE) draw_valve(v);
+  { const MxMan *m = &world.man;                                   /* his shadow on the ground, smaller the higher he is */
+    if(m->mode == MAN_AIM || m->mode == MAN_FLY){ int hgt = gfx_clamp((int)((RI(MX_ROWS) - m->y) >> 12), 0, 40), rw = (v->ppc * (5 * (80 - hgt))) / 80;
+      gfx_dither(v->buf, vx(v, m->x) - rw, vy(v, RI(MX_ROWS)) + 1, rw * 2, v->ppc > 2 ? 2 : 1, C_BLACK); } }
   draw_man(v);
   draw_band(v, 1);
   draw_aim_dots(v);
@@ -550,7 +553,7 @@ static void end_panel(u8 *b){
   if(world.state == MX_PLAY) return;
   int win = world.state == MX_WIN;
   panel(b, 24, 34, 208, 124);
-  gfx_text_c(b, 128, 42, win ? "EVICTION COMPLETE!" : "THE LANDLORDS LIVE...", win ? C_GOLD : C_RED, C_BLACK, 2);
+  gfx_text_c(b, 128, 42, win ? (world.level == MX_NUM_LEVELS - 1 ? "ALL LANDLORDS EVICTED!" : "EVICTION COMPLETE!") : "THE LANDLORDS LIVE...", win ? C_GOLD : C_RED, C_BLACK, 2);
   if(win){
     man_with_towel(b, &tow_win[0], 52, 98, 3, 1, mi_dance_frame(frame), 0);          /* victory butt-wiggle, one on each side */
     man_with_towel(b, &tow_win[1], 204, 98, 3, -1, mi_dance_frame(frame + 14), 0);
@@ -565,7 +568,7 @@ static void end_panel(u8 *b){
   gfx_text_c(b, 128, 120, "DAMAGE", C_UILINE, C_UIBG, 1);
   gfx_text_c(b, 128, 128, gfx_int(disp_score), C_GOLD, C_BLACK, 2);
   if(win && world.men > 0){
-    gfx_text_c(b, 128, 144, "SPARE MEN BONUS INCLUDED", C_GOO, C_UIBG, 1);
+    gfx_text_c(b, 128, 144, world.level == MX_NUM_LEVELS - 1 ? "THE END - THANKS FOR PLAYING" : "SPARE MEN BONUS INCLUDED", C_GOO, C_UIBG, 1);
   } else if(!win){
     gfx_text_c(b, 128, 144, "DAMAGE IS NEVER ENOUGH", C_UILINE, C_UIBG, 1);
   }

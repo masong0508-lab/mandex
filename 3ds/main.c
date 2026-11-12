@@ -266,14 +266,14 @@ static void draw_end(void){
   if(world.state == MX_PLAY) return;
   int win = world.state == MX_WIN;
   rect(&top, 90, 64, 220, 114, RGB(15, 18, 30));
-  textc(&top, 200, 74, win ? "LEVEL CLEAR!" : "OUT OF MEN", 3, win ? RGB(125, 255, 90) : RGB(255, 90, 90));
+  textc(&top, 200, 74, win ? (world.level == MX_NUM_LEVELS - 1 ? "THE END!" : "LEVEL CLEAR!") : "OUT OF MEN", 3, win ? RGB(125, 255, 90) : RGB(255, 90, 90));
   char b[32]; sprintf(b, "SCORE %d", world.score); textc(&top, 200, 98, b, 2, RGB(255, 255, 255));
   if(win){
     int n = mx_stars_for(&world);
     for(int i = 0; i < 3; i++) star(&top, 200 + (i - 1) * 30, 128, 10, i < n ? RGB(255, 210, 63) : RGB(60, 64, 78));
     if(new_best && (frame & 16)) textc(&top, 200, 146, "NEW BEST!", 2, RGB(255, 126, 176));
   }
-  textc(&top, 200, 162, win ? "A = NEXT LEVEL" : "A = TRY AGAIN", 2, RGB(255, 210, 63));
+  textc(&top, 200, 162, win ? (world.level == MX_NUM_LEVELS - 1 ? "ALL LANDLORDS EVICTED" : "A = NEXT LEVEL") : "A = TRY AGAIN", 2, RGB(255, 210, 63));
 }
 
 /* ---------------------------------------------------------------- flow */
