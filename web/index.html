@@ -37,6 +37,7 @@ const WOOD=1,BRICK=2,STONE=3,GLASS=4,TNT=5,STEEL=6,RUBBER=7,SAND=8;
 let grid,hp,anch,hb=new Uint8Array(COLS*ROWS),dmg=new Uint8Array(COLS*ROWS);
 let ox,oy,ovx,ovy,brk,wobOn=false,wobQuiet=0,sandOn=false,sandT=0,crackEv=0;   // wobble lattice (cells, cells/s)
 let chunks=[],parts=[],texts=[],targets=[],interiors=[],explQ=[],man,men=0;
+let tubes=[];   // pneumatic tubes of the current level (chapter 2): see tubeStep / drawTubes
 let level=0,state='title',shake=0,freeze=0,slow=0,needSupport=false,dragging=false;
 let score=0,shownScore=0,time=0,winT=0,loseT=0,banner=0,hint=1,waitT=0,chunkId=0,flash=0;
 
@@ -163,6 +164,8 @@ function house(o){
 const tnt=(x,y)=>rect(x,y-2,2,2,5);
 function mound(x,width,height){for(let r=0;r<height&&width-2*r>0;r++)rect(x+r,ROWS-1-r,width-2*r,1,SAND)}
 const tgt=(cx,row)=>targets.push({x:cx*V+V/2,y:row*V-7,vy:0,r:7,alive:true,t:rnd()*6});
+// pneumatic tube (chapter 2): fly into the mouth at (ax,ay) and you are posted out of the nozzle at (bx,by), shot along `ang` at `sp` px/s
+const tube=(col,ax,ay,bx,by,ang)=>tubes.push({col,ax,ay,bx,by,ang,r:30,sp:760});
 const LEVELS=[
  {name:'Suburban Eviction',men:5,build(){   // wide low house + a little wooden shed (short floors, 18 wide)
    house({x:74,w:18,floors:2,fh:8,wall:2,floor:1,roof:1,gable:true});
@@ -258,11 +261,67 @@ LEVELS.push(
    tgt(49,59);tgt(50,43);tgt(65,59);tgt(78,59);tgt(68,50);tgt(82,41);tgt(72,32);tgt(96,52);tgt(99,38);tgt(95,24);tnt(72,50);tnt(98,59);tnt(64,41)}}
 );
 
+// ---------- CHAPTER 2 (work in progress): levels 21+ use new mechanics ----------
+// CH1 = how many levels chapter 1 has.  Stars, "beat every story level" and the story outfits only count chapter 1, so a
+// work-in-progress chapter never moves goalposts that are already earned.
+const CH1=LEVELS.length;
+// hourglass of 'Hourglass Heights': half-width of the bore, `d` rows from the neck
+const hgHW=d=>Math.min(14,3+Math.floor(d*.7));
+function hourglass(c,rn,top,bot,sandTop){
+  for(let r=top;r<=bot;r++){const hw=hgHW(Math.max(0,Math.abs(r-rn)-4)),glass=r<=rn+2,wm=glass?GLASS:STEEL,th=glass?2:3;   // a 9-row neck, glass to just under the waist, steel below
+    for(let k=0;k<th;k++){set(c-hw-1-k,r,wm);set(c+hw+k,r,wm)}
+    if(r>=sandTop&&r<rn-4)for(let x=c-hw;x<c+hw;x++)set(x,r,SAND)}}
+LEVELS.push(
+ {name:'Special Delivery',men:6,tip:'Fly into a brass tube!  The vault is solid steel.',build(){   // a 3-storey steel vault nothing can plow into; three balloon-held pneumatic tubes post you inside
+   house({x:62,w:34,floors:3,fh:12,wt:3,ft:3,wall:STEEL,floor:STEEL,roof:STEEL,gable:false,paper:'#d8d4c4'});
+   for(let f=0;f<3;f++){const yb=59-f*12;for(let y=yb-9;y<yb;y++)set(79,y,0)}   // house() adds a centre partition when w>13: the tube shot needs a clear room
+   for(const fl of[59,47,35]){tgt(71,fl);tgt(79,fl);tgt(87,fl);tnt(91,fl)}   // three landlords per floor, a keg at the far end for the finish
+   tube('#ff9a3c',300,340,546,456,0);tube('#4fd0ff',410,236,546,360,0);tube('#8cff5a',330,152,546,264,0)}},
+ {name:'Hourglass Heights',men:6,tip:'Pull the plug: let the sand do the rest!',build(){   // a glass hourglass of sand over a steel bulb with three landlords in it: pop the wooden plug in the neck and the flood does the rest
+   hourglass(80,36,14,58,14);rect(63,59,34,1,STEEL);rect(63,11,34,3,STEEL);   // steel cap and base
+   rect(77,32,6,7,WOOD);tnt(79,35);tnt(79,38);   // the plug: seven rows of planks with two kegs in it
+   tgt(72,59);tgt(80,59);tgt(88,59);
+   house({x:44,w:12,floors:2,fh:8,wall:BRICK,floor:WOOD,roof:WOOD,gable:false,paper:'#f0e0a8'});tgt(48,59);tgt(48,51);   // a low hut in front, so the neck stays in the line of fire
+   house({x:106,w:9,floors:4,fh:8,wall:WOOD,floor:WOOD,roof:WOOD,gable:true,paper:'#cfe0c0'});tgt(110,59);tgt(110,35)}}   // and the tall tower behind
+);
+const chEnd=l=>l<CH1?CH1:LEVELS.length;   // the last level of the chapter that level l belongs to
+// ---- pneumatic tubes ----
+function tubeStep(m,dt){
+  if(m.tubeT>0)m.tubeT-=dt;
+  if(m.tubeCd>0){m.tubeCd-=dt;return}
+  for(const tb of tubes){if(Math.hypot(m.x-tb.ax,m.y-tb.ay)>tb.r)continue;
+    ring(tb.ax,tb.ay,50,tb.col);SFX.whoosh();popText(tb.ax,tb.ay-34,'FWOOMP!',tb.col,24);
+    m.x=tb.bx;m.y=tb.by;m.vx=Math.cos(tb.ang)*tb.sp;m.vy=Math.sin(tb.ang)*tb.sp;m.ang=tb.ang;
+    m.tubeT=.55;m.tubeCd=.35;ring(tb.bx,tb.by,50,tb.col);SFX.pop();shake=Math.max(shake,3);break}}
+function drawTubes(){
+  tubes.forEach((tb,i)=>{
+    const sw=Math.sin(time*1.3+i*2)*3,bx=tb.ax+sw,by=tb.ay-62+Math.sin(time*1.9+i)*3;
+    ctx.save();
+    // rope from the balloon down to the mouth
+    ctx.strokeStyle='#3a2a1a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(bx-9,by+26);ctx.lineTo(tb.ax-12,tb.ay-24);ctx.moveTo(bx+9,by+26);ctx.lineTo(tb.ax+12,tb.ay-24);ctx.stroke();
+    // balloon
+    ctx.fillStyle=tb.col;ctx.strokeStyle='#000';ctx.lineWidth=2.5;ctx.beginPath();ctx.ellipse(bx,by,27,31,0,0,7);ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(bx-9,by-12,7,11,-.5,0,7);ctx.fill();
+    ctx.beginPath();ctx.moveTo(bx-5,by+30);ctx.lineTo(bx+5,by+30);ctx.lineTo(bx,by+36);ctx.closePath();ctx.fillStyle=tb.col;ctx.fill();ctx.stroke();
+    txt('IN',bx,by+6,17,'#fff','center');
+    // brass mouth with a swirl
+    ctx.fillStyle='#2a2118';ctx.strokeStyle=tb.col;ctx.lineWidth=4;ctx.beginPath();ctx.arc(tb.ax,tb.ay,26,0,7);ctx.fill();ctx.stroke();
+    ctx.strokeStyle='#c89a3a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(tb.ax,tb.ay,30,0,7);ctx.stroke();
+    ctx.strokeStyle=tb.col;ctx.lineWidth=2.4;ctx.beginPath();
+    for(let k=0;k<=60;k++){const a=k*.3+time*5,r=k*.37;const x=tb.ax+Math.cos(a)*r,y=tb.ay+Math.sin(a)*r;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}
+    ctx.stroke();ctx.restore();
+    // brass nozzle stub on the wall of the room, with a coloured collar
+    ctx.save();ctx.translate(tb.bx,tb.by);
+    ctx.fillStyle='#c8963a';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.fillRect(-38,-11,32,22);ctx.strokeRect(-38,-11,32,22);
+    ctx.fillStyle='#ffe08a';ctx.fillRect(-36,-9,28,5);
+    ctx.fillStyle=tb.col;ctx.fillRect(-6,-13,11,26);ctx.strokeRect(-6,-13,11,26);
+    ctx.restore()})}
+
 function load(l,custom){
   CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
   pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1}};chunks=[];parts=[];texts=[];targets=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;banner=2.4;waitT=0;
-  CL.build();
+  tubes=[];CL.build();
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
   man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};nextMan();
 }
@@ -581,7 +640,8 @@ function manPlow(){
     if(s2<120){stick()}}
 }
 function manStep(dt){
-  const m=man;m.vy+=G*dt*(m.pwr==='towel'&&m.gt<1.8&&!m.dive?.3:1);m.x+=m.vx*dt;m.y+=m.vy*dt;m.gt+=dt;if(m.hitCd>0)m.hitCd-=dt;
+  const m=man;m.vy+=G*dt*(m.pwr==='towel'&&m.gt<1.8&&!m.dive?.3:1)*(m.tubeT>0?.1:1);m.x+=m.vx*dt;m.y+=m.vy*dt;m.gt+=dt;if(m.hitCd>0)m.hitCd-=dt;
+  if(tubes.length)tubeStep(m,dt);
   if(m.y+m.R>=GY){m.y=GY-m.R;const s=Math.hypot(m.vx,m.vy);dust(m.x,GY-2,5,10);if(s>260)shake=Math.max(shake,4);
     if(s>420&&m.vy>120&&(m.bounces|0)<2){m.bounces=(m.bounces|0)+1;m.vy*=-.34;m.vx*=.72;SFX.thud&&SFX.thud(.5);dust(m.x,GY-2,8,14);ring(m.x,GY-4,30,'#d9c9a0');if(m.jg){m.jg.sq=1;m.jg.sa=Math.PI/2;m.jg.st=0}return}   // a hard landing skips once or twice before he sticks
     stick();return}
@@ -2333,6 +2393,7 @@ function draw(){
       if(b&1)ctx.fillRect(px+6,py+1,2,3);if(b&2)ctx.fillRect(px,py+4,2,3);if(b&4)ctx.fillRect(px+3,py+6,4,2);if(b&8)ctx.fillRect(px+1,py,4,2)}}
   for(const ch of chunks){ctx.save();ctx.translate(ch.x,ch.y);ctx.rotate(ch.ang);for(const a of ch.cells){const r=a.h/MAT[a.m].hp;ctx.drawImage(SPR[a.m][(a.lx*7+a.ly*3|0)&3][r>.66?0:r>.33?1:2],-V/2+a.lx,-V/2+a.ly)}ctx.restore()}
   for(const t of targets)if(t.alive){const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);ctx.restore()}
+  if(tubes.length)drawTubes();
   // sling band behind man
   if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX+13,SY+24);ctx.lineTo(man.x+4,man.y+6);ctx.stroke()}
   if(man.mode==='aim'&&dragging){const vx=(SX-man.x)*9.2,vy=(SY-man.y)*9.2;for(let t=.06,i=0;t<1.7;t+=.075,i++){ctx.fillStyle=`rgba(255,255,255,${.9-i*.035})`;ctx.beginPath();ctx.arc(man.x+vx*t,man.y+vy*t+450*t*t,3.4-i*.07,0,7);ctx.fill()}}
@@ -2358,7 +2419,7 @@ function drawHUD(){
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
-  if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt('Evict every landlord!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
+  if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict every landlord!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
   if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
   if(state==='play')btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
   if(state==='win'||state==='lose')drawEnd()}
@@ -2378,7 +2439,7 @@ function drawEnd(){
   if(win){const st=men>=2?3:men>=1?2:1;for(let i=0;i<3;i++)star(P?tx-70+i*70:W/2-10+i*70,y0+70,28,i<st)}
   txt('SCORE  '+Math.round(score),tx,P?y0+330:330,28,'#fff','center');
   const bh=40,by=P?y0+370:366,cx=tx;
-  if(win){btn(cx-190,by,120,bh,'RETRY',retry,{size:16});btn(cx-60,by,120,bh,CL.custom?(testing?'EDITOR':'LEVELS'):(level+1<LEVELS.length?'NEXT >':'LEVELS'),nextAfterWin,{size:16,on:true,col:'#7dff5a'});btn(cx+70,by,120,bh,'MENU',()=>{testing=false;goMenu()},{size:16})}
+  if(win){btn(cx-190,by,120,bh,'RETRY',retry,{size:16});btn(cx-60,by,120,bh,CL.custom?(testing?'EDITOR':'LEVELS'):(level+1<chEnd(level)?'NEXT >':'LEVELS'),nextAfterWin,{size:16,on:true,col:'#7dff5a'});btn(cx+70,by,120,bh,'MENU',()=>{testing=false;goMenu()},{size:16})}
   else{btn(cx-125,by,120,bh,'RETRY',retry,{size:16,on:true});btn(cx+5,by,120,bh,testing?'EDITOR':'LEVELS',backFromPlay,{size:16})}}
 // the WHOLE title picture (the full backdrop, no text but the logo) for the consoles: tools/gen_title.py draws it into a w x h canvas and the small screens pan across it; words = bake the logo in (the Dreamcast has no font)
 function drawTitlePicture(w,h,t,words){
@@ -2399,7 +2460,7 @@ function drawTitle(){
 // =====================================================================
 function pt(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
 function retry(){load(level,CL&&CL.custom?CL:undefined)}
-function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<LEVELS.length)startStory(level+1);else goSelect()}
+function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else goSelect()}
 function backFromPlay(){if(testing){openEditor(true);return}goSelect()}
 cv.addEventListener('pointerdown',e=>{
   audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
@@ -2443,9 +2504,9 @@ function pdTouch(){pdDirty=true}
 pdLoad();
 const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'valve'});
 const ST=()=>PD.st;
-const totalStars=()=>{let n=0;for(const k in PD.stars)if(+k>=0)n+=PD.stars[k]||0;return n};
-const storyDone=()=>{let n=0;for(let i=0;i<LEVELS.length;i++)if((PD.stars[i]||0)>0)n++;return n};
-const threeStarCount=()=>{let n=0;for(let i=0;i<LEVELS.length;i++)if((PD.stars[i]||0)>=3)n++;return n};
+const totalStars=()=>{let n=0;for(const k in PD.stars)if(+k>=0&&+k<CH1)n+=PD.stars[k]||0;return n};
+const storyDone=()=>{let n=0;for(let i=0;i<CH1;i++)if((PD.stars[i]||0)>0)n++;return n};
+const threeStarCount=()=>{let n=0;for(let i=0;i<CH1;i++)if((PD.stars[i]||0)>=3)n++;return n};
 const lv={booms:0,shots:0,flops:0,kills:0};
 
 // ---------- achievements ----------
@@ -2463,10 +2524,10 @@ const ACH=[
  {id:'one5',    n:'Sniper Elite',       d:'Win five levels using one man',          t:()=>ST().oneShots>=5,p:()=>[ST().oneShots,5]},
  {id:'s1',      n:'Star Pupil',         d:'Earn three stars on any level',          t:()=>threeStarCount()>=1},
  {id:'s8',      n:'Star Collector',     d:'Earn three stars on 8 levels',           t:()=>threeStarCount()>=8,p:()=>[threeStarCount(),8]},
- {id:'sall',    n:'Constellation',      d:'Three stars on every story level',       t:()=>threeStarCount()>=LEVELS.length,p:()=>[threeStarCount(),LEVELS.length]},
+ {id:'sall',    n:'Constellation',      d:'Three stars on every story level',       t:()=>threeStarCount()>=CH1,p:()=>[threeStarCount(),CH1]},
  {id:'w5',      n:'Getting Started',    d:'Beat 5 story levels',                    t:()=>storyDone()>=5,  p:()=>[storyDone(),5]},
  {id:'w10',     n:'Halfway Homeless',   d:'Beat 10 story levels',                   t:()=>storyDone()>=10, p:()=>[storyDone(),10]},
- {id:'wall',    n:'Evicted Everyone',   d:'Beat every story level',                 t:()=>storyDone()>=LEVELS.length,p:()=>[storyDone(),LEVELS.length]},
+ {id:'wall',    n:'Evicted Everyone',   d:'Beat every story level',                 t:()=>storyDone()>=CH1,p:()=>[storyDone(),CH1]},
  {id:'score',   n:'High Roller',        d:'Score 60,000 in one level',              t:()=>ST().bestScore>=60000,p:()=>[Math.min(ST().bestScore,60000),60000]},
  {id:'shots',   n:'Persistent',         d:'Launch 100 men',                         t:()=>ST().shots>=100, p:()=>[ST().shots,100]},
  {id:'arch',    n:'Architect',          d:'Save a level you made',                  t:()=>ST().created>=1},
@@ -2504,7 +2565,7 @@ const OUTFITS=[
  {id:'gold',    n:'Golden Boy',    br:'#f0b92a',brd:'#b8851a',tow:'#fff0a8',tows:'#e6c34a', h:'three stars on 8 levels',      t:()=>threeStarCount()>=8},
  {id:'bare',    n:'Birthday Suit', br:'#f4b78e',brd:'#e2a077',tow:'#ffffff',tows:'#d8d8e0', h:'unlock 25 achievements',       t:()=>achCount()>=25},
  {id:'thong',   n:'Cheeky Thong',  br:'#f4b78e',brd:'#e2a077',tow:'#ff7eb0',tows:'#ff4f8f', tg:'#ff2d6f', thong:true, h:'chug sodas with Burpburster 5 times', t:()=>ST().pw_burp>=5},
- {id:'rainbow', n:'Rainbow Rump',  br:'#e0243a',brd:'#a8162a',tow:'#ff7eb0',tows:'#ff4f8f', h:'beat every story level',       t:()=>storyDone()>=LEVELS.length, rainbow:true}
+ {id:'rainbow', n:'Rainbow Rump',  br:'#e0243a',brd:'#a8162a',tow:'#ff7eb0',tows:'#ff4f8f', h:'beat every story level',       t:()=>storyDone()>=CH1, rainbow:true}
 ];
 const ownedCount=()=>OUTFITS.reduce((n,o)=>n+(PD.own[o.id]?1:0),0);
 const outfitById=id=>OUTFITS.find(o=>o.id===id)||OUTFITS[0];
@@ -2544,7 +2605,7 @@ const UISTATES=['menu','select','ach','outfit','options'];
 let selTab=0;
 function goMenu(){state='menu';hits=[]}
 function goSelect(){state='select';hits=[]}
-function startStory(i){testing=false;selTab=0;if(i===0){startCut();return}load(i)}
+function startStory(i){testing=false;selTab=i>=CH1?2:0;if(i===0){startCut();return}load(i)}
 // ---------- OPENING CUTSCENE: the origin of MANDEX (plays before story level 1; tap = next, SKIP or Esc = straight to the level) ----------
 let cutI=0,cutT=0,cutFx=0;
 const cutTotal=()=>CUT[cutI].lines.reduce((n,s)=>n+s.length,0);const CPS=58,cutRT=()=>cutTotal()/CPS+.4;
@@ -2854,6 +2915,7 @@ function drawCutscene(){
   btn(W-112,8,104,32,'SKIP >>',()=>{},{size:14});
   for(let i=0;i<CUT.length;i++){ctx.fillStyle=i===cutI?'#ffd23f':'rgba(255,255,255,.4)';ctx.beginPath();ctx.arc(24+i*16,24,4,0,7);ctx.fill()}}
 
+const ch2Unlocked=i=>PD.unlockAll||i===CH1||(PD.stars[i-1]||0)>0;   // the first chapter 2 level is open; the rest unlock in order
 function storyUnlocked(i){return PD.unlockAll||i<3||(PD.stars[i-1]||0)>0}
 function drawMenu(){
   ctx.fillStyle='rgba(10,14,30,.45)';ctx.fillRect(0,0,W,H);
@@ -2889,11 +2951,21 @@ function drawSelect(){
   ctx.fillStyle='rgba(10,14,30,.55)';ctx.fillRect(0,0,W,H);
   txt('SELECT LEVEL',W/2,52,40,'#ffd23f','center','#7a1a1a');
   btn(16,14,90,36,'< MENU',goMenu,{size:16});
-  btn(W/2-170,66,160,34,'STORY',()=>{selTab=0},{on:selTab===0,size:16});btn(W/2+10,66,160,34,'MY LEVELS',()=>{selTab=1},{on:selTab===1,size:16});
-  if(selTab===0){
+  btn(W/2-251,66,160,34,'STORY',()=>{selTab=0},{on:selTab===0,size:16});
+  btn(W/2-81,66,160,34,'CHAPTER 2 (WIP)',()=>{selTab=2},{on:selTab===2,size:14,col:'#ffb03a'});
+  btn(W/2+89,66,160,34,'MY LEVELS',()=>{selTab=1},{on:selTab===1,size:16});
+  if(selTab===2){   // chapter 2 (work in progress): its own screen, its stars stay out of the story achievements
+    const cols=5,tw=164,th=80,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n2=LEVELS.length-CH1;
+    txt('CHAPTER 2  -  WORK IN PROGRESS',W/2,134,24,'#ffb03a','center','#5a2a00');
+    for(let k=0;k<cols;k++){const x=x0+k*(tw+gx);
+      if(k<n2){const i=CH1+k;tile(x,y0,tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!ch2Unlocked(i),()=>startStory(i))}
+      else tile('?','COMING SOON',0,true,()=>{},false)}
+    txt('New mechanics: pneumatic tubes, sand floods.  More levels are on the way.',W/2,274,16,'#fff','center');
+    txt('Chapter 2 stars do not count towards story achievements yet.',W/2,H-14,13,'#fff','center')}
+  else if(selTab===0){
     const cols=5,tw=164,th=80,gx=10,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=112;
-    for(let i=0;i<LEVELS.length;i++){const c=i%cols,r=(i/cols)|0;tile(x0+c*(tw+gx),y0+r*(th+gy),tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!storyUnlocked(i),()=>startStory(i))}
-    txt(`${totalStars()} / ${LEVELS.length*3} ★   ${storyDone()}/${LEVELS.length} beaten`,W/2,H-14,15,'#cfd','center')}
+    for(let i=0;i<CH1;i++){const c=i%cols,r=(i/cols)|0;tile(x0+c*(tw+gx),y0+r*(th+gy),tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!storyUnlocked(i),()=>startStory(i))}
+    txt(`${totalStars()} / ${CH1*3} ★   ${storyDone()}/${CH1} beaten`,W/2,H-14,15,'#cfd','center')}
   else{
     const cu=PD.custom,cols=4,tw=206,th=96,gx=10,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=112;
     tile('+','NEW LEVEL',0,false,()=>openEditor(false,-1),false);

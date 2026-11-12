@@ -18,6 +18,9 @@ test/                      host regression tests, robustness sweep, DS/DC host h
 docs/                      screenshots rendered by the host harness (real DS drawing code)
 ```
 
+## CHAPTER 2 (work in progress, browser only)
+`web/index.html` has a second chapter on its own level-select tab (CHAPTER 2 (WIP)): level 21 **Special Delivery** (pneumatic tubes: fly into a balloon-held brass mouth and you are posted out of a nozzle inside a steel vault) and level 22 **Hourglass Heights** (pop the plug in the glass hourglass's neck and the sand flood buries the landlords in the steel bulb).  `CH1` (= 20) is the chapter 1 size: stars, "beat every story level" and the story outfits only count chapter 1.  Level 21 is always open, 22 unlocks after 21.  `tools/ch2_check.py` (Playwright) checks both levels.  The console core stays at 20 levels.
+
 ## ROADMAP PROGRESS (Nov 2026): DS first
 Work follows the "Mandex Porting Roadmap" (16 ports) and its status update.  Done so far, with the patch that did it (apply in this order):
 
