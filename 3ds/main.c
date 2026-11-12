@@ -260,9 +260,9 @@ static void draw_end(void){
   if(world.state == MX_PLAY) return;
   int win = world.state == MX_WIN;
   rect(&top, 90, 70, 220, 100, RGB(15, 18, 30));
-  textc(&top, 200, 82, win ? "LEVEL CLEAR!" : "OUT OF MEN", 3, win ? RGB(125, 255, 90) : RGB(255, 90, 90));
+  textc(&top, 200, 82, win ? (world.level == MX_NUM_LEVELS - 1 ? "THE END!" : "LEVEL CLEAR!") : "OUT OF MEN", 3, win ? RGB(125, 255, 90) : RGB(255, 90, 90));
   char b[32]; sprintf(b, "SCORE %d", world.score); textc(&top, 200, 118, b, 2, RGB(255, 255, 255));
-  textc(&top, 200, 146, win ? "A = NEXT LEVEL" : "A = TRY AGAIN", 2, RGB(255, 210, 63));
+  textc(&top, 200, 146, win ? (world.level == MX_NUM_LEVELS - 1 ? "ALL LANDLORDS EVICTED" : "A = NEXT LEVEL") : "A = TRY AGAIN", 2, RGB(255, 210, 63));
 }
 
 /* ---------------------------------------------------------------- flow */

@@ -56,7 +56,7 @@ real rcos(real a);
 #define MX_CHUNK_CELLS   512
 #define MX_MAX_TARGETS   12
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    20
+#define MX_NUM_LEVELS    30
 #define MX_MAX_ROOMS     20
 
 /* Put hot functions in the ARM9's 32 KB instruction TCM (single-cycle, no cache misses).

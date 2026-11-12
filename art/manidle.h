@@ -11,7 +11,7 @@
 #define MX_MANIDLE_H
 
 enum { FX_NONE, FX_SLAP, FX_BOING, FX_GRUNT, FX_BURP, FX_FART, FX_FLICK, FX_YAWN, FX_SNORE, FX_SNIFF, FX_WHOOSH, FX_TAUNT, FX_EEK, FX_SNAP, FX_WHEW, FX_COUNT };
-enum { GAG_BELLY, GAG_WIGGLE, GAG_SCRATCH, GAG_BURP, GAG_FART, GAG_PICK, GAG_YAWN, GAG_CAPE, GAG_COUNT,
+enum { GAG_BELLY, GAG_WIGGLE, GAG_SCRATCH, GAG_BURP, GAG_FART, GAG_PICK, GAG_YAWN, GAG_CAPE, GAG_FLEX, GAG_SHIMMY, GAG_DISCO, GAG_COUNT,
        GAG_OOPS };                  /* GAG_COUNT = the pickable gags (and the "asleep" marker); GAG_OOPS is only ever a rare version of the cape taunt */
 
 typedef struct { unsigned char frame, ticks, fx; } MiStep;
@@ -46,6 +46,16 @@ static const MiStep MI_GAGS[GAG_OOPS + 1][MI_MAXSTEPS] = {
            { MSF_SPIN_BL, 9, FX_BOING }, { MSF_SPIN_BR, 9, FX_BOING }, { MSF_SPIN_R11, 3, FX_WHOOSH }, { MSF_SPIN_R10, 3, 0 }, { MSF_SPIN_R9, 3, 0 },
            { MSF_SPIN_R8, 3, 0 }, { MSF_SPIN_R7, 3, 0 }, { MSF_SPIN_R6, 3, 0 }, { MSF_SPIN_R5, 3, 0 }, { MSF_SPIN_R4, 3, 0 }, { MSF_SPIN_R3, 3, 0 },
            { MSF_SPIN_R2, 3, 0 }, { MSF_SPIN_R1, 3, 0 }, { MSF_SPIN_0, 4, 0 }, { MSF_CAPE_A, 18, 0 }, { MSF_IDLE_A, 12, 0 }),
+  /* muscle show: flex, pump, flex (new gags below are built only from frames the atlas already has) */
+  MI_STEPS({ MSF_FLEX_A, 16, FX_GRUNT }, { MSF_FLEX_B, 8, FX_BOING }, { MSF_FLEX_A, 8, 0 }, { MSF_FLEX_B, 8, FX_BOING }, { MSF_FLEX_A, 8, 0 },
+           { MSF_FLEX_B, 8, FX_BOING }, { MSF_FLEX_A, 20, FX_TAUNT }, { MSF_IDLE_A, 10, 0 }),
+  /* belly shimmy: quick shakes, a slap to finish */
+  MI_STEPS({ MSF_BELLY_B, 5, FX_BOING }, { MSF_IDLE_A, 5, 0 }, { MSF_BELLY_B, 5, FX_BOING }, { MSF_IDLE_B, 5, 0 }, { MSF_BELLY_B, 5, FX_BOING },
+           { MSF_IDLE_A, 5, 0 }, { MSF_BELLY_B, 5, FX_BOING }, { MSF_IDLE_B, 5, 0 }, { MSF_BELLY_A, 12, FX_SLAP }, { MSF_IDLE_A, 10, 0 }),
+  /* disco: flex to the front, hips to the back, in time */
+  MI_STEPS({ MSF_FLEX_A, 10, FX_BOING }, { MSF_BACK_L, 8, FX_BOING }, { MSF_BACK_R, 8, FX_BOING }, { MSF_FLEX_B, 10, FX_BOING }, { MSF_BACK_R, 8, FX_BOING },
+           { MSF_BACK_L, 8, FX_BOING }, { MSF_FLEX_A, 10, FX_BOING }, { MSF_BACK_L, 8, FX_BOING }, { MSF_BACK_R, 8, FX_BOING }, { MSF_FLEX_B, 18, FX_TAUNT },
+           { MSF_IDLE_A, 10, 0 }),
   /* (row GAG_COUNT is unused: that number means "asleep") */
   MI_STEPS({ 0, 0, 0 }),
   /* the rare cape taunt (1 in MI_OOPS_ODDS): same turn and butt wag, then the boxers slip, he wobbles, notices (EEK), covers up, hauls them back on (SNAP) and turns back */
@@ -126,6 +136,9 @@ static int mi_frame(const MiState *s, int ph){
 static int mi_active(const MiState *s){ return s->gag >= 0; }
 
 /* victory dance (butt wiggle loop) and the sad slump for the end panels */
-static int mi_dance_frame(int ph){ static const unsigned char seq[4] = { MSF_BACK_L, MSF_BACK_C, MSF_BACK_R, MSF_BACK_C }; return seq[(ph / 7) & 3]; }
+static int mi_dance_frame(int ph){                       /* butt wiggle for 4 beats, then a flex-and-belly combo, round and round */
+  static const unsigned char seq[16] = { MSF_BACK_L, MSF_BACK_C, MSF_BACK_R, MSF_BACK_C, MSF_BACK_L, MSF_BACK_C, MSF_BACK_R, MSF_BACK_C,
+                                         MSF_FLEX_A, MSF_BELLY_B, MSF_FLEX_B, MSF_BELLY_B, MSF_FLEX_A, MSF_BELLY_A, MSF_FLEX_B, MSF_BELLY_A };
+  return seq[(ph / 7) & 15]; }
 
 #endif

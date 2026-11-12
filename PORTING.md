@@ -289,3 +289,16 @@ Nothing has been run on a real 3DS or in an emulator (Citra / Lime3DS): it is on
 (sky furthest, then back faces of blocks, the building, landlords, sling and valve, aim dots, the man and
 debris nearest). Slider at zero draws one flat image. This is a parallax effect, not real geometry,
 and has not been seen on a real 3DS or in an emulator.
+
+## 30 levels, ending, parallax catch-up, new animations
+
+- Levels 21-30 added to the shared core (`core/mx.c`) and to the HTML game with the same layouts; `MX_NUM_LEVELS` is 30.
+  Each new HTML level was beaten by the automated shot search. On the consoles they are only known to load and run without hanging.
+- Ending: the HTML game plays a credits screen after level 30. The consoles show a "the end" message on the last win panel.
+- Parallax / depth: HTML has three backdrop bands that slide with a camera drift, a ground shadow and foreground grass.
+  Dreamcast has cloud drift against the camera, a ground shadow and foreground grass (its hills are one baked picture with the
+  sling in it, so they cannot slide). DS already scrolled its backdrop; it gained the ground shadow. 3DS has the stereo layers.
+- Animations: HTML has four new idle gags drawn from scratch (blow kiss, pin-up pose, disco, pec pop), hearts and sparkles,
+  and three victory dances. DS and Dreamcast have three new gags (flex, belly shimmy, disco) and a longer victory dance built
+  from frames already in the sprite atlas - the atlas was not regenerated, so the kiss / pin-up drawings are HTML only.
+  The 3DS man is still simple shapes with no gag animations.
