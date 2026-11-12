@@ -72,8 +72,8 @@ def main():
         pg = b.new_page(viewport={'width': 960, 'height': 540}); errs = []
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.goto('file://' + os.path.abspath(a.html)); pg.wait_for_timeout(300); pg.evaluate(BOOT)
-        n, ch1 = pg.evaluate("()=>[LEVELS.length,CH1]"); ok(n == 25 and ch1 == 20, f'{n} levels, chapter 1 = {ch1}')
-        for L in (20, 21, 23, 24):
+        n, ch1 = pg.evaluate("()=>[LEVELS.length,CH1]"); ok(n == 27 and ch1 == 20, f'{n} levels, chapter 1 = {ch1}')
+        for L in (20, 21, 23, 24, 25, 26):
             r = pg.evaluate(STAND, L); ok(r['same'] and r['chunks'] == 0 and r['alive'] == r['n'], f"LV{L+1} {r['name']} stands for 10 s ({r['n']} landlords)")
         r = pg.evaluate(SWEEP, [20, 4]); skip = [x for x in r if x[2] == '' and x[3] < x[4]]
         ok(not skip, f"LV21: {sum(1 for x in r if x[2]=='')} shots that miss every tube kill nobody" + (f' (but {len(skip)} did)' if skip else ''))
@@ -90,6 +90,28 @@ def main():
         r = pg.evaluate(KILLS, [24, 4]); n = len(r)
         ok(sum(1 for x in r if x[2] >= 1) >= 20 and sum(1 for x in r if x[2] == 0) > n * .85, f'LV25: the slots are threadable but the steel stops the rest ({sum(1 for x in r if x[2]>=1)} of {n} pulls kill, {sum(1 for x in r if x[2]==0)} kill nobody)')
         r = pg.evaluate(PLAY2, [24, [[-76, 44], [-80, 44]]]); ok(r['state'] == 'win' and r['men'] >= 3, f'LV25: two slot shots win ({r})')
+        # ---- landlords fight back ----
+        r = pg.evaluate("""()=>{load(25);const xs=targets.map(t=>t.x);for(let i=0;i<60*12;i++)update(1/60);
+          const ok=targets.every((t,i)=>t.alive&&Math.abs(t.x-t.hx)<=t.range+9&&solidAt(t.x,t.y+t.r+1));
+          const moved=targets.filter((t,i)=>Math.abs(t.x-xs[i])>6).length;
+          OPT().fight=false;load(25);const x1=targets.map(t=>t.x);for(let i=0;i<60*6;i++)update(1/60);const still=targets.every((t,i)=>t.x===x1[i]);OPT().fight=true;
+          return{ok,moved,still,n:targets.length}}""")
+        ok(r['ok'] and r['moved'] >= 4 and r['still'], f'LV26: walkers pace their own deck and stay on it, and stand still with fight-back off ({r})')
+        r = pg.evaluate("""()=>{load(25);const t=targets[2];man={mode:'fly',x:t.x+56,y:t.y-4,vx:100,vy:0,R:14,t:0,a:1,hitCd:0,gooT:0,stT:0,swT:0,pop:1,G:gagNew(2.5,4,3),jg:jigNew(),inf:0,pwr:null,bel:0};enterWalk();
+          let minwt=99,swung=0;for(let i=0;i<60*3;i++){update(1/60);minwt=Math.min(minwt,man.wt);if(targets.some(q=>q.swing>0))swung=1}
+          const w0=man.wt;return{swung,wt:man.wt,mode:man.mode,alive:aliveTargets()}}""")
+        ok(r['swung'] == 1 and r['wt'] < 45 - 3 - 2, f'LV26: a walker closes in and clubs a man on foot (time lost beyond the clock: {r})')
+        r = pg.evaluate("""()=>{load(26);let thrown=0,dazed=0,s0=0;for(let i=0;i<60*14;i++){const n=cases.length;update(1/60);if(cases.length>n)thrown++;if(man.stun>0)dazed=1}
+          OPT().fight=false;load(26);let t2=0;for(let i=0;i<60*14;i++){const n=cases.length;update(1/60);if(cases.length>n)t2++}OPT().fight=true;
+          return{thrown,dazed,off:t2}}""")
+        ok(r['thrown'] >= 2 and r['dazed'] == 1 and r['off'] == 0, f'LV27: throwers lob briefcases at the sling and daze the man; none with fight-back off ({r})')
+        r = pg.evaluate("""()=>{let bonk=0,best=null;for(let px=-60;px<=-8;px+=4)for(let py=-30;py<=60;py+=6){if(Math.hypot(px,py)>58)continue;load(26);for(let i=0;i<20;i++)update(1/60);man.x=SX+px;man.y=SY+py;launch();let f=0,st=0;
+            for(let f=0;f<400;f++){update(1/60);if(targets[0].stun>0||targets[1].stun>0)st=1;if(man.mode!=='fly')break}
+            if(st){bonk++;if(!best)best=[px,py,targets[0].alive&&targets[1].alive]}}
+          return{bonk,best}}""")
+        ok(r['bonk'] >= 3 and r['best'] and r['best'][2], f'LV27: a weak shot at a bat guy is swatted away and he survives ({r})')
+        r = pg.evaluate("""()=>{let wins=[];for(const [px,py] of [[-76,44],[-72,48],[-72,44],[-68,48],[-76,48],[-72,52]]){load(26);for(let i=0;i<20;i++)update(1/60);man.x=SX+px;man.y=SY+py;launch();for(let i=0;i<900;i++)update(1/60);if(state==='win')wins.push([px,py])}return wins}""")
+        ok(len(r) >= 1, f'LV27: a hard, steep pull ploughs through the bats and clears the fort in one shot ({r})')
         r = pg.evaluate(SELECT); ok(r['a'] == [True, False] and r['b'] == [0, 0, 0], f'select: chapter 2 opens at 21, its stars stay out of the story counters {r}')
         ok(not errs, 'no page errors' + (': ' + errs[0] if errs else '')); b.close()
     sys.exit(1 if fails else 0)
