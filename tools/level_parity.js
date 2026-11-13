@@ -1,7 +1,7 @@
 // Compares every level the shared C core builds with the web game's: men, landlord positions and the whole grid after load().
 // usage: gcc -std=c99 -O2 -Icore core/mx.c test/level_dump.c -lm -o /tmp/level_dump && /tmp/level_dump > /tmp/c_levels.txt
 //        node tools/level_parity.js /tmp/c_levels.txt [first] [last] [webIndices]   (core level l is compared with web LEVELS[webIndices[l-first]]; default same index.
-//        The consoles now have all 37 levels, in the same order as the web game, so the default (same index) is the right mapping.
+//        Level 39 (Landlord HQ) is a 360-cell wide, three-sling level on the web only for now, so compare 0..38.  The consoles have levels 0..38, in the same order as the web game, so the default (same index) is the right mapping.
 //        Targets are compared with their landlord kind, and the walk flag / number of bounce pads.)
 const {chromium}=require('playwright'),fs=require('fs'),path=require('path');
 (async()=>{

@@ -105,5 +105,5 @@ fi
 if [ -n "$PARITY" ]; then
   echo "--- level parity with the web game ---"
   gcc -std=c99 -O2 -I../core ../core/mx.c level_dump.c -lm -o level_dump && ./level_dump > /tmp/mx_c_levels.txt
-  node ../tools/level_parity.js /tmp/mx_c_levels.txt 0 36
+  node ../tools/level_parity.js /tmp/mx_c_levels.txt 0 38
 fi

@@ -12,9 +12,9 @@ canvas{max-width:100vw;max-height:100vh;touch-action:none;border-radius:10px;box
 //  MANDEX  -  sticky dad-bod demolition.  Voxel world + rigid-body chunks
 // =====================================================================
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
-const V=8,COLS=120,ROWS=60,GY=ROWS*V,G=900,K=1100,RC=V*.5;
-let W=960,H=540;const WW=960,WH=540;   // W,H = the screen (960x540, or a tall 540xN in portrait play); WW,WH = the world, which never changes
-const SX=128,SY=GY-118,PULL=92,VX=36,VY=SY+58,VGRAB=40,VKEEP=44,VPULL=76;   // VX,VY: the air valve, tucked in the far lower-left corner: a full pull-back stops ~15px short of it
+const V=8,ROWS=60,GY=ROWS*V,G=900,K=1100,RC=V*.5;let COLS=120;   // COLS: 120 for every level except the wide finale (see setWorld)
+let W=960,H=540,WW=960;const WH=540;   // W,H = the screen (960x540, or a tall 540xN in portrait play); WW,WH = the world (WW = COLS*V: 960, or 2880 for the wide finale)
+let SX=128,SY=GY-118,VX=36,VY=SY+58;const PULL=92,VGRAB=40,VKEEP=44,VPULL=76;   // VX,VY: the air valve, tucked in the far lower-left corner: a full pull-back stops ~15px short of it
 let pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1}};
 const DX=[1,-1,0,0],DY=[0,0,1,-1];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v,rnd=Math.random;
@@ -126,6 +126,9 @@ function paintCell(x,m,v,d){
 }
 function buildSprites(){for(let m=1;m<MAT.length;m++){SPR[m]=[];for(let v=0;v<4;v++){SPR[m][v]=[];for(let d=0;d<3;d++){const c=mkCanvas(V,V);paintCell(c.getContext('2d'),m,v,d);SPR[m][v][d]=c}}}}
 
+// the world is normally 120 cells (960 px) wide; a level with `cols` is wider (the finale, 360).  Everything sized by COLS is rebuilt here, and the backdrop is redrawn at the new width.
+function setWorld(c){if(c===COLS)return;COLS=c;WW=c*V;hb=new Uint8Array(COLS*ROWS);dmg=new Uint8Array(COLS*ROWS);buildBG();
+  clouds.length=4;if(c>120)for(let i=0;i<c/20;i++)clouds.push({x:(i*410+130)%WW,y:40+(hsh(i,9)%110),s:.7+(i%4)*.15,v:4+(i%5)*2})}
 function buildBG(){
   bgA=mkCanvas(WW,WH);bgB=mkCanvas(WW,WH);
   let x=bgA.getContext('2d');
@@ -376,13 +379,55 @@ LEVELS.push(
    house({x:64,g:27,w:24,floors:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0d9c0'});
    house({x:96,w:10,floors:1,wall:WOOD,floor:WOOD,roof:WOOD,gable:false,paper:'#cfe0c0'});
    tgt(69,27);tgt(84,27);tgt(72,18);tgt(82,18);tgt(100,59);tgt(54,60);tnt(78,27);tnt(79,18)}},
- {name:'Landlord HQ',men:12,build(){                 // the real finale: head office
+ {name:'Mail Room Mayhem',men:6,tip:'Throwers lob briefcases through the slots!  Thread a slot, or post yourself in through a tube.',build(){   // a 2-storey steel vault like Special Delivery, but with a 7-high slot cut in the front of every floor and a briefcase thrower stood behind it
+   house({x:62,w:34,floors:2,fh:12,wt:3,ft:3,wall:STEEL,floor:STEEL,roof:STEEL,gable:false,paper:'#d8d4c4'});
+   for(let f=0;f<2;f++){const yb=59-f*12;for(let y=yb-9;y<yb;y++)set(79,y,0);rect(62,yb-9,3,7,0);   // clear the centre partition (the tube shot needs a clear room), then cut the slot
+     tgt(71,yb,'thrower');tgt(79,yb);tgt(87,yb);tnt(91,yb)}
+   tube('#ff9a3c',300,340,546,456,0);tube('#4fd0ff',410,236,546,360,0)}},
+ {name:'Rent Strike',men:4,walk:true,tip:'Walkers swing at a man on foot: punch them first!  Pads boing you up.',build(){   // Walk-Up Wreckage again, 3 storeys, but the tenants on foot are walkers who fight back
+   const g=59,fh=10,ft=2,X=58,Wd=48,F=3,PT=[71,83,95],pap=['#f0e0a8','#cfe0c0','#f0c9c9'],
+     DR=[[1,0,1],[0,1,0],[1,0,1]],
+     PADS=[[100,0],[60,1]];            // zig-zag again: a pad at the right end of floor 1, at the left end of floor 2
+   rect(X,g,Wd,1,STONE);
+   for(let f=1;f<=F;f++)rect(X-(f===F?1:0),g-f*fh,Wd+(f===F?2:0),ft,f===F?BRICK:WOOD);
+   for(let k=0;k<Wd+2;k+=2)set(X-1+k,g-F*fh-1,BRICK);
+   for(let f=0;f<F;f++){const yb=g-f*fh,y0=yb-fh+ft,wm=f?WOOD:BRICK;
+     rect(X,y0,2,fh-ft,wm);rect(X+Wd-2,y0,2,fh-ft,wm);interiors.push({x:X+2,y:y0,w:Wd-4,h:fh-ft,p:pap[f]});
+     PT.forEach((p,pi)=>{rect(p,y0,1,fh-ft,BRICK);rect(p,yb-7,1,7,DR[f][pi]?WOOD:0)});
+     if(f===0)rect(X,y0,2,8,0);else rect(X,yb-6,2,3,GLASS);
+     rect(X+Wd-2,yb-6,2,3,GLASS)}
+   for(const[c,f]of PADS){const yb=g-f*fh,ys=g-(f+1)*fh;
+     rect(c,ys,4,ft,0);interiors.push({x:c,y:ys,w:4,h:ft,p:pap[f+1]});
+     rect(c,yb-1,4,1,RUBBER);pads.push({x:c*V,y:(yb-1)*V,w:4*V})}
+   for(const[c,r,k]of[[89,59,'walker'],[77,59],[67,49],[77,49,'walker'],[89,49],[90,39],[80,39,'walker'],[67,39]])tgt(c,r,k);
+   tnt(82,59);tnt(86,49);tnt(72,39)}},
+ {name:'Sand Standoff',men:7,tip:'Bat guards swat weak shots!  Break the roof: the sand tank does the rest.',build(){   // a 2-storey brick house with a glass tank of sand on its wooden roof, and two bat landlords at the gate
+   house({x:64,w:26,floors:2,fh:10,wall:BRICK,floor:WOOD,roof:WOOD,gable:false,paper:'#e8d3a8'});
+   rect(63,25,2,12,GLASS);rect(89,25,2,12,GLASS);rect(65,25,24,12,SAND);   // the tank on the roof (roof rows 37-38)
+   tgt(58,59,'bat');tgt(61,59,'bat');tgt(69,59);tgt(84,59);tgt(69,49);tgt(84,49);tnt(76,49)}},
+ {name:'Landlord HQ',men:10,cols:360,zones:[118,244],zoneMen:4,slings:[[128,GY-118],[1000,GY-118],[1976,GY-118]],tip:'THE TOUR: three slings across a 360-cell world.  Evict a whole district and you are carried on to the next sling, with fresh men!',build(){   // the real finale: head office, three districts long
+   // ---- district 1 (sling 1): the old head office, 12 landlords
    house({x:46,w:10,floors:4,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:'#f0d9c0'});
    house({x:60,w:18,floors:5,wall:STONE,floor:STEEL,roof:STEEL,crenel:true,paper:'#b9b2c8'});
    house({x:82,w:12,floors:6,wall:GLASS,floor:STONE,roof:STEEL,gable:false,paper:'#e8f0f8'});
    house({x:98,w:10,floors:3,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f8d4e4'});
    tgt(50,59);tgt(52,32);tgt(66,59);tgt(72,50);tgt(66,41);tgt(72,32);tgt(68,23);tgt(86,59);tgt(90,41);tgt(86,23);tgt(88,14);tgt(102,59);
-   tnt(70,59);tnt(74,41);tnt(88,50);tnt(90,32);tnt(100,50);tnt(48,50)}}
+   tnt(70,59);tnt(74,41);tnt(88,50);tnt(90,32);tnt(100,50);tnt(48,50);
+   // ---- district 2 (sling 2): the bank quarter: a steel vault with a wooden lid, a glass tower of throwers, a dune-top villa, a keg yard
+   house({x:152,w:20,floors:3,fh:9,wt:2,ft:2,wall:STEEL,floor:STEEL,roof:WOOD,gable:false,paper:'#d8d4c4'});
+   tgt(158,59,'bat');tgt(166,59);tgt(158,50);tgt(166,41);tnt(165,50);
+   house({x:178,w:12,floors:7,fh:8,wall:GLASS,floor:STONE,roof:STEEL,gable:false,paper:'#e8f0f8'});
+   tgt(183,59);tgt(183,43,'thrower');tgt(183,27);tgt(183,11);
+   mound(196,34,10);house({x:200,g:49,w:14,floors:3,fh:9,wall:WOOD,floor:WOOD,roof:WOOD,gable:true,paper:'#cfe0c0'});
+   tgt(205,49);tgt(209,40,'walker');tgt(205,31);
+   for(let k=0;k<3;k++)rect(214+k*4,52+k*2,3,8-k*2,5);tgt(193,59);   // a stair of kegs (columns 230-250 stay clear for sling 3 and its air valve)
+   // ---- district 3 (sling 3): head office proper: a stone castle with bat guards, a steel-roofed tower, a bouncy annexe
+   house({x:272,w:40,floors:5,fh:9,wt:3,ft:2,wall:STONE,floor:STEEL,roof:STEEL,crenel:true,paper:'#b9b2c8'});
+   tgt(266,59,'bat');tgt(269,59,'bat');tgt(280,59);tgt(296,59,'walker');tgt(306,59);tgt(284,50,'thrower');tgt(300,50);tgt(290,41);tgt(298,32,'thrower');tgt(284,23);tnt(288,50);tnt(296,41);tnt(290,32);
+   house({x:318,w:14,floors:6,fh:8,wall:BRICK,floor:STONE,roof:STEEL,gable:false,paper:'#f0d9c0'});
+   tgt(324,59);tgt(324,43,'thrower');tgt(324,27);tgt(324,19);tnt(327,43);
+   house({x:338,w:12,floors:3,fh:9,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f8d4e4'});
+   tgt(343,59);tgt(343,50);tgt(343,41)}}
 );
 const chEnd=l=>l<CH1?CH1:LEVELS.length;   // the last level of the chapter that level l belongs to
 // ---- pneumatic tubes ----
@@ -419,13 +464,24 @@ function drawTubes(){
     ctx.restore()})}
 
 function load(l,custom){
-  CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
+  CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
   pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;banner=2.4;waitT=0;
   tubes=[];pads=[];CL.build();
+  zonePaid=[];if(CL.slings){const zb=CL.zones||[];for(const t of targets){t.zone=0;for(let k=0;k<zb.length;k++)if(t.x>=zb[k]*V)t.zone=k+1}setSling(0)}else{SX=128;SY=GY-118;VX=36;VY=SY+58;slingK=0}
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
   man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};nextMan();
 }
+// ---- the wide finale: three slings along a 360-cell world.  Clear the landlords of the sling you are at and you are resupplied and moved to the next one.
+let slingK=0;
+function setSling(k){slingK=k;const s=CL.slings[k];SX=s[0];SY=s[1];VX=SX-92;VY=SY+58}
+let zonePaid=[];
+// you can walk to any sling yourself (buttons under the men, or [ and ]); clearing a district pays +men once and carries you to the next sling
+function goSling(k){if(!CL.slings||k<0||k>=CL.slings.length||k===slingK)return;setSling(k);if(man.mode==='aim'){man.x=SX;man.y=SY;man.seated=false;man.vlv=false}CAM.hold=0;ring(SX,SY,50,'#ffd23f');popText(SX,SY-90,'SLING '+(k+1)+' OF '+CL.slings.length,'#ffd23f',28);SFX.pop&&SFX.pop()}
+function zoneAdvance(){
+  if(!CL.slings||slingK>=CL.slings.length-1||zonePaid[slingK]||targets.some(t=>t.alive&&t.zone<=slingK))return;
+  zonePaid[slingK]=1;const bonus=CL.zoneMen||4;men+=bonus;score+=3000;flash=Math.max(flash,.5);SFX.wooo&&SFX.wooo();
+  goSling(slingK+1);popText(SX,SY-56,'DISTRICT CLEARED!  +'+bonus+' MEN','#7dff5a',24);banner=2.2}
 function nextMan(){
   if(men>0)man={mode:'aim',x:SX,y:SY,vx:0,vy:0,ang:0,spin:0,t:0,a:1,R:14,dive:false,gt:0,hitCd:0,gooT:0,pop:1,stT:0,swT:0,G:gagNew(2.5,4,3),jg:jigNew(),inf:0,seated:false,pwr:null,vlv:false,airT:0,beaned:false,bel:0,burped:false,burpT:0,chug:null};
   else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};
@@ -1109,7 +1165,8 @@ function update(dt){
   if(man.jg)jigStep(man,dt);
   if(man.jg&&(man.mode==='stuck'||man.mode==='fly'))ragStep(man,dt);
   if(man.mode==='done'){man={mode:'wait',x:-999,y:-999,t:0,a:1,R:14};waitT=0;aftershock()}
-  if(man.mode==='wait'){waitT+=dt;if(waitT>.7&&(!busy()||waitT>3.5)){if(men>0)nextMan();else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14}}}
+  if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug&&!man.seated&&!(man.stun>0)){const k0=slingK;zoneAdvance();if(slingK!==k0){man.x=SX;man.y=SY}}   // a district that fell apart after the last shot also moves you on
+  if(man.mode==='wait'){waitT+=dt;if(waitT>.7&&(!busy()||waitT>3.5)){zoneAdvance();if(men>0)nextMan();else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14}}}
   processExpl();
   if(needSupport)supportPass();
   for(let i=0;i<6;i++)stepChunks(dt/6);
@@ -2610,6 +2667,9 @@ function drawCases(){for(const c of cases){ctx.save();ctx.translate(c.x,c.y);ctx
 function txt(s,x,y,size,fill,align,stroke){ctx.font=`bold ${size}px "Trebuchet MS",Impact,sans-serif`;ctx.textAlign=align||'left';ctx.lineWidth=Math.max(3,size/6);ctx.strokeStyle=stroke||'#000';ctx.lineJoin='round';ctx.strokeText(s,x,y);ctx.fillStyle=fill;ctx.fillText(s,x,y)}
 function drawCloud(c){ctx.globalAlpha=.9;ctx.fillStyle='#fff';const r=34*c.s;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.arc(c.x+r*.9,c.y+6,r*.75,0,7);ctx.arc(c.x-r*.9,c.y+9,r*.65,0,7);ctx.arc(c.x+r*.2,c.y-r*.4,r*.7,0,7);ctx.fill();ctx.globalAlpha=1}
 function drawSling(back){
+  if(!CL.slings){drawSling1(back);return}
+  const sx=SX,sy=SY;for(const s of CL.slings){SX=s[0];SY=s[1];drawSling1(back)}SX=sx;SY=sy}   // every sling of the wide finale stands in the world; the man uses the current one
+function drawSling1(back){
   ctx.lineCap='round';
   if(back){ctx.strokeStyle='#4a2e14';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(SX+4,SY+34);ctx.lineTo(SX+13,SY+24);ctx.stroke();return}
   ctx.strokeStyle='#4a2e14';ctx.lineWidth=11;ctx.beginPath();ctx.moveTo(SX,GY+2);ctx.lineTo(SX,SY+44);ctx.stroke();
@@ -2627,12 +2687,14 @@ function layoutTick(){
   if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;
     if(por){cv.style.width='min(100vw,'+(100*w/h).toFixed(2)+'vh)';cv.style.height='auto'}else{cv.style.width='';cv.style.height=''}
     CAM.snap=true}
-  CAM.on=por}
+  if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);   // menus, cut scenes and the editor are always the normal 120 wide
+  CAM.on=por||!!(CL&&CL.cols>120&&(state==='play'||state==='win'||state==='lose'))}
 function camTick(dt){
   if(!CAM.on){CAM.z=1;CAM.x=0;CAM.y=0;return}
   const z=Math.min(1.8,H/600),vw=W/z,vh=H/z,baseY=WH-vh;CAM.z=z;
   let sx=0,n=0;for(const t of targets)if(t.alive){sx+=t.x;n++}
-  const bL=clamp((n?sx/n:640)-vw*.5,0,WW-vw),iL=0,m=man;
+  if(CL.slings){n=0;sx=0;for(const t of targets)if(t.alive&&t.zone===slingK){sx+=t.x;n++}}   // the wide finale: look at the landlords of the sling you stand at
+  const bL=clamp((n?sx/n:640)-vw*.5,0,WW-vw),iL=CL.slings?clamp(SX-vw*.2,0,WW-vw):0,m=man;
   let tl=bL,ty=baseY,fast=4;
   if(CAM.hold>0){CAM.hold-=dt}
   else if(m.mode==='aim'){if(dragging){const k=Math.min(1,Math.hypot(m.x-SX,m.y-SY)/PULL);tl=iL+(bL-iL)*k*k*(3-2*k);fast=8}else tl=iL}
@@ -2659,7 +2721,8 @@ function draw(){
   for(const r of interiors){ctx.fillStyle=r.p;ctx.fillRect(r.x*V,r.y*V,r.w*V,r.h*V);ctx.fillStyle='rgba(0,0,0,.07)';for(let k=0;k<r.w*V;k+=16)ctx.fillRect(r.x*V+k,r.y*V,8,r.h*V);
     ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(r.x*V,(r.y+r.h)*V-5,r.w*V,5)}
   drawSling(true);drawValve();drawBurpStand();drawPwProp();
-  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
+  const cx0=Math.max(0,Math.floor(CAM.x/V)-2),cx1=Math.min(COLS,Math.ceil((CAM.x+W/CAM.z)/V)+2);   // only the columns on screen
+  for(let y=0;y<ROWS;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
     if(wobOn){px=Math.round(px+ox[i]*V);py=Math.round(py+oy[i]*V)}   // swaying with the wobble
     ctx.drawImage(SPR[m][hsh(x,y)&3][r>.66?0:r>.33?1:2],px,py);
     if(brk[i]){ctx.fillStyle=m===GLASS?'rgba(255,255,255,.95)':'rgba(15,8,4,.8)';const b=brk[i];   // snapped joints show as cracks
@@ -2685,12 +2748,15 @@ function drawHUD(){
   drawWalkHUD();
   const P=W<700;ctx.fillStyle='rgba(15,18,30,.72)';ctx.fillRect(0,0,W,P?62:34);ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(0,0,W,2);
   {const nm=`${CL.custom?'CUSTOM':'LV '+(level+1)}  ${CL.name.toUpperCase()}`;let sz=18;if(P){while(sz>11){ctx.font=`bold ${sz}px "Trebuchet MS",Impact,sans-serif`;if(ctx.measureText(nm).width<=285)break;sz--}}txt(nm,12,24,sz,'#ffd23f','left')}
-  const lb=aliveTargets();txt(`LANDLORDS ${lb}/${targets.length}`,P?12:Math.max(430,300+men*20+24),P?54:24,18,lb?'#ff8a8a':'#7dff5a','left');
+  const lb=aliveTargets();txt(`LANDLORDS ${lb}/${targets.length}`,P?12:Math.max(430,300+men*Math.min(20,230/Math.max(1,men))+24),P?54:24,18,lb?'#ff8a8a':'#7dff5a','left');
   txt(String(Math.round(shownScore)).padStart(6,'0'),W-12,24,20,'#fff','right');
-  for(let i=0;i<men;i++){const x=(P?330:300)+i*(P?16:20),dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
+  const mstp=Math.min(P?16:20,(P?190:230)/Math.max(1,men));   // a long row of men squeezes together (the wide finale can have 17)
+  for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60);txt('DRAG BACK  &  RELEASE!',hp[0],hp[1],22,'#fff','center')};ctx.globalAlpha=1}
   if(state==='play'){const tid=OPT().tool||'valve',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+pw.left[tid]:'';
+    if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
+      btn(W-212,H-44,96,32,'< SLING',()=>goSling(slingK-1),{size:13,disabled:slingK<=0});btn(W-108,H-44,96,32,'SLING >',()=>goSling(slingK+1),{size:13,disabled:slingK>=CL.slings.length-1});void ny}
     btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
     if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
@@ -2775,6 +2841,7 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.
   if(e.code==='Space'){dive();e.preventDefault()}
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
   if(state==='title')return;
+  if(state==='play'&&CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){if(e.key==='[')goSling(slingK-1);if(e.key===']')goSling(slingK+1)}
   if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending')goMenu();return}
   if(state==='select'&&(e.key==='u'||e.key==='U')){PD.unlockAll=!PD.unlockAll;pdTouch();toast('ach',PD.unlockAll?'All levels unlocked':'Levels locked again','');return}
   if(state==='edit'){const k=e.key.toLowerCase();if(k>='1'&&k<='8'){E.tool='mat';E.mat=+k}else if(k==='e')E.tool='erase';else if(k==='l')E.tool='lord';else if(k==='r')E.shape=E.shape==='pen'?'rect':'pen';else if(k==='z')eUndo();else if(k==='b')eSize(e.shiftKey?-1:1);else if(k==='v')eKind(1);else if(k==='t')eThick();return}
@@ -3284,7 +3351,7 @@ function drawSelect(){
     for(let k=0;k<rows*cols;k++){const x=x0+(k%cols)*(tw+gx),y=y0+((k/cols)|0)*(th+10);
       if(k<n2){const i=CH1+k;tile(x,y,tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!ch2Unlocked(i),()=>startStory(i))}
       else tile(x,y,tw,th,'?','COMING SOON',0,true,()=>{},false)}
-    txt('New mechanics: pneumatic tubes, sand floods, walking.  Plus pure slingshot levels.  More on the way.',W/2,Math.min(H-34,y0+rows*(th+10)+24),14,'#fff','center');
+    txt('New mechanics: pneumatic tubes, sand floods, walking.  Plus pure slingshot levels.',W/2,Math.min(H-34,y0+rows*(th+10)+24),14,'#fff','center');
     txt('Chapter 2 stars do not count towards story achievements yet.',W/2,H-14,13,'#fff','center')}
   else if(selTab===0){
     const cols=5,tw=164,th=80,gx=10,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=112;

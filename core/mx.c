@@ -1539,8 +1539,8 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   "Skyscraper Special", "Bridge Troll", "Fort Knoxed", "Jenga Joe", "Moat Madness", "Glass Cannon", "Mandex Manor",
   "Special Delivery", "Hourglass Heights", "Walk-Up Wreckage", "Over the Top", "Needle Threader", "Collection Day", "Batter Up",
   "Leaning Loft", "Powder Keg Plaza", "Rubber Room", "Stairway to Eviction", "Sand Trap", "The Vault", "Triple Decker",
-  "Glass Menagerie", "Penthouse Panic", "Landlord HQ"};
-static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8, 12};
+  "Glass Menagerie", "Penthouse Panic", "Mail Room Mayhem", "Rent Strike", "Sand Standoff", "Landlord HQ"};
+static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  12};
 const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
 
 static void build(MxWorld *w, int l){
@@ -1716,7 +1716,39 @@ static void build(MxWorld *w, int l){
     rect_fill(w, 72, 30, 8, 30, S); rect_fill(w, 62, 28, 28, 2, ST);
     house_at(w, 64, 27, 24, 2, B, W_, W_, 1, 0); house(w, 96, 10, 1, W_, W_, W_, 0, 0);
     tgt(w, 69, 27); tgt(w, 84, 27); tgt(w, 72, 18); tgt(w, 82, 18); tgt(w, 100, 59); tgt(w, 54, 60); tnt(w, 78, 27); tnt(w, 79, 18); break;
-  case 36:      /* the real finale: head office */
+  case 36:      /* mail room mayhem: a 2-storey steel vault with a 7-high slot cut in the front of every floor and a briefcase thrower behind it, two tubes post you inside */
+    HX(62, GR, 34, 2, 12, 3, 3, ST, ST, ST, 0, 0);
+    for(int f = 0; f < 2; f++){ int yb = 59 - f * 12; for(int y = yb - 9; y < yb; y++) set_cell(w, 79, y, 0); rect_fill(w, 62, yb - 9, 3, 7, 0);
+      tgtk(w, 71, yb, LK_THROWER); tgt(w, 79, yb); tgt(w, 87, yb); tnt(w, 91, yb); }
+    tube(w, R(37.5), R(42.5), R(68.25), R(57)); tube(w, R(51.25), R(29.5), R(68.25), R(45)); break;
+  case 37: {    /* rent strike: a 3-storey walk-up like Walk-Up Wreckage, but some of the tenants are walkers who fight back */
+    static const int PT[3] = {71, 83, 95}, PADS[2][2] = {{100, 0}, {60, 1}};
+    static const uint8_t DR[3][3] = {{1,0,1},{0,1,0},{1,0,1}};
+    static const int TG[8][3] = {{89,59,1},{77,59,0},{67,49,0},{77,49,1},{89,49,0},{90,39,0},{80,39,1},{67,39,0}};
+    const int g = 59, fh = 10, ft = 2, X = 58, Wd = 48, F = 3;
+    w->walk = 1;
+    rect_fill(w, X, g, Wd, 1, S);
+    for(int f = 1; f <= F; f++) rect_fill(w, X - (f == F), g - f * fh, Wd + (f == F ? 2 : 0), ft, f == F ? B : W_);
+    for(int k = 0; k < Wd + 2; k += 2) set_cell(w, X - 1 + k, g - F * fh - 1, B);
+    for(int f = 0; f < F; f++){
+      int yb = g - f * fh, y0 = yb - fh + ft, wm = f ? W_ : B;
+      rect_fill(w, X, y0, 2, fh - ft, wm); rect_fill(w, X + Wd - 2, y0, 2, fh - ft, wm); room(w, X + 2, y0, Wd - 4, fh - ft, f);
+      for(int pi = 0; pi < 3; pi++){ rect_fill(w, PT[pi], y0, 1, fh - ft, B); rect_fill(w, PT[pi], yb - 7, 1, 7, DR[f][pi] ? W_ : 0); }
+      if(f == 0) rect_fill(w, X, y0, 2, 8, 0); else rect_fill(w, X, yb - 6, 2, 3, MX_GLASS);
+      rect_fill(w, X + Wd - 2, yb - 6, 2, 3, MX_GLASS);
+    }
+    for(int k = 0; k < 2; k++){
+      int c = PADS[k][0], f = PADS[k][1], yb = g - f * fh, ys = g - (f + 1) * fh;
+      rect_fill(w, c, ys, 4, ft, 0); room(w, c, ys, 4, ft, f + 1);
+      rect_fill(w, c, yb - 1, 4, 1, RU); pad(w, c, yb - 1, 4);
+    }
+    for(int k = 0; k < 8; k++) tgtk(w, TG[k][0], TG[k][1], TG[k][2] ? LK_WALKER : LK_NONE);
+    tnt(w, 82, 59); tnt(w, 86, 49); tnt(w, 72, 39); break; }
+  case 38:      /* sand standoff: a 2-storey brick house with a glass tank of sand on its wooden roof, two bat landlords at the gate */
+    HX(64, GR, 26, 2, 10, 1, 1, B, W_, W_, 0, 0);
+    rect_fill(w, 63, 25, 2, 12, MX_GLASS); rect_fill(w, 89, 25, 2, 12, MX_GLASS); rect_fill(w, 65, 25, 24, 12, MX_SAND);
+    tgtk(w, 58, 59, LK_BAT); tgtk(w, 61, 59, LK_BAT); tgt(w, 69, 59); tgt(w, 84, 59); tgt(w, 69, 49); tgt(w, 84, 49); tnt(w, 76, 49); break;
+  case 39:      /* the real finale: head office */
     house(w, 46, 10, 4, B, W_, W_, 1, 0); house(w, 60, 18, 5, S, ST, ST, 0, 1); house(w, 82, 12, 6, MX_GLASS, S, ST, 0, 0); house(w, 98, 10, 3, RU, W_, W_, 1, 0);
     tgt(w, 50, 59); tgt(w, 52, 32); tgt(w, 66, 59); tgt(w, 72, 50); tgt(w, 66, 41); tgt(w, 72, 32); tgt(w, 68, 23); tgt(w, 86, 59); tgt(w, 90, 41);
     tgt(w, 86, 23); tgt(w, 88, 14); tgt(w, 102, 59);

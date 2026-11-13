@@ -62,7 +62,7 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #endif
 #define MX_MAX_TARGETS   12
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    37
+#define MX_NUM_LEVELS    40
 #define MX_STORY_LEVELS  20      /* chapter 1: the story achievements and outfits count only these, so adding levels never moves earned goalposts */
 #define MX_MAX_ROOMS     20
 

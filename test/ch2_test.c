@@ -23,6 +23,12 @@ int main(void){
   CHECK(W.walk == 1 && W.npads == 3 && W.ntargets == 11 && W.men == 4, "Walk-Up Wreckage: walk level, 3 pads, 11 landlords, 4 men");
   CHECK(strcmp(mx_level_name(22), "Walk-Up Wreckage") == 0 && strcmp(mx_level_name(25), "Collection Day") == 0 && strcmp(mx_level_name(26), "Batter Up") == 0, "level names");
   { mx_load(&W, 0); CHECK(W.walk == 0 && W.npads == 0, "an ordinary level is not a walk level"); }
+  /* the three levels that fill the chapter 2 screen (36-38), then the finale at 39 */
+  mx_load(&W, 36); CHECK(W.ntubes == 2 && W.ntargets == 6 && W.targets[0].kind == LK_THROWER && W.targets[3].kind == LK_THROWER && W.walk == 0, "Mail Room Mayhem: 2 tubes, a thrower per floor");
+  mx_load(&W, 37); CHECK(W.walk == 1 && W.npads == 2 && W.ntargets == 8 && W.men == 4, "Rent Strike: walk level, 2 pads, 8 landlords, 4 men");
+  { int walkers = 0; for(int i = 0; i < W.ntargets; i++) walkers += W.targets[i].kind == LK_WALKER; CHECK(walkers == 3, "Rent Strike: three walkers"); }
+  mx_load(&W, 38); CHECK(W.ntargets == 6 && W.targets[0].kind == LK_BAT && W.targets[1].kind == LK_BAT && W.men == 7, "Sand Standoff: two bat guards, 6 landlords");
+  CHECK(MX_NUM_LEVELS == 40 && strcmp(mx_level_name(39), "Landlord HQ") == 0 && strcmp(mx_level_name(36), "Mail Room Mayhem") == 0, "40 levels, Landlord HQ last");
 
   /* ---- a flight onto a walk level ends on his feet ---- */
   mx_load(&W, 22);

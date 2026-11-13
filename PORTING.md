@@ -404,7 +404,7 @@ exercised with the host harnesses in `test/` and CI (compile only for the consol
   (It also fails on the old layouts, so it does discriminate.)
 - Console level order now: 1-20 story (same numbers as the web), 21-24 = web 21, 22, 24, 25 (Special Delivery,
   Hourglass Heights, Over the Top, Needle Threader), 25-34 = web 28-37 (the ten pure-slingshot levels; the last one,
-  Landlord HQ, is the finale and shows "the end"). `MX_NUM_LEVELS` is 37 (see the Chapter 2 mechanics section: the level order now equals the web order); `MX_STORY_LEVELS` (20) is what the story
+  Landlord HQ, is the finale and shows "the end"). `MX_NUM_LEVELS` is 40 (see the Chapter 2 mechanics section: the level order now equals the web order); `MX_STORY_LEVELS` (20) is what the story
   achievements and outfits count, so nothing already earned moves. The save blob grows by 5 bytes per level and the
   loader already accepts saves with fewer levels.
 - Walk-Up Wreckage and the two fight-back levels (Collection Day, Batter Up) are now on the consoles too: see "Chapter 2 mechanics" below.
@@ -413,7 +413,7 @@ exercised with the host harnesses in `test/` and CI (compile only for the consol
   proof that a level is impossible, "solved" is a proof that it can be won with this exact physics. `SOLVE=1`.
 
 ### Chapter 2 mechanics (core + DS + 3DS + Dreamcast)
-- Level order is now exactly the web order (core index = web index, 37 levels): 20 Special Delivery, 21 Hourglass Heights, 22 Walk-Up Wreckage, 23 Over the Top, 24 Needle Threader, 25 Collection Day, 26 Batter Up, 27-36 the ten slingshot levels. Saves made on the 34-level build keep their data by index, so best scores of levels after Hourglass Heights now sit under different levels (the save loader is index based, not name based).
+- Level order is now exactly the web order (core index = web index, 40 levels): 20 Special Delivery, 21 Hourglass Heights, 22 Walk-Up Wreckage, 23 Over the Top, 24 Needle Threader, 25 Collection Day, 26 Batter Up, 27-35 the nine slingshot levels, 36 Mail Room Mayhem (tubes + briefcase throwers), 37 Rent Strike (a second walk-up, with walkers that fight back), 38 Sand Standoff (bat guards + a sand tank on the roof), 39 Landlord HQ (the finale, moved from 36 so it stays last; the web chapter 2 screen now has all 20 slots filled). Bots solve the three new levels, but no human has played them. Saves made on the 34-level build keep their data by index, so best scores of levels after Hourglass Heights now sit under different levels (the save loader is index based, not name based).
 - Walk mode (`MAN_WALK`, `mx_walk_input(w, ax, jump, punch, stomp)`, `mx_walk_quit`): he lands on his feet on a walk level, walks (16.9 cells/s), jumps, punches (barge when running), belly-slams, bounces off pads (pads are rubber cells in the grid; `MxPad` is only for drawing). 45 s clock, +3 s per landlord, -3 s when hurt, run out of time or give up = the man is lost. Events EV_WALK / PUNCH / SLAM / PAD / HURT / BONK / THROW / SWING.
 - Landlord kinds (`MxTarget.kind`): walker patrols and swings at a man on foot, thrower lobs briefcases (`MxCase`) at the man in the sling, bat swats shots slower than `MX_BAT_BREAK`. Getting hit in the sling stuns him 1.4 s (aim input is ignored) and costs 2000 points.
 - Fight-back switch: `mx_set_fight(w, on)`; options byte bit 4 = fight-back OFF (default 0 = on); `MxOptions.nofight`. DS options row, 3DS Y on the title, Dreamcast Y on the title / X on pause.
@@ -425,6 +425,9 @@ exercised with the host harnesses in `test/` and CI (compile only for the consol
 - The chunk broad-phase grid (`bhead`) is cleared only over the rows used last step (`bh_lo`/`bh_hi`) instead of the whole 16 KB each sub-step. Bit-identical.
 - Benchmark `test/bench.c` (all 37 levels, one fixed shot, 600 frames, fixed point): 9.98 G instructions before, 6.71 G after (callgrind), about 25% less host time. Instruction counts on the PC do not include the DS's missing hardware divide or cache effects, so this is not a DS frame time: **DS speed has still never been measured on hardware or an emulator.**
 - Where a DS frame goes (callgrind of the real DS front-end on the host, level 7, 3000 frames): about half is drawing, mostly the man's sprite warp/rotate (`spr_man_jr`), voxel tiles (`gfx_tile`), `draw_world`, `gfx_rect` and the background copy. Not optimised yet.
+
+### Wide finale (web only so far)
+- Web Landlord HQ (level 39) is now 360 cells wide (`cols:360`, `setWorld`), with three slings (`slings`), districts (`zones`) and +men per cleared district (`zoneMen`); `[` and `]` or the SLING buttons move between slings. The core and consoles still have the old 120-wide HQ, so `level_parity.js` stops at 38. Bots have not played it; only a headless-browser smoke test (nothing dies on its own, shots launch, forced district clears advance the sling).
 
 ### Pneumatic tubes (core + all three consoles)
 - `MxTube` (mouth, nozzle, exit velocity 95 cells/s), `MX_TUBE_R` 3.75 cells, `EV_TUBE`. A flying man within the
