@@ -45,6 +45,7 @@ EYES = {
     "sad":    {6: ".......HH.", 7: "...HHHH...", 8: "....BBBB..", 9: "....wiBw..", 10: "....wiiw..", 11: "....rwww..", 12: "....r....."},
     "shades": {8: "..gGGGGGGG", 9: "..GBwBBBBG", 10: "..GBBwBBBG", 11: "..gBBBBBgg"},
     "dizzy":  {7: "...HHHHH..", 8: "....BBBB..", 9: "....wBiw..", 10: "....wiBw..", 11: "....ssss.."},
+    "lids":   {7: "...HHHHH..", 8: "....ssss..", 9: "....BBBB..", 10: "....wiBw..", 11: "....SSSS.."},   # half-lidded bedroom eyes
 }
 # mouths: rows 13-17.  Row 13/14 mustache is common; mouth sits under it.
 MUS = {13: "....hhhhhh", 14: "..hhhh...."}
@@ -60,6 +61,8 @@ MOUTH = {
     "frown":   {15: "......LLLL", 16: ".....L...."},
     "flat":    {15: "......LLLL"},
     "snore":   {15: "......LLLL", 16: ".....Lmmmm", 17: "........tt"},
+    "pucker":  {15: ".......LLL", 16: ".......Lmm", 17: "........LL"},                  # lips pursed for a kiss
+    "smirk":   {15: ".....LLLLL", 16: "...LL....."},                                  # closed, lopsided smile
 }
 EXTRA = {   # whole-face tweaks keyed by name (applied last, half strings)
     "puff": {11: ".oSppSSSSS", 12: ".oppppSsSS"},
@@ -89,6 +92,10 @@ FRAME_HEADS = {
     "SLEEP_A": ("sleep", "snore", None), "SLEEP_B": ("sleep", "snore", None),
     "SAD": ("sad", "frown", None),
     "CAPE_A": ("wink", "grin2", None),
+    "BK_A": ("wink", "pucker", None), "BK_B": ("wink", "pucker", None),          # blown kiss
+    "POSE_A": ("lids", "smirk", None), "POSE_B": ("lids", "smirk", None),        # pin-up pose
+    "DANCE_A": ("happy", "grin2", None), "DANCE_B": ("happy", "grin2", None),    # disco
+    "PEC_A": ("lids", "smirk", None), "PEC_B": ("lids", "smirk", None),          # pec pops
 }
 KEY = {'B': 'BLK', 'G': 'GOLD', 'g': 'GOLD2', 'w': 'WH', 'h': 'HAIR', 'H': 'HAIR2', 'o': 'RIM', 'm': 'MOUTH', 't': 'TONG', 's': 'SKD', 'k': 'SKM', 'S': 'SK', 'r': 'GR', 'l': 'HAIRL', 'p': 'BLUSH', 'i': 'IRIS', 'L': 'LIP', 'T': 'TOOTH', 'K': 'SKH'}
 

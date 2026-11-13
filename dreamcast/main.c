@@ -138,7 +138,7 @@ static void text(const char *s, float x, float y, float size, uint32 col, int al
 }
 
 /* ---- tiny particle pool driven by core events and the idle gags ---- */
-enum { PK_BIT, PK_STINK, PK_FLY, PK_ZZZ, PK_SWEAT };
+enum { PK_BIT, PK_STINK, PK_FLY, PK_ZZZ, PK_SWEAT, PK_HEART, PK_GLINT };
 typedef struct { float x, y, vx, vy, life, max; uint32 c; int kind; } Part;
 static Part parts[256];
 static float frand(void){ return (float)rand() / (float)RAND_MAX; }
@@ -199,6 +199,8 @@ static void handle_events(void){
     case EV_AIRPOP:  for(int k = 0; k < 30; k++) spawn(e->x, e->y, k & 1 ? argb(255, 60, 60, 255) : k & 2 ? argb(255, 240, 220, 255) : argb(125, 255, 90, 255), 700); break;
     case EV_FART:    for(int k = 0; k < 10; k++) spawn_k(PK_STINK, e->x, e->y, (frand() - 0.5f) * 140, (frand() - 0.5f) * 90, 1.2f, argb(180, 225, 60, 255)); break;
     case EV_SPLOOSH: for(int k = 0; k < 40; k++) spawn(e->x, e->y, argb(125, 255, 90, 255), 760); break;
+    case EV_TUBE: { const uint32 TC[3] = { argb(255, 154, 60, 255), argb(79, 208, 255, 255), argb(140, 255, 90, 255) };   /* posted through a pneumatic tube */
+      for(int k = 0; k < 14; k++){ spawn(e->x, e->y, TC[e->m % 3], 300); spawn(e->a, e->b, TC[e->m % 3], 420); } break; }
     default: break;   /* TODO: AICA sound for EV_CRUNCH / EV_LAUNCH / EV_THUD / ... */
     }
   }
@@ -301,6 +303,10 @@ static void idle_fx(int fx, float wx, float wy, int face){
   case FX_SNAP:  for(int k = 0; k < 4; k++) spawn_k(PK_BIT, wx + (frand() - 0.5f) * 5, wy - 3, (frand() - 0.5f) * 120, -frand() * 90, 0.5f, argb(255, 255, 210, 60)); break;
   case FX_WHEW:  spawn_k(PK_SWEAT, wx + 3, wy - 6, 30, -60, 0.8f, argb(200, 190, 232, 255)); break;
   case FX_SNORE: spawn_k(PK_ZZZ, wx + face * 3, wy - 5, 20 * face, -45, 1.4f, argb(255, 255, 255, 255)); break;
+  case FX_KISS:  for(int k = 0; k < 3; k++) spawn_k(PK_HEART, wx + face * (3 + k * 0.6f), wy - 5 - k * 0.5f, face * (40 + frand() * 40), -(40 + frand() * 30), 1.5f + frand() * 0.4f, argb(255, 95, 147, 255)); break;
+  case FX_SPARKLE: for(int k = 0; k < 5; k++) spawn_k(PK_GLINT, wx + (frand() - 0.5f) * 9, wy - frand() * 9, 0, -8, 0.5f + frand() * 0.4f, argb(255, 247, 194, 255)); break;
+  case FX_DISCO: spawn_k(PK_GLINT, wx + (frand() < 0.5f ? 1 : -1) * (3 + frand() * 3), wy - 5 - frand() * 3, 0, -8, 0.5f, argb(255, 255, 120, 255)); break;
+  case FX_POP:   for(int k = 0; k < 2; k++) spawn_k(PK_BIT, wx + (k ? 2.5f : -2.5f), wy - 3, (k ? 1 : -1) * (40 + frand() * 40), -50 - frand() * 40, 0.4f, argb(255, 255, 255, 255)); break;
   default: break;
   }
 }
@@ -430,6 +436,20 @@ static void draw_all(void){
     float wx, wy; mx_target_offset(&world, t, &wx, &wy);
     draw_landlord(X(t->x + wx), Y(t->y + wy) + sinf(world.time * 5 + t->t) * 0.5f, Z_TARGET);
   }
+  /* chapter 2 pneumatic tubes: balloon, brass mouth, nozzle stub */
+  for(int i = 0; i < world.ntubes; i++){
+    const uint32 TC[3] = { argb(255, 154, 60, 255), argb(79, 208, 255, 255), argb(140, 255, 90, 255) };
+    const MxTube *t = &world.tubes[i]; uint32 c = TC[i % 3];
+    float ax = X(t->ax), ay = Y(t->ay), bx = X(t->bx), by = Y(t->by);
+    float sw = sinf(world.time * 1.3f + i * 2) * 2, balx = ax + sw, baly = ay - 39 + sinf(world.time * 1.9f + i) * 2;
+    seg(balx - 6, baly + 16, ax - 8, ay - 15, 1.4f, Z_TARGET + 0.1f, argb(58, 42, 26, 255)); seg(balx + 6, baly + 16, ax + 8, ay - 15, 1.4f, Z_TARGET + 0.1f, argb(58, 42, 26, 255));
+    puff(balx, baly, 19.5f, Z_TARGET + 0.2f, argb(0, 0, 0, 255)); puff(balx, baly, 17.5f, Z_TARGET + 0.25f, c);
+    puff(balx - 6, baly - 7, 5.5f, Z_TARGET + 0.3f, argb(255, 255, 255, 110));
+    text("IN", balx, baly + 3, 10, WHITE, 1, Z_TARGET + 0.4f);
+    puff(ax, ay, 19, Z_TARGET + 0.2f, argb(200, 154, 58, 255)); puff(ax, ay, 16.5f, Z_TARGET + 0.25f, c); puff(ax, ay, 14.5f, Z_TARGET + 0.3f, argb(42, 33, 24, 255));
+    { float a = world.time * 5; for(int k = 0; k < 24; k++){ float aa = k * 0.3f + a, r = k * 0.5f; puff(ax + cosf(aa) * r, ay + sinf(aa) * r, 1.4f, Z_TARGET + 0.35f, c); } }
+    quad(bx - 24, by - 8, 20, 16, Z_TARGET + 0.2f, argb(200, 150, 58, 255)); quad(bx - 22, by - 6, 17, 3, Z_TARGET + 0.25f, argb(255, 224, 138, 255)); quad(bx - 4, by - 9, 7, 18, Z_TARGET + 0.3f, c);
+  }
   /* the air valve */
   { float vx = X(MX_VALVE_X), vy = Y(MX_VALVE_Y), gy = Y((float)MX_ROWS); int f = m->mode == MAN_AIM ? (int)(m->inf * 100) : 0;
     quad(vx - 14, gy - 4, 28, 5, Z_MAN - 0.6f, argb(110, 115, 130, 255));
@@ -487,6 +507,10 @@ static void draw_all(void){
     case PK_FLY: { float t = world.time * 18.0f + i; quad(p->x + sinf(t * 1.3f) * 9, p->y + cosf(t) * 7, 3, 3, Z_FX, p->c); break; }
     case PK_ZZZ: { text("Z", p->x, p->y, 16 + age * 8, argb(255, 255, 255, (int)(255 * (1.0f - age))), 1, Z_FX); break; }
     case PK_SWEAT: puff(p->x, p->y, 3.0f, Z_FX, p->c); break;
+    case PK_HEART: { float r = 7 + 2 * sinf(world.time * 9 + i), hx = p->x + sinf(world.time * 4 + i) * 5;      /* two blobs and a point: a heart */
+      puff(hx - r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c); puff(hx + r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c);
+      { float xs[4] = { hx - r * 1.1f, hx, hx, hx + r * 1.1f }, ys[4] = { p->y, p->y - 0.1f, p->y + r * 1.3f, p->y }; quad4(xs, ys, Z_FX, p->c); } break; }
+    case PK_GLINT: { float r = 10 * sinf(age * 3.14159f); if(r > 0){ quad(p->x - r, p->y - 1, r * 2, 2, Z_FX, p->c); quad(p->x - 1, p->y - r, 2, r * 2, Z_FX, p->c); } break; }
     default: { float a = 1.0f - age; puff(p->x, p->y, 3.4f + a * 1.6f, Z_FX, c | ((uint32)((int)(255 * (a > 0.3f ? 1.0f : a / 0.3f))) << 24)); }
     }
   }

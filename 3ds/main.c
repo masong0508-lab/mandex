@@ -18,6 +18,8 @@
 #include <math.h>
 #include "mx.h"
 #include "mx_meta.h"
+#include "manspr.h"                                /* the same pixel-art man as the DS and Dreamcast ports (generated from the web game) */
+#include "manidle.h"                                /* his idle gags, victory dance */
 
 static MxWorld world;
 enum { ST_TITLE, ST_PLAY, ST_PAUSE };
@@ -74,12 +76,14 @@ static void textc(Scr *s, int cx, int y, const char *t, int k, u32 c){ text(s, c
 static void itoa_(int v, char *o){ sprintf(o, "%d", v); }
 
 /* ---------------------------------------------------------------- tiny effects */
-typedef struct { float x, y, vx, vy; int life; u32 c; } Part;
+typedef struct { float x, y, vx, vy; int life; u32 c; int kind; } Part;     /* kind 0 = dust/debris, 1 = heart, 2 = sparkle (the last two float: no gravity) */
 #define NP 160
 static Part parts[NP];
-static void spawn(float x, float y, float vx, float vy, int life, u32 c){
-  for(int i = 0; i < NP; i++) if(parts[i].life <= 0){ parts[i] = (Part){x, y, vx, vy, life, c}; return; }
+static void spawn_k(float x, float y, float vx, float vy, int life, u32 c, int kind){
+  for(int i = 0; i < NP; i++) if(parts[i].life <= 0){ parts[i] = (Part){x, y, vx, vy, life, c, kind}; return; }
 }
+static void spawn(float x, float y, float vx, float vy, int life, u32 c){ spawn_k(x, y, vx, vy, life, c, 0); }
+static void popup(float x, float y, const char *s, u32 c);
 static void on_events(void){
   for(int i = 0; i < world.nev; i++){
     const MxEvent *e = &world.ev[i];
@@ -89,13 +93,62 @@ static void on_events(void){
       spawn(x, y, RTOF(e->a) * .3f + (rand() % 9 - 4) * .2f, RTOF(e->b) * .3f - (rand() % 7) * .2f, 30 + rand() % 20, RGB(c[0], c[1], c[2])); } break;
     case EV_BOOM: for(int k = 0; k < 24; k++) spawn(x, y, (rand() % 21 - 10) * .35f, (rand() % 21 - 10) * .35f, 30, RGB(255, 200 - rand() % 100, 40)); break;
     case EV_SPLAT: for(int k = 0; k < 12; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 30, RGB(110, 255, 90)); break;
+    case EV_TUBE: { static const u32 TC[3] = { RGB(255, 154, 60), RGB(79, 208, 255), RGB(140, 255, 90) };        /* posted through a pneumatic tube */
+      for(int k = 0; k < 16; k++){ float an = k * .39f; spawn(x, y, cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); spawn(RTOF(e->a), RTOF(e->b), cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); }
+      popup(x, y - 5, "FWOOMP!", TC[e->m % 3]); } break;
     case EV_TARGET: for(int k = 0; k < 14; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 11) * .3f, 36, RGB(255, 220, 60)); break;
     default: break;
     }
   }
 }
+/* floating words ("MWAH!", "BUUURP!"): world position in cells */
+typedef struct { float x, y; int life; const char *s; u32 c; } Pop;
+static Pop pops[4];
+static void popup(float x, float y, const char *s, u32 c){
+  for(int i = 0; i < 4; i++) if(pops[i].life <= 0){ pops[i] = (Pop){x, y, 70, s, c}; return; }
+}
 static void tick_parts(void){
-  for(int i = 0; i < NP; i++) if(parts[i].life > 0){ Part *p = &parts[i]; p->vy += .06f; p->x += p->vx * .1f; p->y += p->vy * .1f; p->life--; }
+  for(int i = 0; i < NP; i++) if(parts[i].life > 0){ Part *p = &parts[i]; if(!p->kind) p->vy += .06f; p->x += p->vx * .1f; p->y += p->vy * .1f; p->life--; }
+  for(int i = 0; i < 4; i++) if(pops[i].life > 0){ pops[i].y -= .05f; pops[i].life--; }
+}
+
+/* ---------------------------------------------------------------- the man: indexed sprite frames (art/manspr.h, 4 art pixels per cell), scaled to ppc px per cell */
+static inline int fdiv4(int a){ return a >= 0 ? a / 4 : -((-a + 3) / 4); }
+static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
+  const MsFrame *f = &MS_FRAMES[fr];
+  for(int sy = 0; sy < f->h; sy++){
+    int dy = sy - f->ay, y0 = cy + fdiv4(dy * ppc), y1 = cy + fdiv4((dy + 1) * ppc);
+    if(y1 <= y0) y1 = y0 + 1;
+    if(y1 < 0 || y0 >= s->h) continue;
+    for(int sx = 0; sx < f->w; sx++){
+      int c = f->px[sy * f->w + sx];
+      if(!c) continue;
+      int dx = face >= 0 ? sx - f->ax : f->ax - sx - 1, x0 = cx + fdiv4(dx * ppc), x1 = cx + fdiv4((dx + 1) * ppc);
+      if(x1 <= x0) x1 = x0 + 1;
+      rect(s, x0, y0, x1 - x0, y1 - y0, RGB(MS_PAL[c - 1][0], MS_PAL[c - 1][1], MS_PAL[c - 1][2]));
+    }
+  }
+}
+static MiState mi;                                             /* idle gag state, see art/manidle.h */
+static void idle_fx(int fx, float wx, float wy){               /* particles and words for a gag step (no sound on the 3DS port yet) */
+  float mxp = wx + 1.3f, myp = wy - 3.6f;
+  switch(fx){
+  case FX_SLAP: spawn(wx - 2, wy - 4, -.6f, -1.f, 30, RGB(150, 200, 255)); spawn(wx + 2, wy - 4, .6f, -1.f, 30, RGB(150, 200, 255)); break;
+  case FX_GRUNT: spawn(wx + 2, wy - 4, .4f, -1.2f, 30, RGB(150, 200, 255)); break;
+  case FX_BURP: for(int k = 0; k < 6; k++) spawn(mxp, myp, .8f + (rand() % 10) * .1f, (rand() % 7 - 3) * .1f, 50 + rand() % 20, RGB(125, 255, 90)); popup(mxp, myp - 3, "BUUURP!", RGB(125, 255, 90)); break;
+  case FX_FART: for(int k = 0; k < 9; k++) spawn(wx + (rand() % 5 - 2), wy + 1.5f, (rand() % 13 - 6) * .1f, -(rand() % 5) * .1f, 60 + rand() % 30, RGB(125, 255, 90)); popup(wx, wy - 5, "PFFFFT!", RGB(125, 255, 90)); break;
+  case FX_FLICK: spawn(mxp, myp, 1.8f, -.9f, 50, RGB(125, 255, 90)); break;
+  case FX_TAUNT: popup(wx, wy - 7, "NYAH NYAH!", RGB(255, 126, 176)); break;
+  case FX_EEK: spawn(wx - 2, wy - 5, -.6f, -1.f, 30, RGB(150, 200, 255)); spawn(wx + 2, wy - 5, .6f, -1.f, 30, RGB(150, 200, 255)); popup(wx, wy - 7, "EEK!", RGB(255, 90, 90)); break;
+  case FX_SNAP: popup(wx, wy - 5, "SNAP!", RGB(255, 210, 63)); break;
+  case FX_SNORE: spawn(wx + 3, wy - 5, .2f, -.4f, 60, RGB(235, 240, 255)); break;
+  case FX_KISS: for(int k = 0; k < 3; k++) spawn_k(wx + 3 + k, wy - 5, .3f + (rand() % 4) * .1f, -(.3f + (rand() % 3) * .1f), 70 + rand() % 20, RGB(255, 126, 176), 1);
+                popup(wx + 2, wy - 7, "MWAH!", RGB(255, 126, 176)); break;
+  case FX_SPARKLE: for(int k = 0; k < 5; k++) spawn_k(wx + (rand() % 9 - 4), wy - (rand() % 9), 0, -.1f, 14 + rand() % 8, (k & 1) ? RGB(255, 245, 190) : RGB(255, 210, 63), 2); break;
+  case FX_DISCO: spawn_k(wx + ((rand() & 1) ? 1 : -1) * (3 + rand() % 3), wy - (5 + rand() % 3), 0, -.1f, 16, RGB(255, 255, 255), 2); break;
+  case FX_POP: if(!(rand() % 3)) popup(wx, wy - 5, "POP!", RGB(255, 210, 63)); break;
+  default: break;
+  }
 }
 
 /* ---------------------------------------------------------------- drawing the world into a view */
@@ -171,19 +224,32 @@ static void draw_landlords(const View *v){
 static void draw_man(const View *v){
   const MxMan *m = &world.man;
   if(m->mode == MAN_NONE || m->mode == MAN_WAIT) return;
-  int p = v->ppc, x = VX(v, RTOF(m->x)), y = VY(v, RTOF(m->y));
-  if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); }
-  const MxOutfit *of = mx_outfit(outfit_sel);
-  disc(v->s, x, y, p * 2 - 1, RGB(244, 183, 142));                          /* body */
+  int p = v->ppc, x = VX(v, RTOF(m->x)), y = VY(v, RTOF(m->y)), face = 1, fr;
+  if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : (((frame >> 2) & 1) ? MSF_FLY_A : MSF_FLY_B); }
+  else if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); fr = ((frame >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
+  else if(dragging) fr = MSF_DRAG;
+  else fr = mi_frame(&mi, frame);                                            /* idle gags */
+  blit_frame(v->s, fr, x, y, p, face);
   if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){             /* only the belly swells */
-    float f = RTOF(m->inf); int r = (int)(p * (2 + f * 3.2f)), bx = x + (int)(p * f * 1.5f);
+    float f = RTOF(m->inf); int r = (int)(p * (2 + f * 3.2f)), bx = x + face * (int)(p * f * 1.5f);
     disc(v->s, bx, y + p / 2, r + 1, RGB(205, 135, 100)); disc(v->s, bx, y + p / 2, r, RGB(244, 183, 142));
     disc(v->s, bx - r / 3, y + p / 2 - r / 3, r / 5 + 1, RGB(255, 215, 180));
-    if(f > .45f) disc(v->s, x, y - p * 2, p + 1, RGB(235, 40 + (int)(40 * (1 - f)), 50));   /* red in the face */
   }
-  rect(v->s, x - p * 2 + 2, y + p / 2, p * 4 - 4, p, RGB(of->br[0], of->br[1], of->br[2]));     /* boxers */
-  disc(v->s, x + (m->vx >= 0 ? p / 2 : -p / 2), y - p * 2, p, (m->inf > .45f) ? RGB(235, 90, 90) : RGB(244, 183, 142));
-  rect(v->s, x - p * 2, y - p, p, p * 2, RGB(of->tow[0], of->tow[1], of->tow[2]));               /* towel */
+}
+/* chapter 2 pneumatic tubes: a balloon-held brass mouth to fly into, and the nozzle stub on the wall it posts you into */
+static void draw_tubes(const View *v){
+  static const u32 TC[3] = { RGB(255, 154, 60), RGB(79, 208, 255), RGB(140, 255, 90) };
+  Scr *s = v->s; int p = v->ppc;
+  for(int i = 0; i < world.ntubes; i++){
+    const MxTube *t = &world.tubes[i]; u32 c = TC[i % 3];
+    int ax = VX(v, RTOF(t->ax)), ay = VY(v, RTOF(t->ay)), bx = VX(v, RTOF(t->bx)), by = VY(v, RTOF(t->by));
+    int balx = ax + (int)(sinf(frame * .02f + i * 2) * 2), baly = ay - p * 31 / 4 + (int)(sinf(frame * .03f + i) * 2);
+    line(s, balx - p, baly + p * 3, ax - p * 3 / 2, ay - p * 3, RGB(58, 42, 26)); line(s, balx + p, baly + p * 3, ax + p * 3 / 2, ay - p * 3, RGB(58, 42, 26));
+    disc(s, balx, baly, p * 7 / 2 + 1, RGB(0, 0, 0)); disc(s, balx, baly, p * 7 / 2, c); disc(s, balx - p, baly - p * 3 / 2, p * 3 / 4 + 1, RGB(255, 255, 255));
+    disc(s, ax, ay, p * 15 / 4, RGB(200, 154, 58)); disc(s, ax, ay, p * 13 / 4, c); disc(s, ax, ay, p * 11 / 4, RGB(42, 33, 24)); disc(s, ax, ay, p, c); disc(s, ax, ay, p / 2 + 1, RGB(42, 33, 24));
+    rect(s, bx - p * 19 / 4, by - p * 3 / 2, p * 4, p * 3, RGB(200, 150, 58)); rect(s, bx - p * 9 / 2, by - p * 5 / 4, p * 7 / 2, p * 5 / 8 + 1, RGB(255, 224, 138));
+    rect(s, bx - p * 3 / 4, by - p * 13 / 8, p * 3 / 2, p * 13 / 4, c);
+  }
 }
 static void draw_sling(const View *v){
   int sx = VX(v, RTOF(MX_ANCHOR_X)), sy = VY(v, RTOF(MX_ANCHOR_Y)), p = v->ppc;
@@ -205,7 +271,19 @@ static void draw_aim(const View *v){
   }
 }
 static void draw_parts(const View *v){
-  for(int i = 0; i < NP; i++) if(parts[i].life > 0) rect(v->s, VX(v, parts[i].x), VY(v, parts[i].y), 2, 2, parts[i].c);
+  for(int i = 0; i < NP; i++) if(parts[i].life > 0){
+    const Part *q = &parts[i]; int x = VX(v, q->x), y = VY(v, q->y), k = v->ppc >= 4 ? 2 : 1;
+    if(q->kind == 1){                                                        /* heart: two bumps and a point */
+      rect(v->s, x - 2 * k, y - k, 2 * k, 2 * k, q->c); rect(v->s, x + 1, y - k, 2 * k, 2 * k, q->c);
+      rect(v->s, x - 2 * k, y, 5 * k - (k - 1), k, q->c); rect(v->s, x - k, y + k, 3 * k, k, q->c); rect(v->s, x, y + 2 * k, k, k, q->c);
+    } else if(q->kind == 2){                                                 /* sparkle: a four-point star that pulses */
+      int r = (q->life > 8 ? 8 : q->life) * k / 2 + 1;
+      rect(v->s, x - r, y, 2 * r + 1, 1, q->c); rect(v->s, x, y - r, 1, 2 * r + 1, q->c); rect(v->s, x - 1, y - 1, 3, 3, q->c);
+    } else rect(v->s, x, y, 2, 2, q->c);
+  }
+  for(int i = 0; i < 4; i++) if(pops[i].life > 0){
+    int k = v->ppc >= 4 ? 2 : 1; textc(v->s, VX(v, pops[i].x), VY(v, pops[i].y), pops[i].s, k, pops[i].c);
+  }
 }
 static void draw_valve(const View *v){
   int p = v->ppc, x = VX(v, RTOF(MX_VALVE_X)), y = VY(v, RTOF(MX_VALVE_Y)), gy = VY(v, (float)MX_ROWS);
@@ -216,7 +294,7 @@ static void draw_valve(const View *v){
   if(m->mode == MAN_AIM && f > 0){ rect(v->s, x - p * 5, y - p * 9, p * 10, p, RGB(20, 24, 40)); rect(v->s, x - p * 5 + 1, y - p * 9 + 1, f * (p * 10 - 2) / 100, p - 2, f < 50 ? RGB(125, 255, 90) : f < 80 ? RGB(255, 210, 63) : RGB(255, 70, 70)); }
 }
 static void draw_world(const View *v){
-  draw_sky(v); draw_cells(v); draw_landlords(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
+  draw_sky(v); draw_cells(v); draw_landlords(v); draw_tubes(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
 }
 
 /* Stereoscopic top screen.  The slider sets how strong the depth is; each layer gets a horizontal disparity D (px at full slider):
@@ -233,7 +311,7 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
   a.ox = vt->ox + DX(14); draw_sky(&a);                                                   /* far plane (hills/clouds inside carry their own parallax) */
   if(stereo){ a.ox = vt->ox + DX(4); g_dim = .45f; draw_cells(&a); g_dim = 1.0f; }       /* back faces */
   a.ox = vt->ox; draw_cells(&a);
-  a.ox = vt->ox + DX(-3); draw_landlords(&a);
+  a.ox = vt->ox + DX(-3); draw_landlords(&a); draw_tubes(&a);
   a.ox = vt->ox + DX(-4); draw_sling(&a); draw_valve(&a);
   a.ox = vt->ox + DX(-5); draw_aim(&a);
   if(m->mode != MAN_NONE && m->mode != MAN_WAIT){                                         /* ground shadow stays on the ground plane, man lifts off it */
@@ -274,12 +352,17 @@ static void draw_end(void){
     if(new_best && (frame & 16)) textc(&top, 200, 146, "NEW BEST!", 2, RGB(255, 126, 176));
   }
   textc(&top, 200, 162, win ? (world.level == MX_NUM_LEVELS - 1 ? "ALL LANDLORDS EVICTED" : "A = NEXT LEVEL") : "A = TRY AGAIN", 2, RGB(255, 210, 63));
+  if(win){                                                                   /* two dancers, one on each side of the panel (the 32-beat loop in art/manidle.h) */
+    int bob = (int)(fabsf(sinf(frame * .116f)) * 8);
+    blit_frame(&top, mi_dance_frame(frame), 52, 150 - bob, 3, 1);
+    blit_frame(&top, mi_dance_frame(frame + 14), 348, 150 - (int)(fabsf(sinf(frame * .116f + 1.3f)) * 8), 3, -1);
+  } else blit_frame(&top, MSF_SAD, 52, 150, 3, 1);
 }
 
 /* ---------------------------------------------------------------- flow */
 static void load_level(int l){
   mx_load(&world, l); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats);
-  memset(parts, 0, sizeof parts);
+  memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); mi_reset(&mi);
   cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1;
   dragging = 0; pad_used = 0; pad_dx = pad_dy = 0; new_best = 0;
 }
@@ -341,6 +424,11 @@ int main(void){
         if((down & KEY_A) && pad_used){ pad_used = 0; mx_release(&world); }
       } else if(m->mode == MAN_FLY){
         if(down & (KEY_A | KEY_B | KEY_TOUCH)) mx_dive(&world);
+      }
+      if(app == ST_PLAY){        /* idle gags: only while he waits in the sling and nobody is touching anything */
+        if(world.man.mode == MAN_AIM && !dragging && !pad_used && world.banner <= 0 && world.state == MX_PLAY && !(down | held)){
+          mi_update(&mi); if(mi.fx) idle_fx(mi.fx, RTOF(world.man.x), RTOF(world.man.y));
+        } else mi_reset(&mi);
       }
       if(app == ST_PLAY) mx_update(&world, R(1.0 / 60.0));
       on_events();

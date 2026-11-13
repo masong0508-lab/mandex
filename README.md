@@ -15,7 +15,7 @@ One game, four builds: a browser version with its own JS physics, and three cons
 | Sega Dreamcast | `dreamcast/` (KallistiOS, float) | same: host-tested with a software rasteriser, **never built for real** |
 
 `core/mx.c` is the shared C game core for the three consoles (a 120x60 voxel grid, rigid chunks, a wobble lattice with
-8 block kinds and 20 levels; `core/mx_meta.c` holds the stars, achievements and outfits rules), `art/` holds the generated pixel art and the idle-gag player, `tools/` the sprite generator,
+8 block kinds and 34 levels (20 story levels, then 14 chapter 2 levels; same layouts as the web game); `core/mx_meta.c` holds the stars, achievements and outfits rules), `art/` holds the generated pixel art and the idle-gag player, `tools/` the sprite generator,
 `test/` the host tests.  See [PORTING.md](PORTING.md) for the full status, design notes and what is not verified.
 
 ## What is in it

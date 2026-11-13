@@ -82,3 +82,19 @@ echo "--- 3DS front-end drawing on the host (real 3ds/main.c loop, stub libctru)
 gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -Istubs -I../core -I../art n3ds_render.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o n3ds_render
 ./n3ds_render /tmp/n3r0 0 | grep -v "^ok:"
 ./n3ds_render /tmp/n3r1 1.0 | grep -v "^ok:"
+echo "--- pneumatic tubes and the hourglass (core, both math modes): a man flying into a mouth is posted out of the nozzle; the sand stands until the plug goes ---"
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c tube_test.c -lm -o tube_float && ./tube_float | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c tube_test.c -lm -o tube_fixed && ./tube_fixed | grep -v "^ok:"
+echo "--- 3DS man: pixel-art sprites, idle gags, hearts and sparkles, tubes (real 3ds/main.c against the stub libctru) ---"
+gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -Istubs -I../core -I../art n3ds_gags.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o n3ds_gags && ./n3ds_gags | grep -v "^ok:"
+# Optional, slow:  SOLVE=1 bash run_tests.sh   greedy search for a winning shot sequence on every level (see level_solve.c; a "NOT solved" is not a proof)
+if [ -n "$SOLVE" ]; then
+  echo "--- greedy solver: which levels have a winning shot sequence in the core ---"
+  gcc -std=c99 -O2 -I../core ../core/mx.c level_solve.c -lm -o level_solve && ./level_solve
+fi
+# Optional (needs node + playwright):  PARITY=1 bash run_tests.sh   every console level against the web game's level, cell by cell (tools/level_parity.js)
+if [ -n "$PARITY" ]; then
+  echo "--- level parity with the web game ---"
+  gcc -std=c99 -O2 -I../core ../core/mx.c level_dump.c -lm -o level_dump && ./level_dump > /tmp/mx_c_levels.txt
+  node ../tools/level_parity.js /tmp/mx_c_levels.txt 0 33 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,27,28,29,30,31,32,33,34,35,36
+fi

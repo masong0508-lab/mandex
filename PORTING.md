@@ -21,7 +21,7 @@ docs/                      screenshots rendered by the host harness (real DS dra
 ## CHAPTER 2 (work in progress, browser only)
 `web/index.html` has a second chapter on its own level-select tab (CHAPTER 2 (WIP)): level 21 **Special Delivery** (pneumatic tubes: fly into a balloon-held brass mouth and you are posted out of a nozzle inside a steel vault) and level 22 **Hourglass Heights** (pop the plug in the glass hourglass's neck and the sand flood buries the landlords in the steel bulb).  `CH1` (= 20) is the chapter 1 size: stars, "beat every story level" and the story outfits only count chapter 1.  Level 21 is always open, 22 unlocks after 21.  Level 24 **Over the Top** and level 25 **Needle Threader** are pure slingshot levels (no tubes, pads or walking): a solid steel wall that no flat shot gets through (only a steep lob at near-full pull drops in behind it), and a steel curtain with a 7-high slot per floor that a pull has to thread.  `tools/ch2_check.py` (Playwright) checks the chapter 2 levels, including a sweep of every pull on both slingshot levels.  The chapter 2 select tab grows a new row every 5 levels.
 
-Browser **OPTIONS** screen (two columns, all saved in `PD.opt`): collapsible buildings, start tool, aim guide (off / short / full), burp charge, the no-burst cheat, sound on/off (now remembered), a draggable master volume slider with -/+, screen shake (off / low / full), reset options, and reset progress (stars, achievements, outfits; both resets need a second tap within 3 s; creator levels are kept).  The console core stays at 20 levels.
+Browser **OPTIONS** screen (two columns, all saved in `PD.opt`): collapsible buildings, start tool, aim guide (off / short / full), burp charge, the no-burst cheat, sound on/off (now remembered), a draggable master volume slider with -/+, screen shake (off / low / full), reset options, and reset progress (stars, achievements, outfits; both resets need a second tap within 3 s; creator levels are kept).  The console core has 34 levels now (see "Ten more levels" below).
 
 ## ROADMAP PROGRESS (Nov 2026): DS first
 Work follows the "Mandex Porting Roadmap" (16 ports) and its status update.  Done so far, with the patch that did it (apply in this order):
@@ -391,15 +391,48 @@ now step-turn round first.  The console sprites (`art/manspr.h`, `art/manidle.h`
 
 ## Ten more levels, ending, depth touches, new animations (rebuilt on top of the chapter 2 work)
 
-- Ten pure-slingshot levels, same layouts in the HTML game (chapter 2, levels 28-37) and in the shared core
-  (`core/mx.c`, levels 21-30 on the consoles). `MX_NUM_LEVELS` is 30; `MX_STORY_LEVELS` (20) is what the story
+Nothing in this section has run on a Nintendo DS, a 3DS, a Dreamcast or an emulator. Everything was compiled and
+exercised with the host harnesses in `test/` and CI (compile only for the console toolchains). Sounds were never heard.
+
+### Levels: every port now builds the same buildings
+- The console levels 1-20 used to be older fixed layouts (1-thick walls, 9-high floors). `house_ex()` in `core/mx.c`
+  now takes floor height, wall thickness and slab thickness like the web game's `house()`, and levels 1-20 are
+  rewritten from the web builders (men counts too: level 1 has 5, level 13 has 6).
+- Parity is checked cell by cell: `test/level_dump.c` writes every core level after `mx_load`, and
+  `tools/level_parity.js` loads the same levels in the web game with Playwright and diffs men, landlord positions and
+  the whole grid. `PARITY=1 bash test/run_tests.sh` runs it. All 34 console levels are identical to their web twins.
+  (It also fails on the old layouts, so it does discriminate.)
+- Console level order now: 1-20 story (same numbers as the web), 21-24 = web 21, 22, 24, 25 (Special Delivery,
+  Hourglass Heights, Over the Top, Needle Threader), 25-34 = web 28-37 (the ten pure-slingshot levels; the last one,
+  Landlord HQ, is the finale and shows "the end"). `MX_NUM_LEVELS` is 34; `MX_STORY_LEVELS` (20) is what the story
   achievements and outfits count, so nothing already earned moves. The save blob grows by 5 bytes per level and the
-  loader already accepts saves with fewer levels. The HTML chapter 2 levels 21-27 (tubes, sand flood, walking,
-  patrolling landlords) are still HTML only.
-- Ending: the HTML game plays a credits screen after the last level of a chapter. The consoles show a "the end"
-  message on the last win panel.
-- Depth: Dreamcast has cloud drift against a camera pan, a ground shadow and foreground grass. DS has the ground
-  shadow. The HTML backdrop was left alone in this pass (it now has its own camera).
-- Animations: HTML has four new idle gags (blow kiss, pin-up pose, disco, pec pop), hearts and sparkles, and three
-  victory dances. DS and Dreamcast have three new gags (flex, belly shimmy, disco) and a longer victory dance built
-  from frames already in the sprite atlas; the atlas was not regenerated, so the new HTML drawings are HTML only.
+  loader already accepts saves with fewer levels.
+- Not on the consoles (web only): Walk-Up Wreckage (walk mode, pads, doors) and the two fight-back levels (Collection
+  Day, Batter Up: patrolling walkers, bat guys, briefcase throwers). They need new core mechanics and a console
+  control scheme; porting only their geometry would make levels whose tips lie.
+- `test/level_solve.c` is a greedy search (angle, pull, belly-flop timing; a few random restarts with `DEEP=n`) that
+  plays levels on the core. It found a winning sequence on every level except where noted below; "not solved" is not a
+  proof that a level is impossible, "solved" is a proof that it can be won with this exact physics. `SOLVE=1`.
+
+### Pneumatic tubes (core + all three consoles)
+- `MxTube` (mouth, nozzle, exit velocity 95 cells/s), `MX_TUBE_R` 3.75 cells, `EV_TUBE`. A flying man within the
+  radius is posted out of the nozzle, 10 % gravity for 0.55 s and a 0.35 s cooldown (the web game's numbers).
+  `test/tube_test.c` runs in float and DS fixed point. The Hourglass level's sand is the existing sand physics.
+- Drawn on DS (ellipses and lines), Dreamcast (puffs and quads, spinning swirl) and 3DS (discs), with rings and a
+  FWOOMP! word when he is posted through.
+
+### Sprites and gags
+- `tools/splice_frames.py` adds frames to `art/manspr.h` without touching the others: regenerating the whole atlas
+  from the current web game changes the flying, diving and stuck frames (the web game's limb physics moved on), so the
+  eight new frames (blow kiss x2, pin-up pose x2, disco x2, pec pop x2) were generated with `tools/gen_manspr.py` into a
+  scratch copy and spliced in; the 62 existing frames are byte-identical. Faces for them are in `tools/manhead.py`.
+- `art/manidle.h` has the new gags (cape, kiss, pin-up, disco, pecs, shimmy), the new fx (kiss, sparkle, disco, pop)
+  and a 32-beat victory dance. DS and Dreamcast react with hearts, sparkles and "MWAH!" / "POP!" words.
+- The 3DS man used to be simple shapes. It now uses the same pixel-art frames (blitted and scaled in software), the same
+  idle gags, hearts and sparkles (floating particles without gravity) and word pop-ups, and two victory dancers (or a
+  slumped man) at the sides of the end panel. It does not rotate in flight or tint with the outfit (the DS and Dreamcast
+  sprites do not tint either). `test/n3ds_gags.c` blits all 70 frames at both scales and facings.
+
+### Depth and the ending
+- Dreamcast has cloud drift against a camera pan, a ground shadow and foreground grass. DS has the ground shadow.
+- HTML credits after the last level of a chapter; the consoles show "the end" on the last win panel.

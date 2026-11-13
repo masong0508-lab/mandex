@@ -62,7 +62,7 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #endif
 #define MX_MAX_TARGETS   12
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    30
+#define MX_NUM_LEVELS    34
 #define MX_STORY_LEVELS  20      /* chapter 1: the story achievements and outfits count only these, so adding levels never moves earned goalposts */
 #define MX_MAX_ROOMS     20
 
@@ -108,7 +108,8 @@ enum {
   EV_FART,     /* beans power-up jet at x,y */
   EV_SPLOOSH,  /* splat power-up blast at x,y */
   EV_CRUMBLE,  /* the run ended and the damaged walls crumbled: x,y = centre of the cracked blocks, a = how many (<= 80) */
-  EV_LAND      /* the man touched the ground at x,y: a = speed (cells/s), m = 1 if it was a hard landing that skips (browser: dust, ring, shake) */
+  EV_LAND,     /* the man touched the ground at x,y: a = speed (cells/s), m = 1 if it was a hard landing that skips (browser: dust, ring, shake) */
+  EV_TUBE      /* he flew into the mouth of pneumatic tube m at x,y and was posted out of its nozzle at (a,b) */
 };
 /* power-ups: one use of each per level */
 enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT };
@@ -136,9 +137,15 @@ typedef struct {
 
 typedef struct { real x, y, vy, t; uint8_t alive; } MxTarget;
 
+/* Pneumatic tube (chapter 2): a man who flies within MX_TUBE_R of the mouth (ax,ay) is posted out of the nozzle (bx,by) at (vx,vy) cells/s. */
+#define MX_MAX_TUBES 3
+#define MX_TUBE_R    R(3.75)
+typedef struct { real ax, ay, bx, by, vx, vy; } MxTube;
+
 typedef struct {
   int mode;            /* MAN_* */
   real x, y, vx, vy, t, gt, hitCd, gooT, ang;
+  real tubeT, tubeCd;  /* just posted out of a tube: gravity is 10 % for tubeT seconds, no second tube for tubeCd seconds */
   uint8_t dive;
   /* air valve (an unlockable, tucked into the far lower-left corner, clear of every pull-back): w->valve_ok must be set, then
      mx_valve_seat() puts him on it (vlv=1, seated=1) and he inflates; dragging him off (mx_set_pull) fires from the sling as usual.
@@ -188,6 +195,8 @@ typedef struct {
   uint32_t stat_cells;          /* chunk voxels processed by the solver (profiling) */
   MxRoom rooms[MX_MAX_ROOMS];
   int nrooms;
+  MxTube tubes[MX_MAX_TUBES];
+  int ntubes;
   /* events (cleared at the start of each mx_update) */
   MxEvent ev[MX_MAX_EVENTS];
   int nev;

@@ -33,3 +33,8 @@ test/meta_locks
 test/meta_open
 test/ach_float
 test/ach_fixed
+test/tube_float
+test/tube_fixed
+test/n3ds_gags
+test/level_dump
+test/level_solve

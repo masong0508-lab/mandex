@@ -52,11 +52,15 @@ def spin_th(name):
 OOPS_NAMES = ["OOPS_" + c for c in "ABCDEFGH"]
 OOPS_LD = dict(zip(OOPS_NAMES, (0, 0, 0, -112, -122, -118, -120, -104)))
 NEW_FRAMES += OOPS_NAMES
+# the cheeky set (blown kiss, pin-up pose, disco, pec pops): drawn by the HTML (drawManFrame), faces pixelled in manhead.FRAME_HEADS
+CHEEKY = ["BK_A", "BK_B", "POSE_A", "POSE_B", "DANCE_A", "DANCE_B", "PEC_A", "PEC_B"]
+NEW_FRAMES += CHEEKY
 def spiny(name): return name.startswith("SPIN_") or name.startswith("OOPS_")      # frames that turn around: shared head / body handling
 ALIAS = {n: "IDLE_A" for n in NEW_FRAMES}
 ALIAS.update({"CAPE_A": "FLEX_A", "BACK_C": "FLEX_A", "BACK_L": "FLEX_A", "BACK_R": "FLEX_B", "FART_A": "FLEX_A", "FART_B": "FLEX_B"})
 ALIAS.update({n: ("IDLE_A" if spin_th(n)[0] < 90 else "FLEX_B") for n in SPIN_NAMES})
 ALIAS.update({n: "FLEX_B" for n in OOPS_NAMES})
+ALIAS.update({n: "IDLE_A" for n in CHEEKY})
 # jiggle blobs in design units (centre x, y, radius): belly and rear, per body family
 BLOBS = {"front": ((0, -2, 21), (0, 10, 21)), "back": ((0, -6, 20), (0, 10, 21)),
          "fly": ((2, -2, 19), (-13, 6, 14)), "dive": ((3, -2, 17), (-13, 6, 14)), "star": ((0, -2, 21), (0, 12, 20))}

@@ -62,7 +62,7 @@ static u32 rng = 0x2545F491u;
 static int rnd(int n){ rng = rng * 1664525u + 1013904223u; return (int)((rng >> 16) % (u32)n); }
 
 /* ------------------------------------------------------------ particles/popups */
-enum { PT_DEBRIS, PT_SMOKE, PT_SPARK, PT_GOO, PT_HAT, PT_DUST, PT_STAR, PT_STINK, PT_FLY, PT_ZZZ, PT_SWEAT, PT_RING };
+enum { PT_DEBRIS, PT_SMOKE, PT_SPARK, PT_GOO, PT_HAT, PT_DUST, PT_STAR, PT_STINK, PT_FLY, PT_ZZZ, PT_SWEAT, PT_RING, PT_HEART, PT_GLINT };
 typedef struct { int x, y, vx, vy; short life, max; u8 type, col; short r; } Part;      /* positions in 1/64 cell; r = a ring's final radius in 1/64 cell */
 #define NPART 128
 static Part parts[NPART];
@@ -121,6 +121,11 @@ static void idle_fx(int fx, real wx, real wy, int face, int sc, int popups){
   case FX_EEK:   sfx_play(SFX_EEK, 64); spawn(PT_SWEAT, wx - R(2) * sc, wy - R(5) * sc, -6, -10, 0, 30); spawn(PT_SWEAT, wx + R(2) * sc, wy - R(5) * sc, 6, -10, 0, 30); if(popups) popup(wx, wy - RI(7), "EEK!", C_RED2); break;
   case FX_SNAP:  sfx_play(SFX_SLAP, 64); sfx_play(SFX_BOING, 64); if(popups) popup(wx, wy - RI(5), "SNAP!", C_GOLD); break;
   case FX_WHEW:  sfx_play(SFX_WHEW, 64); break;
+  case FX_KISS:  sfx_play(SFX_POP, 64); for(int k = 0; k < 3; k++) spawn(PT_HEART, wx + face * (R(3) + RI(k)) * sc, wy - R(5) * sc, face * (3 + rnd(4)), -(3 + rnd(3)), 0, 70 + rnd(20));
+                 if(popups) popup(wx + face * RI(3), wy - RI(7), "MWAH!", C_PINK); break;
+  case FX_SPARKLE: sfx_play(SFX_STRETCH, 64); for(int k = 0; k < 5; k++) spawn(PT_GLINT, wx + RI(rnd(9) - 4) * sc, wy - RI(rnd(9)) * sc, 0, -1, 0, 14 + rnd(8)); break;
+  case FX_DISCO: sfx_play(SFX_BOING, 64); spawn(PT_GLINT, wx + (rnd(2) ? 1 : -1) * RI(3 + rnd(3)) * sc, wy - RI(5 + rnd(3)) * sc, 0, -1, 0, 16); break;
+  case FX_POP:   sfx_play(SFX_SLAP, 64); if(popups && !rnd(3)) popup(wx, wy - RI(5), "POP!", C_GOLD); break;
   }
 }
 
@@ -146,6 +151,8 @@ static void update_parts(void){
     case PT_FLY:   p->vx = p->vx * 7 / 8; p->vy = p->vy * 7 / 8; break;
     case PT_ZZZ:   p->vx = p->vx * 15 / 16; if(p->life & 3) p->vy = p->vy * 7 / 8 - 0; break;
     case PT_SWEAT: p->vy += 2; if(p->y > ground - 2) p->life = 0; break;
+    case PT_HEART: p->vx = p->vx * 31 / 32; p->vy = p->vy * 15 / 16 - (p->life & 1); break;      /* drifts up and slows */
+    case PT_GLINT: break;
     case PT_DUST:  p->vx = p->vx * 7 / 8; p->vy = p->vy * 7 / 8; break;
     }
   }
@@ -183,6 +190,13 @@ static void on_events(void){
       sfx_play(SFX_BOUNCE, pan);
       popup(e->x, e->y - RI(3), "BOING!", C_PINK);
       break;
+    case EV_TUBE: {                                          /* posted through a pneumatic tube: a ring at each end and FWOOMP */
+      static const u8 TC[3] = { C_FIRE, C_UILINE, C_GOO };
+      u8 tc = TC[e->m % 3];
+      spawn_ring(e->x, e->y, 6, tc); spawn_ring(e->a, e->b, 6, tc);
+      popup(e->x, e->y - RI(5), "FWOOMP!", tc); sfx_play(SFX_WHOOSH, pan);
+      for(int k = 0; k < 6; k++) spawn(PT_DUST, e->a, e->b, rnd(25) + 4, rnd(9) - 4, 0, 20 + rnd(8));
+      break; }
     case EV_THUD:   if(e->b > R(0.3)) sfx_play(SFX_THUD, pan); break;
     case EV_LAND:                                           /* ground touch: a puff of dust, and a hard landing adds a ring */
       for(int k = 0, n = e->m ? 8 : 5; k < n; k++) spawn(PT_DUST, e->x + RI(rnd(5) - 2) / 4, e->y - R(0.5), rnd(15) - 7, -rnd(5) - 1, 0, 22 + rnd(10));
@@ -362,6 +376,29 @@ static void man_with_towel(u8 *b, ClothActor *ta, int x, int y, int ppc, int fac
   if(ta->live) gfx_cloth(b, &ta->c, x, y, ppc, face, 1);
 }
 
+/* chapter 2 pneumatic tubes: a balloon-held brass mouth to fly into, and the nozzle stub on the wall of the room it posts you into */
+static void draw_tubes(const View *v){
+  static const u8 TC[3] = { C_FIRE, C_UILINE, C_GOO };
+  int p = v->ppc;
+  for(int i = 0; i < world.ntubes; i++){
+    const MxTube *t = &world.tubes[i]; u8 c = TC[i % 3];
+    int ax = vx(v, t->ax), ay = vy(v, t->ay), bx = vx(v, t->bx), by = vy(v, t->by);
+    int sway = (((frame >> 4) + i * 3) & 3) - 1, bxx = ax + sway, byy = ay - p * 31 / 4 + (((frame >> 5) + i) & 1);
+    gfx_line(v->buf, bxx - p, byy + p * 3, ax - p * 3 / 2, ay - p * 3, C_DARK);                        /* ropes */
+    gfx_line(v->buf, bxx + p, byy + p * 3, ax + p * 3 / 2, ay - p * 3, C_DARK);
+    gfx_ell(v->buf, bxx, byy, p * 7 / 2 + 1, p * 4 + 1, C_BLACK); gfx_ell(v->buf, bxx, byy, p * 7 / 2, p * 4, c);   /* balloon */
+    gfx_ell(v->buf, bxx - p, byy - p * 3 / 2, p * 3 / 4 + 1, p * 3 / 2, C_WHITE);
+    if(p >= 4) gfx_text_c(v->buf, bxx, byy - 3, "IN", C_WHITE, C_BLACK, 1);
+    gfx_ell(v->buf, ax, ay, p * 15 / 4, p * 15 / 4, C_GOLD2);                                           /* brass mouth */
+    gfx_ell(v->buf, ax, ay, p * 13 / 4, p * 13 / 4, c);
+    gfx_ell(v->buf, ax, ay, p * 11 / 4, p * 11 / 4, C_DARK);
+    gfx_ell(v->buf, ax, ay, p, p, c); gfx_ell(v->buf, ax, ay, p / 2 + 1, p / 2 + 1, C_DARK);            /* swirl, still */
+    gfx_rect(v->buf, bx - p * 19 / 4, by - p * 3 / 2, p * 4, p * 3, C_GOLD2);                          /* nozzle stub on the room's wall, shooting right */
+    gfx_rect(v->buf, bx - p * 9 / 2, by - p * 5 / 4, p * 7 / 2, p * 5 / 8 + 1, C_GOLD);
+    gfx_rect(v->buf, bx - p * 3 / 4, by - p * 13 / 8, p * 3 / 2, p * 13 / 4, c);
+  }
+}
+
 /* the air valve: a pipe with an orange nozzle, a gauge, and a pressure bar while he is on it */
 static void draw_valve(const View *v){
   int ppc = v->ppc, x = vx(v, MX_VALVE_X), y = vy(v, MX_VALVE_Y), gy = MX_ROWS * ppc - v->cy;
@@ -437,6 +474,15 @@ static void draw_parts(const View *v){
     case PT_FLY: { int a = age * 5; gfx_px(v->buf, px + ((a * 7) & 7) - 3, py + ((a * 5) & 7) - 3, C_BLACK); if(big) gfx_px(v->buf, px + ((a * 7) & 7) - 2, py + ((a * 5) & 7) - 3, C_GRAY); break; }
     case PT_ZZZ:   gfx_text_o(v->buf, px, py, age > p->max / 2 ? "z" : "Z", C_WHITE, C_BLACK, 1); break;
     case PT_SWEAT: gfx_rect(v->buf, px, py, 1, big ? 2 : 1, C_CLOUD2); break;
+    case PT_HEART: {                                                       /* a small pink heart (5x4 at the big scale, 3x2 at the small one) */
+      int w = ((age >> 3) & 1) ? 1 : 0; px += w;
+      if(big){ gfx_rect(v->buf, px - 2, py - 1, 2, 2, C_PINK); gfx_rect(v->buf, px + 1, py - 1, 2, 2, C_PINK); gfx_rect(v->buf, px - 2, py, 5, 1, C_PINK); gfx_rect(v->buf, px - 1, py + 1, 3, 1, C_PINK); gfx_px(v->buf, px, py + 2, C_PINK); gfx_px(v->buf, px - 1, py - 1, C_WHITE); }
+      else { gfx_px(v->buf, px - 1, py, C_PINK); gfx_px(v->buf, px + 1, py, C_PINK); gfx_rect(v->buf, px - 1, py + 1, 3, 1, C_PINK); gfx_px(v->buf, px, py + 2, C_PINK); }
+      break; }
+    case PT_GLINT: {                                                       /* a four-point sparkle that grows and shrinks */
+      int r = age < p->max / 2 ? 1 + age * 2 / p->max * 2 : 2; if(big && age > p->max / 3 && age < p->max * 2 / 3) r = 3;
+      gfx_px(v->buf, px, py, C_WHITE); gfx_rect(v->buf, px - r, py, r * 2 + 1, 1, C_GOLD2); gfx_rect(v->buf, px, py - r, 1, r * 2 + 1, C_GOLD2); gfx_px(v->buf, px, py, C_WHITE);
+      break; }
     case PT_RING: {                                                        /* swells fast, then slows (ease out), thins out over the last third */
       if(age * 3 > p->max * 2 && (frame & 1)) break;
       int u = 256 - (256 - age * 256 / p->max) * (256 - age * 256 / p->max) / 256;
@@ -476,6 +522,7 @@ static void draw_world(const View *v, int parallax){
   draw_voxels(v);
   draw_chunks(v);
   draw_targets(v);
+  if(world.ntubes) draw_tubes(v);
   if(opt.tool == MX_TOOL_VALVE) draw_valve(v);
   { const MxMan *m = &world.man;                                   /* his shadow on the ground, smaller the higher he is */
     if(m->mode == MAN_AIM || m->mode == MAN_FLY){ int hgt = gfx_clamp((int)((RI(MX_ROWS) - m->y) >> 12), 0, 40), rw = (v->ppc * (5 * (80 - hgt))) / 80;
