@@ -225,6 +225,13 @@ void mx_dive(MxWorld *w);                     /* belly flop (or the beans jet wh
 void mx_select_power(MxWorld *w, int pw);      /* PW_*: arm / disarm before launching (only while aiming) */
 #define MX_VALVE_X R(4.5)                      /* the air valve, in cells (his rear goes here): far lower-left, a full pull-back */
 #define MX_VALVE_Y R(52.5)                     /* stays ~1.9 cells clear of it, so no aim can ever touch it */
+/* Pointer/touch drag (DS, 3DS): like mx_set_pull, but the raw finger position may be past the full pull. Within MX_VALVE_GRAB of the nozzle he drops onto the
+   valve (and stays while the finger stays within MX_VALVE_KEEP); between that and MX_VALVE_PULLIN the sling keeps stretching on toward the valve.  The launch
+   power is always capped at a full pull (MX_PULL_MAX), so the extra stretch is only for looks and for finding the seat.  Pad/stick input keeps using mx_set_pull. */
+#define MX_VALVE_GRAB   R(5)
+#define MX_VALVE_KEEP   R(5.5)
+#define MX_VALVE_PULLIN R(9.5)
+void mx_drag(MxWorld *w, real dx, real dy);
 int  mx_valve_seat(MxWorld *w);                /* put him on the valve. 0 if locked or not aiming */
 int  mx_targets_alive(const MxWorld *w);
 int  mx_cells_left(const MxWorld *w);

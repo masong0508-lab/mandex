@@ -1025,6 +1025,21 @@ void mx_set_pull(MxWorld *w, real dx, real dy){
   m->x = MX_ANCHOR_X + dx; m->y = MX_ANCHOR_Y + dy;
   m->vlv = 0; m->seated = 0;                            /* any pull-back leaves the valve; the valve never grabs a pull */
 }
+void mx_drag(MxWorld *w, real dx, real dy){
+  MxMan *m = &w->man;
+  if(m->mode != MAN_AIM) return;
+  real fx = MX_ANCHOR_X + dx - MX_VALVE_X, fy = MX_ANCHOR_Y + dy - MX_VALVE_Y, dv2 = rmul(fx, fx) + rmul(fy, fy);
+  if(w->valve_ok && w->state == MX_PLAY){
+    if(m->seated && dv2 < rmul(MX_VALVE_KEEP, MX_VALVE_KEEP)) return;               /* finger still on the seat: stay */
+    if(!m->seated && dv2 < rmul(MX_VALVE_GRAB, MX_VALVE_GRAB)){ mx_valve_seat(w); return; }
+  }
+  mx_set_pull(w, dx, dy);
+  if(w->valve_ok && dv2 < rmul(MX_VALVE_PULLIN, MX_VALVE_PULLIN)){               /* nearing the valve: the sling stretches on back toward it */
+    real dv = rsqrt(dv2), k = rdiv(MX_VALVE_PULLIN - dv, MX_VALVE_PULLIN - MX_VALVE_GRAB);
+    k = rmul(k, R(0.9));
+    m->x += rmul(MX_VALVE_X - m->x, k); m->y += rmul(MX_VALVE_Y - m->y, k);
+  }
+}
 int mx_valve_seat(MxWorld *w){
   MxMan *m = &w->man;
   if(!w->valve_ok || m->mode != MAN_AIM || w->state != MX_PLAY) return 0;
@@ -1037,6 +1052,8 @@ void mx_release(MxWorld *w){
   if(m->vlv){ m->seated = 1; return; }                  /* let go ON the valve: he stays and keeps filling; drag him off to fire */
   real dx = MX_ANCHOR_X - m->x, dy = MX_ANCHOR_Y - m->y;
   if(rmul(dx, dx) + rmul(dy, dy) < R(3)){ m->x = MX_ANCHOR_X; m->y = MX_ANCHOR_Y; return; }
+  { real d = rsqrt(rmul(dx, dx) + rmul(dy, dy));                   /* stretched on toward the valve: power is still a full pull at most */
+    if(d > MX_PULL_MAX){ real k = rdiv(MX_PULL_MAX, d); dx = rmul(dx, k); dy = rmul(dy, k); m->x = MX_ANCHOR_X - dx; m->y = MX_ANCHOR_Y - dy; } }
   { real sp0 = RI(1) - rmul(m->inf, R(0.5));            /* inflated: slower but bigger and heavier */
     m->rad = rmul(MAN_R0, RI(1) + rmul(m->inf, R(0.9)));
     m->vx = rmul(rmul(dx, R(9.2)), sp0); m->vy = rmul(rmul(dy, R(9.2)), sp0);

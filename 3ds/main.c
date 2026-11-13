@@ -286,6 +286,11 @@ static void draw_parts(const View *v){
   }
 }
 static void draw_valve(const View *v){
+  if(dragging && world.valve_ok && world.man.mode == MAN_AIM && !world.man.seated){           /* ghost seat while a pull is in hand: a ring of dots */
+    static const signed char RX[12] = { 100, 87, 50, 0, -50, -87, -100, -87, -50, 0, 50, 87 }, RY[12] = { 0, 50, 87, 100, 87, 50, 0, -50, -87, -100, -87, -50 };
+    int gx = VX(v, RTOF(MX_VALVE_X)), gyy = VY(v, RTOF(MX_VALVE_Y)), rr = v->ppc * 5 / 2 + ((frame >> 3) & 1), on = (frame >> 2) & 1;
+    for(int k = on; k < 12; k += 2) rect(v->s, gx + RX[k] * rr / 100 - 1, gyy + RY[k] * rr / 100 - 1, 2, 2, RGB(235, 245, 255));
+  }
   int p = v->ppc, x = VX(v, RTOF(MX_VALVE_X)), y = VY(v, RTOF(MX_VALVE_Y)), gy = VY(v, (float)MX_ROWS);
   const MxMan *m = &world.man; int f = m->mode == MAN_AIM ? (int)(RTOF(m->inf) * 100) : 0;
   rect(v->s, x - p * 2, gy - 2, p * 4, 3, RGB(110, 115, 130));
@@ -408,7 +413,7 @@ int main(void){
         if(down & KEY_TOUCH) dragging = 1;
         if((held & KEY_TOUCH) && dragging){
           float cx = (float)t.px / 4.0f + vb.cx, cy = (float)t.py / 4.0f + vb.cy;
-          mx_set_pull(&world, R(1) * (cx - RTOF(MX_ANCHOR_X)), R(1) * (cy - RTOF(MX_ANCHOR_Y)));
+          mx_drag(&world, R(1) * (cx - RTOF(MX_ANCHOR_X)), R(1) * (cy - RTOF(MX_ANCHOR_Y)));   /* stretches on toward the valve; drops onto it up close */
         }
         if((up & KEY_TOUCH) && dragging){ dragging = 0; mx_release(&world); }
         if(!dragging && !pad_used && m->seated){}                      /* seated on the valve: leave him there until he is dragged off */

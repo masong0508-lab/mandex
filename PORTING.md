@@ -436,3 +436,18 @@ exercised with the host harnesses in `test/` and CI (compile only for the consol
 ### Depth and the ending
 - Dreamcast has cloud drift against a camera pan, a ground shadow and foreground grass. DS has the ground shadow.
 - HTML credits after the last level of a chapter; the consoles show "the end" on the last win panel.
+
+## Air valve: easier to seat him, the sling stretches on back toward it (web, core, DS, 3DS)
+
+Nothing was moved on screen; only how a drag toward the valve behaves changed. Nothing here has run on real hardware.
+- Web: while you drag toward the valve the sling keeps stretching back toward it (from 76 px out, easing in), he drops onto
+  the seat from 40 px (was 28) and stays while the pointer is within 44 px, and a dotted ghost seat blinks at the nozzle
+  while a pull is in hand. Shot power is still capped at a full pull (`pullVec()` in `launch()` and in the aim guide),
+  so no level's balance changes.
+- Core: `mx_drag(w, dx, dy)` (raw finger offset from the sling) does the same with `MX_VALVE_GRAB` 5 / `MX_VALVE_KEEP` 5.5 /
+  `MX_VALVE_PULLIN` 9.5 cells; `mx_release` caps the launch at `MX_PULL_MAX`. `mx_set_pull` is unchanged and still never grabs
+  the valve (pad and stick input keep using it, so a full-pull aim toward the lower left cannot sit him down by accident).
+  `test/valve_test.c` covers it in float and fixed.
+- DS and 3DS touch drags call `mx_drag` and draw the dotted ghost seat. The DS stylus path is exercised in
+  `test/ds_render.c` (drag back, drop on, lift: stays seated). The Dreamcast has no pointer, so it is unchanged (D-pad DOWN
+  still seats him).

@@ -164,7 +164,14 @@ void swiWaitForVBlank(void){
       opt.tool = MX_TOOL_VALVE; apply_options(); PCHECK(world.valve_ok == 1, "air valve as the start tool and 3 levels beaten: the valve is usable");
       opt.tool = MX_TOOL_NONE; apply_options(); PCHECK(world.valve_ok == 0, "tool NONE: no valve");
       opt.tool = MX_TOOL_VALVE; apply_options();
-      st = 4; f0 = vf; g_ticks = 400000; }                                                                /* the solver now looks slow */
+      st = 30; f0 = vf; }                                                                                 /* first the stylus-on-the-valve check, then the slow solver */
+    if(st == 30){                                                                                         /* drag the man with the stylus, back onto the valve */
+      int vpx = (int)(RTOF(MX_VALVE_X) * 4), vpy = (int)(RTOF(MX_VALVE_Y) * 4) - 56, mpx = (int)(RTOF(MX_ANCHOR_X) * 4), mpy = (int)(RTOF(MX_ANCHOR_Y) * 4) - 56;
+      if(vf == f0 + 1){ g_keys |= KEY_TOUCH; g_touch.px = mpx; g_touch.py = mpy; }                        /* grab him in the sling */
+      if(vf == f0 + 2){ g_keys |= KEY_TOUCH; g_touch.px = (mpx + vpx) / 2; g_touch.py = (mpy + vpy) / 2; PCHECK(!world.man.seated && world.valve_ok, "stylus drag: half way back he is not on the valve yet"); }
+      if(vf == f0 + 3){ g_keys |= KEY_TOUCH; g_touch.px = vpx + 6; g_touch.py = vpy - 5; }               /* the stylus arrives near the nozzle */
+      if(vf == f0 + 4){ g_keys |= KEY_TOUCH; g_touch.px = vpx + 6; g_touch.py = vpy - 5; PCHECK(world.man.seated && world.man.vlv, "stylus drag: pulling the sling all the way back drops him onto the air valve"); }
+      if(vf == f0 + 6){ PCHECK(world.man.seated, "stylus lifted on the valve: he stays seated and keeps filling"); st = 4; f0 = vf; g_ticks = 400000; } }   /* the solver now looks slow */
     if(st == 4 && vf == f0 + 5){ PCHECK(world.collapse == 0 && coll_shed == 1 && opt.collapse == 1, "slow solver: collapse is the FIRST thing dropped, the preference stays on");
       PCHECK(world.substeps == MX_DS_MAX_SUBSTEPS && world.wob_enabled, "...before substeps or the wobble lattice are touched"); st = 5; f0 = vf; }
     if(st == 5 && vf == f0 + 2){ PCHECK(world.substeps == 2 && world.wob_enabled, "still slow: substeps go next"); st = 6; f0 = vf; }

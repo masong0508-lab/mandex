@@ -401,6 +401,11 @@ static void draw_tubes(const View *v){
 
 /* the air valve: a pipe with an orange nozzle, a gauge, and a pressure bar while he is on it */
 static void draw_valve(const View *v){
+  if(dragging && world.valve_ok && world.man.mode == MAN_AIM && !world.man.seated){           /* ghost seat while a pull is in hand: a ring of dots that blinks */
+    static const signed char RX[12] = { 100, 87, 50, 0, -50, -87, -100, -87, -50, 0, 50, 87 }, RY[12] = { 0, 50, 87, 100, 87, 50, 0, -50, -87, -100, -87, -50 };
+    int gx = vx(v, MX_VALVE_X), gyy = vy(v, MX_VALVE_Y), rr = v->ppc * 5 / 2 + ((frame >> 3) & 1), on = (frame >> 2) & 1;
+    for(int k = on; k < 12; k += 2) gfx_rect(v->buf, gx + RX[k] * rr / 100 - 1, gyy + RY[k] * rr / 100 - 1, 2, 2, C_WHITE);
+  }
   int ppc = v->ppc, x = vx(v, MX_VALVE_X), y = vy(v, MX_VALVE_Y), gy = MX_ROWS * ppc - v->cy;
   const MxMan *m = &world.man; int f = m->mode == MAN_AIM ? (int)((m->inf * 100) >> 12) : 0;
   int th = ppc * 3 / 4 < 2 ? 2 : ppc * 3 / 4;
@@ -1051,12 +1056,11 @@ int main(void){
           else dragging = dx * dx + dy * dy < 34 * 34;                   /* grab the man */
         }
         if((held & KEY_TOUCH) && dragging){
-          int vdx = t.px - vx(&av, MX_VALVE_X), vdy = t.py - vy(&av, MX_VALVE_Y);
-          if(!(m->seated && vdx * vdx + vdy * vdy < 20 * 20)){            /* seated: the stylus must leave the valve to pull him off */
           real cx = RI(t.px + av.cx) >> 2, cy = RI(t.py + av.cy) >> 2;    /* stylus px -> cells (4 px per cell) */
-          mx_set_pull(&world, cx - MX_ANCHOR_X, cy - MX_ANCHOR_Y);
-          if(frame % 6 == 0) sfx_play(SFX_STRETCH, 40);
-          }
+          int was_seated = m->seated;
+          mx_drag(&world, cx - MX_ANCHOR_X, cy - MX_ANCHOR_Y);            /* the sling stretches on toward the valve; close to it he drops on; on it he stays until the stylus leaves */
+          if(!was_seated && m->seated) sfx_play(SFX_CLICK, 64);
+          else if(!m->seated && frame % 6 == 0) sfx_play(SFX_STRETCH, 40);
         }
         if((up & KEY_TOUCH) && dragging){ dragging = 0; mx_release(&world); }
         if(!dragging){

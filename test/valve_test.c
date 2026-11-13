@@ -65,6 +65,33 @@ int main(void){
   mx_set_pull(&W, -R(3), R(5)); mx_release(&W);
   run(20); real vx0 = W.man.vx; mx_dive(&W);
   CHECK(W.man.beaned && W.man.vx > vx0 && !W.man.dive, "beans jet speeds him up instead of diving");
+  /* touch drag (mx_drag): the sling stretches on toward the valve, he drops onto it from a bigger zone, power stays a full pull */
+  { mx_load(&W, 0); run(120); W.valve_ok = 0;
+    mx_drag(&W, R(-12), R(7.25));                                    /* finger right on the nozzle, but the valve is locked */
+    CHECK(!W.man.seated && !W.man.vlv, "touch drag: a locked valve grabs nothing");
+    { double dd = hypot(RTOF(W.man.x) - RTOF(MX_ANCHOR_X), RTOF(W.man.y) - RTOF(MX_ANCHOR_Y)); CHECK(dd <= RTOF(MX_PULL_MAX) + 0.05, "touch drag: locked, the pull is clamped as before"); }
+    W.valve_ok = 1;
+    double fx = RTOF(MX_VALVE_X) - RTOF(MX_ANCHOR_X), fy = RTOF(MX_VALVE_Y) - RTOF(MX_ANCHOR_Y), fd = hypot(fx, fy);   /* anchor to valve, cells */
+    double ux = fx / fd, uy = fy / fd;
+    mx_drag(&W, R(ux * (fd - 3)), R(uy * (fd - 3)));                 /* finger 3 cells short of the nozzle */
+    CHECK(W.man.seated && W.man.vlv && W.man.x == MX_VALVE_X, "touch drag: within the grab radius he drops onto the valve");
+    mx_drag(&W, R(ux * (fd - 4.5)), R(uy * (fd - 4.5)));
+    CHECK(W.man.seated, "touch drag: a finger still near the seat keeps him on it");
+    mx_drag(&W, R(ux * (fd - 7.5)), R(uy * (fd - 7.5)));
+    CHECK(!W.man.seated && !W.man.vlv, "touch drag: moving off the seat lets him go");
+    mx_drag(&W, R(ux * (fd - 5.8)), R(uy * (fd - 5.8)));              /* just outside the grab radius */
+    { double dd = hypot(RTOF(W.man.x) - RTOF(MX_ANCHOR_X), RTOF(W.man.y) - RTOF(MX_ANCHOR_Y));
+      CHECK(dd > RTOF(MX_PULL_MAX) + 0.2 && dd < fd, "touch drag: 5.8 cells from the nozzle the sling is stretched on past a full pull, but not onto the valve");
+      mx_drag(&W, R(ux * (fd - 7.5)), R(uy * (fd - 7.5)));
+      double d2 = hypot(RTOF(W.man.x) - RTOF(MX_ANCHOR_X), RTOF(W.man.y) - RTOF(MX_ANCHOR_Y));
+      CHECK(d2 < dd, "touch drag: the stretch eases off further from the seat");
+      mx_drag(&W, R(ux * (fd - 5.8)), R(uy * (fd - 5.8)));
+      mx_release(&W); double sp = hypot(RTOF(W.man.vx), RTOF(W.man.vy));
+      CHECK(W.man.mode == MAN_FLY && sp <= RTOF(MX_PULL_MAX) * 9.2 + 0.2, "touch drag: released while stretched on, he flies at most a full pull's speed");
+      CHECK(sp > RTOF(MX_PULL_MAX) * 9.2 * 0.95, "... and not less than a full pull either"); }
+    /* the pad never grabs: mx_set_pull stays as it was */
+    mx_load(&W, 0); run(120); W.valve_ok = 1; mx_set_pull(&W, R(ux * RTOF(MX_PULL_MAX)), R(uy * RTOF(MX_PULL_MAX)));
+    CHECK(!W.man.seated, "stick/pad pull toward the valve still never grabs it"); }
   printf(fails ? "VALVE TEST FAILED\n" : "valve test passed\n");
   return fails != 0;
 }
