@@ -3106,7 +3106,10 @@ function cutShirtBack(mode){const OU='#5a2f1b';ctx.save();ctx.lineJoin='round';c
   ctx.restore()}
 // Gerald: the same body, no cape, khaki shorts (or boxers), optional tie.  feetY = where his feet land
 function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;if(o.wolf>=3){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
-  const op={nocape:true};if(o.belly)op.belly=o.belly;if(o.head)op.head=o.head;if(o.armL){op.armL=o.armL;op.armR=o.armR}const shm=o.wolf>=3||o.noshirt?0:(o.shirt!=null?o.shirt:(CUTS&&CUTS[cutI]&&CUTS[cutI].shirt!=null?CUTS[cutI].shirt:1)),ti=o.tie;if(shm||ti)op.after=()=>{if(shm)cutShirt(shm);if(ti)cutTie()};WOLFH=o.wolf&&o.wolf<3?o.wolf:0;
+  const op={nocape:true},T=cutT;if(o.belly)op.belly=o.belly;op.head=o.head||[Math.sin(T*1.3)*.5,Math.sin(T*2.6)*.5,Math.sin(T*1.1)*.035];
+  if(o.armL){op.armL=o.armL;op.armR=o.armR}
+  else if((o.pose||'up')==='up'){const a=Math.sin(T*2.1),b=Math.sin(T*2.1+1.2);op.armL=[-35-a*1.2,-12+b*1.5,-33-a*2.2,-34+b*3];op.armR=[35+a*1.2,-12+b*1.5,33+a*2.2,-34+b*3]}   // arms drift with the breathing
+  if(o.walk!=null){const ph=o.walk;for(const q of[-1,1]){const w=ph+(q>0?Math.PI:0),sn=Math.sin(w),lf=Math.max(0,Math.cos(w));const L=[q*(12+3*sn),39-lf*3,q*(13+9*sn),55-lf*7];if(q<0)op.legL=L;else op.legR=L}}const shm=o.wolf>=3||o.noshirt?0:(o.shirt!=null?o.shirt:(CUTS&&CUTS[cutI]&&CUTS[cutI].shirt!=null?CUTS[cutI].shirt:1)),ti=o.tie;if(shm||ti)op.after=()=>{if(shm)cutShirt(shm);if(ti)cutTie()};WOLFH=o.wolf&&o.wolf<3?o.wolf:0;
   const bz=Math.sin(cutT*3.1)*.012+(o.sq||0);ctx.save();ctx.translate(x+(o.dx||0),feetY-48*s+(o.dy||0));ctx.scale(s*(1-bz*.6),s*(1+bz));drawFront(o.pose||'up',o.face||'cool',cutT*.8+.3,op);ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf;WOLFH=0}
 function cutFlag(k,f){const b=1<<k;if(!(cutFx&b)){cutFx|=b;f()}}
 function cutWork(f){applyOutfit(outfitById('workman'),time);try{f()}finally{applyOutfit(outfitCur,time)}}
@@ -3212,9 +3215,45 @@ function cgLogo(s,x,y,size){ctx.save();ctx.translate(x,y);ctx.font='bold '+size+
 function cgSpark(x,y,r,c){ctx.fillStyle=c||'#fff';ctx.beginPath();ctx.moveTo(x,y-r);ctx.quadraticCurveTo(x+r*.12,y-r*.12,x+r,y);ctx.quadraticCurveTo(x+r*.12,y+r*.12,x,y+r);ctx.quadraticCurveTo(x-r*.12,y+r*.12,x-r,y);ctx.quadraticCurveTo(x-r*.12,y-r*.12,x,y-r);ctx.fill()}
 // Brenda in the window, Dennis the lawyer (desk, suit, glasses, tired eyes)
 // Brenda, drawn at the window: bob, blinking, swaying earrings and hair, a coffee mug with steam, and a slow, smug goodbye wave.
+// A cutscene landlord, drawn big: top hat with a buckle, monocle, curly mustache, waistcoat, watch chain, trousers and shoes.
+// Marches in place, swings an arm, waves his papers, sneers, blinks.  Faces left (towards Gerald); origin = between his feet.
+function cgLordBig(t,o){o=o||{};const ph=t*5.2,st=Math.sin(ph),bob=Math.abs(Math.sin(ph))*-2.2,bl=(t*1.3%3.1)>2.98,sneer=.5+.5*Math.sin(t*2.3),wave=Math.sin(t*6.5);
+  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';const SU='#4a5568',SUD='#363e4d',SK='#f2c7a1';
+  const lim=(x0,y0,x1,y1,w,fill)=>{ctx.strokeStyle=CO;ctx.lineWidth=w+3;ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();ctx.strokeStyle=fill;ctx.lineWidth=w;ctx.stroke()};
+  // legs and shoes
+  for(const q of[-1,1]){const sp=Math.sin(ph+(q>0?Math.PI:0)),lf=Math.max(0,Math.cos(ph+(q>0?Math.PI:0)));const fx=q*5+sp*8,fy=-3-lf*5;lim(q*5,-36,fx,fy-4,8.5,'#2d3340');cgE(fx+2,fy+1,8,3.8,'#15151c',1.6)}
+  ctx.translate(0,bob);
+  // far arm swings behind the body
+  lim(13,-66,17-st*4,-46,7,SUD);cgE(17-st*4,-43,3.5,3.5,SK,1.4);
+  // jacket + waistcoat + shirt + tie
+  cgP([-15,-70,15,-70,19,-52,17,-34,0,-31,-17,-34,-19,-52],cgLG(-18,0,18,0,[0,SUD,.4,SU,1,SUD]),2);
+  cgP([-6,-70,6,-70,8,-40,0,-35,-8,-40],'#7a2a3a',1.6);cgP([-4.6,-70,4.6,-70,0,-58],'#fff',1.2);cgP([-1.8,-68,1.8,-68,2.4,-52,0,-48,-2.4,-52],'#d12b2b',1.2);
+  for(const y of[-46,-41]){cgE(0,y,1,1,'#e6c34a')}
+  ctx.strokeStyle='#e6c34a';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(-7,-43);ctx.quadraticCurveTo(-3,-37,2,-43);ctx.stroke();cgE(2,-41-Math.sin(ph*2)*.4,2.2,2.2,'#f2d26a',1.1);   // the pocket watch swings
+  cgP([-15,-70,-6,-70,-9,-40,-17,-34,-19,-52],'rgba(0,0,0,.14)',0);
+  // near arm: papers, waved like a summons
+  const ex=-17+wave*1.4,ey=-52;lim(-14,-66,ex,ey,7.5,SU);lim(ex,ey,ex-10,-60+wave*3,6.6,SU);cgR(ex-14,-70+wave*3,5,4,'#fff',1,1);
+  ctx.save();ctx.translate(ex-12,-62+wave*3);ctx.rotate(-.5+wave*.18);cgR(-8,-13,16,20,'#fbfbf4',1.5,1);ctx.strokeStyle='#9aa';ctx.lineWidth=1;for(const y of[-9,-5,-1,3]){ctx.beginPath();ctx.moveTo(-5,y);ctx.lineTo(5,y);ctx.stroke()}cgE(0,5,2.4,2.4,'#c43a3a',.8);ctx.restore();
+  cgE(ex-10,-59+wave*3,3.6,3.6,SK,1.4);
+  // head
+  ctx.save();ctx.translate(0,-70);ctx.rotate(Math.sin(t*2.6)*.035-.04);ctx.translate(0,70);
+  cgR(-4,-76,8,8,SK,1.3,2);cgE(0,-86,12.6,13.4,cgLG(-12,0,12,0,[0,'#f7d2ae',1,'#e0a77c']),2);cgE(-12.4,-86,2.6,4,'#eebb92',1.4);cgE(12.4,-86,2.6,4,'#eebb92',1.4);
+  ctx.fillStyle='#8a8a94';for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(q*11,-93,3.4,5.2,q*.3,0,6.3);ctx.fill();ctx.strokeStyle=CO;ctx.lineWidth=1.1;ctx.stroke()}   // grey side hair
+  // brows (angry, one lifts), eyes with a monocle on the near one
+  ctx.strokeStyle=CO;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(-10,-96+sneer*1.5);ctx.lineTo(-2.5,-92.5);ctx.moveTo(10,-96-sneer);ctx.lineTo(2.5,-92.5);ctx.stroke();
+  for(const q of[-1,1]){if(bl){ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(q*7-3,-88);ctx.lineTo(q*7+3,-88);ctx.stroke()}else{cgE(q*6.2,-88,3.3,3.6,'#fff',1.2);cgE(q*6.2-1.1,-87.6,1.5,1.7,'#111')}}
+  cgE(-6.2,-88,5.4,5.6,0,1.8,'#d9b43a');ctx.strokeStyle='#d9b43a';ctx.lineWidth=.9;ctx.beginPath();ctx.moveTo(-10,-84);ctx.quadraticCurveTo(-16,-72,-13,-60);ctx.stroke();ctx.fillStyle='rgba(200,235,255,.35)';ctx.beginPath();ctx.arc(-6.2,-88,5.2,0,6.3);ctx.fill();   // monocle + chain
+  cgE(1,-82,2.8,3.4,'#e3a37a',1.4);   // big nose
+  // mustache: two curled lobes; mouth: a sneer with a tooth
+  ctx.fillStyle='#22222c';for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(0,-79);ctx.quadraticCurveTo(q*7,-81+sneer,q*12,-77-q*sneer);ctx.quadraticCurveTo(q*14,-74,q*11,-73);ctx.quadraticCurveTo(q*8,-77,0,-76);ctx.closePath();ctx.fill();ctx.strokeStyle=CO;ctx.lineWidth=1;ctx.stroke()}
+  ctx.strokeStyle=CO;ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(-6,-72+sneer*.8);ctx.quadraticCurveTo(0,-69.5,7,-73.5);ctx.stroke();ctx.fillStyle='#fff';ctx.fillRect(2,-73.4,2,2.4);
+  // top hat
+  ctx.save();ctx.translate(0,-98);ctx.rotate(-.05+Math.sin(t*5.2)*.02);
+  cgE(0,0,19,4.6,'#17171d',2);cgP([-12.5,0,-11,-27,11,-27,12.5,0],cgLG(-12,0,12,0,[0,'#17171d',.45,'#2c2c36',1,'#101015']),2);cgE(0,-27,11,3.4,'#22222b',1.8);
+  cgR(-12.2,-8,24.4,6,'#d12b2b',1.4);cgR(-3.5,-8.6,7,7,'#e6c34a',1.2,1);
+  ctx.restore();ctx.restore();ctx.restore()}
 // a landlord with acting: marches in place, rolls his shoulders, waves his papers at the audience, and sneers
-function cgLord(x,y,s,t,o){const u=t+o,sw=Math.sin(u*2.1)>.6,ph={x:0,y:0,t:u,mv:1,wk:u*5.2,face:-1,swing:sw?.3:0,blink:Math.sin(u*1.1)>.97?-1:1};
-  cgShadow(x,y+2,26*s/2.8,5,.4);ctx.save();ctx.translate(x,y+Math.abs(Math.sin(u*5.2))*-2*s/2.8);ctx.scale(s,s);ctx.rotate(Math.sin(u*2.6)*.03);drawLandlord(ph);ctx.restore()}
+function cgLord(x,y,s,t,o){cgShadow(x,y+2,30*s/2.8,6,.4);ctx.save();ctx.translate(x,y);ctx.scale(-s*.6,s*.6);cgLordBig(t+o);ctx.restore()}
 function cgBrenda(x,y,t){ctx.save();ctx.translate(x,y);ctx.lineJoin='round';ctx.lineCap='round';
   const br=Math.sin(t*2.2)*.5,hs=Math.sin(t*1.3)*.9,bl=(t%3.3)>3.18,wv=Math.sin(t*5);
   ctx.translate(0,br);
@@ -3347,7 +3386,7 @@ const CUT=[
    if(k===0){cgSky('#4aa8f5','#e9f6ff',395);cgSun(840,84,36,t);cgHills(395,'#8fd0a0','#6cbb7e','#4ea35c');cutCloud(150+t*6,90,1.1);cutCloud(520+t*4,58,.85);cutCloud(760+t*3,150,.7);
      cgGrass(395,145,'#79c26a','#3f8a3c');ctx.fillStyle=cgLG(0,395,0,H,[0,'#d9d2c0',1,'#b8b09a']);ctx.beginPath();ctx.moveTo(528,395);ctx.lineTo(580,395);ctx.lineTo(650,H);ctx.lineTo(420,H);ctx.fill();
      cutTree(76,396,1.15);cutHouse(560,395);cutFence(410,548,396);cutFence(806,960,396);cgMailbox(380,398);cgBrenda(611,330,t);
-     const wx=Math.min(290,-80+t*230);cutGerald(wx,395,1.7,{tie:1,face:'cool',dy:wx<290?-Math.abs(Math.sin(t*11))*5:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-27,-8,-26,16]})}
+     const wx=Math.min(290,-80+t*230);cutGerald(wx,395,1.7,{tie:1,face:'cool',walk:wx<290?t*11:null,dy:wx<290?-Math.abs(Math.sin(t*11))*4:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-27,-8,-26,16]})}
    else if(k===1){cgSky('#2d7fe0','#bfe3ff',420);cgSun(170,110,42,t);cutCloud(520+t*5,80,1.7);cutCloud(820,180,1.2);cutCloud(300,230,.9);cgHills(430,'#8fd0a0','#6cbb7e','#4ea35c');
      ctx.save();ctx.translate(790,432);ctx.scale(.5,.5);cutHouse(0,0);ctx.restore();cutTree(110,452,2.2);cgGrass(432,120,'#79c26a','#3f8a3c');
      cutGerald(450,560,3.1,{tie:1,face:'cool',armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-27,-8,-26,16]});cutBubble(700,150,"Honey, I'm home!",0)}
@@ -3394,7 +3433,7 @@ const CUT=[
      cgShadow(360,397,70,9,.4);cutGerald(360,395,1.6,{boxers:1,face:'sad',belly:[1.3,1.22],armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]});
      [[620,0],[720,1.3],[820,2.6]].forEach(([x,o])=>cgLord(x-t*9,395,2.8,t,o))}
    else if(k===1){cgSunsetStreet(560,250);cutCloud(250,90,1.2,'#ffd2a6');cgPole(880,395);
-     [[470,0,3.2,388],[640,1.3,3.6,398],[820,2.6,4.1,410]].forEach(([x,o,s,y])=>cgLord(x-(t-1.6)*12,y,s,t,o));
+     [[470,0,2.7,392],[640,1.3,3.0,396],[820,2.6,3.3,398]].forEach(([x,o,s,y])=>cgLord(x-(t-1.6)*12,y,s,t,o));
      cutGeraldBack(190,630,3.5,{boxers:1});cutBubble(640,140,"RENT'S DUE, GERALD.",1)}
    else{cgSky('#ff7a3c','#ffd7a0',540);cgBokeh(t,['#fff1c0','#ffb070','#ff8a5a'],14);cutGerald(480,624,4.6,{boxers:1,face:'sad',belly:[1.3,1.22],armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]})}}},
  // 6. the snap: wide storm / low angle / extreme close-up
@@ -3447,7 +3486,7 @@ const CUT3=[
    const mr=k===0?58+t*8:120+(t-2.8)*14;cgMoon(k===0?760:500,k===0?140:170,mr,t);
    cgHills(395,'#14183a','#10132e','#0c0e24');
    if(k===0){ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);cgGrass(395,145,'#1d3a2c','#0f2218');
-     const wx=-80+t*150;cgShadow(wx,396,50,7,.4);cutGerald(wx,395,1.7,{dy:-Math.abs(Math.sin(t*9))*5,face:'cool',pose:'up'});
+     const wx=-80+t*150;cgShadow(wx,396,50,7,.4);cutGerald(wx,395,1.7,{walk:t*9,dy:-Math.abs(Math.sin(t*9))*4,face:'cool',pose:'up'});
      if(t>1.9)cutBubble(Math.min(wx+170,820),230,"Nice night.",0)}
    else{ctx.fillStyle='#10132a';ctx.fillRect(0,420,W,H-420);const u=t-2.8;
      // a tiny wolf on the hill starts to howl, and its tail wags
