@@ -3211,11 +3211,45 @@ function cgLogo(s,x,y,size){ctx.save();ctx.translate(x,y);ctx.font='bold '+size+
   ctx.strokeStyle='#3a0a0a';ctx.lineWidth=16;ctx.strokeText(s,0,0);ctx.fillStyle=cgLG(0,-size*.8,0,size*.1,[0,'#fff3a8',.45,'#ffd23f',.55,'#f2a21a',1,'#ff7a1a']);ctx.fillText(s,0,0);ctx.strokeStyle='#fff';ctx.globalAlpha=.55;ctx.lineWidth=2;ctx.strokeText(s,-1,-2);ctx.restore()}
 function cgSpark(x,y,r,c){ctx.fillStyle=c||'#fff';ctx.beginPath();ctx.moveTo(x,y-r);ctx.quadraticCurveTo(x+r*.12,y-r*.12,x+r,y);ctx.quadraticCurveTo(x+r*.12,y+r*.12,x,y+r);ctx.quadraticCurveTo(x-r*.12,y+r*.12,x-r,y);ctx.quadraticCurveTo(x-r*.12,y-r*.12,x,y-r);ctx.fill()}
 // Brenda in the window, Dennis the lawyer (desk, suit, glasses, tired eyes)
-function cgBrenda(x,y,t){ctx.save();ctx.translate(x,y);cgP([-16,34,-14,12,-7,6,7,6,14,12,16,34],'#c43a6a',1.8);cgE(0,-4,10,11,'#f2c7a1',1.8);
-  ctx.fillStyle='#e9b44a';ctx.beginPath();ctx.ellipse(0,-10,12,9,0,Math.PI,0);ctx.lineTo(12,2);ctx.quadraticCurveTo(10,-2,6,-6);ctx.lineTo(-6,-6);ctx.quadraticCurveTo(-10,-2,-12,2);ctx.closePath();ctx.fill();ctx.strokeStyle=CO;ctx.lineWidth=1.6;ctx.stroke();
-  cgE(-4,-3,1.6,1.8,'#222');cgE(4,-3,1.6,1.8,'#222');ctx.strokeStyle='#a0224a';ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(0,4,3.6,.2,2.9);ctx.stroke();
-  ctx.save();ctx.translate(14,16);ctx.rotate(-.6+Math.sin(t*6)*.3);cgR(-2.5,-14,5,14,'#f2c7a1',1.4,2);cgE(0,-15,3.4,3.4,'#f2c7a1',1.4);ctx.restore();ctx.restore()}
-function cgDennis(x,y,t){ctx.save();ctx.translate(x,y);
+// Brenda, drawn at the window: bob, blinking, swaying earrings and hair, a coffee mug with steam, and a slow, smug goodbye wave.
+// a landlord with acting: marches in place, rolls his shoulders, waves his papers at the audience, and sneers
+function cgLord(x,y,s,t,o){const u=t+o,sw=Math.sin(u*2.1)>.6,ph={x:0,y:0,t:u,mv:1,wk:u*5.2,face:-1,swing:sw?.3:0,blink:Math.sin(u*1.1)>.97?-1:1};
+  cgShadow(x,y+2,26*s/2.8,5,.4);ctx.save();ctx.translate(x,y+Math.abs(Math.sin(u*5.2))*-2*s/2.8);ctx.scale(s,s);ctx.rotate(Math.sin(u*2.6)*.03);drawLandlord(ph);ctx.restore()}
+function cgBrenda(x,y,t){ctx.save();ctx.translate(x,y);ctx.lineJoin='round';ctx.lineCap='round';
+  const br=Math.sin(t*2.2)*.5,hs=Math.sin(t*1.3)*.9,bl=(t%3.3)>3.18,wv=Math.sin(t*5);
+  ctx.translate(0,br);
+  // hair behind the head: a swinging bob
+  cgP([-14,-6,-15,6,-9,12,9,12,15,6,14,-6,10,-17,-10,-17].map((v,i)=>i%2===0&&Math.abs(v)>8?v+hs*.7:v),'#d9a336',1.6);
+  // body: dress with a neckline, shoulders, and a belt
+  cgP([-17,36,-15,12,-8,5,8,5,15,12,17,36],'#c43a6a',1.8);cgP([-4,5,0,12,4,5],'#f2c7a1',1.2);cgP([-15,22,15,22,16,25,-16,25],'#7a1f40',1);
+  ctx.strokeStyle='rgba(255,255,255,.18)';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(-11,12);ctx.lineTo(-13,34);ctx.stroke();
+  // left arm: holds a mug up near her chin
+  ctx.save();ctx.strokeStyle=CO;ctx.lineWidth=6.6;ctx.beginPath();ctx.moveTo(-13,13);ctx.quadraticCurveTo(-21,22,-11,24);ctx.stroke();ctx.strokeStyle='#c43a6a';ctx.lineWidth=4.2;ctx.stroke();
+  cgR(-13,18,9,9,'#fff',1.4,2);ctx.strokeStyle=CO;ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(-4,22.5,2.8,-1.2,1.2);ctx.stroke();cgE(-12,24,3.1,3.1,'#f2c7a1',1.3);
+  ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=1.2;for(let k=0;k<2;k++){ctx.beginPath();ctx.moveTo(-10+k*3,16);ctx.bezierCurveTo(-12+k*3+Math.sin(t*3+k)*2,11,-8+k*3+Math.sin(t*3+k+1)*2,8,-10+k*3,3-Math.abs(Math.sin(t*2+k))*2);ctx.stroke()}   // steam
+  ctx.restore();
+  // right arm: the goodbye wave (upper arm fixed, forearm sweeps)
+  ctx.save();ctx.translate(13,13);ctx.strokeStyle=CO;ctx.lineWidth=6.6;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(7,7);ctx.stroke();ctx.strokeStyle='#c43a6a';ctx.lineWidth=4.2;ctx.stroke();
+  ctx.translate(7,7);ctx.rotate(-1.1+wv*.45);ctx.strokeStyle=CO;ctx.lineWidth=5.4;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-11);ctx.stroke();ctx.strokeStyle='#f2c7a1';ctx.lineWidth=3.2;ctx.stroke();
+  cgE(0,-14,3.6,3.9,'#f2c7a1',1.4);for(let f=-1;f<=1;f++){ctx.beginPath();ctx.moveTo(f*1.6,-17);ctx.lineTo(f*2.4+f*wv*.6,-21);ctx.strokeStyle=CO;ctx.lineWidth=2.6;ctx.stroke();ctx.strokeStyle='#f2c7a1';ctx.lineWidth=1.2;ctx.stroke()}   // fingers wiggle
+  ctx.restore();
+  // head: tilts a little, smug
+  ctx.save();ctx.translate(0,-3);ctx.rotate(hs*.018-.03);ctx.translate(0,3);
+  cgE(0,-4,10.2,11.2,cgLG(-10,0,10,0,[0,'#f8d2ae',1,'#e8b48a']),1.8);
+  cgE(-6,0,2.6,1.7,'rgba(255,110,120,.35)');cgE(6,0,2.6,1.7,'rgba(255,110,120,.35)');
+  // eyes: white, iris, lashes, lid on blink; brows arched, one higher
+  for(const q of[-1,1]){const ex=q*4.2,ey=-4;if(bl){ctx.strokeStyle=CO;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ex-2.6,ey+.6);ctx.quadraticCurveTo(ex,ey+2,ex+2.6,ey+.6);ctx.stroke()}
+    else{cgE(ex,ey,2.7,2.9,'#fff',1.1);cgE(ex+q*.2+hs*.15,ey+.2,1.5,1.7,'#3a7ac0');cgE(ex+q*.2+hs*.15,ey+.2,.75,.85,'#111');cgE(ex-.4,ey-.6,.5,.5,'#fff');ctx.strokeStyle=CO;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(ex+q*2.5,ey-1.4);ctx.lineTo(ex+q*4,ey-2.6);ctx.stroke()}
+    ctx.strokeStyle='#8a5a1e';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(ex-2.8,ey-4.2+(q>0?-1.2:0));ctx.quadraticCurveTo(ex,ey-6.4+(q>0?-1.2:0),ex+2.8,ey-4+(q>0?-1.2:0));ctx.stroke()}
+  cgE(0,-1,.9,1.1,'#d99a78');
+  // lipstick smirk that goes a little wider when the wave swings out
+  ctx.fillStyle='#c2185b';ctx.strokeStyle=CO;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-3.6,3.4);ctx.quadraticCurveTo(0,5.6+wv*.3,4.2,2.6);ctx.quadraticCurveTo(0,4.3,-3.6,3.4);ctx.fill();ctx.stroke();
+  // hair front: a sweeping fringe and the bob's side curtains
+  ctx.fillStyle='#e9b44a';ctx.beginPath();ctx.moveTo(-12,-2);ctx.quadraticCurveTo(-14,-17,0,-17);ctx.quadraticCurveTo(14,-17,12,-2);ctx.quadraticCurveTo(10,-8,5,-10);ctx.quadraticCurveTo(-1,-13,-9,-9);ctx.quadraticCurveTo(-11,-6,-12,-2);ctx.fill();ctx.strokeStyle=CO;ctx.lineWidth=1.5;ctx.stroke();
+  ctx.strokeStyle='rgba(255,240,170,.6)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-6,-14);ctx.quadraticCurveTo(-1,-16,4,-14);ctx.stroke();
+  for(const q of[-1,1]){const sw=Math.sin(t*3+q)*1.2;ctx.beginPath();ctx.moveTo(q*10.2,2);ctx.lineTo(q*10.2+sw*.3,6+Math.abs(sw));ctx.strokeStyle='#e0b03a';ctx.lineWidth=1.2;ctx.stroke();cgE(q*10.2+sw*.3,7.5+Math.abs(sw),1.5,1.5,'#ffd23f',1)}   // swinging earrings
+  ctx.restore();ctx.restore()}
+function cgDennis(x,y,t){ctx.save();ctx.translate(x,y);const dbr=Math.sin(t*1.9),shr=Math.max(0,Math.sin(t*2.4)),tk=Math.abs(Math.sin(t*8.5));ctx.translate(0,dbr*.9);ctx.save();ctx.translate(0,-96);ctx.rotate(Math.sin(t*1.1)*.012+shr*.025);ctx.translate(0,96);
   cgP([-58,0,-52,-70,-30,-92,30,-92,52,-70,58,0],cgLG(-58,0,58,0,[0,'#262a3a',.5,'#3a4056',1,'#262a3a']),2.6);
   cgP([-16,-92,0,-66,16,-92,10,-96,-10,-96],'#f4f4f4',1.8);cgP([-4,-86,4,-86,6,-60,0,-52,-6,-60],'#9c1c2a',1.6);
   cgP([-30,-92,-8,-60,-18,-30,-40,-60],'#333a52',1.6);cgP([30,-92,8,-60,18,-30,40,-60],'#333a52',1.6);
@@ -3223,6 +3257,12 @@ function cgDennis(x,y,t){ctx.save();ctx.translate(x,y);
   ctx.fillStyle='#7a5a44';ctx.beginPath();ctx.moveTo(-28,-138);ctx.quadraticCurveTo(-22,-158,0,-158);ctx.quadraticCurveTo(22,-158,28,-138);ctx.quadraticCurveTo(22,-146,0,-148);ctx.quadraticCurveTo(-22,-146,-28,-138);ctx.fill();ctx.strokeStyle=CO;ctx.lineWidth=1.6;ctx.stroke();
   const bl=Math.max(0,Math.sin(t*1.6)*8-7);for(const s of[-1,1]){cgE(s*12,-128,10,8-bl*.6,'#fff',2.2);cgE(s*12,-127,3,3,'#222');ctx.strokeStyle=CO;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(s*3,-138);ctx.lineTo(s*22,-137+s*-1);ctx.stroke();ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(s*12,-135,10,3,0,Math.PI,0);ctx.fill()}
   ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-2,-128);ctx.lineTo(2,-128);ctx.stroke();ctx.strokeStyle='#3a2a20';ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(-8,-110);ctx.lineTo(8,-112);ctx.stroke();
+  // mouth: flaps while he mumbles "ooh, that's rough"; brows lift on the shrug
+  ctx.fillStyle='#7a2a2a';ctx.strokeStyle='#3a2a20';ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(0,-111,7,1.5+tk*3.6,0,0,6.3);ctx.fill();ctx.stroke();
+  ctx.restore();
+  // shrugging shoulders and open palms on the desk
+  for(const q of[-1,1]){ctx.save();ctx.translate(q*50,-70);const up=shr*7;ctx.strokeStyle=CO;ctx.lineWidth=17;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(0,-up*.3);ctx.lineTo(q*14,30-up);ctx.stroke();ctx.strokeStyle='#2c3248';ctx.lineWidth=13;ctx.stroke();
+    cgR(q*14-6,28-up,12,6,'#fff',1.2,2);cgE(q*14,38-up,6.4,5.4,'#f2c7a1',1.6);ctx.restore()}
   ctx.restore()}
 // Gerald's flat: couch with cushions, TV on a stand, calendar, pizza boxes, cans, lamp
 function cgCouchBack(x,y){cgP([x,y-8,x+4,y-88,x+330,y-88,x+332,y-8],cgLG(0,y-88,0,y,[0,'#8a4a4a',1,'#6a3434']),3);for(let i=0;i<3;i++){cgR(x+14+i*106,y-80,98,50,cgLG(0,y-80,0,y-30,[0,'#9a5656',1,'#7a4040']),2.4,14);cgLine(x+22+i*106,y-72,x+84+i*106,y-72,'rgba(255,255,255,.22)',3)}
@@ -3256,7 +3296,8 @@ function cgDebris(t,gy,n){ctx.save();for(let i=0;i<n;i++){const ph=(t*.6+i*.173)
 // framing rule: the caption box covers y>406, so a close-up puts the face at y~205: feetY = 205 + 91*scale.
 function cgK(c,t){let k=0;for(let j=0;j<c.length;j++)if(t>=c[j])k=j;return k}
 function cutCam(i,t){const S=CUTS[i],c=S.cuts,k=cgK(c,t),dt=t-c[k],sk=((S.shake||[])[k]||0)*Math.exp(-4*dt),r=(S.tilt||[])[k]||0;
-  return{z:1.04+Math.abs(r)*2.4,x:480,y:270,r:r,sx:Math.sin(t*93)*sk,sy:Math.cos(t*71)*sk,fl:k>0?Math.max(0,.45*(1-dt/.12)):0}}
+  const pu=S.push!=null?S.push:.016,pn=(S.pan||[])[k]||[0,0];
+  return{z:1.04+Math.abs(r)*2.4+Math.min(.12,pu*dt),x:480+pn[0]*dt,y:270+pn[1]*dt,r:r,sx:Math.sin(t*93)*sk,sy:Math.cos(t*71)*sk,fl:k>0?Math.max(0,.45*(1-dt/.12)):0}}
 // Gerald seen from behind (over-the-shoulder shots)
 function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;if(o.wolf>=3){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
   ctx.save();ctx.translate(x,feetY-48*s);ctx.scale(s,s);drawBack(null,cutT*.8+.3,{noflag:true});WOLFH=o.wolf&&o.wolf<3?o.wolf:0;if(!(o.wolf>=3)&&!o.noshirt){const sm=o.shirt!=null?o.shirt:(CUTS&&CUTS[cutI]&&CUTS[cutI].shirt!=null?CUTS[cutI].shirt:1);if(sm){ctx.save();ctx.translate(0,3);ctx.beginPath();ctx.rect(-40,-25,80,60);ctx.clip();cutShirtBack(sm);ctx.restore()}}ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
@@ -3334,7 +3375,7 @@ const CUT=[
      ctx.save();ctx.translate(480,740);ctx.scale(4.2,4.2);cgDennis(0,0,t);ctx.restore()}
    else{cgWood('#6a4224','#3a2414');cgInvoice();cgCalc(t)}}},
  // 4. apartment: wide / from the TV / from inside the fridge
- {lines:["Then Gerald stopped.","Gym: cancelled. Dinner: over the sink. Light source: the fridge.","By day nine the pants were gone. He never asked where."],hl:0,cuts:[0,1.9,4.2],draw(t){const k=cgK(this.cuts,t),day=Math.min(30,1+Math.floor(t*8)),kk=Math.min(1,t/4),fl=.12+.08*Math.sin(t*17)+.05*Math.sin(t*5.3);
+ {lines:["Then Gerald stopped.","Gym: cancelled. Dinner: over the sink. Light source: the fridge.","By day nine the pants were gone. By day twelve he stopped asking where."],hl:0,cuts:[0,1.9,4.2],draw(t){const k=cgK(this.cuts,t),day=Math.min(30,1+Math.floor(t*8)),kk=Math.min(1,t/4),fl=.12+.08*Math.sin(t*17)+.05*Math.sin(t*5.3);
    const G={tie:day<4,boxers:day>=9,face:day<9?'sad':'bliss',belly:[1+.3*kk,1+.22*kk],armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]};
    if(k===0){ctx.fillStyle=cgLG(0,0,0,395,[0,'#2a2438',1,'#1b1726']);ctx.fillRect(0,0,W,H);ctx.fillStyle='rgba(255,255,255,.03)';for(let x=0;x<W;x+=48)ctx.fillRect(x,0,24,395);
      ctx.fillStyle=cgLG(0,395,0,H,[0,'#3a2c2c',1,'#1c1414']);ctx.fillRect(0,395,W,H-395);for(let i=0;i<7;i++)cgLine(0,400+i*20,W,400+i*20,'rgba(0,0,0,.35)',1.6);cgR(0,388,W,10,'#1c1620',2.4);
@@ -3348,22 +3389,22 @@ const CUT=[
    else{cgFridge(t);cutGerald(480,520,3.4,Object.assign({},G,{face:'bliss'}))}
    txt('DAY '+day,60,70,54,'#ffd23f','left','#4a2a00')}},
  // 5. landlords: wide / from behind Gerald / his face
- {lines:["Then the landlord. \"Rent's due, Gerald.\"","Then all of them. Every hike. Every \"no refunds.\" Every \"quiet hours.\"","Something in Gerald snapped. Also his waistband."],hl:2,cuts:[0,1.6,4.0],draw(t){const k=cgK(this.cuts,t);
+ {lines:["Then the landlord. \"Rent's due, Gerald.\"","Then all of them. Every hike. Every \"no refunds.\" The fee for the pigeon.","Something in Gerald snapped. Also his waistband."],hl:2,cuts:[0,1.6,4.0],draw(t){const k=cgK(this.cuts,t);
    if(k===0){cgSunsetStreet(700,300);cutCloud(230+t*3,100,1,'#ffd2a6');cutCloud(640,70,.8,'#ffc79a');cgPole(300,395);cgDoor(60,395,t);cgNotice(135,262,t);cgHydrant(300,396);
      cgShadow(360,397,70,9,.4);cutGerald(360,395,1.6,{boxers:1,face:'sad',belly:[1.3,1.22],armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]});
-     [[620,0],[720,1.3],[820,2.6]].forEach(([x,o])=>{cgShadow(x,397,26,5,.4);ctx.save();ctx.translate(x,395);ctx.scale(2.8,2.8);drawLandlord({x:0,y:0,t:t+o});ctx.restore()})}
+     [[620,0],[720,1.3],[820,2.6]].forEach(([x,o])=>cgLord(x-t*9,395,2.8,t,o))}
    else if(k===1){cgSunsetStreet(560,250);cutCloud(250,90,1.2,'#ffd2a6');cgPole(880,395);
-     [[470,0,3.2,388],[640,1.3,3.6,398],[820,2.6,4.1,410]].forEach(([x,o,s,y])=>{cgShadow(x,y+2,34*s/2.8,6,.4);ctx.save();ctx.translate(x,y);ctx.scale(s,s);drawLandlord({x:0,y:0,t:t+o});ctx.restore()});
+     [[470,0,3.2,388],[640,1.3,3.6,398],[820,2.6,4.1,410]].forEach(([x,o,s,y])=>cgLord(x-(t-1.6)*12,y,s,t,o));
      cutGeraldBack(190,630,3.5,{boxers:1});cutBubble(640,140,"RENT'S DUE, GERALD.",1)}
    else{cgSky('#ff7a3c','#ffd7a0',540);cgBokeh(t,['#fff1c0','#ffb070','#ff8a5a'],14);cutGerald(480,624,4.6,{boxers:1,face:'sad',belly:[1.3,1.22],armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]})}}},
  // 6. the snap: wide storm / low angle / extreme close-up
- {lines:["Gerald snapped.","The sky snapped. Part of the roof snapped.","And something old, pink and terry-cloth answered."],hl:2,cuts:[0,1.6,3.2],shake:[0,5,8],tilt:[0,-.07,.05],draw(t){const k=cgK(this.cuts,t);
+ {lines:["Gerald snapped.","The sky snapped. Part of the roof snapped.","And something old, pink and terry-cloth answered. Damp. Determined."],hl:2,cuts:[0,1.6,3.2],shake:[0,5,8],tilt:[0,-.07,.05],draw(t){const k=cgK(this.cuts,t);
    const G=(s,x,y,extra)=>cutGerald(x,y,s,Object.assign({boxers:1,face:t<1.8?'sad':'scream',belly:[1.3,1.22],armL:[-27,-8,-26,16],armR:[27,-8,26,16]},extra||{}));
    if(k===0){cgStorm(t);ctx.fillStyle='#1c0e2c';for(const[bx,bw,bh]of[[0,110,230],[110,70,160],[760,90,200],[850,110,260]])ctx.fillRect(bx,395-bh,bw,bh);cgR(0,395,W,H-395,cgLG(0,395,0,H,[0,'#2a1a3a',1,'#120a1c']));cgBolt(t,200);cutRain(t,395);cgShadow(480,397,60,8,.45);G(1.3,480,395)}
    else if(k===1){cgStorm(t);for(let i=0;i<10;i++){ctx.strokeStyle='rgba(255,255,255,'+(.04+i*.01)+')';ctx.lineWidth=40;ctx.beginPath();ctx.arc(480,-120,200+i*80,.2,2.9);ctx.stroke()}cgBolt(t,150);cutRain(t,9999);ctx.save();ctx.globalAlpha=.25;ctx.fillStyle=cgRG(480,300,10,420,[0,'#ff7ab8',1,'rgba(255,122,184,0)']);ctx.fillRect(0,0,W,H);ctx.restore();cgDebris(t,395,14);G(3.8,480,560,{dx:Math.sin(t*60)*5,dy:Math.cos(t*47)*3})}
    else{ctx.fillStyle=cgLG(0,0,0,H,[0,'#2a1048',1,'#7a2a9a']);ctx.fillRect(0,0,W,H);cgBolt(t,300);ctx.save();ctx.globalAlpha=.3;ctx.fillStyle=cgRG(480,230,10,460,[0,'#ff7ab8',1,'rgba(255,122,184,0)']);ctx.fillRect(0,0,W,H);ctx.restore();cutRain(t,9999);G(6.4,480,790,{dx:Math.sin(t*60)*7,dy:Math.cos(t*47)*4})}}},
  // 7. the reveal: low-angle hero / face / wide with the logo
- {lines:["GERALD FITZGERALD IS DEAD.","In his place: a sticky, shirtless, furious man in red underwear and a pink towel.","Behold: MANDEX."],hl:2,cuts:[0,1.8,3.4],shake:[6,5,3],tilt:[.05,-.04,0],draw(t){const k=cgK(this.cuts,t);cutOnce(()=>SFX.boom());
+ {lines:["GERALD FITZGERALD IS DEAD.","In his place: a sticky, shirtless, furious man in red underwear and a damp pink towel.","Behold: MANDEX."],hl:2,cuts:[0,1.8,3.4],shake:[6,5,3],tilt:[.05,-.04,0],draw(t){const k=cgK(this.cuts,t);cutOnce(()=>SFX.boom());
    const rays=(cy,sp)=>{cgSky('#ff6a2c','#ffd23f',395);ctx.save();ctx.translate(480,cy);ctx.rotate(t*sp);for(let i=0;i<20;i++){ctx.rotate(Math.PI/10);ctx.fillStyle=i%2?'rgba(255,255,255,.2)':'rgba(255,70,30,.26)';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(1000,-80);ctx.lineTo(1000,80);ctx.closePath();ctx.fill()}ctx.restore();
      for(let r=0;r<9;r++)for(let c=0;c<16;c++){const d=Math.hypot(c*64-480,r*64-cy);if(d>230)cgE(c*64+(r%2)*32,r*64,2+d/260,2+d/260,'rgba(120,30,0,.16)')}};
    const ground=()=>{cgR(0,395,W,H-395,cgLG(0,395,0,H,[0,'#7a4a2e',1,'#3a2214']));cgLine(0,396,W,396,CO,3);for(let i=0;i<20;i++){const x=cgRnd(i)*W,y=400+cgRnd(i+8)*130;cgE(x,y,10+cgRnd(i+3)*24,3,'rgba(0,0,0,.25)')}for(let i=0;i<16;i++){const x=cgRnd(i+60)*W,y=402+cgRnd(i+90)*120;cgP([x,y,x+12,y-4,x+18,y+4,x+4,y+8],['#a4553a','#6b4a2e','#8a8a92'][i%3],1.8)}};
