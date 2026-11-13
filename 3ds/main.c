@@ -48,8 +48,16 @@ static void rect(Scr *s, int x, int y, int w, int h, u32 c){
     for(int j = y0; j < y1; j++, p -= 3){ p[0] = c & 255; p[1] = (c >> 8) & 255; p[2] = (c >> 16) & 255; }
   }
 }
-static void disc(Scr *s, int cx, int cy, int r, u32 c){
-  for(int y = -r; y <= r; y++) for(int x = -r; x <= r; x++) if(x * x + y * y <= r * r) px(s, cx + x, cy + y, c);
+static void disc(Scr *s, int cx, int cy, int r, u32 c){      /* one vertical run per column (the framebuffer is column-major): same pixels as the old per-pixel test */
+  if(r < 0) return;
+  u8 b0 = c & 255, b1 = (c >> 8) & 255, b2 = (c >> 16) & 255;
+  for(int x = -r, rr = r * r; x <= r; x++){
+    int X = cx + x; if(X < 0 || X >= s->w) continue;
+    int h = (int)sqrtf((float)(rr - x * x)); while(h * h > rr - x * x) h--; while((h + 1) * (h + 1) <= rr - x * x) h++;
+    int y0 = cy - h, y1 = cy + h; if(y0 < 0) y0 = 0; if(y1 > s->h - 1) y1 = s->h - 1; if(y0 > y1) continue;
+    u8 *p = s->fb + (X * s->h + (s->h - 1 - y0)) * 3;
+    for(int j = y0; j <= y1; j++, p -= 3){ p[0] = b0; p[1] = b1; p[2] = b2; }
+  }
 }
 static void line(Scr *s, int x0, int y0, int x1, int y1, u32 c){
   int dx = abs(x1 - x0), dy = -abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, e = dx + dy;
@@ -436,6 +444,7 @@ static void load_level(int l){
 static int was_state;
 
 int main(void){
+  osSetSpeedupEnable(true);                  /* New 3DS: 804 MHz + L2 cache (a no-op on an old 3DS; emulators that model it get the speed-up too) */
   gfxInitDefault();
   gfxSetDoubleBuffering(GFX_TOP, true); gfxSetDoubleBuffering(GFX_BOTTOM, true);
   srand(1234);

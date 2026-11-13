@@ -15,7 +15,7 @@
 static u8 fb_top[2][400 * 240 * 3], fb_bot[320 * 240 * 3];
 static float g_slider; static int g_keys, g_prev, g_dn, g_up;
 static touchPosition g_touch;
-void gfxInitDefault(void){} void gfxSetDoubleBuffering(gfxScreen_t s, bool b){ (void)s; (void)b; } void gfxSet3D(bool b){ (void)b; }
+void osSetSpeedupEnable(bool b){ (void)b; } void gfxInitDefault(void){} void gfxSetDoubleBuffering(gfxScreen_t s, bool b){ (void)s; (void)b; } void gfxSet3D(bool b){ (void)b; }
 void gfxFlushBuffers(void){} void gfxSwapBuffers(void){} void gspWaitForVBlank(void){} void gfxExit(void){}
 u8 *gfxGetFramebuffer(gfxScreen_t s, gfx3dSide_t e, u16 *w, u16 *h){ (void)w; (void)h; return s == GFX_BOTTOM ? fb_bot : fb_top[e == GFX_RIGHT]; }
 float osGet3DSliderState(void){ return g_slider; }

@@ -208,6 +208,24 @@ void swiWaitForVBlank(void){
       ICHECK(world.level == 0 && world.state == MX_PLAY && world.man.mode == MAN_AIM, "...and handed over to level 1, ready to aim");
       ICHECK(BG_PALETTE[C_MAN0 + 5] == worn, "...with the worn outfit's colours back");
       printf(fails ? "intro: %d FAILED\n" : "intro: all passed\n", fails); exit(fails != 0); }
+  } else if(getenv("WOLF_TEST")){                                          /* chapter 3 wolfman cutscene: starts from level 40 on the title, plays out alone, hands over to level 40 */
+    static int fails, lf, last_sc = -1, played;
+#define WCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
+    if(vf == 1){ sel_level = MX_CH3_START; load_level(sel_level); }
+    if(vf == 2){ int ok = 1; for(int s = 0; s < WOLF_SCENES; s++){ intro_start_wolf(); (void)s; } intro_start_wolf(); ok = intro_count() == WOLF_SCENES; WCHECK(ok, "seven wolf scenes");
+      for(int s = 0; s < WOLF_SCENES; s++) if(intro_text_rows(s) >= 9) ok = 0;
+      WCHECK(ok, "the narration of every wolf scene fits the bottom screen"); app = ST_TITLE; wolf_seen = 0; g_keys |= KEY_A; }
+    if(vf == 5) WCHECK(app == ST_INTRO && wolf_seen && intro_scene() == 0, "A on the title at level 41 starts the wolf cutscene");
+    if(app == ST_INTRO){
+      if(intro_scene() != last_sc){ last_sc = intro_scene(); lf = 0; }
+      lf++; played++;
+      static const int LFS[] = { 15, 100, 190, 260, 330 };
+      for(unsigned i = 0; i < sizeof LFS / sizeof LFS[0]; i++) if(lf == LFS[i]){ char nm[32]; snprintf(nm, sizeof nm, "wolf_s%d_%03d", last_sc, lf); shot(nm); }
+    }
+    if(vf > 10 && app == ST_PLAY){
+      WCHECK(last_sc == WOLF_SCENES - 1 && played > 1500, "all seven scenes played out on their own");
+      WCHECK(world.level == MX_CH3_START && world.state == MX_PLAY, "...and handed over to the first chapter 3 level");
+      printf(fails ? "wolf: %d FAILED\n" : "wolf: all passed\n", fails); exit(fails != 0); }
   } else if(getenv("INTRO_SKIP")){                                         /* A, SKIP, START, and when the cutscene does NOT play */
     static int fails;
     if(vf == 2) g_keys |= KEY_A;
@@ -267,7 +285,7 @@ void swiWaitForVBlank(void){
     if(vf == 23) g_keys |= KEY_UP;                                                                       /* up from row 1 col 0 -> row 0 col 0 */
     if(vf == 25){ OCHECK(out_cur == 0, "d-pad up moves a row"); }
     if(vf == 26) g_keys |= KEY_UP;
-    if(vf == 28){ OCHECK(out_cur == 8, "d-pad up from the top row wraps to the bottom row"); }
+    if(vf == 28){ OCHECK(out_cur == 12, "d-pad up from the top row wraps to the bottom row"); }
     if(vf == 29){ g_keys |= KEY_TOUCH; g_touch.px = 20; g_touch.py = 175; }                              /* BACK */
     if(vf == 31){ OCHECK(!out_open && app == ST_TITLE, "BACK returns to the title without starting a level");
       OCHECK(gfx_pal[C_SW0 + 2] == RGB15(47 >> 3, 79 >> 3, 168 >> 3) && gfx_pal[C_SW0 + 3] == RGB15(242 >> 3, 242 >> 3, 242 >> 3), "swatch palette holds the outfit colours (Navy boxers + towel)"); }

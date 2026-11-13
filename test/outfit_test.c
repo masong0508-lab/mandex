@@ -8,7 +8,7 @@ static int fails;
 static void fill_all(MxStats *s){ mx_meta_init(s); s->kills = 100; s->cells = 20000; s->pops = 1; s->oneShots = 5; for(int i = 0; i < MX_NUM_LEVELS; i++) s->stars[i] = 3; s->ach = (1u << 20) - 1u; }
 int main(void){
   MxStats S; mx_meta_init(&S);
-  CHECK(MX_NUM_OUTFITS == 12 && !strcmp(mx_outfit(11)->name, "Working Man") && mx_outfit(11)->work == 1, "Working Man is outfit 11 and flagged work");
+  CHECK(MX_NUM_OUTFITS == 13 && mx_outfit(12)->name[0] == 'W' && !strcmp(mx_outfit(11)->name, "Working Man") && mx_outfit(11)->work == 1, "Working Man is outfit 11 and flagged work");
   { int w = 0; for(int i = 0; i < MX_NUM_OUTFITS; i++) w += mx_outfit(i)->work; CHECK(w == 1, "only Working Man is a work outfit"); }
   CHECK(mx_outfit(11)->br[0] == 63 && mx_outfit(11)->br[1] == 95 && mx_outfit(11)->br[2] == 143 && mx_outfit(11)->tow[0] == 201, "Working Man colours are the browser's #3f5f8f / #c9ced6");
   CHECK(mx_outfit_unlocked(&S, 0) && mx_outfit_unlocked(&S, 11), "fresh stats: Classic Red and Working Man are owned");

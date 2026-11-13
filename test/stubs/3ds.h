@@ -12,6 +12,7 @@ enum { KEY_A = 1 << 0, KEY_B = 1 << 1, KEY_SELECT = 1 << 2, KEY_START = 1 << 3, 
        KEY_UP = KEY_DUP | KEY_CPAD_UP, KEY_DOWN = KEY_DDOWN | KEY_CPAD_DOWN, KEY_LEFT = KEY_DLEFT | KEY_CPAD_LEFT, KEY_RIGHT = KEY_DRIGHT | KEY_CPAD_RIGHT };
 typedef enum { GFX_TOP, GFX_BOTTOM } gfxScreen_t;
 typedef enum { GFX_LEFT, GFX_RIGHT } gfx3dSide_t;
+void osSetSpeedupEnable(bool);
 void gfxInitDefault(void); void gfxSetDoubleBuffering(gfxScreen_t, bool); u8 *gfxGetFramebuffer(gfxScreen_t, gfx3dSide_t, u16 *, u16 *);
 void gfxSet3D(bool); void gfxFlushBuffers(void); void gfxSwapBuffers(void); void gspWaitForVBlank(void); void gfxExit(void);
 bool aptMainLoop(void); void hidScanInput(void); u32 hidKeysDown(void); u32 hidKeysHeld(void); u32 hidKeysUp(void);

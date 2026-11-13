@@ -39,7 +39,8 @@ static u8 buf_top[256 * 192], buf_bot[256 * 192];
 
 enum { ST_TITLE, ST_PLAY, ST_PAUSE, ST_INTRO };
 static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
-static int intro_seen;               /* the opening cutscene (ds/source/intro.c) plays once per power-on, the first time level 1 is started from the title */
+static int intro_seen, wolf_seen, intro_level;   /* wolf_seen: the chapter 3 wolfman cutscene, once per power-on too */
+static int intro_seen_unused;               /* the opening cutscene (ds/source/intro.c) plays once per power-on, the first time level 1 is started from the title */
 static int disp_score, cells0 = 1, end_t, was_state;      /* best scores live in stats.best[] (core, saved by port 5) */
 static MxStats stats;                 /* achievements / outfits / best scores; loaded from the cartridge backup chip at boot, written by save_sync() */
 static int ach_open, ach_page;       /* achievements list shown on the title's bottom screen */
@@ -849,7 +850,7 @@ static void ach_bottom(u8 *b){
 #define OUT_DX (OUT_CW + 3)
 #define OUT_DY (OUT_CH + 4)
 #define C_SW0 224                      /* swatch colours: palette slots 224.. (two per outfit), main engine only; the man owns 160-198, the title is sub-engine */
-typedef char out_grid_fits[(OUT_ROWS <= 3 && MX_NUM_OUTFITS <= 16) ? 1 : -1];   /* breaks the build if the grid overflows the screen or the palette block */
+typedef char out_grid_fits[(OUT_ROWS <= 4 && MX_NUM_OUTFITS <= 16) ? 1 : -1];   /* breaks the build if the grid overflows the screen or the palette block */
 static void outfit_swatches(void){
   for(int i = 0; i < MX_NUM_OUTFITS; i++){
     const MxOutfit *o = mx_outfit(i);
@@ -861,9 +862,12 @@ static void outfit_swatches(void){
   }
 }
 static int outfits_owned(void){ int n = 0; for(int i = 0; i < MX_NUM_OUTFITS; i++) n += mx_outfit_unlocked(&stats, i); return n; }
-static void out_cell_xy(int i, int *x, int *y){ *x = OUT_X0 + (i % OUT_COLS) * OUT_DX; *y = OUT_Y0 + (i / OUT_COLS) * OUT_DY; }
+static int out_row0;                                       /* first visible row: three rows fit, a 13th outfit scrolls the grid */
+static void out_follow(void){ int r = out_cur / OUT_COLS; if(r < out_row0) out_row0 = r; if(r > out_row0 + 2) out_row0 = r - 2; }
+static int out_visible(int i){ int r = i / OUT_COLS; return r >= out_row0 && r < out_row0 + 3; }
+static void out_cell_xy(int i, int *x, int *y){ *x = OUT_X0 + (i % OUT_COLS) * OUT_DX; *y = OUT_Y0 + (i / OUT_COLS - out_row0) * OUT_DY; }
 static int out_cell_at(const touchPosition *t){           /* the outfit under the stylus, or -1 */
-  for(int i = 0; i < MX_NUM_OUTFITS; i++){ int x, y; out_cell_xy(i, &x, &y); if(hit(t, x, y, OUT_CW, OUT_CH)) return i; }
+  for(int i = 0; i < MX_NUM_OUTFITS; i++){ int x, y; if(!out_visible(i)) continue; out_cell_xy(i, &x, &y); if(hit(t, x, y, OUT_CW, OUT_CH)) return i; }
   return -1;
 }
 static int out_move(int c, int dx, int dy){                /* d-pad: left/right walk the list, up/down walk a column; both wrap */
@@ -887,8 +891,9 @@ static void draw_lock(u8 *b, int cx, int y){               /* 12 x 15 padlock */
 static void outfits_bottom(u8 *b){
   gfx_rect(b, 0, 0, 256, 192, C_BLACK);
   gfx_text_c(b, 128, 6, "OUTFITS", C_GOLD, C_BLACK, 1);
+  out_follow();
   for(int i = 0; i < MX_NUM_OUTFITS; i++){
-    int x, y; out_cell_xy(i, &x, &y);
+    int x, y; if(!out_visible(i)) continue; out_cell_xy(i, &x, &y);
     const MxOutfit *o = mx_outfit(i); int un = mx_outfit_unlocked(&stats, i);
     u8 bc = i == out_cur ? C_GOLD : C_UILINE;
     gfx_rect(b, x, y, OUT_CW, OUT_CH, C_UIBG);
@@ -1104,11 +1109,12 @@ int main(void){
       else if(((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)) && !mx_level_unlocked(&stats, sel_level)) sfx_play(SFX_CLICK, 24);
       else if((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)){
         save_sync();                                               /* an outfit chosen on the title is kept */
-        if(sel_level == 0 && !intro_seen){ intro_seen = 1; app = ST_INTRO; intro_start(); apply_outfit(0); sfx_play(SFX_CLICK, 64); }   /* the origin story is told in the classic outfit */
+        if(sel_level == 0 && !intro_seen){ intro_seen = 1; app = ST_INTRO; intro_level = 0; intro_start(); apply_outfit(0); sfx_play(SFX_CLICK, 64); }   /* the origin story is told in the classic outfit */
+        else if(sel_level == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_level = sel_level; app = ST_INTRO; intro_start_wolf(); apply_outfit(0); sfx_play(SFX_CLICK, 64); }
         else { app = ST_PLAY; load_level(sel_level); sfx_play(SFX_CLICK, 64); music_set(music_pref); }
       }
     } else if(app == ST_INTRO){
-      if(intro_tick(down, t.px, t.py)){ app = ST_PLAY; apply_outfit(outfit_sel); load_level(0); music_set(music_pref); sfx_play(SFX_CLICK, 64); }   /* finished or skipped: straight into level 1 */
+      if(intro_tick(down, t.px, t.py)){ app = ST_PLAY; apply_outfit(outfit_sel); load_level(intro_level); music_set(music_pref); sfx_play(SFX_CLICK, 64); }   /* finished or skipped: straight into level 1 */
     } else if(app == ST_PAUSE){
       if(down & KEY_START) app = ST_PLAY;
       if(down & KEY_SELECT){ load_level(world.level); app = ST_PLAY; music_set(music_pref); }
