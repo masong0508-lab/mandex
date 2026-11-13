@@ -87,6 +87,15 @@ gcc -std=c99 -O2 -Wall -I../core ../core/mx.c tube_test.c -lm -o tube_float && .
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c tube_test.c -lm -o tube_fixed && ./tube_fixed | grep -v "^ok:"
 echo "--- 3DS man: pixel-art sprites, idle gags, hearts and sparkles, tubes (real 3ds/main.c against the stub libctru) ---"
 gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -Istubs -I../core -I../art n3ds_gags.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o n3ds_gags && ./n3ds_gags | grep -v "^ok:"
+echo "--- chapter 2 (walk mode, bounce pads, walker / thrower / bat landlords, the fight-back switch): core in both math modes, DS and 3DS front-ends ---"
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c ch2_test.c -lm -o ch2_float && ./ch2_float | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c ch2_test.c -lm -o ch2_fixed && ./ch2_fixed | grep -v "^ok:"
+WALK_TEST=1 ./ds_render /tmp/dswalk 1400 22 | grep -v "^ok:"
+WALK_TEST=3 ./ds_render /tmp/dswalk3 1400 25 | grep -v "^ok:"
+WALK_TEST=2 ./ds_render /tmp/dswalk2 1400 26 | grep -v "^ok:"
+gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -Istubs -I../core -I../art n3ds_walk.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o n3ds_walk && ./n3ds_walk | grep -v "^ok:"
+echo "--- Dreamcast chapter 2 drawing (walking man, pads, briefcases, landlord kinds) ---"
+DC_WALK=1 ./dc_render | grep "walk mode"
 # Optional, slow:  SOLVE=1 bash run_tests.sh   greedy search for a winning shot sequence on every level (see level_solve.c; a "NOT solved" is not a proof)
 if [ -n "$SOLVE" ]; then
   echo "--- greedy solver: which levels have a winning shot sequence in the core ---"
@@ -96,5 +105,5 @@ fi
 if [ -n "$PARITY" ]; then
   echo "--- level parity with the web game ---"
   gcc -std=c99 -O2 -I../core ../core/mx.c level_dump.c -lm -o level_dump && ./level_dump > /tmp/mx_c_levels.txt
-  node ../tools/level_parity.js /tmp/mx_c_levels.txt 0 33 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,23,24,27,28,29,30,31,32,33,34,35,36
+  node ../tools/level_parity.js /tmp/mx_c_levels.txt 0 36
 fi

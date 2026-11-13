@@ -62,7 +62,7 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #endif
 #define MX_MAX_TARGETS   12
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    34
+#define MX_NUM_LEVELS    37
 #define MX_STORY_LEVELS  20      /* chapter 1: the story achievements and outfits count only these, so adding levels never moves earned goalposts */
 #define MX_MAX_ROOMS     20
 
@@ -86,7 +86,8 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
      rubber  super bouncy; man rebounds   sand   no cohesion: flows like a liquid and piles up            */
 enum { MX_EMPTY, MX_WOOD, MX_BRICK, MX_STONE, MX_GLASS, MX_TNT, MX_STEEL, MX_RUBBER, MX_SAND, MX_NMAT };
 enum { MX_PLAY, MX_WIN, MX_LOSE };
-enum { MAN_NONE, MAN_AIM, MAN_FLY, MAN_STUCK, MAN_WAIT };
+enum { MAN_NONE, MAN_AIM, MAN_FLY, MAN_STUCK, MAN_WAIT, MAN_WALK };
+enum { LK_NONE, LK_WALKER, LK_THROWER, LK_BAT };   /* landlord kinds: only act when w->nofight is 0 */
 
 /* Event types the front-end turns into particles and sound. */
 enum {
@@ -109,7 +110,15 @@ enum {
   EV_SPLOOSH,  /* splat power-up blast at x,y */
   EV_CRUMBLE,  /* the run ended and the damaged walls crumbled: x,y = centre of the cracked blocks, a = how many (<= 80) */
   EV_LAND,     /* the man touched the ground at x,y: a = speed (cells/s), m = 1 if it was a hard landing that skips (browser: dust, ring, shake) */
-  EV_TUBE      /* he flew into the mouth of pneumatic tube m at x,y and was posted out of its nozzle at (a,b) */
+  EV_TUBE,     /* he flew into the mouth of pneumatic tube m at x,y and was posted out of its nozzle at (a,b) */
+  EV_WALK,     /* walk levels: he landed on his feet at x,y */
+  EV_PUNCH,    /* walking punch at x,y: a = damage dealt (0 = whiff), m = 1 if it was a running shoulder-barge */
+  EV_SLAM,     /* walking belly slam at x,y: a = damage dealt */
+  EV_PAD,      /* bounce pad boing at x,y: m = 1 if it was a stomp-boosted one */
+  EV_HURT,     /* a landlord hurt him at x,y: m = 1 on foot, 0 in the sling */
+  EV_BONK,     /* a bat landlord swatted a weak shot at x,y */
+  EV_THROW,    /* a landlord threw a briefcase from x,y */
+  EV_SWING     /* a landlord swung at x,y (walker punch / bat practice swing) */
 };
 /* power-ups: one use of each per level */
 enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT };
@@ -135,7 +144,14 @@ typedef struct {
   MxCell cells[MX_CHUNK_CELLS];
 } MxChunk;
 
-typedef struct { real x, y, vy, t; uint8_t alive; } MxTarget;
+/* kind LK_*: walker patrols range cells around home hx and scatters when he flies close, chases and swings at a man on foot; thrower lobs briefcases at the man waiting in the sling;
+   bat swats any shot slower than BAT_BREAK.  face = -1/1.  cd = attack cooldown, wind = wind-up left, swing = swing animation left, stun = dazed (bat after a swat), pan = scared (cosmetic), wk = walk phase (cosmetic), mv = 0 still / 1 strolling / 2 running. */
+typedef struct { real x, y, vy, t; uint8_t alive, kind, mv; int8_t face, pdir; uint8_t eng; real hx, range, cd, wind, swing, stun, pan, wk; } MxTarget;
+#define MX_MAX_CASES 4
+typedef struct { real x, y, vx, vy, rot, l; uint8_t active; } MxCase;      /* a thrown briefcase */
+#define MX_MAX_PADS 3
+typedef struct { uint8_t x, y, w; } MxPad;                                  /* bounce pad: top-left cell and width (the pad itself is rubber in the grid) */
+#define MX_WALK_T 45
 
 /* Pneumatic tube (chapter 2): a man who flies within MX_TUBE_R of the mouth (ax,ay) is posted out of the nozzle (bx,by) at (vx,vy) cells/s. */
 #define MX_MAX_TUBES 3
@@ -145,6 +161,11 @@ typedef struct { real ax, ay, bx, by, vx, vy; } MxTube;
 typedef struct {
   int mode;            /* MAN_* */
   real x, y, vx, vy, t, gt, hitCd, gooT, ang;
+  /* walk levels: after the flight he lands on his feet (MAN_WALK).  Input comes from mx_walk_input(); wt = seconds left, pT = punch animation left, hurtCd = ouch immunity.
+     stun: in the sling, a briefcase hit leaves him dazed (aim is locked) for this long. */
+  int8_t face; uint8_t gr, stomp, walked;
+  real wt, pT, pCd, padCd, hurtCd, stun;
+  int8_t in_ax; uint8_t in_jump, in_punch, in_stomp;
   real tubeT, tubeCd;  /* just posted out of a tube: gravity is 10 % for tubeT seconds, no second tube for tubeCd seconds */
   uint8_t dive;
   /* air valve (an unlockable, tucked into the far lower-left corner, clear of every pull-back): w->valve_ok must be set, then
@@ -197,6 +218,12 @@ typedef struct {
   int nrooms;
   MxTube tubes[MX_MAX_TUBES];
   int ntubes;
+  int walk;                      /* level has walk mode: the man lands on his feet and you steer him */
+  int nofight;                   /* option: 1 = landlords just stand there (see mx_set_fight); survives mx_load */
+  MxPad pads[MX_MAX_PADS];
+  int npads;
+  MxCase cases[MX_MAX_CASES];
+  uint32_t rng;
   /* events (cleared at the start of each mx_update) */
   MxEvent ev[MX_MAX_EVENTS];
   int nev;
@@ -232,7 +259,12 @@ void mx_select_power(MxWorld *w, int pw);      /* PW_*: arm / disarm before laun
 #define MX_VALVE_KEEP   R(5.5)
 #define MX_VALVE_PULLIN R(9.5)
 void mx_drag(MxWorld *w, real dx, real dy);
-int  mx_valve_seat(MxWorld *w);                /* put him on the valve. 0 if locked or not aiming */
+int  mx_valve_seat(MxWorld *w);
+/* Walk levels (w->walk): while man.mode == MAN_WALK the front-end calls this every frame: ax = -1/0/1, the rest are held buttons (jump, punch, stomp), then mx_walk_quit() gives up. */
+void mx_walk_input(MxWorld *w, int ax, int jump, int punch, int stomp);
+void mx_walk_quit(MxWorld *w);
+void mx_set_fight(MxWorld *w, int on);          /* landlords fight back (default on) */
+#define MX_BAT_BREAK R(70)                       /* a bat landlord only swats shots slower than this (cells/s) */                /* put him on the valve. 0 if locked or not aiming */
 int  mx_targets_alive(const MxWorld *w);
 int  mx_cells_left(const MxWorld *w);
 const char *mx_level_name(int level);

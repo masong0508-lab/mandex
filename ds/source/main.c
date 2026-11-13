@@ -197,6 +197,32 @@ static void on_events(void){
       popup(e->x, e->y - RI(5), "FWOOMP!", tc); sfx_play(SFX_WHOOSH, pan);
       for(int k = 0; k < 6; k++) spawn(PT_DUST, e->a, e->b, rnd(25) + 4, rnd(9) - 4, 0, 20 + rnd(8));
       break; }
+    case EV_WALK:                                           /* he landed on his feet (walk levels) */
+      for(int k = 0; k < 10; k++) spawn(PT_GOO, e->x, e->y, rnd(31) - 15, -rnd(20), 0, 40 + rnd(20));
+      spawn_ring(e->x, e->y, 6, C_GOO); popup(e->x, e->y - RI(6), "ON FOOT!", C_GOO); sfx_play(SFX_SPLAT, pan);
+      break;
+    case EV_PUNCH:
+      if(e->a > 0){ for(int k = 0; k < 5; k++) spawn(PT_SPARK, e->x, e->y, rnd(31) - 15, -rnd(15), k & 1 ? C_GOLD : C_WHITE, 12 + rnd(8)); popup(e->x, e->y - RI(3), e->m ? "SHOULDER!" : "POW!", C_GOLD); sfx_play(SFX_SLAP, pan); sfx_play(SFX_CRUNCH, pan); }
+      else sfx_play(SFX_WHOOSH, pan);
+      break;
+    case EV_SLAM:
+      for(int k = 0; k < 8; k++) spawn(PT_DUST, e->x + RI(rnd(9) - 4), e->y, rnd(31) - 15, -rnd(6), 0, 22 + rnd(10));
+      spawn_ring(e->x, e->y, 8, C_WHITE); spawn_ring(e->x, e->y, 5, C_GOLD); popup(e->x, e->y - RI(5), "BELLY SLAM!", C_FIRE); sfx_play(SFX_THUD, pan); sfx_play(SFX_CRUNCH, pan);
+      break;
+    case EV_PAD:
+      for(int k = 0; k < 5; k++) spawn(PT_STAR, e->x, e->y, rnd(17) - 8, -rnd(12) - 2, 0, 24 + rnd(10));
+      spawn_ring(e->x, e->y, 5, C_PINK); popup(e->x, e->y - RI(5), "BOING!", C_PINK); sfx_play(SFX_BOING, pan);
+      break;
+    case EV_HURT:                                           /* a landlord got him: on foot (m=1) or in the sling (m=0, the pull is let go) */
+      for(int k = 0; k < 8; k++) spawn(PT_SPARK, e->x, e->y - RI(1), rnd(41) - 20, -rnd(20), k & 1 ? C_GOLD : C_WHITE, 14 + rnd(8));
+      spawn_ring(e->x, e->y, 5, C_RED); popup(e->x, e->y - RI(6), "OUCH!", C_RED); sfx_play(SFX_GRUNT, pan); sfx_play(SFX_THUD, pan);
+      if(!e->m){ dragging = 0; pad_used = 0; }
+      break;
+    case EV_BONK:                                           /* a bat landlord swatted a weak shot */
+      for(int k = 0; k < 8; k++) spawn(PT_SPARK, e->x, e->y - RI(1), rnd(41) - 20, -rnd(20), k & 1 ? C_GOLD : C_WHITE, 14 + rnd(8));
+      spawn_ring(e->x, e->y, 5, C_GOLD); popup(e->x, e->y - RI(6), "BONK!", C_GOLD); sfx_play(SFX_SLAP, pan); sfx_play(SFX_CRUNCH, pan);
+      break;
+    case EV_THROW: case EV_SWING: sfx_play(SFX_WHOOSH, pan); break;
     case EV_THUD:   if(e->b > R(0.3)) sfx_play(SFX_THUD, pan); break;
     case EV_LAND:                                           /* ground touch: a puff of dust, and a hard landing adds a ring */
       for(int k = 0, n = e->m ? 8 : 5; k < n; k++) spawn(PT_DUST, e->x + RI(rnd(5) - 2) / 4, e->y - R(0.5), rnd(15) - 7, -rnd(5) - 1, 0, 22 + rnd(10));
@@ -350,9 +376,30 @@ static void draw_targets(const View *v){
   for(int i = 0; i < world.ntargets; i++){
     const MxTarget *t = &world.targets[i];
     if(!t->alive) continue;
-    int scared = (m->mode == MAN_FLY || m->mode == MAN_STUCK) && rabs(t->x - m->x) < RI(26);
+    int scared = ((m->mode == MAN_FLY || m->mode == MAN_STUCK) && rabs(t->x - m->x) < RI(26)) || t->pan > 0;
     real wx, wy; mx_target_offset(&world, t, &wx, &wy);
-    spr_landlord(v->buf, vx(v, t->x + wx), vy(v, t->y + wy), v->ppc, frame + i * 11, scared);
+    int st = (t->stun > 0 ? 1 : 0) | (t->wind > 0 ? 2 : 0) | (t->swing > 0 ? 4 : 0) | (t->mv == 1 ? 8 : 0) | (t->mv == 2 ? 16 : 0);
+    if(t->kind || st) spr_landlord_k(v->buf, vx(v, t->x + wx), vy(v, t->y + wy), v->ppc, frame + i * 11, scared, t->kind, t->face < 0 ? -1 : 1, st);
+    else spr_landlord(v->buf, vx(v, t->x + wx), vy(v, t->y + wy), v->ppc, frame + i * 11, scared);
+  }
+}
+
+/* briefcases in the air (Batter Up) and the bounce pads of walk levels: three chevrons float up from each pink pad */
+static void draw_cases(const View *v){
+  for(int i = 0; i < MX_MAX_CASES; i++){
+    const MxCase *c = &world.cases[i];
+    if(c->active) spr_case(v->buf, vx(v, c->x), vy(v, c->y), v->ppc, (int)((c->rot * 2) >> 12) & 3);
+  }
+}
+static void draw_pads(const View *v){
+  int p = v->ppc, bob = (frame >> 3) & 3;
+  for(int i = 0; i < world.npads; i++){
+    const MxPad *pd = &world.pads[i];
+    int cx = vx(v, RI(pd->x) + RI(pd->w) / 2), cy = vy(v, RI(pd->y));
+    for(int k = 0; k < 3; k++){
+      int y = cy - p * (3 + 3 * k) - bob; u8 c = k == 0 ? C_WHITE : k == 1 ? C_PINK : C_RED2;
+      gfx_line(v->buf, cx - p * 5 / 4, y + p / 2, cx, y - p / 2, c); gfx_line(v->buf, cx, y - p / 2, cx + p * 5 / 4, y + p / 2, c);
+    }
   }
 }
 
@@ -430,6 +477,14 @@ static void draw_man(const View *v){
   const MxMan *m = &world.man;
   if(m->mode == MAN_NONE || m->mode == MAN_WAIT) return;
   int x = vx(v, m->x), y = vy(v, m->y);
+  if(m->mode == MAN_WALK){                                                                  /* on his own feet: the turning-round frames step him along, three quarters of the sling size */
+    if(m->hurtCd > 0 && (frame & 2)) return;                                                  /* blinks while he is protected after a hit */
+    int p = v->ppc * 3 / 4, mv = m->gr && (m->vx > R(3) || m->vx < -R(3)), fr = MSF_SPIN_6 + (mv ? ((frame >> 2) & 1 ? 1 : -1) : 0), face = m->face < 0 ? -1 : 1;
+    int fy = vy(v, m->y + R(2.375)) - (mv && ((frame >> 2) & 1) ? 1 : 0);
+    spr_man_walk(v->buf, x, fy, p < 1 ? 1 : p, face, fr, 0);
+    if(m->pT > 0){ int r = v->ppc * 5, ax = x + face * v->ppc * 4; for(int k = -3; k <= 3; k++) gfx_px(v->buf, ax + face * (r - k * k * r / 18), y + k * v->ppc * 3 / 4, C_WHITE); }   /* punch swoosh */
+    return;
+  }
   int pose = POSE_IDLE, face = 1;
   ManJig jg = man_jig(v);
   if(m->mode == MAN_FLY){ pose = m->dive ? POSE_DIVE : POSE_FLY; face = m->vx >= 0 ? 1 : -1; }
@@ -528,6 +583,8 @@ static void draw_world(const View *v, int parallax){
   draw_chunks(v);
   draw_targets(v);
   if(world.ntubes) draw_tubes(v);
+  if(world.npads) draw_pads(v);
+  draw_cases(v);
   if(opt.tool == MX_TOOL_VALVE) draw_valve(v);
   { const MxMan *m = &world.man;                                   /* his shadow on the ground, smaller the higher he is */
     if(m->mode == MAN_AIM || m->mode == MAN_FLY){ int hgt = gfx_clamp((int)((RI(MX_ROWS) - m->y) >> 12), 0, 40), rw = (v->ppc * (5 * (80 - hgt))) / 80;
@@ -553,6 +610,9 @@ static void button(u8 *b, int x, int y, int w, int h, const char *s){
   gfx_rect(b, x + 1, y + h - 2, w - 2, 1, C_UIBG);
   gfx_text_c(b, x + w / 2, y + (h - 5) / 2, s, C_WHITE, C_UIBG, 1);
 }
+/* walk levels: the touch screen shows these buttons while he is on foot (the stylus can only press one; the d-pad and A/B/Y/X play the same moves) */
+static const struct { int x, w; const char *s; } WB[6] = { { 4, 22, "<" }, { 28, 22, ">" }, { 58, 44, "JUMP" }, { 104, 50, "PUNCH" }, { 156, 44, "SLAM" }, { 204, 48, "GIVE UP" } };
+static int walk_btn_at(const touchPosition *t){ for(int i = 0; i < 6; i++) if(hit(t, WB[i].x, 168, WB[i].w, 20)) return i; return -1; }
 static void draw_men_icons(u8 *b, int x, int y, int bust){
   for(int i = 0; i < world.men; i++){
     if(bust) spr_man_bust(b, x + i * 14, y, 2);
@@ -581,6 +641,12 @@ static void top_hud(u8 *b){
   gfx_text_o(b, 70 + 30 + gfx_text_w(gfx_int(pct), 1) + 2, 15, "%", C_WHITE, C_BLACK, 1);
   gfx_text_o(b, 4, 24, "LANDLORDS", C_WHITE, C_BLACK, 1);
   draw_hats(b, 46, 28);
+  if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                      /* walk levels: the clock, and what the buttons do */
+    int k = gfx_clamp((int)((world.man.wt * 100 / MX_WALK_T) >> 12), 0, 100);
+    gfx_rect(b, 4, 36, 82, 7, C_UIBG); gfx_rect(b, 5, 37, 80, 5, C_DARK); gfx_rect(b, 5, 37, k * 80 / 100, 5, k > 30 ? C_GOO : C_RED);
+    gfx_text_o(b, 90, 36, "TIME", C_WHITE, C_BLACK, 1);
+    gfx_text_c(b, 128, 183, "PAD MOVE  A JUMP  B PUNCH  DOWN SLAM  L GIVE UP", C_WHITE, C_BLACK, 1);
+  }
   toast_tick();
   if(toast_t >= 0){
     int y = toast_t < 12 ? toast_t * 3 - 36 : toast_t > 138 ? (150 - toast_t) * 3 - 36 : 0;      /* slides down, waits, slides up */
@@ -632,10 +698,14 @@ static void bottom_overview(View *v){
   draw_world(v, 0);
   draw_popups(v, 1);
   gfx_rect(v->buf, 0, 164, 256, 28, C_UIBG); gfx_rect(v->buf, 0, 164, 256, 1, C_UILINE);
+  if(world.man.mode == MAN_WALK){
+    for(int i = 0; i < 6; i++) button(v->buf, WB[i].x, 168, WB[i].w, 20, WB[i].s);
+  } else {
   draw_men_icons(v->buf, 12, 177, 0);
   draw_hats(v->buf, 100, 178);
   button(v->buf, 170, 170, 46, 16, "RESTART");
   button(v->buf, 220, 170, 32, 16, "MENU");
+  }
   if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) gfx_text_c(v->buf, 128, 6, "TAP = BELLY FLOP!", C_WHITE, C_BLACK, 1);
 }
 
@@ -692,7 +762,7 @@ static void apply_outfit(int o){
 }
 /* the air valve exists only while it is the start tool (and unlocked); NONE and the three power-ups hide it, as in the browser */
 static int valve_allowed(void){ return opt.tool == MX_TOOL_VALVE && mx_valve_unlocked(&stats); }
-static void apply_options(void){ mx_set_collapse(&world, opt.collapse && !coll_shed); world.valve_ok = valve_allowed(); }
+static void apply_options(void){ mx_set_collapse(&world, opt.collapse && !coll_shed); world.valve_ok = valve_allowed(); mx_set_fight(&world, !opt.nofight); }
 static void load_level(int l){
   mx_load(&world, l); mx_meta_level_start(&stats, &world); apply_options(); was_aim = 0;
   mx_set_substeps(&world, world.substeps > MX_DS_MAX_SUBSTEPS ? MX_DS_MAX_SUBSTEPS : world.substeps);
@@ -839,13 +909,14 @@ static void outfits_bottom(u8 *b){
 }
 
 /* ---- options screen (port 13): three rows on the title's bottom screen.  Tap a row (or d-pad up/down + A / left / right); B or BACK returns and saves. ---- */
-enum { OPT_COLLAPSE, OPT_TOOL, OPT_MUSIC, OPT_ROWS };
+enum { OPT_COLLAPSE, OPT_TOOL, OPT_FIGHT, OPT_MUSIC, OPT_ROWS };
 #define OPT_RX 8
 #define OPT_RW 240
-static const int OPT_RY[OPT_ROWS] = { 18, 66, 114 }, OPT_RH[OPT_ROWS] = { 44, 44, 26 };
+static const int OPT_RY[OPT_ROWS] = { 10, 56, 102, 130 }, OPT_RH[OPT_ROWS] = { 44, 44, 26, 26 };
 static void opt_change(int row, int dir){                 /* dir +1 / -1; the two-state rows ignore the sign */
   if(row == OPT_COLLAPSE){ opt.collapse = !opt.collapse; coll_shed = 0; }
   else if(row == OPT_TOOL){ opt.tool = (u8)((opt.tool + dir + MX_NUM_TOOLS) % MX_NUM_TOOLS); }
+  else if(row == OPT_FIGHT){ opt.nofight = !opt.nofight; }
   else { music_pref = !music_pref; music_set(music_pref && world.state == MX_PLAY); }
   apply_options(); sfx_play(SFX_CLICK, 64);
 }
@@ -876,6 +947,11 @@ static void options_bottom(u8 *b){
       static const char *const D2[MX_NUM_TOOLS] = { "", "", "ONE USE PER LEVEL. THE AIR VALVE IS HIDDEN", "ONE USE PER LEVEL. THE AIR VALVE IS HIDDEN", "ONE USE PER LEVEL. THE AIR VALVE IS HIDDEN" };
       gfx_text(b, x + 34, y + 21, D1[opt.tool], C_WHITE, 1);
       gfx_text(b, x + 34, y + 29, D2[opt.tool], C_GRAY, 1);
+    } else if(i == OPT_FIGHT){
+      gfx_text(b, x + 6, y + 5, "LANDLORDS FIGHT BACK", lc, 1);
+      const char *v = opt.nofight ? "OFF" : "ON";
+      gfx_text(b, x + w - 8 - gfx_text_w(v, 2), y + 3, v, opt.nofight ? C_GRAY : C_GOO, 2);
+      gfx_text(b, x + 6, y + 16, "WALKERS, BAT GUYS, BRIEFCASE THROWERS", C_WHITE, 1);
     } else {
       gfx_text(b, x + 6, y + 10, "MUSIC", lc, 1); gfx_text(b, x + 6 + 24, y + 10, "(Y)", C_UILINE, 1);
       const char *v = music_pref ? "ON" : "OFF";
@@ -1077,6 +1153,17 @@ int main(void){
           }
           if((down & KEY_A) && pad_used){ pad_used = 0; mx_release(&world); }
         }
+      } else if(m->mode == MAN_WALK){                                      /* walk levels: steer him on foot */
+        dragging = 0; pad_used = 0;
+        int ax = 0, jump = 0, punch = 0, stomp = 0;
+        if(held & KEY_LEFT) ax--;
+        if(held & KEY_RIGHT) ax++;
+        if(held & (KEY_A | KEY_UP)) jump = 1;
+        if(held & (KEY_B | KEY_Y)) punch = 1;
+        if(held & (KEY_DOWN | KEY_X)) stomp = 1;
+        if(held & KEY_TOUCH){ int bn = walk_btn_at(&t); if(bn == 0) ax--; else if(bn == 1) ax++; else if(bn == 2) jump = 1; else if(bn == 3) punch = 1; else if(bn == 4) stomp = 1; }
+        mx_walk_input(&world, ax, jump, punch, stomp);
+        if((down & KEY_L) || ((down & KEY_TOUCH) && walk_btn_at(&t) == 5)){ mx_walk_quit(&world); sfx_play(SFX_CLICK, 64); }
       } else {
         dragging = 0; pad_used = 0;
         if(down & (KEY_A | KEY_B)) mx_dive(&world);
@@ -1143,7 +1230,7 @@ int main(void){
     const MxMan *m = &world.man;
     if(app == ST_PLAY){
       if(m->mode == MAN_FLY){ tx = m->x + rmul(m->vx, R(0.22)); ty = m->y; rate = R(0.3); }
-      else if(m->mode == MAN_STUCK){ tx = m->x; ty = m->y; rate = R(0.2); }
+      else if(m->mode == MAN_STUCK || m->mode == MAN_WALK){ tx = m->x; ty = m->y; rate = R(0.2); }
       else if(ev_ft > 0){ tx = ev_fx; ty = ev_fy; rate = R(0.12); ev_ft--; }
     }
     fx += rmul(tx - fx, rate); fy += rmul(ty - fy, R(0.12));

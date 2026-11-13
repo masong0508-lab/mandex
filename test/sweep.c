@@ -27,6 +27,11 @@ int main(void){
         r=r*1664525u+1013904223u; double a=(12+((r>>16)%40))*3.14159265/180; r=r*1664525u+1013904223u; double p=7+((r>>16)%46)/10.0;
         mx_set_pull(&w,(real)(-p*cos(a)*RS),(real)(p*sin(a)*RS)); mx_release(&w); shot++;
       }
+      if(w.state==MX_PLAY && w.man.mode==MAN_WALK){        /* walk levels: random button mashing, and give up after 1-12 s */
+        r=r*1664525u+1013904223u;
+        if(((r>>16)&31)==0){ static int ax; ax=(int)((r>>8)%3)-1; mx_walk_input(&w,ax,(r>>12)&1,(r>>13)&1,(r>>14)%5==0); }
+        if(((r>>10)&511)==0) mx_walk_quit(&w);
+      }
       if(w.state==MX_PLAY && w.man.mode==MAN_FLY){ r=r*1664525u+1013904223u; if((r>>20)%90==0) mx_dive(&w); }
       mx_update(&w,R(1.0/60.0));
       { int a=0, s=0; for(int c=0;c<MX_MAX_CHUNKS;c++){ a+=w.chunks[c].active; s+=w.chunks[c].active&&w.chunks[c].rest; } if(a>peak) peak=a; if(s>peakrest) peakrest=s; }

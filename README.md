@@ -15,7 +15,7 @@ One game, four builds: a browser version with its own JS physics, and three cons
 | Sega Dreamcast | `dreamcast/` (KallistiOS, float) | same: host-tested with a software rasteriser, **never built for real** |
 
 `core/mx.c` is the shared C game core for the three consoles (a 120x60 voxel grid, rigid chunks, a wobble lattice with
-8 block kinds and 34 levels (20 story levels, then 14 chapter 2 levels; same layouts as the web game); `core/mx_meta.c` holds the stars, achievements and outfits rules), `art/` holds the generated pixel art and the idle-gag player, `tools/` the sprite generator,
+8 block kinds and 37 levels (20 story levels, then 17 chapter 2 levels; same layouts and mechanics as the web game); `core/mx_meta.c` holds the stars, achievements and outfits rules), `art/` holds the generated pixel art and the idle-gag player, `tools/` the sprite generator,
 `test/` the host tests.  See [PORTING.md](PORTING.md) for the full status, design notes and what is not verified.
 
 ## What is in it
@@ -48,7 +48,10 @@ python tools/gen_manspr.py      # re-render art/manspr.h from web/index.html's o
 ```
 
 Controls: DS stylus drag-and-release to fling, tap in flight to belly-flop; 3DS the same on the bottom screen; Dreamcast analog stick to pull, A to launch
-or flop.  Full list in [PORTING.md](PORTING.md).
+or flop.  Chapter 2 walk levels (Walk-Up Wreckage, Collection Day, Batter Up): once he lands on his feet, DS/3DS d-pad
+walks, A / up jumps, B / Y punches, X / down belly-slams, L gives up (3DS also has touch buttons); Dreamcast d-pad or stick walks, A jumps, B punches, X slams,
+L trigger gives up.  Landlords fighting back can be switched off: DS options screen, 3DS Y on the title, Dreamcast Y on the title (X on the pause screen).
+Full list in [PORTING.md](PORTING.md).
 
 ## Workflows (`.github/workflows`)
 

@@ -400,19 +400,25 @@ exercised with the host harnesses in `test/` and CI (compile only for the consol
   rewritten from the web builders (men counts too: level 1 has 5, level 13 has 6).
 - Parity is checked cell by cell: `test/level_dump.c` writes every core level after `mx_load`, and
   `tools/level_parity.js` loads the same levels in the web game with Playwright and diffs men, landlord positions and
-  the whole grid. `PARITY=1 bash test/run_tests.sh` runs it. All 34 console levels are identical to their web twins.
+  the whole grid. `PARITY=1 bash test/run_tests.sh` runs it. All 37 console levels are identical to their web twins (including landlord kinds, walk flag and pads).
   (It also fails on the old layouts, so it does discriminate.)
 - Console level order now: 1-20 story (same numbers as the web), 21-24 = web 21, 22, 24, 25 (Special Delivery,
   Hourglass Heights, Over the Top, Needle Threader), 25-34 = web 28-37 (the ten pure-slingshot levels; the last one,
-  Landlord HQ, is the finale and shows "the end"). `MX_NUM_LEVELS` is 34; `MX_STORY_LEVELS` (20) is what the story
+  Landlord HQ, is the finale and shows "the end"). `MX_NUM_LEVELS` is 37 (see the Chapter 2 mechanics section: the level order now equals the web order); `MX_STORY_LEVELS` (20) is what the story
   achievements and outfits count, so nothing already earned moves. The save blob grows by 5 bytes per level and the
   loader already accepts saves with fewer levels.
-- Not on the consoles (web only): Walk-Up Wreckage (walk mode, pads, doors) and the two fight-back levels (Collection
-  Day, Batter Up: patrolling walkers, bat guys, briefcase throwers). They need new core mechanics and a console
-  control scheme; porting only their geometry would make levels whose tips lie.
+- Walk-Up Wreckage and the two fight-back levels (Collection Day, Batter Up) are now on the consoles too: see "Chapter 2 mechanics" below.
 - `test/level_solve.c` is a greedy search (angle, pull, belly-flop timing; a few random restarts with `DEEP=n`) that
   plays levels on the core. It found a winning sequence on every level except where noted below; "not solved" is not a
   proof that a level is impossible, "solved" is a proof that it can be won with this exact physics. `SOLVE=1`.
+
+### Chapter 2 mechanics (core + DS + 3DS + Dreamcast)
+- Level order is now exactly the web order (core index = web index, 37 levels): 20 Special Delivery, 21 Hourglass Heights, 22 Walk-Up Wreckage, 23 Over the Top, 24 Needle Threader, 25 Collection Day, 26 Batter Up, 27-36 the ten slingshot levels. Saves made on the 34-level build keep their data by index, so best scores of levels after Hourglass Heights now sit under different levels (the save loader is index based, not name based).
+- Walk mode (`MAN_WALK`, `mx_walk_input(w, ax, jump, punch, stomp)`, `mx_walk_quit`): he lands on his feet on a walk level, walks (16.9 cells/s), jumps, punches (barge when running), belly-slams, bounces off pads (pads are rubber cells in the grid; `MxPad` is only for drawing). 45 s clock, +3 s per landlord, -3 s when hurt, run out of time or give up = the man is lost. Events EV_WALK / PUNCH / SLAM / PAD / HURT / BONK / THROW / SWING.
+- Landlord kinds (`MxTarget.kind`): walker patrols and swings at a man on foot, thrower lobs briefcases (`MxCase`) at the man in the sling, bat swats shots slower than `MX_BAT_BREAK`. Getting hit in the sling stuns him 1.4 s (aim input is ignored) and costs 2000 points.
+- Fight-back switch: `mx_set_fight(w, on)`; options byte bit 4 = fight-back OFF (default 0 = on); `MxOptions.nofight`. DS options row, 3DS Y on the title, Dreamcast Y on the title / X on pause.
+- Tests: `test/ch2_test.c` (float + fixed), `test/n3ds_walk.c`, DS `WALK_TEST=1/2/3`, Dreamcast `DC_WALK=1` render, the sweep and the solver now include walk bots, and the level parity check covers all 37 levels.
+- Verified only on the PC: nothing has been run on real hardware or an emulator, no sound has been heard, and the new levels have not been played by a human (a scripted bot clears the Walk-Up zig-zag; the fight-back levels were only watched). The Dreamcast landlord kinds are tinted copies of the one landlord sprite plus drawn props; the Dreamcast walk sprite is the man's turning frame scaled down.
 
 ### Pneumatic tubes (core + all three consoles)
 - `MxTube` (mouth, nozzle, exit velocity 95 cells/s), `MX_TUBE_R` 3.75 cells, `EV_TUBE`. A flying man within the

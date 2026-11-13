@@ -10,12 +10,22 @@
 #define DT R(1.0/60.0)
 static MxWorld W, S, B;
 
+/* walk levels: head for the nearest landlord, punching, hopping now and then; give up after 6 s */
+static int walk_f;
+static void walk_bot(MxWorld *w){
+  if(w->man.mode != MAN_WALK){ walk_f = 0; return; }
+  if(++walk_f > 360){ mx_walk_quit(w); return; }
+  int best = -1; double bd = 1e9, mx = RTOF(w->man.x), my = RTOF(w->man.y);
+  for(int i = 0; i < w->ntargets; i++) if(w->targets[i].alive){ double d = fabs(RTOF(w->targets[i].x) - mx) + 2 * fabs(RTOF(w->targets[i].y) - my); if(d < bd){ bd = d; best = i; } }
+  int ax = best >= 0 ? (RTOF(w->targets[best].x) > mx ? 1 : -1) : 0;
+  mx_walk_input(w, ax, walk_f % 25 == 0, 1, 0);
+}
 static void shoot(MxWorld *w, double pull, int deg, int dive_at){
   double a = deg * 3.14159265 / 180.0;
   mx_set_pull(w, R(-pull * cos(a)), R(pull * sin(a))); mx_release(w);
   for(int f = 0; f < 60 * 14 && w->state == MX_PLAY; f++){
     if(dive_at && f == dive_at && w->man.mode == MAN_FLY) mx_dive(w);
-    mx_update(w, DT);
+    walk_bot(w); mx_update(w, DT);
     if(w->man.mode == MAN_AIM) break;
   }
 }
@@ -38,7 +48,7 @@ int main(int argc, char **argv){
         if(nc >= 256) break;
         memcpy(&B, &S, sizeof B);
         shoot(&B, pulls[pi], d, dives[vi]);
-        for(int f = 0; f < 60 * 8 && B.state == MX_PLAY && B.man.mode != MAN_AIM; f++) mx_update(&B, DT);
+        for(int f = 0; f < 60 * 8 && B.state == MX_PLAY && B.man.mode != MAN_AIM; f++){ walk_bot(&B); mx_update(&B, DT); }
         int k = alive0 - mx_targets_alive(&B), c = mx_cells_left(&S) - mx_cells_left(&B);
         if(B.state == MX_WIN) k += 100;
         cand[nc].sc = (long)k * 100000 + c; cand[nc].p = pulls[pi]; cand[nc].d = d; cand[nc].v = dives[vi]; nc++;
@@ -50,7 +60,7 @@ int main(int argc, char **argv){
         for(int r = 0; r < 5 && r < nc; r++){ int bi = -1; for(int i = 0; i < nc; i++){ int skip = 0; for(int q = 0; q < nt; q++) if(top[q] == i) skip = 1; if(!skip && (bi < 0 || cand[i].sc > cand[bi].sc)) bi = i; } top[nt++] = bi; used_sc[r] = cand[bi].sc; }
         pick = top[rand() % nt]; (void)used_sc; }
       shoot(&W, cand[pick].p, cand[pick].d, cand[pick].v); used++;
-      for(int f = 0; f < 60 * 8 && W.state == MX_PLAY && W.man.mode != MAN_AIM; f++) mx_update(&W, DT);
+      for(int f = 0; f < 60 * 8 && W.state == MX_PLAY && W.man.mode != MAN_AIM; f++){ walk_bot(&W); mx_update(&W, DT); }
       if(W.state == MX_WIN){ ok = 1; break; }
     }
     }

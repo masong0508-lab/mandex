@@ -75,5 +75,18 @@ int main(void){
       if(!forced && getenv("FORCE_GAG") && mi.gag < 0 && mi.total > 0){ forced = 1; mi.gag = atoi(getenv("FORCE_GAG")); mi.step = 0; mi.t = 0; }
       if(mi.gag >= 0 && (mi.gag != lg || mi.step != ls)){ int fr = mi_frame(&mi, i); if(!seen[fr]){ seen[fr]=1; char fn[64]; snprintf(fn,sizeof fn,"/tmp/dc_idle%02d.ppm",n++); frame(fn); printf("  idle shot gag=%d frame=%d\n", mi.gag, fr); } }
       lg = mi.gag; ls = mi.step; } }
+  /* chapter 2: Walk-Up Wreckage on foot (22), Collection Day (25) with a walker, Batter Up (26) with the bat and briefcases */
+  if(getenv("DC_WALK")){
+    load_level(22); for(int i=0;i<30;i++) tick(0);
+    mx_set_pull(&world,-11.5f*cosf(0.45f),11.5f*sinf(0.45f)); mx_release(&world);
+    for(int i=0;i<900 && world.man.mode != MAN_WALK;i++) tick(0);
+    printf("walk mode reached: %d\n", world.man.mode == MAN_WALK);
+    for(int i=0;i<20;i++){ mx_walk_input(&world, 1, 0, 0, 0); tick(0); } frame("/tmp/dc_walk0.ppm");
+    for(int i=0;i<8;i++){ mx_walk_input(&world, 1, 0, 1, 0); tick(0); } frame("/tmp/dc_walk1.ppm");
+    for(int i=0;i<6;i++){ mx_walk_input(&world, 0, 1, 0, 0); tick(0); } frame("/tmp/dc_walk2.ppm");
+    load_level(25); for(int i=0;i<60;i++) tick(0); frame("/tmp/dc_l25.ppm");
+    load_level(26); for(int i=0;i<60;i++) tick(0); frame("/tmp/dc_l26.ppm");
+    for(int i=0;i<400;i++){ tick(0); if(world.cases[0].active || world.cases[1].active){ frame("/tmp/dc_l26b.ppm"); break; } }
+  }
   world.state = MX_WIN; frame("/tmp/dc_win.ppm"); world.state = MX_LOSE; frame("/tmp/dc_lose.ppm");
   return 0; }

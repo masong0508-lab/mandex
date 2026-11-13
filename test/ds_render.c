@@ -144,21 +144,24 @@ void swiWaitForVBlank(void){
     if(vf == 29) g_keys |= KEY_LEFT; if(vf == 31) PCHECK(opt.tool == MX_TOOL_VALVE, "...to the air valve");
     if(vf == 32) g_keys |= KEY_LEFT; if(vf == 34) PCHECK(opt.tool == MX_TOOL_NONE, "...to none");
     if(vf == 35) g_keys |= KEY_LEFT; if(vf == 37) PCHECK(opt.tool == MX_TOOL_SPLAT, "...and the list wraps round to splat");
-    if(vf == 38) g_keys |= KEY_DOWN; if(vf == 40) PCHECK(opt_cur == 2, "d-pad down to the music row");
-    if(vf == 41) g_keys |= KEY_A; if(vf == 43){ PCHECK(music_pref == 0, "A on the music row switches it off"); shot("opt4"); }
-    if(vf == 44) g_keys |= KEY_A; if(vf == 46) PCHECK(music_pref == 1, "...and back on");
-    if(vf == 47) g_keys |= KEY_DOWN; if(vf == 49) PCHECK(opt_cur == 0, "the cursor wraps from the bottom row to the top");
-    if(vf == 50){ opt.tool = MX_TOOL_TOWEL; }                                                             /* the start tool for the play test */
-    if(vf == 51){ g_keys |= KEY_TOUCH; g_touch.px = 20; g_touch.py = 175; }                               /* BACK */
-    if(vf == 53) PCHECK(!opt_open && app == ST_TITLE, "BACK closes the screen and stays on the title");
-    if(vf == 54) g_keys |= KEY_A;                                                                         /* play */
-    if(vf == 58){
+    if(vf == 38) g_keys |= KEY_DOWN; if(vf == 40) PCHECK(opt_cur == 2, "d-pad down to the landlords-fight-back row");
+    if(vf == 41) g_keys |= KEY_A; if(vf == 43){ PCHECK(opt.nofight == 1 && world.nofight == 1, "A on the fight-back row switches it off (and the world follows)"); shot("opt4f"); }
+    if(vf == 44) g_keys |= KEY_A; if(vf == 46) PCHECK(opt.nofight == 0 && world.nofight == 0, "...and back on");
+    if(vf == 50) g_keys |= KEY_DOWN; if(vf == 52) PCHECK(opt_cur == 3, "d-pad down to the music row");
+    if(vf == 53) g_keys |= KEY_A; if(vf == 55){ PCHECK(music_pref == 0, "A on the music row switches it off"); shot("opt4"); }
+    if(vf == 56) g_keys |= KEY_A; if(vf == 58) PCHECK(music_pref == 1, "...and back on");
+    if(vf == 59) g_keys |= KEY_DOWN; if(vf == 61) PCHECK(opt_cur == 0, "the cursor wraps from the bottom row to the top");
+    if(vf == 62){ opt.tool = MX_TOOL_TOWEL; }                                                             /* the start tool for the play test */
+    if(vf == 63){ g_keys |= KEY_TOUCH; g_touch.px = 20; g_touch.py = 175; }                               /* BACK */
+    if(vf == 65) PCHECK(!opt_open && app == ST_TITLE, "BACK closes the screen and stays on the title");
+    if(vf == 66) g_keys |= KEY_A;                                                                         /* play */
+    if(vf == 70){
       PCHECK(app == ST_PLAY && world.collapse == 1, "the level starts with collapsible buildings on");
       PCHECK(world.valve_ok == 0, "a power-up start tool hides the air valve (valve locked out even though the stub save has it unlocked)");
       PCHECK(world.pw_sel == PW_TOWEL, "the start tool (towel) is pre-armed when he is in the sling"); st = 1; }
-    if(st == 1 && vf == 60){ mx_set_pull(&world, -RI(8), RI(4)); men0 = world.men; mx_release(&world); }
-    if(st == 1 && vf == 62){ PCHECK(world.man.mode == MAN_FLY && world.man.pwr == PW_TOWEL && world.pw_left[PW_TOWEL] == 0, "the launch used the pre-armed towel"); st = 2; }
-    if(st == 2 && world.man.mode == MAN_AIM && world.state == MX_PLAY && world.men < men0 && vf > 62){
+    if(st == 1 && vf == 72){ mx_set_pull(&world, -RI(8), RI(4)); men0 = world.men; mx_release(&world); }
+    if(st == 1 && vf == 74){ PCHECK(world.man.mode == MAN_FLY && world.man.pwr == PW_TOWEL && world.pw_left[PW_TOWEL] == 0, "the launch used the pre-armed towel"); st = 2; }
+    if(st == 2 && world.man.mode == MAN_AIM && world.state == MX_PLAY && world.men < men0 && vf > 74){
       PCHECK(world.pw_sel == 0, "back in the sling with no towel left: nothing is armed again"); st = 3; f0 = vf; }
     if(st == 3 && vf == f0 + 2){                                                                          /* apply_options(): the valve is only there when it is the start tool */
       opt.tool = MX_TOOL_VALVE; apply_options(); PCHECK(world.valve_ok == 1, "air valve as the start tool and 3 levels beaten: the valve is usable");
@@ -272,6 +275,33 @@ void swiWaitForVBlank(void){
     if(vf == 34) g_keys |= KEY_B;
     if(vf == 36){ OCHECK(!out_open, "B closes the screen"); shot("out5");
       printf(fails ? "outfits screen: %d FAILED\n" : "outfits screen: all passed\n", fails); exit(fails != 0); }
+  } else if(getenv("WALK_TEST") && app == ST_PLAY){                      /* chapter 2: walk levels (22 = Walk-Up Wreckage), fight-back landlords (25 Collection Day, 26 Batter Up) */
+    static int fails, st, f0, x0, y0;
+#define WCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
+    int wt = atoi(getenv("WALK_TEST"));
+    if(wt == 1){                                                       /* Walk-Up Wreckage */
+      if(st == 0 && world.banner <= 0 && world.man.mode == MAN_AIM){ world.men--; world.man.mode = MAN_FLY; world.man.x = RI(64); world.man.y = R(54); world.man.vx = RI(3); world.man.vy = RI(10); world.man.gt = 0; st = 1; f0 = vf; }
+      if(st == 1 && world.man.mode == MAN_WALK){ WCHECK(1, "he lands on his feet on the walk level"); st = 2; f0 = vf; }
+      if(st == 2 && vf == f0 + 40){ shot("walk0"); x0 = world.man.x; g_keys |= KEY_RIGHT; }
+      if(st == 2 && vf > f0 + 40 && vf < f0 + 100) g_keys |= KEY_RIGHT;
+      if(st == 2 && vf == f0 + 100){ WCHECK(world.man.x - x0 > RI(8), "D-pad right walks him along"); shot("walk1"); st = 3; f0 = vf; y0 = world.man.y; }
+      if(st == 3 && vf == f0 + 1) g_keys |= KEY_A;
+      if(st == 3 && vf == f0 + 8){ WCHECK(world.man.y < y0 - RI(1), "A jumps"); shot("walkjump"); st = 4; f0 = vf; }
+      if(st == 4 && vf == f0 + 40){ g_keys |= KEY_B; world.man.pCd = 0; }
+      if(st == 4 && vf == f0 + 43){ WCHECK(world.man.pT > 0, "B punches"); shot("punch"); st = 5; f0 = vf; }
+      if(st == 5 && vf == f0 + 30){ g_keys |= KEY_TOUCH; g_touch.px = 70; g_touch.py = 176; }                      /* the JUMP button */
+      if(st == 5 && vf == f0 + 31){ g_keys |= KEY_TOUCH; g_touch.px = 70; g_touch.py = 176; y0 = world.man.y; }
+      if(st == 5 && vf == f0 + 38){ WCHECK(world.man.y < y0 - R(0.5) || !world.man.gr, "the touch JUMP button jumps"); shot("walkbtn"); st = 6; f0 = vf; }
+      if(st == 6 && vf == f0 + 40){ g_keys |= KEY_L; }
+      if(st == 6 && vf == f0 + 44){ WCHECK(world.man.mode != MAN_WALK, "L gives up the walk"); printf(fails ? "walk: %d FAILED\n" : "walk: all passed\n", fails); exit(fails != 0); }
+    } else {                                                           /* fight-back levels: just watch for 12 s and photograph the first of each kind of thing */
+      static int sh_case, sh_throw, sh_swing;
+      for(int i = 0; i < world.nev; i++){ int ty = world.ev[i].type; if(ty == EV_THROW) sh_throw++; if(ty == EV_SWING) sh_swing++; }
+      for(int i = 0; i < MX_MAX_CASES; i++) if(world.cases[i].active && !sh_case){ sh_case = 1; shot("case"); }
+      if(vf == 120) shot("lords");
+      if(vf == 780){ printf("fight: throws=%d swings=%d case_shot=%d hurt_dazed=%d\n", sh_throw, sh_swing, sh_case, world.man.stun > 0); WCHECK(wt == 3 || sh_throw > 0 || sh_swing > 0, "something fought back within 13 s");
+        printf(fails ? "fight: %d FAILED\n" : "fight: all passed\n", fails); exit(fails != 0); }
+    }
   } else if(app == ST_TITLE && getenv("TITLE_SHOTS")){                    /* just sit on the title and photograph the pan: logo end, mid glide, the man */
     if(title_t == 30) shot("tpan0");
     if(title_t == 170) shot("tpan1");

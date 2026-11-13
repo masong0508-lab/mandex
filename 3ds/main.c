@@ -97,6 +97,12 @@ static void on_events(void){
       for(int k = 0; k < 16; k++){ float an = k * .39f; spawn(x, y, cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); spawn(RTOF(e->a), RTOF(e->b), cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); }
       popup(x, y - 5, "FWOOMP!", TC[e->m % 3]); } break;
     case EV_TARGET: for(int k = 0; k < 14; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 11) * .3f, 36, RGB(255, 220, 60)); break;
+    case EV_WALK: for(int k = 0; k < 10; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 30, RGB(110, 255, 90)); popup(x, y - 6, "ON FOOT!", RGB(125, 255, 90)); break;
+    case EV_PUNCH: if(e->a > 0){ for(int k = 0; k < 6; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 20, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 3, e->m ? "SHOULDER!" : "POW!", RGB(255, 210, 63)); } break;
+    case EV_SLAM: for(int k = 0; k < 10; k++) spawn(x + (rand() % 9 - 4), y, (rand() % 21 - 10) * .35f, -(rand() % 5) * .2f, 24, RGB(220, 220, 230)); popup(x, y - 5, "BELLY SLAM!", RGB(255, 138, 58)); break;
+    case EV_PAD: for(int k = 0; k < 8; k++) spawn_k(x, y, (rand() % 11 - 5) * .2f, -(rand() % 9) * .3f, 24, RGB(255, 126, 176), 2); popup(x, y - 5, "BOING!", RGB(255, 126, 176)); break;
+    case EV_HURT: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, "OUCH!", RGB(255, 107, 107)); if(!e->m){ dragging = 0; pad_used = 0; } break;
+    case EV_BONK: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, "BONK!", RGB(255, 210, 63)); break;
     default: break;
     }
   }
@@ -214,17 +220,59 @@ static void draw_landlords(const View *v){
     const MxTarget *t = &world.targets[i];
     if(!t->alive) continue;
     real ox, oy; mx_target_offset(&world, t, &ox, &oy);
-    int x = VX(v, RTOF(t->x + ox)), y = VY(v, RTOF(t->y + oy)), p = v->ppc;
-    rect(v->s, x - p, y - p / 2, p * 2, p * 2, RGB(60, 70, 90));          /* suit */
-    disc(v->s, x, y - p, p, RGB(240, 200, 160));                           /* head */
+    int p = v->ppc, fc = t->face < 0 ? -1 : 1, stun = t->stun > 0, wind = t->wind > 0, swing = t->swing > 0;
+    int x = VX(v, RTOF(t->x + ox)), y = VY(v, RTOF(t->y + oy)) - (t->mv && ((frame >> 2) & 1) ? 1 : 0);
+    rect(v->s, x - p, y - p / 2, p * 2, p * 2, t->kind == LK_BAT ? RGB(47, 93, 58) : t->kind == LK_THROWER ? RGB(58, 74, 122) : RGB(60, 70, 90));   /* suit */
+    rect(v->s, x - p / 3, y - p / 2, p * 2 / 3 + 1, p, RGB(255, 255, 255)); rect(v->s, x - 1 + 0, y - p / 2, 1, p + 1, RGB(209, 43, 43));   /* shirt + tie */
+    disc(v->s, x, y - p, p, stun ? RGB(232, 176, 144) : RGB(240, 200, 160));                                                                  /* head */
+    if(stun){ for(int k = -1; k <= 1; k += 2){ int ex = x + k * p / 2, ey = y - p; line(v->s, ex - 1, ey - 1, ex + 1, ey + 1, RGB(20, 20, 20)); line(v->s, ex + 1, ey - 1, ex - 1, ey + 1, RGB(20, 20, 20)); }
+      for(int k = 0; k < 3; k++){ int a = (frame * 3 + k * 85) & 255; px(v->s, x + (a < 128 ? a - 64 : 192 - a) * p / 12, y - p * 3 - 3 - (k & 1), RGB(255, 235, 90)); } }
+    else { px(v->s, x - p / 2, y - p, RGB(20, 20, 20)); px(v->s, x + p / 2, y - p, RGB(20, 20, 20)); }
     rect(v->s, x - p, y - p * 2, p * 2, p / 2 + 1, RGB(20, 20, 20));       /* hat brim */
     rect(v->s, x - p / 2, y - p * 3, p, p + 1, RGB(20, 20, 20));           /* hat */
+    if(t->kind == LK_BAT || t->kind == LK_THROWER) rect(v->s, x - p / 2, y - p * 2 - p / 3 - 1, p, p / 3 + 2, t->kind == LK_BAT ? RGB(42, 138, 42) : RGB(58, 106, 209));   /* hat band */
+    if(t->kind == LK_BAT){                                                  /* the club: up, or swung out flat */
+      int hx = x + fc * p, hy = y, ex = swing ? x + fc * p * 4 : x + fc * p * 3, ey = swing ? y + p / 2 : y - p * 3;
+      line(v->s, hx, hy, ex, ey, RGB(90, 52, 20)); line(v->s, hx, hy + 1, ex, ey + 1, RGB(185, 122, 60)); line(v->s, hx + 1, hy, ex + 1, ey, RGB(185, 122, 60));
+    } else if(t->kind == LK_THROWER){                                       /* briefcase: raised over the head to throw */
+      int bx = wind ? x + fc * p : swing ? x + fc * p * 3 : x + fc * p * 2, by = wind ? y - p * 4 : swing ? y : y + p / 2;
+      rect(v->s, bx - p, by - p / 2, p * 2, p + 1, RGB(58, 34, 12)); rect(v->s, bx - p + 1, by - p / 2 + 1, p * 2 - 2, p - 1, RGB(122, 74, 34)); px(v->s, bx, by, RGB(255, 210, 63));
+      if(wind) textc(v->s, x, y - p * 6, "!", 2, RGB(255, 210, 63));
+    } else if(t->kind == LK_WALKER){                                        /* walker: papers in his hand */
+      int bx = swing ? x + fc * p * 3 : x + fc * p * 2; rect(v->s, bx - p / 2, y, p, p + 1, RGB(255, 255, 255)); rect(v->s, bx - p / 2, y + 1, p, 1, RGB(42, 138, 42));
+    }
+  }
+}
+/* briefcases in the air (Batter Up), and the pink bounce pads of walk levels: chevrons float up from each */
+static void draw_cases(const View *v){
+  for(int i = 0; i < MX_MAX_CASES; i++){
+    const MxCase *c = &world.cases[i]; if(!c->active) continue;
+    int x = VX(v, RTOF(c->x)), y = VY(v, RTOF(c->y)), p = v->ppc, turn = (int)(RTOF(c->rot) * 2) & 3, w = p * 2, h = p * 3 / 2 + 1; if(turn & 1){ int q = w; w = h; h = q; }
+    rect(v->s, x - w / 2 - 1, y - h / 2 - 1, w + 2, h + 2, RGB(30, 18, 6)); rect(v->s, x - w / 2, y - h / 2, w, h, RGB(122, 74, 34)); rect(v->s, x - 1, y - h / 2, 2, h, RGB(255, 210, 63));
+  }
+}
+static void draw_pads(const View *v){
+  int p = v->ppc, bob = (frame >> 3) & 3;
+  for(int i = 0; i < world.npads; i++){
+    const MxPad *pd = &world.pads[i];
+    int cx = VX(v, pd->x + pd->w * .5f), cy = VY(v, (float)pd->y);
+    for(int k = 0; k < 3; k++){ int yy = cy - p * (3 + 3 * k) - bob; u32 c = k == 0 ? RGB(255, 255, 255) : k == 1 ? RGB(255, 158, 200) : RGB(255, 110, 150);
+      line(v->s, cx - p * 5 / 4, yy + p / 2, cx, yy - p / 2, c); line(v->s, cx, yy - p / 2, cx + p * 5 / 4, yy + p / 2, c); }
   }
 }
 static void draw_man(const View *v){
   const MxMan *m = &world.man;
   if(m->mode == MAN_NONE || m->mode == MAN_WAIT) return;
   int p = v->ppc, x = VX(v, RTOF(m->x)), y = VY(v, RTOF(m->y)), face = 1, fr;
+  if(m->mode == MAN_WALK){                                                   /* on his own feet: the turning frames step him along, three quarters of the sling size */
+    if(m->hurtCd > 0 && (frame & 2)) return;
+    int q = (p * 3 + 2) / 4, mv = m->gr && (m->vx > R(3) || m->vx < -R(3)), wf = MSF_SPIN_6 + (mv ? ((frame >> 2) & 1 ? 1 : -1) : 0), fc = m->face < 0 ? -1 : 1;
+    const MsFrame *f = &MS_FRAMES[wf];
+    int fy = VY(v, RTOF(m->y) + 2.375f) - (mv && ((frame >> 2) & 1) ? 1 : 0);
+    blit_frame(v->s, wf, x, fy - fdiv4((f->h - f->ay) * q), q, fc);
+    if(m->pT > 0){ for(int k = -3; k <= 3; k++) px(v->s, x + fc * (p * 5 - k * k * p * 5 / 18) + fc * p * 4, y + k * p * 3 / 4, RGB(255, 255, 255)); }
+    return;
+  }
   if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : (((frame >> 2) & 1) ? MSF_FLY_A : MSF_FLY_B); }
   else if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); fr = ((frame >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
   else if(dragging) fr = MSF_DRAG;
@@ -299,7 +347,7 @@ static void draw_valve(const View *v){
   if(m->mode == MAN_AIM && f > 0){ rect(v->s, x - p * 5, y - p * 9, p * 10, p, RGB(20, 24, 40)); rect(v->s, x - p * 5 + 1, y - p * 9 + 1, f * (p * 10 - 2) / 100, p - 2, f < 50 ? RGB(125, 255, 90) : f < 80 ? RGB(255, 210, 63) : RGB(255, 70, 70)); }
 }
 static void draw_world(const View *v){
-  draw_sky(v); draw_cells(v); draw_landlords(v); draw_tubes(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
+  draw_sky(v); draw_cells(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
 }
 
 /* Stereoscopic top screen.  The slider sets how strong the depth is; each layer gets a horizontal disparity D (px at full slider):
@@ -316,7 +364,7 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
   a.ox = vt->ox + DX(14); draw_sky(&a);                                                   /* far plane (hills/clouds inside carry their own parallax) */
   if(stereo){ a.ox = vt->ox + DX(4); g_dim = .45f; draw_cells(&a); g_dim = 1.0f; }       /* back faces */
   a.ox = vt->ox; draw_cells(&a);
-  a.ox = vt->ox + DX(-3); draw_landlords(&a); draw_tubes(&a);
+  a.ox = vt->ox + DX(-3); draw_landlords(&a); draw_tubes(&a); draw_pads(&a); draw_cases(&a);
   a.ox = vt->ox + DX(-4); draw_sling(&a); draw_valve(&a);
   a.ox = vt->ox + DX(-5); draw_aim(&a);
   if(m->mode != MAN_NONE && m->mode != MAN_WAIT){                                         /* ground shadow stays on the ground plane, man lifts off it */
@@ -334,6 +382,11 @@ static void draw_hud(void){
   char b[48];
   text(&top, 6, 8, "LV", 2, RGB(255, 210, 63)); itoa_(world.level + 1, b); text(&top, 30, 8, b, 2, RGB(255, 210, 63));
   text(&top, 56, 8, mx_level_name(world.level), 2, RGB(255, 255, 255));
+  if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                               /* walk levels: the clock */
+    int k = (int)(RTOF(world.man.wt) * 100.0f / MX_WALK_T); if(k < 0) k = 0; if(k > 100) k = 100;
+    rect(&top, 250, 6, 142, 12, RGB(255, 255, 255)); rect(&top, 251, 7, 140, 10, RGB(40, 40, 50)); rect(&top, 251, 7, k * 140 / 100, 10, k > 30 ? RGB(125, 255, 90) : RGB(255, 74, 74));
+    text(&top, 206, 8, "TIME", 1, RGB(255, 255, 255));
+  }
   rect(&top, 0, 216, 400, 24, RGB(15, 18, 30));
   text(&top, 6, 224, "MEN", 2, RGB(190, 190, 190)); itoa_(world.men, b); text(&top, 40, 224, b, 2, RGB(255, 255, 255));
   text(&top, 80, 224, "LANDLORDS", 2, RGB(255, 138, 138)); sprintf(b, "%d/%d", alive(), world.ntargets); text(&top, 168, 224, b, 2, RGB(255, 255, 255));
@@ -365,8 +418,12 @@ static void draw_end(void){
 }
 
 /* ---------------------------------------------------------------- flow */
+/* walk levels: touch buttons on the bottom screen while he is on foot (one finger at a time; the pad and face buttons do the same) */
+static const struct { int x, w; const char *s; } WB[6] = { { 4, 44, "<" }, { 52, 44, ">" }, { 104, 52, "JUMP" }, { 160, 56, "PUNCH" }, { 220, 52, "SLAM" }, { 276, 40, "QUIT" } };
+static int walk_btn_at(int tx, int ty){ if(ty < 196 || ty >= 236) return -1; for(int i = 0; i < 6; i++) if(tx >= WB[i].x && tx < WB[i].x + WB[i].w) return i; return -1; }
+static int nofight;                                      /* Y on the title: landlords stand still instead of fighting back */
 static void load_level(int l){
-  mx_load(&world, l); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats);
+  mx_load(&world, l); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats);
   memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); mi_reset(&mi);
   cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1;
   dragging = 0; pad_used = 0; pad_dx = pad_dy = 0; new_best = 0;
@@ -390,6 +447,7 @@ int main(void){
       if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } }
+      if(down & KEY_Y){ nofight = !nofight; mx_set_fight(&world, !nofight); }
       if(down & (KEY_A | KEY_START | KEY_TOUCH)){ app = ST_PLAY; load_level(sel); }
     } else if(app == ST_PAUSE){
       if(down & KEY_START) app = ST_PLAY;
@@ -427,6 +485,17 @@ int main(void){
           mx_set_pull(&world, R(1) * pad_dx, R(1) * pad_dy);
         }
         if((down & KEY_A) && pad_used){ pad_used = 0; mx_release(&world); }
+      } else if(m->mode == MAN_WALK){                                  /* walk levels: steer him on foot */
+        dragging = 0; pad_used = 0;
+        int ax = 0, jump = 0, punch = 0, stomp = 0;
+        if(held & (KEY_DLEFT | KEY_CPAD_LEFT)) ax--;
+        if(held & (KEY_DRIGHT | KEY_CPAD_RIGHT)) ax++;
+        if(held & (KEY_A | KEY_DUP | KEY_CPAD_UP)) jump = 1;
+        if(held & (KEY_B | KEY_Y)) punch = 1;
+        if(held & (KEY_X | KEY_DDOWN | KEY_CPAD_DOWN)) stomp = 1;
+        if(held & KEY_TOUCH){ int bn = walk_btn_at(t.px, t.py); if(bn == 0) ax--; else if(bn == 1) ax++; else if(bn == 2) jump = 1; else if(bn == 3) punch = 1; else if(bn == 4) stomp = 1; }
+        mx_walk_input(&world, ax, jump, punch, stomp);
+        if((down & KEY_L) || ((down & KEY_TOUCH) && walk_btn_at(t.px, t.py) == 5)) mx_walk_quit(&world);
       } else if(m->mode == MAN_FLY){
         if(down & (KEY_A | KEY_B | KEY_TOUCH)) mx_dive(&world);
       }
@@ -461,13 +530,20 @@ int main(void){
       rect(&top, 140, 161, 120, 9, RGB(15, 18, 30));
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
+      { char fb[48]; sprintf(fb, "Y: LANDLORDS FIGHT BACK  %s", nofight ? "OFF" : "ON"); textc(&top, 200, 190, fb, 1, nofight ? RGB(150, 150, 165) : RGB(125, 255, 90)); }
       { char ob[64]; sprintf(ob, "L/R: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {
       draw_hud(); draw_end();
       if(app == ST_PAUSE){ rect(&top, 110, 80, 180, 70, RGB(15, 18, 30)); textc(&top, 200, 88, "PAUSED", 3, RGB(255, 210, 63)); textc(&top, 200, 116, "START RESUME", 1, RGB(255, 255, 255)); textc(&top, 200, 126, "SELECT RESTART  B MENU", 1, RGB(255, 255, 255)); }
     }
     }
+    vb.cx = world.man.mode == MAN_WALK ? fminf(fmaxf(RTOF(world.man.x) - 40.0f, 0.0f), 40.0f) : -24.0f;        /* on foot the touch screen follows him, above the buttons */
+    vb.cy = world.man.mode == MAN_WALK ? fminf(fmaxf(RTOF(world.man.y) - 26.0f, 0.0f), 11.0f) : 0.0f;
     draw_world(&vb);
+    if(app == ST_PLAY && world.man.mode == MAN_WALK && world.state == MX_PLAY){
+      for(int i = 0; i < 6; i++){ int on = (held & KEY_TOUCH) && walk_btn_at(t.px, t.py) == i; rect(&bot, WB[i].x, 196, WB[i].w, 40, RGB(255, 255, 255)); rect(&bot, WB[i].x + 1, 197, WB[i].w - 2, 38, on ? RGB(60, 80, 140) : RGB(26, 32, 56)); textc(&bot, WB[i].x + WB[i].w / 2, 212, WB[i].s, 1, RGB(255, 255, 255)); }
+      textc(&bot, 160, 8, "PAD MOVE  A JUMP  B PUNCH  X SLAM  L QUIT", 1, RGB(255, 255, 255));
+    }
     if(app == ST_PLAY){
       if(world.man.mode == MAN_AIM && !dragging && world.state == MX_PLAY) textc(&bot, 200, 12, "DRAG BACK AND LET GO", 2, RGB(255, 255, 255));
       if(world.man.mode == MAN_AIM && world.state == MX_PLAY){ static const char *const PWN[4] = { "NONE", "BEANS", "TOWEL", "SPLAT" }; char pb[48]; sprintf(pb, "X: POWER-UP %s", PWN[world.pw_sel]); textc(&bot, 160, 228, pb, 1, world.pw_sel ? RGB(255, 210, 63) : RGB(200, 200, 200)); }

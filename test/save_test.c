@@ -66,7 +66,7 @@ int main(void){
   { MxStats U = S; U.unlock_all = 1; int o2 = 0; mx_meta_unpack(&U, &o2, buf, n); CHECK(U.unlock_all == 1, "unpack leaves a session unlock_all cheat alone"); }
 
   /* a chip read is longer than the blob: padding is ignored */
-  { uint8_t big[256]; memset(big, 0xFF, sizeof big); memcpy(big, buf, n); mx_meta_init(&T);
+  { uint8_t big[512]; memset(big, 0xFF, sizeof big); memcpy(big, buf, n); mx_meta_init(&T);
     CHECK(mx_meta_unpack(&T, &of, big, (int)sizeof big) == 1 && same_saved(&S, &T), "trailing 0xFF padding after the blob is ignored"); }
 
   /* failures leave everything untouched */
@@ -135,7 +135,10 @@ int main(void){
       CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, n1) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_VALVE, "an options byte with a tool index this build lacks (and reserved bits set) loads as air valve, never trusted"); }
     { MxOptions sent = { 1, MX_TOOL_BEANS }; uint8_t bb[MX_SAVE_MAX]; memcpy(bb, b, n1); bb[0] ^= 1; MxStats X; fill(&X);
       CHECK(mx_meta_unpack_opt(&X, &of2, &sent, bb, n1) == 0 && sent.collapse == 1 && sent.tool == MX_TOOL_BEANS, "a failed unpack leaves the options untouched"); }
-    CHECK(mx_meta_unpack_opt(&B, &of2, 0, b, n1) == 1, "options pointer may be NULL"); }
+    CHECK(mx_meta_unpack_opt(&B, &of2, 0, b, n1) == 1, "options pointer may be NULL");
+    { MxOptions f = { 0, MX_TOOL_VALVE, 1 }, g = { 0, 0, 0 }; uint8_t bb[MX_SAVE_MAX]; int nn = mx_meta_pack_opt(&A, 0, &f, bb, (int)sizeof bb);
+      CHECK(bb[nn - 5] == (0 | (MX_TOOL_VALVE << 1) | 16) && mx_meta_unpack_opt(&B, &of2, &g, bb, nn) == 1 && g.nofight == 1 && g.collapse == 0 && g.tool == MX_TOOL_VALVE, "landlords-fight-back OFF is bit 4 of the options byte and round trips");
+      MxOptions d; mx_options_default(&d); CHECK(d.nofight == 0, "default: landlords fight back"); } }
   { uint8_t c[MX_SAVE_MAX + 8]; int cn = craft(c, MX_NUM_LEVELS); MxOptions r = { 1, MX_TOOL_SPLAT }; MxStats B; mx_meta_init(&B); int of2 = -1;
     CHECK(cn == MX_SAVE_MAX - 1 && c[4] == 1, "(the independent writer still produces a 175-byte version 1 blob)");
     CHECK(mx_meta_unpack_opt(&B, &of2, &r, c, cn) == 1 && r.collapse == 0 && r.tool == MX_TOOL_VALVE && B.best[4] == 504 && of2 == 2, "a version 1 save still loads: progress kept, options = defaults");

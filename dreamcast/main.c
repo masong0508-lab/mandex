@@ -201,6 +201,13 @@ static void handle_events(void){
     case EV_SPLOOSH: for(int k = 0; k < 40; k++) spawn(e->x, e->y, argb(125, 255, 90, 255), 760); break;
     case EV_TUBE: { const uint32 TC[3] = { argb(255, 154, 60, 255), argb(79, 208, 255, 255), argb(140, 255, 90, 255) };   /* posted through a pneumatic tube */
       for(int k = 0; k < 14; k++){ spawn(e->x, e->y, TC[e->m % 3], 300); spawn(e->a, e->b, TC[e->m % 3], 420); } break; }
+    case EV_WALK:  for(int k = 0; k < 8; k++) spawn(e->x, e->y + 2.3f, argb(255, 255, 255, 255), 200); break;
+    case EV_PUNCH: for(int k = 0; k < (e->a > 0 ? 12 : 3); k++) spawn(e->x, e->y, k & 1 ? argb(255, 255, 255, 255) : argb(255, 210, 63, 255), e->m ? 420 : 300); break;
+    case EV_SLAM:  for(int k = 0; k < 14; k++) spawn(e->x, e->y + 2.3f, k & 1 ? argb(255, 255, 255, 255) : argb(200, 190, 170, 255), 380); break;
+    case EV_PAD:   for(int k = 0; k < (e->m ? 16 : 8); k++) spawn(e->x, e->y, k & 1 ? argb(255, 126, 176, 255) : argb(255, 255, 255, 255), 460); break;
+    case EV_HURT:  for(int k = 0; k < 12; k++) spawn(e->x, e->y, k & 1 ? argb(255, 74, 74, 255) : argb(255, 255, 255, 255), 420); break;
+    case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), 520); break;
+    case EV_THROW: case EV_SWING: for(int k = 0; k < 4; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 160); break;
     default: break;   /* TODO: AICA sound for EV_CRUNCH / EV_LAUNCH / EV_THUD / ... */
     }
   }
@@ -334,6 +341,7 @@ static void fx_step(int calm, int strain){
 /* The title: the whole landscape with the man dropping butt-first on a landlord (a 852x480 picture, art/dcart.h, from the HTML title, logo included).
    The picture is wider than the screen, so the screen pans across it: hold on the logo, glide right to the man, hold, glide back. */
 static int on_title = 1, title_t, paused, title_lv;
+static int nofight;                                       /* 1 = landlords don't fight back (title: Y; pause: X) */
 static int title_pan(int t, int range){                 /* 0..range for tick t: hold (90), glide right (160), hold (150), glide back (160), smoothstep */
   t %= 560;
   int k = t < 90 ? 0 : t < 250 ? t - 90 : t < 400 ? 160 : t < 560 ? 160 - (t - 400) : 0;
@@ -344,7 +352,8 @@ static void draw_title(void){
   int pan = title_pan(title_t, 852 - 640);
   tquad(&hdr_ttl, DCT_TTL_W, DCT_TTL_H, (float)-pan, 0, 852, 480, 0, 0, 852, 480, Z_BG, WHITE);
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
-  { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD); }
+  { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD);
+    snprintf(tb, sizeof tb, "Y: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(tb, 320, 418, 16, argb(255, 255, 255, 220), 1, Z_HUD); }
 }
 
 /* ---- the world ---- */
@@ -364,9 +373,32 @@ static void tile_rot(float cx, float cy, float ca, float sa, int m, int v, int d
 }
 static int dmg(float hp, int m){ float r = hp / MAXHP[m]; return r > 0.66f ? 0 : r > 0.33f ? 1 : 2; }
 
-static void draw_landlord(float x, float y, float z){
+/* chapter 2 kinds: the same sprite, tinted (bat green, thrower blue), mirrored to face his way, plus the club / briefcase / papers / dazed stars */
+static void draw_landlord(float x, float y, float z, const MxTarget *t){
   const short *r = DCA_LANDLORD;
-  atl(x - r[4] * 0.5f, y - r[5] * 0.5f, r[2] * 0.5f, r[3] * 0.5f, r, z, WHITE);
+  int k = t ? t->kind : LK_NONE, fc = t && t->face < 0 ? -1 : 1, stun = t && t->stun > 0, wind = t && t->wind > 0, swing = t && t->swing > 0;
+  uint32 c = k == LK_BAT ? argb(200, 255, 200, 255) : k == LK_THROWER ? argb(205, 220, 255, 255) : WHITE;
+  float w = r[2] * 0.5f, h = r[3] * 0.5f, lx = x - r[4] * 0.5f;
+  if(k == LK_NONE) tquad(&hdr_atl, 512, 512, lx, y - r[5] * 0.5f, w, h, r[0], r[1], r[2], r[3], z, c);
+  else if(fc > 0) tquad(&hdr_atl, 512, 512, lx, y - r[5] * 0.5f, w, h, r[0], r[1], r[2], r[3], z, c);
+  else tquad(&hdr_atl, 512, 512, x + r[4] * 0.5f - w, y - r[5] * 0.5f, w, h, r[0] + r[2], r[1], -r[2], r[3], z, c);
+  if(!t || k == LK_NONE) return;
+  float zz = z + 0.05f, top = y - r[5] * 0.5f;
+  if(stun){
+    for(int i = 0; i < 3; i++){ float a = world.time * 6 + i * 2.1f; puff(x + cosf(a) * 7, top - 3 + sinf(a) * 2, 2.2f, zz, argb(255, 235, 90, 255)); }
+  }
+  if(k == LK_BAT){                                                      /* the club: up, or swung out flat */
+    float hx = x + fc * 5, hy = y + 2, ex = x + fc * (swing ? 26 : 16), ey = swing ? y + 4 : y - 18;
+    seg(hx, hy, ex, ey, 3.2f, zz, argb(90, 52, 20, 255)); seg(hx, hy, ex, ey, 1.6f, zz + 0.01f, argb(185, 122, 60, 255));
+    quad(x - 4, top + 2, 8, 2.5f, zz, argb(42, 138, 42, 255));
+  } else if(k == LK_THROWER){                                           /* briefcase, raised over the head to throw */
+    float bx = wind ? x + fc * 5 : swing ? x + fc * 16 : x + fc * 11, by = wind ? y - 24 : swing ? y : y + 3;
+    quad(bx - 7, by - 4.5f, 14, 9, zz, argb(58, 34, 12, 255)); quad(bx - 6, by - 3.5f, 12, 7, zz + 0.01f, argb(122, 74, 34, 255)); quad(bx - 1, by - 1, 2, 2, zz + 0.02f, argb(255, 210, 63, 255));
+    quad(x - 4, top + 2, 8, 2.5f, zz, argb(58, 106, 209, 255));
+    if(wind) text("!", x, y - 32, 14, argb(255, 210, 63, 255), 1, Z_HUD);
+  } else if(k == LK_WALKER){                                            /* papers in his hand */
+    float bx = swing ? x + fc * 16 : x + fc * 11; quad(bx - 3, y, 6, 7, zz, WHITE); quad(bx - 3, y + 1, 6, 1.2f, zz + 0.01f, argb(42, 138, 42, 255));
+  }
 }
 
 static void draw_rooms(void){
@@ -434,7 +466,21 @@ static void draw_all(void){
     const MxTarget *t = &world.targets[i];
     if(!t->alive) continue;
     float wx, wy; mx_target_offset(&world, t, &wx, &wy);
-    draw_landlord(X(t->x + wx), Y(t->y + wy) + sinf(world.time * 5 + t->t) * 0.5f, Z_TARGET);
+    draw_landlord(X(t->x + wx), Y(t->y + wy) + sinf(world.time * 5 + t->t) * 0.5f - (t->mv && ((int)(world.time * 14) & 1) ? 1 : 0), Z_TARGET, t);
+  }
+  /* briefcases in the air (Batter Up) and the pink bounce pads of the walk levels */
+  for(int i = 0; i < MX_MAX_CASES; i++){
+    const MxCase *c = &world.cases[i]; if(!c->active) continue;
+    float cx = X(c->x), cy = Y(c->y), a = c->rot * 2, ca = cosf(a), sa = sinf(a), hw = 8, hh = 6;
+    float ex[4] = { -hw, hw, -hw, hw }, ey[4] = { -hh, -hh, hh, hh }, qx[4], qy[4], ix[4], iy[4];
+    for(int k = 0; k < 4; k++){ qx[k] = cx + ex[k] * ca - ey[k] * sa; qy[k] = cy + ex[k] * sa + ey[k] * ca; float fx = ex[k] * 0.8f, fy = ey[k] * 0.75f; ix[k] = cx + fx * ca - fy * sa; iy[k] = cy + fx * sa + fy * ca; }
+    quad4(qx, qy, Z_TARGET + 0.2f, argb(30, 18, 6, 255)); quad4(ix, iy, Z_TARGET + 0.25f, argb(122, 74, 34, 255)); puff(cx, cy, 1.8f, Z_TARGET + 0.3f, argb(255, 210, 63, 255));
+  }
+  for(int i = 0; i < world.npads; i++){
+    const MxPad *pd = &world.pads[i];
+    float cx = X(pd->x + pd->w * 0.5f), cy = Y((float)pd->y); float bob = (float)((int)(world.time * 8) & 3);
+    for(int k = 0; k < 3; k++){ float yy = cy - 15 - 15 * k - bob * 1.5f; uint32 c = k == 0 ? WHITE : k == 1 ? argb(255, 158, 200, 255) : argb(255, 110, 150, 255);
+      seg(cx - 10, yy + 4, cx, yy - 4, 2.4f, Z_FX - 0.2f, c); seg(cx, yy - 4, cx + 10, yy + 4, 2.4f, Z_FX - 0.2f, c); }
   }
   /* chapter 2 pneumatic tubes: balloon, brass mouth, nozzle stub */
   for(int i = 0; i < world.ntubes; i++){
@@ -482,12 +528,23 @@ static void draw_all(void){
       if(dx * dx + dy * dy > 4.0f) fr = MSF_DRAG;                         /* pulled back: yelling */
       else fr = mi_frame(&mi, ph);                                        /* waiting: idle gags */
     }
+    else if(m->mode == MAN_WALK){ fr = -1; }
     else if(m->mode == MAN_STUCK){ puff(x, y + 6, 30, Z_MAN - 0.2f, argb(111, 227, 74, 200)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
     else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
     if(m->mode == MAN_AIM || m->mode == MAN_FLY){                         /* his shadow on the ground: smaller and fainter the higher he is */
       float hgt = (MX_ROWS - m->y) / 40.0f; if(hgt < 0) hgt = 0; if(hgt > 1) hgt = 1;
       float rw = 30.0f * (1.0f - 0.55f * hgt); quad(XB(m->x) - rw, YB(MX_ROWS) + 1, rw * 2, 4, Z_SLING + 0.05f, argb(0, 0, 0, (int)(90 - 60 * hgt)));
     }
+    if(m->mode == MAN_WALK){                                              /* on his own feet: the turning frame steps him along, three quarters of the sling size */
+      if(!(m->hurtCd > 0 && (fcount & 2))){
+        int mv = m->gr && (m->vx > 3 || m->vx < -3), wf = MSF_SPIN_6 + (mv ? ((fcount >> 2) & 1 ? 1 : -1) : 0), fc = m->face < 0 ? -1 : 1;
+        const short *f = DCM_FR[wf]; float zm = man_zoom; man_zoom = zm * 0.75f;
+        float foot = Y(m->y + 2.375f) - (mv && ((fcount >> 2) & 1) ? 1.0f : 0.0f);
+        draw_frame(wf, x, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
+        man_zoom = zm;
+        if(m->pT > 0) for(int k = -3; k <= 3; k++) puff(x + fc * (24 - k * k * 1.4f) + fc * 18, y + k * 3.4f, 1.8f, Z_MAN + 0.3f, WHITE);
+      }
+    } else
     man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
     if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){               /* only the belly swells; the face flushes as the pressure builds */
       float f = m->inf, rx = 11 + f * 28, ry = 10 + f * 24, bx = x + face * f * 10, by = y + 6 + f * 4;
@@ -532,6 +589,12 @@ static void draw_all(void){
   for(int i = 0; i < world.men; i++) atl(324 + i * 15, 11, 15, 16, DCA_ICON, Z_HUD + 0.1f, WHITE);
   if(hint_t > 0 && world.state == MX_PLAY && m->mode == MAN_AIM)
     text("PULL BACK WITH THE STICK, RELEASE WITH A!", 340, 330, 18, argb(255, 255, 255, 160 + (int)(95 * sinf(world.time * 5))), 1, Z_HUD);
+  if(m->mode == MAN_WALK && world.state == MX_PLAY){                       /* walk levels: the clock and the controls */
+    int k = (int)(m->wt * 100.0f / MX_WALK_T); if(k < 0) k = 0; if(k > 100) k = 100;
+    quad(246, 40, 148, 12, Z_HUD, WHITE); quad(247, 41, 146, 10, Z_HUD + 0.05f, argb(40, 40, 50, 255)); quad(247, 41, 146.0f * k / 100.0f, 10, Z_HUD + 0.1f, k > 30 ? argb(125, 255, 90, 255) : argb(255, 74, 74, 255));
+    text("TIME", 238, 51, 12, WHITE, 2, Z_HUD + 0.1f);
+    text("A JUMP   B PUNCH   X SLAM   L GIVE UP", 320, 466, 14, argb(255, 255, 255, 205), 1, Z_HUD);
+  }
   if(m->mode == MAN_FLY && !m->dive) text("PRESS A = BELLY FLOP", 320, 466, 20, argb(255, 255, 255, 205), 1, Z_HUD);
   if(world.state == MX_PLAY && m->mode == MAN_AIM){
     static const char *const PWN[4] = { "NONE", "BEANS", "TOWEL", "SPLAT" };
@@ -579,7 +642,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ mx_load(&world, n); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats); hint_t = 420; }
+static void load_level(int n){ mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats); hint_t = 420; }
 
 static void gfx_init(void){
   pvr_init_defaults();
@@ -620,12 +683,14 @@ int main(int argc, char **argv){
           for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + (tr ? k : MX_NUM_OUTFITS - k)) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
           recolor_man(outfit_sel);
         } }
+        if(pressed & CONT_Y) nofight = !nofight;
         if(pressed & (CONT_START | CONT_A)){ on_title = 0; load_level(title_lv); if(tx_ttl){ pvr_mem_free(tx_ttl); tx_ttl = 0; } }
       } else if(world.state != MX_PLAY){
         if(pressed & CONT_START) load_level(world.state == MX_WIN ? world.level + 1 : world.level);
       } else if(paused){
         if(pressed & CONT_START) paused = 0;
         if(pressed & CONT_Y){ load_level(world.level); paused = 0; }
+        if(pressed & CONT_X){ nofight = !nofight; mx_set_fight(&world, !nofight); }
       } else {
         if(pressed & CONT_START) paused = 1;
         if(pressed & CONT_Y) load_level(world.level);
@@ -639,6 +704,12 @@ int main(int argc, char **argv){
           if(!(world.man.seated && jx == 0 && jy == 0)) mx_set_pull(&world, jx * MX_PULL_MAX, jy * MX_PULL_MAX);   /* seated on the valve: a centred stick leaves him there */
           if(pressed & CONT_DPAD_DOWN) mx_valve_seat(&world);
           if(pressed & (CONT_A | CONT_B)){ mx_release(&world); hint_t = 0; }
+        } else if(world.man.mode == MAN_WALK){                                  /* walk levels: steer him on foot */
+          int ax = 0;
+          if((st->buttons & CONT_DPAD_LEFT) || st->joyx < -40) ax--;
+          if((st->buttons & CONT_DPAD_RIGHT) || st->joyx > 40) ax++;
+          mx_walk_input(&world, ax, (st->buttons & (CONT_A | CONT_DPAD_UP)) != 0 || st->joyy < -90, (st->buttons & CONT_B) != 0, (st->buttons & (CONT_X | CONT_DPAD_DOWN)) != 0 || st->joyy > 90);
+          { static int lwas; int l = st->ltrig > 128; if(l && !lwas) mx_walk_quit(&world); lwas = l; }
         } else if(pressed & (CONT_A | CONT_B)) mx_dive(&world);
       }
     }
@@ -660,7 +731,7 @@ int main(int argc, char **argv){
     pvr_scene_begin();
     pvr_list_begin(PVR_LIST_TR_POLY);
     cur_hdr = 0;
-    if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART", 320, 270, 24, WHITE, 1, Z_HUD); } }
+    if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART", 320, 270, 24, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
     pvr_list_finish();
     pvr_scene_finish();
   }

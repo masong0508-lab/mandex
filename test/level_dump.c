@@ -6,8 +6,8 @@ static MxWorld W;
 int main(void){
   for(int l = 0; l < MX_NUM_LEVELS; l++){
     memset(&W, 0, sizeof W); mx_load(&W, l);
-    printf("L %d men %d targets %d\n", l, W.men, W.ntargets);
-    for(int i = 0; i < W.ntargets; i++) printf("T %d %d\n", (int)(W.targets[i].x * 2) , (int)(W.targets[i].y * 8));
+    printf("L %d men %d targets %d walk %d pads %d\n", l, W.men, W.ntargets, W.walk, W.npads);
+    for(int i = 0; i < W.ntargets; i++) printf("T %d %d %d\n", (int)(W.targets[i].x * 2) , (int)(W.targets[i].y * 8), W.targets[i].kind);
     for(int y = 0; y < MX_ROWS; y++){ for(int x = 0; x < MX_COLS; x++) putchar('0' + W.grid[y * MX_COLS + x]); putchar('\n'); }
   }
   return 0;

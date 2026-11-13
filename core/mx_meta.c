@@ -150,7 +150,7 @@ static uint32_t get32(const uint8_t *p){ return (uint32_t)p[0] | (uint32_t)p[1] 
 #define SAVE_STARS (SAVE_PW + 16)                  /* 66 */
 static int save_size(int nlev, int ver){ return SAVE_STARS + nlev + 4 + 1 + 4 * nlev + (ver >= 2 ? 1 : 0) + 4; }
 
-void mx_options_default(MxOptions *o){ o->collapse = 0; o->tool = MX_TOOL_VALVE; }
+void mx_options_default(MxOptions *o){ o->collapse = 0; o->tool = MX_TOOL_VALVE; o->nofight = 0; }
 const char *mx_tool_name(int t){
   static const char *const N[MX_NUM_TOOLS] = { "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT" };
   return t >= 0 && t < MX_NUM_TOOLS ? N[t] : "?";
@@ -171,7 +171,7 @@ int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t
   *p++ = (uint8_t)(outfit >= 0 && outfit < MX_NUM_OUTFITS ? outfit : 0);
   for(int i = 0; i < MX_NUM_LEVELS; i++){ put32(p, s->best[i]); p += 4; }
   { MxOptions o; mx_options_default(&o); if(opt) o = *opt;
-    *p++ = (uint8_t)((o.collapse ? 1 : 0) | ((o.tool < MX_NUM_TOOLS ? o.tool : MX_TOOL_VALVE) << 1)); }
+    *p++ = (uint8_t)((o.collapse ? 1 : 0) | ((o.tool < MX_NUM_TOOLS ? o.tool : MX_TOOL_VALVE) << 1) | (o.nofight ? 16 : 0)); }
   put32(p, mx_crc32(out, (int)(p - out)));
   return n;
 }
@@ -195,7 +195,7 @@ int mx_meta_unpack_opt(MxStats *s, int *outfit, MxOptions *opt, const uint8_t *i
   p += 4 * nl;
   if(opt){
     mx_options_default(opt);
-    if(ver >= 2){ int b = *p; opt->collapse = (uint8_t)(b & 1); int t = (b >> 1) & 7; opt->tool = (uint8_t)(t < MX_NUM_TOOLS ? t : MX_TOOL_VALVE); }
+    if(ver >= 2){ int b = *p; opt->collapse = (uint8_t)(b & 1); int t = (b >> 1) & 7; opt->tool = (uint8_t)(t < MX_NUM_TOOLS ? t : MX_TOOL_VALVE); opt->nofight = (uint8_t)((b >> 4) & 1); }
   }
   s->lv_booms = s->lv_shots = 0; s->seen_st_inflated = s->seen_st_pops = 0;
   for(int i = 0; i < 4; i++) s->seen_pw[i] = 0;

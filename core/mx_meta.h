@@ -47,7 +47,7 @@ void mx_outfit_shades(int i, uint8_t out[6][3]);
 
 /* ---- options (port 13): kept by each front-end, saved in the blob (version 2).  Default = off / air valve, the browser's defaults. ---- */
 enum { MX_TOOL_NONE, MX_TOOL_VALVE, MX_TOOL_BEANS, MX_TOOL_TOWEL, MX_TOOL_SPLAT, MX_NUM_TOOLS };   /* appended, never inserted (stored as an index); Burpbuster is slot 5 when port 14 lands */
-typedef struct { uint8_t collapse, tool; } MxOptions;   /* collapse: collapsible buildings; tool: the start tool (MX_TOOL_*) */
+typedef struct { uint8_t collapse, tool, nofight; } MxOptions;   /* collapse: collapsible buildings; tool: the start tool (MX_TOOL_*); nofight: 1 = landlords just stand there (default 0: they fight back) */
 void mx_options_default(MxOptions *o);
 const char *mx_tool_name(int tool);                      /* "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT" */
 int mx_tool_power(int tool);                             /* the PW_* a start tool pre-arms before every launch, or PW_NONE (none / air valve) */
@@ -63,7 +63,7 @@ int mx_tool_power(int tool);                             /* the PW_* a start too
          u32       ach
          u8        outfit index
          nlev x u32 best[]
-         u8        options (version 2 only): bit 0 collapse, bits 1-3 start tool (MX_TOOL_*), bits 4-7 reserved (written 0, ignored)
+         u8        options (version 2 only): bit 0 collapse, bits 1-3 start tool (MX_TOOL_*), bit 4 landlords-fight-back OFF (0 = on, so older saves load the default), bits 5-7 reserved (written 0, ignored)
          u32       CRC32 (IEEE) of every byte before it
    20 levels = 176 bytes (175 for a version 1 blob).  Not saved: unlock_all and the per-level transients (lv_*, seen_*).  A save with fewer or more levels than this build
    still loads (missing levels read as 0, extra ones are dropped); any other layout change must bump the version byte. */

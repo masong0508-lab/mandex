@@ -38,3 +38,13 @@ test/tube_fixed
 test/n3ds_gags
 test/level_dump
 test/level_solve
+test/ch2_float
+test/ch2_fixed
+test/ch2_t
+test/n3ds_walk
+test/n3ds_render
+test/tube_float
+test/tube_fixed
+test/bench_float
+test/bench_fixed
+test/bench_prof

@@ -592,6 +592,44 @@ void spr_landlord(u8 *b, int x, int y, int ppc, int ph, int scared){
   gfx_rect(b, x - S(7), hy - S(23), SM(2), S(8), C_SUIT2);                   /* hat sheen */
 }
 
+/* chapter 2 landlords: the plain landlord plus what makes his kind.  face = -1/1, st bits: 1 dazed, 2 winding up, 4 swinging, 8 strolling, 16 running.
+   bat (kind 3): green hat band and a club;  thrower (2): blue band, the briefcase goes up over his head to throw;  walker (1): strolls with a clipboard. */
+void spr_landlord_k(u8 *b, int x, int y, int ppc, int ph, int scared, int kind, int face, int st){
+  if(st & 24) y -= ((ph >> 2) & 1);                                           /* a bounce in his step */
+  spr_landlord(b, x, y, ppc, ph, scared);
+  int by = y + ((ph >> 4) & 1 && ppc >= 4 ? 1 : 0), hy = by - S(16);
+  if(kind == 3 || kind == 2) gfx_rect(b, x - S(8), hy - S(15), S(16), SM(5), kind == 3 ? C_GRASS : C_UILINE);   /* hat band */
+  if(kind == 3){                                                              /* the club: held up, or swung flat out in front of him */
+    int hx = x + face * S(12), hyy = by + S(2), ex = (st & 4) ? x + face * S(30) : x + face * S(21), ey = (st & 4) ? by + S(4) : by - S(20);
+    gfx_tline(b, hx, hyy, ex, ey, SM(3), C_DIRT2);
+    gfx_tline(b, hx, hyy, ex, ey, SM(2), C_DIRT);
+    gfx_ell(b, hx, hyy, SM(2), SM(2), C_SKIN);
+  } else if(kind == 2){                                                       /* briefcase thrower */
+    if(st & 2){ gfx_rect(b, x + face * S(8) - SM(5), by - S(32), SM(10), SM(7), C_GOLD2); gfx_rect(b, x + face * S(8) - SM(5), by - S(32), SM(10), 1, C_GOLD); gfx_rect(b, x + face * S(8) - SM(2), by - S(34), SM(4), 1, C_DARK); gfx_text_c(b, x, hy - S(30), "!", C_GOLD, C_BLACK, 1); }
+    else if(st & 4){ gfx_rect(b, x + face * S(22), by + S(1), SM(10), SM(7), C_GOLD2); }
+  } else if(kind == 1){                                                       /* walker: papers in his hand */
+    int px = x + face * S(14); if(st & 4) px = x + face * S(24);
+    gfx_rect(b, px - SM(3), by + S(4), SM(6), SM(8), C_WHITE); gfx_rect(b, px - SM(3), by + S(6), SM(6), 1, C_GRASS);
+  }
+  if(st & 1){                                                                 /* dazed: X eyes and stars going round */
+    gfx_rect(b, x - S(5), hy - S(3), S(10), SM(3), C_SKIN);
+    for(int k = -1; k <= 1; k += 2){ int ex = x + k * S(3), ey = hy - S(1); gfx_line(b, ex - 1, ey - 1, ex + 1, ey + 1, C_BLACK); gfx_line(b, ex + 1, ey - 1, ex - 1, ey + 1, C_BLACK); }
+    for(int k = 0; k < 3; k++){ int a = (ph * 3 + k * 85) & 255, sx = x + (a < 128 ? a - 64 : 192 - a) * ppc / 20, sy = hy - S(30) + (k & 1); gfx_px(b, sx, sy, C_STAR); gfx_px(b, sx + 1, sy, C_STAR2); }
+  }
+}
+/* a thrown briefcase, tumbling (turns in quarter steps) */
+void spr_case(u8 *b, int x, int y, int ppc, int turn){
+  int w = SM(14), h = SM(10); if(turn & 1){ int t = w; w = h; h = t; }
+  gfx_rect(b, x - w / 2 - 1, y - h / 2 - 1, w + 2, h + 2, C_BLACK);
+  gfx_rect(b, x - w / 2, y - h / 2, w, h, C_GOLD2);
+  if(w > h) gfx_rect(b, x - 1, y - h / 2, 2, h, C_GOLD); else gfx_rect(b, x - w / 2, y - 1, w, 2, C_GOLD);
+}
+/* the man standing on his own feet (walk levels): (x,fy) = the middle of his feet; he is drawn at about 3/4 of the sling size */
+void spr_man_walk(u8 *b, int x, int fy, int ppc, int face, int frame, const ManJig *jg){
+  const MsFrame *f = &MS_FRAMES[frame];
+  blit_frame(b, f, x, fy - (f->h - f->ay) * ppc / 4, ppc, face, 0, jg);
+}
+
 void spr_hat(u8 *b, int x, int y, int sc, int mode){
   u8 bl = mode == 2 ? C_UIHI : mode == 1 ? C_WHITE : C_BLACK, go = mode == 2 ? C_UILINE : C_GOLD;
   gfx_rect(b, x - 2 * sc, y + 2 * sc, 5 * sc, sc, bl);
