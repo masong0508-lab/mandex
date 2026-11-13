@@ -466,3 +466,9 @@ Nothing was moved on screen; only how a drag toward the valve behaves changed. N
 - DS and 3DS touch drags call `mx_drag` and draw the dotted ghost seat. The DS stylus path is exercised in
   `test/ds_render.c` (drag back, drop on, lift: stays seated). The Dreamcast has no pointer, so it is unchanged (D-pad DOWN
   still seats him).
+
+## Chapter 3 and tougher landlords (core + DS + 3DS + Dreamcast)
+- `MX_NUM_LEVELS` is 60 (`MX_CH3_START` 40, built by `build_ch3` with the same formulas as the web generator). `tools/level_parity.js` compares 0..38 and 40..59 (39, Landlord HQ, differs on purpose: web is 360 cells wide, core is still 120).
+- Landlords have `hp`/`hpmax`/`armor` and new kinds: shield (riot shield bounces/smashes), sprinter, boss (3 hits, double throw), healer (`EV_HEAL`). They dodge, take cover and use stairs; light collapses no longer kill them. `EV_OOF` = survived a hit. The three front-ends draw tints, armor bands and hp bars and show OOF!/CRACK!/+HP.
+- Still web only: the wolfman cutscene, Wolfman outfit, redrawn cutscene characters, wide Landlord HQ.
+- Verified on the PC only: test suite and level parity pass; nothing run on hardware or an emulator, no sound heard, no human playtest, chapter 3 difficulty unknown.
