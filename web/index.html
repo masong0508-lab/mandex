@@ -1172,10 +1172,12 @@ function updCases(dt){for(let i=cases.length-1;i>=0;i--){const c=cases[i];c.vy+=
 function updTargets(dt){
   for(const t of targets){if(!t.alive)continue;t.t+=dt;if(t.inv>0)t.inv-=dt;lordAI(t,dt);
     const gr=solidAt(t.x,t.y+t.r+1)||solidAt(t.x-4,t.y+t.r+1)||solidAt(t.x+4,t.y+t.r+1);
-    if(gr){if(t.vy>330){killTarget(t,true);continue}t.vy=0}else{t.vy+=G*dt;t.y+=t.vy*dt}
-    if(solidAt(t.x,t.y)){killTarget(t,true);continue}
+    if(gr){if(t.vy>430){killTarget(t,true);continue}if(t.vy>300&&t.inv<=0){t.stun=.8;t.inv=.8;popText(t.x,t.y-38,'OOF!','#ffd23f',16)}t.vy=0}else{t.vy+=G*dt;t.y+=t.vy*dt}
+    if(solidAt(t.x,t.y)){   // buried by settling rubble: dig out if there is air within 3 cells above (a light collapse), else crushed
+      let up=0;for(let d=2;d<=V*3;d+=2)if(!solidAt(t.x,t.y-d)&&!solidAt(t.x,t.y-d-t.r)){up=d;break}
+      if(up){t.y-=up;t.vy=0;t.stun=1;t.inv=1;popText(t.x,t.y-38,'PHEW!','#7dff5a',16)}else{killTarget(t,true);continue}}
     for(const ch of chunks){if(Math.hypot(ch.x-t.x,ch.y-t.y)>ch.rad+t.r+4)continue;let dead=false;
-      for(const a of ch.cells){if(Math.hypot(a.wx-t.x,a.wy-t.y)<t.r+RC){const sp=Math.hypot(ch.vx-ch.w*(a.wy-ch.y),ch.vy+ch.w*(a.wx-ch.x));if(sp>70){dead=true;break}}}
+      for(const a of ch.cells){if(Math.hypot(a.wx-t.x,a.wy-t.y)<t.r+RC){const sp=Math.hypot(ch.vx-ch.w*(a.wy-ch.y),ch.vy+ch.w*(a.wx-ch.x));if(sp>70){if(sp>150){dead=true;break}if(t.inv<=0){t.inv=.8;t.stun=.9;t.vx=0;popText(t.x,t.y-38,'OOF!','#ffd23f',16);shake=Math.max(shake,4);SFX.thud(.5)}}}}
       if(dead){killTarget(t);break}}}}
 
 // =====================================================================
