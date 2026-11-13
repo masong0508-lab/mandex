@@ -430,7 +430,29 @@ LEVELS.push(
    house({x:338,w:12,floors:3,fh:9,wall:RUBBER,floor:WOOD,roof:WOOD,gable:true,paper:'#f8d4e4'});
    tgt(343,59);tgt(343,50);tgt(343,41)}}
 );
-const chEnd=l=>l<CH1?CH1:LEVELS.length;   // the last level of the chapter that level l belongs to
+
+// ---------- CHAPTER 3: the Wolfman chapter.  20 levels built from three houses each; the landlords come with new tricks ----------
+const CH2=LEVELS.length;
+(function(){
+ const MATS=[[WOOD,WOOD],[BRICK,WOOD],[STONE,WOOD],[STEEL,BRICK],[GLASS,STONE]],
+  NAMES=['Full Moon Rising','Howling Heights','Flea Market','Fang Street','Bad Moon Brick','Wolf Pack Lofts','Moonlit Mortgage','Claw Foreclosure','Growl Gardens','Night Shift',
+   'Tail Spin','Lunar Lease','Pelt Place','The Long Howl','Scratch Post Towers','Fur Ball Plaza','Silver Bullet Row','Midnight Eviction','Pack Leader Penthouse','Alpha Landlord'],
+  TIPS={0:'New: landlords have health bars.  Hit them twice!',5:'Riot shields block you from the front.  Hit them fast, or from behind.',10:'Healers patch landlords up.  Take them out first.',15:'Bosses throw two briefcases at once.'};
+ for(let i=0;i<20;i++){
+  const tier=Math.min(3,(i/5)|0),kinds=[['walker','thrower','bat'],['walker','shield','sprinter','thrower'],['shield','sprinter','healer','bat','thrower'],['boss','shield','healer','sprinter','thrower']][tier];
+  const m1=MATS[i%5],m2=MATS[(i*2+1)%5],m3=MATS[(i*3+2)%5];
+  const H1={x:48+(i%3)*4,w:8+(i%4)*2,floors:2+(i%4),fh:8+(i%3)},H2={x:80+(i%2)*4,w:10+(i%5)*2,floors:2+((i+1)%4),fh:9+(i%2)},H3={x:108,w:8,floors:2+(i%3),fh:8};
+  const hs=[[H1,m1],[H2,m2]];if(i>=8)hs.push([H3,m3]);
+  LEVELS.push({name:NAMES[i],men:5+((i/5)|0)+(i>=15?1:0),tip:TIPS[i],build(){
+   let k=0;
+   for(const[H,mt]of hs){house({x:H.x,w:H.w,floors:H.floors,fh:H.fh,wt:mt[0]===STEEL?2:1,wall:mt[0],floor:mt[1],roof:mt[1]===WOOD?WOOD:STONE,gable:false,paper:['#e8d8c0','#d8e0e8','#e8d8e8'][k%3]});
+    for(let f=0;f<H.floors;f++){const row=ROWS-1-f*H.fh,cx=f===0?H.x+H.w-3:H.w>13?H.x+3+((f&1)?H.w-7:0):H.x+(H.w>>1)+((f*3+k)%3-1),kind=(f+k+i)%3===0&&i<5?'':kinds[(f*2+k+i)%kinds.length];
+      if(f===H.floors-1&&k===0||f===0||(f+k+i)%2===0)tgt(cx,row,kind,Math.max(2,Math.min(6,(H.w>>1)-3)))}
+    tnt(H.x+2,ROWS-1);k++}
+   // make sure there are at least 4 landlords
+   if(targets.length<4){const H=hs[0][0];tgt(H.x+3,ROWS-1-H.fh,'walker',2)}}})}
+})();
+const chEnd=l=>l<CH1?CH1:l<CH2?CH2:LEVELS.length;   // the last level of the chapter that level l belongs to
 // ---- pneumatic tubes ----
 function tubeStep(m,dt){
   if(m.tubeT>0)m.tubeT-=dt;
@@ -1216,7 +1238,7 @@ function update(dt){
 //  CHARACTER ART
 // =====================================================================
 const SK='#f4b78e',SKD='#d98f64',SKH='#ffd5b4',OUT='#5a2f1b',HAIR='#4a2d1a';
-let WORK=false;let THONG=false,TG='#ff2d6f';   // the thong outfit: skin-coloured 'shorts' plus thin straps and a little pouch in TG
+let WORK=false,WOLF=false;let THONG=false,TG='#ff2d6f';   // the thong outfit: skin-coloured 'shorts' plus thin straps and a little pouch in TG
 let BR='#e0243a',BRD='#a8162a',TOW='#ff7eb0',TOWS='#ff4f8f';   // the outfit colours (boxers, boxer shading, towel, towel edge); see OUTFITS
 function limb(x,y,x1,y1,w,col,hi){ctx.lineCap='round';ctx.strokeStyle=OUT;ctx.lineWidth=w+2.4;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x1,y1);ctx.stroke();
   ctx.strokeStyle=col;ctx.lineWidth=w;ctx.stroke();if(hi){ctx.strokeStyle=hi;ctx.lineWidth=w*.26;ctx.beginPath();ctx.moveTo(x-w*.18,y-w*.22);ctx.lineTo(x1-w*.18,y1-w*.22);ctx.stroke()}}
@@ -1275,7 +1297,35 @@ function ribbonPoly(xa,xb,yc,hw,n,fill,rip){if(THONG){hw=Math.max(.9,hw*.3);fill
 function ribbonStripes(xa,xb,yc,hw,step,col){if(THONG)return;ctx.save();ctx.strokeStyle=col||BR;ctx.lineWidth=1.25;ctx.lineCap='round';
   for(let x=xa+step/2;x<xb;x+=step){const u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u)*.82;ctx.beginPath();ctx.moveTo(x,yc(x)-h);ctx.quadraticCurveTo(x+.5,yc(x),x+.2,yc(x)+h);ctx.stroke()}ctx.restore()}
 // a soft cloth band that follows a quadratic curve P0 -> C -> P1 (a waistband seen from the side), with stitched stripes across it
-function thongFront(){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
+// ---- WOLFMAN: grey fur, ears, snout, tail, and shorts that did not survive the transformation (the cartoon rear stays bare and fully drawn)
+const WF='#7b7f8c',WFD='#6a3f28',WFL='#b9bdc9';
+function furTufts(pts,col){ctx.save();ctx.strokeStyle=col||WFD;ctx.lineWidth=1.3;ctx.lineCap='round';for(const[x,y,d]of pts){ctx.beginPath();ctx.moveTo(x-2.2,y);ctx.lineTo(x,y+3.2*(d||1));ctx.lineTo(x+2.2,y);ctx.stroke()}ctx.restore()}
+function wolfFront(){ctx.save();ctx.lineJoin='round';
+  // ragged brown shorts: a torn waistband and a zig-zag hem, one leg ripped higher than the other
+  ctx.beginPath();ctx.moveTo(-23,14);ctx.quadraticCurveTo(0,21,23,14);ctx.lineTo(25,25);for(let i=0;i<7;i++)ctx.lineTo(23-i*3.8,(i&1?33:28)+(i>4?-4:0));ctx.lineTo(-25,26);ctx.closePath();
+  ctx.fillStyle='#8a5a2b';ctx.fill();ctx.strokeStyle='#3a220c';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.strokeStyle='#5a3515';ctx.lineWidth=1;for(const x of[-14,-6,9,17]){ctx.beginPath();ctx.moveTo(x,17);ctx.lineTo(x+1,24);ctx.stroke()}
+  ctx.fillStyle='#d5a86a';ctx.beginPath();ctx.moveTo(-23,14);ctx.lineTo(-18,17);ctx.lineTo(-22,20);ctx.closePath();ctx.fill();   // a flap of cloth hanging loose
+  ctx.restore();
+  furTufts([[-9,-8,1],[0,-4,1],[9,-8,1],[-14,3,1],[14,3,1],[-4,5,1],[5,6,1],[0,12,1]],WFD)}
+function wolfBack(bx,cy0){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  // what is left of the shorts: two shreds on the hips and a torn waistband, cheeks completely out
+  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*24,14);ctx.lineTo(bx+q*15,16);ctx.lineTo(bx+q*18,23);ctx.lineTo(bx+q*22,20);ctx.lineTo(bx+q*26,27);ctx.closePath();ctx.fillStyle='#8a5a2b';ctx.fill();ctx.strokeStyle='#3a220c';ctx.lineWidth=1.3;ctx.stroke()}
+  furTufts([[bx-11,cy0+10,1],[bx-14,cy0+4,1],[bx+12,cy0+9,1],[bx+14,cy0+3,1]],WFD);
+  // the tail pokes out right where the shorts used to be, poofy and grey with a pale tip
+  ctx.beginPath();ctx.moveTo(bx-3,17);ctx.bezierCurveTo(bx-8,6,bx+4,-4,bx+14,-2);ctx.bezierCurveTo(bx+22,0,bx+22,10,bx+14,10);ctx.bezierCurveTo(bx+8,10,bx+6,6,bx+3,17);ctx.closePath();
+  ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke();
+  ctx.beginPath();ctx.moveTo(bx+11,-1.4);ctx.bezierCurveTo(bx+19,0,bx+21,8,bx+14.4,9.6);ctx.bezierCurveTo(bx+17,6,bx+17,2,bx+11,-1.4);ctx.fillStyle=WFL;ctx.fill();
+  ctx.restore()}
+function wolfHeadF(){ctx.save();ctx.lineJoin='round';
+  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5,-54);ctx.lineTo(q*13,-68);ctx.lineTo(q*17,-52);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(q*8,-54);ctx.lineTo(q*13,-63);ctx.lineTo(q*15,-54);ctx.closePath();ctx.fillStyle='#e8a0a8';ctx.fill()}
+  furTufts([[-14,-36,1],[14,-36,1],[-12,-31,1],[12,-31,1],[-6,-57,-1],[0,-58,-1],[6,-57,-1]],WFD);
+  ell(0,-36.5,8.5,5.6,WFL,1.5);ell(0,-40,3.2,2.1,'#15151c',1);ctx.fillStyle='#fff';ctx.strokeStyle='#222';ctx.lineWidth=.8;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*3.2,-33.6);ctx.lineTo(q*4.4,-30);ctx.lineTo(q*1.6,-33.4);ctx.closePath();ctx.fill();ctx.stroke()}
+  ctx.restore()}
+function wolfHeadB(){ctx.save();ctx.lineJoin='round';for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5,-54);ctx.lineTo(q*13,-68);ctx.lineTo(q*17,-52);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke()}
+  furTufts([[-9,-30,1],[0,-28,1],[9,-30,1],[-15,-40,1],[15,-40,1]],WFD);ctx.restore()}
+function thongFront(){if(WOLF)return wolfFront();ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
   for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5.5,20.5);ctx.quadraticCurveTo(q*13,18,q*21,14.5);ctx.stroke()}          // the side strings
   ctx.beginPath();ctx.moveTo(0,31);ctx.lineTo(0,37.4);ctx.lineWidth=1.7;ctx.stroke();ctx.lineWidth=1.3;   // the strap runs down between the legs
   ctx.beginPath();ctx.moveTo(-6,19.6);ctx.quadraticCurveTo(-8.6,25.4,-3.4,30.2);ctx.quadraticCurveTo(0,32.8,3.4,30.2);ctx.quadraticCurveTo(8.6,25.4,6,19.6);ctx.quadraticCurveTo(0,21.2,-6,19.6);ctx.closePath();   // a small pouch that tapers into the strap, not a loincloth
@@ -1288,7 +1338,7 @@ function gluteCreases(){ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
     ctx.strokeStyle='rgba(140,62,34,.8)';ctx.lineWidth=1.2;fold();
     ctx.strokeStyle='rgba(255,238,222,.42)';ctx.lineWidth=.9;ctx.beginPath();ctx.moveTo(q*24.1,24.4);ctx.quadraticCurveTo(q*23.8,28.2,q*21.2,31);ctx.stroke()}
   ctx.restore()}
-function thongBack(bx,cy0){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
+function thongBack(bx,cy0){if(WOLF)return wolfBack(bx,cy0);ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
   for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*13,15);ctx.quadraticCurveTo(bx+q*8,18.5,bx+q*3.2,20.5);ctx.stroke()}
   ctx.beginPath();ctx.moveTo(bx,20);ctx.quadraticCurveTo(bx,cy0+4,bx,cy0+12);ctx.stroke();                                    // the strap down the cleft
   ctx.beginPath();ctx.moveTo(bx-4,18.2);ctx.lineTo(bx+4,18.2);ctx.lineTo(bx,25.5);ctx.closePath();ctx.fillStyle=TG;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1.1;ctx.stroke();ctx.restore()}
@@ -1431,7 +1481,7 @@ function drawFront(pose,fk,t,o){
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(-14,-46);ctx.quadraticCurveTo(-17,-62,-5,-58);ctx.quadraticCurveTo(0,-68,6,-58);ctx.quadraticCurveTo(17,-62,14,-46);ctx.quadraticCurveTo(8,-53,0,-51);ctx.quadraticCurveTo(-8,-53,-14,-46);ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.6;ctx.stroke();
   ctx.fillStyle='rgba(74,45,26,.35)';for(let k=0;k<12;k++)ctx.fillRect(-8+k*1.4,-33+(k%3)*1.2,1,1);
   if(INF>.45){ctx.fillStyle='rgba(235,40,50,'+Math.min(.62,(INF-.45)*1.4)*(.9+.1*Math.sin(t*14))+')';ctx.beginPath();ctx.ellipse(0,-39,13,10.5,0,0,6.3);ctx.fill();ctx.beginPath();ctx.ellipse(0,-33,10.5,7,0,0,6.3);ctx.fill()}   // blushing redder as the pressure builds
-  if(WORK)workHatF();face(0,-43,1,fk,t,false,o&&o.fx);if(o&&o.head)ctx.restore();if(o&&o.after)o.after()}
+  if(WORK)workHatF();face(0,-43,1,fk,t,false,o&&o.fx);if(WOLF)wolfHeadF();if(o&&o.head)ctx.restore();if(o&&o.after)o.after()}
 // ---- seated side profile, rear on the air valve (local origin = the rear on the nozzle, he faces right, y up is negative). f = belly inflation 0..1.
 // Everything but the belly keeps its size: head, neck, chest, arms and legs are separate shapes; only the belly bulge grows out the front.
 function drawSeatSide(f,t){
@@ -1884,7 +1934,7 @@ function drawBack(pose,t,o){o=jigMerge(o)||{};const bo=o.bo||[0,0],ro=o.ro||[0,0
   else{ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.beginPath();ctx.arc(13.5,-45.5,2.4,Math.PI*1.1,Math.PI*1.9);ctx.stroke()}   // smug wink
   ctx.fillStyle=HAIR;ctx.strokeStyle=OUT;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(10,-39);ctx.quadraticCurveTo(16,-41,19.5,-37.5);ctx.quadraticCurveTo(21,-39.5,20,-42);ctx.quadraticCurveTo(22.5,-35,15,-36);ctx.quadraticCurveTo(12,-36,10,-37);ctx.closePath();ctx.fill();ctx.stroke();
   if(lean){ctx.fillStyle='#bfe8ff';ctx.beginPath();ctx.ellipse(-11,-55,1.6,2.4,0,0,6.3);ctx.ellipse(18,-53,1.4,2.2,0,0,6.3);ctx.fill()}   // nervous sweat
-  if(WORK)workHatF(1);
+  if(WORK)workHatF(1);if(WOLF)wolfHeadB();
   ctx.restore()}
 
 // ---- every pose by name; the console sprite generator (tools/gen_manspr.py) renders these at the origin with no extra scale
@@ -2947,6 +2997,7 @@ const hex2=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.sl
 const mulc=(c,k)=>c.map(v=>Math.max(0,Math.min(255,Math.round(v*k))));
 const OUTFITS=[
  {id:'classic', n:'Classic Red',   br:'#e0243a',brd:'#a8162a',tow:'#ff7eb0',tows:'#ff4f8f', h:'always yours',                 t:()=>true},
+ {id:'wolf',n:'Wolfman',br:'#f4b78e',brd:'#e2a077',tow:'#b9bdc9',tows:'#7b7f8c',wolf:true,h:'watch the wolfman cutscene',t:()=>!!PD.seenWolf},
  {id:'workman',n:'Working Man',br:'#3f5f8f',brd:'#2b4468',tow:'#c9ced6',tows:'#8f98a6',work:true,h:'always yours',t:()=>true},
  {id:'navy',    n:'Navy Stripes',  br:'#2f4fa8',brd:'#1f347a',tow:'#f2f2f2',tows:'#c9c9d6', h:'earn 3 stars in total',        t:()=>totalStars()>=3},
  {id:'banana',  n:'Banana Boxers', br:'#f5d02f',brd:'#c9a517',tow:'#7cd36a',tows:'#4fae42', h:'evict 25 landlords',           t:()=>ST().kills>=25},
@@ -2966,7 +3017,7 @@ function paintOutfit(br,brd,tow,tows){BR=br;BRD=brd;TOW=tow;TOWS=tows;const f=he
 const _hx=document.createElement('canvas').getContext('2d');
 const hslHex=s=>{_hx.fillStyle=s;return _hx.fillStyle};
 function applyOutfit(o,tm){
-  WORK=!!o.work;THONG=!!o.thong;TG=o.tg||'#ff2d6f';
+  WORK=!!o.work;WOLF=!!o.wolf;THONG=!!o.thong||WOLF;TG=o.tg||'#ff2d6f';
   if(o.rainbow){const h=(tm*60)%360,c=(hh,l)=>`hsl(${hh},85%,${l}%)`;paintOutfit(hslHex(c(h,52)),hslHex(c(h,36)),hslHex(c((h+180)%360,72)),hslHex(c((h+180)%360,56)))}
   else paintOutfit(o.br,o.brd,o.tow,o.tows)}
 let outfitCur=outfitById(PD.outfit);
@@ -2998,23 +3049,24 @@ const UISTATES=['menu','select','ach','outfit','options','ending'];
 let selTab=0;
 function goMenu(){state='menu';hits=[]}
 function goSelect(){state='select';hits=[]}
-function startStory(i){testing=false;selTab=i>=CH1?2:0;if(i===0){startCut();return}load(i)}
+function startStory(i){testing=false;selTab=i>=CH2?3:i>=CH1?2:0;if(i===0){startCut();return}if(i===CH2){startCut3();return}load(i)}
 // ---------- OPENING CUTSCENE: the origin of MANDEX (plays before story level 1; tap = next, SKIP or Esc = straight to the level) ----------
 let cutI=0,cutT=0,cutFx=0;
-const cutTotal=()=>CUT[cutI].lines.reduce((n,s)=>n+s.length,0);const CPS=58,cutRT=()=>cutTotal()/CPS+.4;
-function startCut(){state='cutscene';cutI=0;cutT=0;cutFx=0;hits=[]}
-function endCut(){load(0)}
-function cutNext(){cutI++;cutT=0;cutFx=0;if(cutI>=CUT.length)endCut()}
+let CUTS=null,cutDone=()=>load(0);
+const cutTotal=()=>CUTS[cutI].lines.reduce((n,s)=>n+s.length,0);const CPS=58,cutRT=()=>cutTotal()/CPS+.4;
+function startCut(){CUTS=CUT;cutDone=()=>load(0);state='cutscene';cutI=0;cutT=0;cutFx=0;hits=[]}
+function endCut(){cutDone()}
+function cutNext(){cutI++;cutT=0;cutFx=0;if(cutI>=CUTS.length)endCut()}
 function cutClick(x,y){if(x>W-122&&y<50){endCut();return}const rt=cutRT();if(cutT<rt)cutT=rt;else cutNext()}
-function cutTick(dt){cutT+=dt;if(cutT>cutRT()+(CUT[cutI].hold||3.2))cutNext()}
+function cutTick(dt){cutT+=dt;if(cutT>cutRT()+(CUTS[cutI].hold||3.2))cutNext()}
 function cutOnce(f){if(!cutFx){cutFx=1;f()}}
 function cutTie(){const OU='#5a2f1b';ctx.fillStyle='#fff';for(const s of[-1,1]){ctx.beginPath();ctx.moveTo(s*2,-32);ctx.lineTo(s*11,-28);ctx.lineTo(s*3,-22);ctx.closePath();ctx.fill();ctx.strokeStyle=OU;ctx.lineWidth=1;ctx.stroke()}
   ctx.fillStyle='#2a4d9c';ctx.strokeStyle=OU;ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(-3.4,-30);ctx.lineTo(3.4,-30);ctx.lineTo(2.6,-26);ctx.lineTo(7,8);ctx.lineTo(0,17);ctx.lineTo(-7,8);ctx.lineTo(-2.6,-26);ctx.closePath();ctx.fill();ctx.stroke();
   ctx.strokeStyle='#8fb0ff';ctx.lineWidth=1.4;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(-3.6+k*.3,-18+k*7);ctx.lineTo(3.6-k*.3,-14+k*7);ctx.stroke()}}
 // Gerald: the same body, no cape, khaki shorts (or boxers), optional tie.  feetY = where his feet land
-function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG;WORK=false;THONG=false;if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
+function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;THONG=!!o.wolf;WOLF=!!o.wolf;if(o.wolf){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
   const op={nocape:true};if(o.belly)op.belly=o.belly;if(o.head)op.head=o.head;if(o.armL){op.armL=o.armL;op.armR=o.armR}if(o.tie)op.after=cutTie;
-  ctx.save();ctx.translate(x+(o.dx||0),feetY-48*s+(o.dy||0));ctx.scale(s,s);drawFront(o.pose||'up',o.face||'cool',cutT*.8+.3,op);ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st}
+  ctx.save();ctx.translate(x+(o.dx||0),feetY-48*s+(o.dy||0));ctx.scale(s,s);drawFront(o.pose||'up',o.face||'cool',cutT*.8+.3,op);ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
 function cutFlag(k,f){const b=1<<k;if(!(cutFx&b)){cutFx|=b;f()}}
 function cutWork(f){applyOutfit(outfitById('workman'),time);try{f()}finally{applyOutfit(outfitCur,time)}}
 function cutGear(x,fy,s,t){if(t>.7)cutFlag(10,()=>SFX.thud(.6));if(t>1.3)cutFlag(11,()=>SFX.thud(.6));if(t>1.9)cutFlag(12,()=>SFX.thud(.7));ctx.save();ctx.translate(x,fy-48*s);ctx.scale(s,s);const e=u=>{u=Math.max(0,Math.min(1,u));return 1-Math.pow(1-u,3)};
@@ -3162,11 +3214,11 @@ function cgDebris(t,gy,n){ctx.save();for(let i=0;i<n;i++){const ph=(t*.6+i*.173)
 // a hard cut with a short flash between them.  cuts = start time of each shot; shake / tilt = optional per-shot kick and dutch angle.
 // framing rule: the caption box covers y>406, so a close-up puts the face at y~205: feetY = 205 + 91*scale.
 function cgK(c,t){let k=0;for(let j=0;j<c.length;j++)if(t>=c[j])k=j;return k}
-function cutCam(i,t){const S=CUT[i],c=S.cuts,k=cgK(c,t),dt=t-c[k],sk=((S.shake||[])[k]||0)*Math.exp(-4*dt),r=(S.tilt||[])[k]||0;
+function cutCam(i,t){const S=CUTS[i],c=S.cuts,k=cgK(c,t),dt=t-c[k],sk=((S.shake||[])[k]||0)*Math.exp(-4*dt),r=(S.tilt||[])[k]||0;
   return{z:1.04+Math.abs(r)*2.4,x:480,y:270,r:r,sx:Math.sin(t*93)*sk,sy:Math.cos(t*71)*sk,fl:k>0?Math.max(0,.45*(1-dt/.12)):0}}
 // Gerald seen from behind (over-the-shoulder shots)
-function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG;WORK=false;THONG=false;if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
-  ctx.save();ctx.translate(x,feetY-48*s);ctx.scale(s,s);drawBack(null,cutT*.8+.3,{noflag:true});ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st}
+function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;THONG=!!o.wolf;WOLF=!!o.wolf;if(o.wolf){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
+  ctx.save();ctx.translate(x,feetY-48*s);ctx.scale(s,s);drawBack(null,cutT*.8+.3,{noflag:true});ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
 function cgBill(t,x,y,sz){txt('$'+Math.floor(t*t*600).toLocaleString(),x,y,sz,'#7dff5a','center','#0a3a0a');txt('BILLED SO FAR',x,y+sz*.45,Math.max(12,sz*.26),'#cfd','center')}
 function cgBokeh(t,cols,n){ctx.save();for(let i=0;i<n;i++){const x=(cgRnd(i)*W+t*6*(i%3+1))%W,y=cgRnd(i+20)*H*.75,r=16+cgRnd(i+40)*36;ctx.globalAlpha=.1+.14*cgRnd(i+60);cgE(x,y,r,r,cols[i%cols.length])}ctx.restore()}
 function cgWood(c1,c2){ctx.fillStyle=cgLG(0,0,W,H,[0,c1,1,c2]);ctx.fillRect(0,0,W,H);for(let i=0;i<46;i++)cgLine(0,i*12+cgRnd(i)*8,W,i*12+cgRnd(i+5)*14,'rgba(0,0,0,.16)',1.4);for(let i=0;i<30;i++)cgLine(0,i*19+4,W,i*19+cgRnd(i+9)*7,'rgba(255,220,170,.05)',1.2)}
@@ -3300,15 +3352,45 @@ function cutTrans(tr,t){if(t>=.5||tr==='cut')return;const u=t/.5;
  else if(tr==='iris'){ctx.beginPath();ctx.rect(0,0,W,H);ctx.arc(480,270,u*u*620+1,0,7);ctx.fillStyle='#000';ctx.fill('evenodd')}
  else{ctx.fillStyle=(tr==='white'?'rgba(255,255,255,':'rgba(0,0,0,')+(1-u)+')';ctx.fillRect(0,0,W,H)}}
 ['fade','wipe','wipe','iris','white','cut','cut','iris'].forEach((v,i)=>{if(CUT[i])CUT[i].tr=v});
+
+// ---------- CHAPTER 3 CUTSCENE: the transformation (plays before chapter 3 level 1) ----------
+function cgMoon(x,y,r,t){ctx.save();const g=ctx.createRadialGradient(x,y,r*.2,x,y,r*2.2);g.addColorStop(0,'rgba(255,250,200,.5)');g.addColorStop(1,'rgba(255,250,200,0)');ctx.fillStyle=g;ctx.fillRect(x-r*2.2,y-r*2.2,r*4.4,r*4.4);ctx.restore();
+  cgE(x,y,r,r,'#f6f1d0',3,'#cbbf7a');for(const[a,b,c]of[[-.3,-.2,.18],[.25,.1,.22],[-.1,.35,.12],[.4,-.35,.1]])cgE(x+a*r,y+b*r,r*c,r*c,'#e0d9a8',0)}
+function cgHowl(t,x,y){const a=Math.min(1,t*.8);ctx.save();ctx.globalAlpha=a*.7;ctx.strokeStyle='#fff';ctx.lineWidth=3;for(let i=0;i<3;i++){const r=30+((t*60+i*30)%90);ctx.beginPath();ctx.arc(x,y,r,-1.2,-.2);ctx.stroke()}ctx.restore()}
+const CUT3=[
+ {lines:["After Landlord HQ fell, Gerald went home.","Home is a couch. The couch is in a friend's garage.","Above him: the biggest, roundest moon anyone has ever seen."],hl:2,cuts:[0,3],tr:'fade',hold:3.4,draw(t){
+   cgSky('#0a0d24','#2a3060',395);for(let i=0;i<40;i++)cgE(cgRnd(i)*W,cgRnd(i+50)*300,1.3,1.3,'#fff');cgMoon(720,150,70+Math.sin(t)*2,t);
+   ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);cgGrass(395,145,'#1d3a2c','#0f2218');
+   const wx=Math.min(330,-80+t*180);cutGerald(wx,395,1.7,{tie:1,face:'cool',dy:wx<330?-Math.abs(Math.sin(t*11))*5:0});if(t>2.2)cutBubble(460,170,"That is a big moon.",0)}},
+ {lines:["The fridge. Gerald is hungry.","In the back: a wedge of MOON CHEESE.","BEST BEFORE: THE FULL MOON."],hl:2,cuts:[0],tr:'wipe',hold:3.2,draw(t){
+   cgFridge(t);cgR(330,150,300,160,'#f2d24a',3,10);for(const[a,b,c]of[[390,200,16],[470,250,22],[560,190,12],[520,280,10],[420,270,9]])cgE(a,b,c,c,'#d9b02a',2);
+   txt('MOON CHEESE',480,350,26,'#fff','center','#5a3a00');cgR(560,320,60,22,'#d8352b',2,4);txt('EXPIRED',590,337,13,'#fff','center');
+   if(t>2.2){cutFlag(1,()=>SFX.thud(.5));cutBubble(750,120,"Probably fine.",0)}}},
+ {lines:["Gerald sneezes. The moon peeks through the window.","His ears grow. His nose grows. His mustache stays exactly the same.","Hair. Everywhere. Fangs. A thing happens to his tail area."],hl:1,cuts:[0,1.6,3.4],tr:'white',shake:[0,5,9],hold:3.4,draw(t){
+   cgSky('#0a0d24','#2a3060',395);cgMoon(480,170,120,t);ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);
+   const w=t>1.6;cutGerald(480,392,w?2.5:2.2,{face:w?'cool':'sad',wolf:t>3.4||(w&&((t*10|0)&1)),pose:'up',dy:Math.sin(t*40)*(w?4:1)});
+   if(t<1.6)cutBubble(700,110,"Ah... ah... AH-",0);else if(t<3.4)cutBubble(700,110,"AAAH-WOOOP!",0);else cutBubble(730,110,"I have a tail.",0)}},
+ {lines:["The shorts did not survive.","The tail did not ask.","Gerald checked. Very round. Very furry."],hl:1,cuts:[0,1.5,3],tr:'iris',shake:[0,0,6],hold:3.6,draw(t){
+   cgWood('#4a3a5a','#241a30');cgMoon(140,110,60,t);
+   const k=cgK(this.cuts,t);if(k===0){cutGerald(480,392,2.5,{wolf:true,face:'sad',pose:'up'});cutBubble(760,150,"My pants!",0)}
+   else if(k===1){cutGeraldBack(480,392,2.5,{wolf:true});cutFlag(4,()=>SFX.whoosh());ctx.fillStyle='#8a5a2b';for(let i=0;i<4;i++){const a=((t-1.5)*2.4+i*1.4);ctx.save();ctx.translate(780+Math.sin(a*2)*20,60+((t-1.5)*120+i*70)%420);ctx.rotate(a);ctx.fillRect(-8,-4,16,8);ctx.restore()}cutBubble(760,150,"*tail wag*",0)}
+   else{cutGeraldBack(480,392,2.9,{wolf:true});cutBubble(740,130,"Cool breeze.",0)}}},
+ {lines:["AWOOOOOOOOO!","(translation: \"I AM THE LATE FEE NOW.\")","Chapter 3: the landlords do not stand a chance."],hl:0,cuts:[0],tr:'iris',shake:[8],hold:4,draw(t){
+   cgSky('#0a0d24','#3a2a60',395);cgMoon(480,200,200,t);cgHowl(t,300,300);cgHowl(t+.4,660,300);
+   ctx.fillStyle='#10132a';ctx.fillRect(0,420,W,H-420);cutGerald(480,392,2.7,{wolf:true,face:'cool',pose:'up',armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]});
+   if(t>1)cutBubble(740,170,"AWOOOO!",0)}}
+];
+function startCut3(){CUTS=CUT3;cutDone=()=>{PD.seenWolf=true;pdTouch();pdSave();load(CH2)};state='cutscene';cutI=0;cutT=0;cutFx=0;hits=[]}
 function drawCutscene(){
-  const sc=CUT[cutI],cs=cutCam(cutI,cutT);ctx.save();ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);ctx.translate(-cs.x,-cs.y);sc.draw(cutT);ctx.restore();cutDust(cutT);cutVig();
+  const sc=CUTS[cutI],cs=cutCam(cutI,cutT);ctx.save();ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);ctx.translate(-cs.x,-cs.y);sc.draw(cutT);ctx.restore();cutDust(cutT);cutVig();
   if(cs.fl>0){ctx.fillStyle='rgba(255,255,255,'+cs.fl+')';ctx.fillRect(0,0,W,H)}
   const bar=16*Math.min(1,cutT*3);ctx.fillStyle='#000';ctx.fillRect(0,0,W,bar);ctx.fillRect(0,H-bar,W,bar);cutTrans(sc.tr,cutT);
   cutBox(sc.lines,cutT,sc.hl);
   btn(W-112,8,104,32,'SKIP >>',()=>{},{size:14});
-  for(let i=0;i<CUT.length;i++){ctx.fillStyle=i===cutI?'#ffd23f':'rgba(255,255,255,.4)';ctx.beginPath();ctx.arc(24+i*16,24,4,0,7);ctx.fill()}}
+  for(let i=0;i<CUTS.length;i++){ctx.fillStyle=i===cutI?'#ffd23f':'rgba(255,255,255,.4)';ctx.beginPath();ctx.arc(24+i*16,24,4,0,7);ctx.fill()}}
 
-const ch2Unlocked=i=>PD.unlockAll||i===CH1||(PD.stars[i-1]||0)>0;   // the first chapter 2 level is open; the rest unlock in order
+const ch2Unlocked=i=>PD.unlockAll||i===CH1||(PD.stars[i-1]||0)>0;
+const ch3Unlocked=i=>PD.unlockAll||(i===CH2?(PD.stars[CH2-1]||0)>0:(PD.stars[i-1]||0)>0);   // the first chapter 2 level is open; the rest unlock in order
 function storyUnlocked(i){return PD.unlockAll||i<3||(PD.stars[i-1]||0)>0}
 function drawMenu(){
   ctx.fillStyle='rgba(10,14,30,.45)';ctx.fillRect(0,0,W,H);
@@ -3373,11 +3455,18 @@ function drawSelect(){
   ctx.fillStyle='rgba(10,14,30,.55)';ctx.fillRect(0,0,W,H);
   txt('SELECT LEVEL',W/2,52,40,'#ffd23f','center','#7a1a1a');
   btn(16,14,90,36,'< MENU',goMenu,{size:16});
-  btn(W/2-251,66,160,34,'STORY',()=>{selTab=0},{on:selTab===0,size:16});
-  btn(W/2-81,66,160,34,'CHAPTER 2 (WIP)',()=>{selTab=2},{on:selTab===2,size:14,col:'#ffb03a'});
-  btn(W/2+89,66,160,34,'MY LEVELS',()=>{selTab=1},{on:selTab===1,size:16});
-  if(selTab===2){   // chapter 2 (work in progress): its own screen, its stars stay out of the story achievements
-    const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n2=LEVELS.length-CH1,th=n2>15?60:80;
+  btn(W/2-336,66,160,34,'STORY',()=>{selTab=0},{on:selTab===0,size:16});
+  btn(W/2-166,66,160,34,'CHAPTER 2 (WIP)',()=>{selTab=2},{on:selTab===2,size:14,col:'#ffb03a'});
+  btn(W/2+4,66,160,34,'CHAPTER 3 (WIP)',()=>{selTab=3},{on:selTab===3,size:14,col:'#9aa4d8'});
+  btn(W/2+174,66,160,34,'MY LEVELS',()=>{selTab=1},{on:selTab===1,size:16});
+  if(selTab===3){
+    const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n3=LEVELS.length-CH2,th=60;
+    txt('CHAPTER 3  -  THE WOLFMAN',W/2,134,24,'#9aa4d8','center','#10132a');
+    for(let k=0;k<n3;k++){const x=x0+(k%cols)*(tw+gx),y=y0+((k/cols)|0)*(th+10),i=CH2+k;tile(x,y,tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!ch3Unlocked(i),()=>startStory(i))}
+    txt('New landlords: health bars, riot shields, sprinters, healers, bosses.',W/2,Math.min(H-34,y0+Math.ceil(n3/cols)*(th+10)+24),14,'#fff','center');
+    txt('Beat Landlord HQ (chapter 2) to open it.  Chapter 3 stars do not count towards story achievements.',W/2,H-14,13,'#fff','center')}
+  else if(selTab===2){   // chapter 2 (work in progress): its own screen, its stars stay out of the story achievements
+    const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n2=CH2-CH1,th=n2>15?60:80;
     txt('CHAPTER 2  -  WORK IN PROGRESS',W/2,134,24,'#ffb03a','center','#5a2a00');
     const rows=Math.ceil(Math.max(n2,cols)/cols);   // a new row every 5 levels
     for(let k=0;k<rows*cols;k++){const x=x0+(k%cols)*(tw+gx),y=y0+((k/cols)|0)*(th+10);
