@@ -177,7 +177,8 @@ function mound(x,width,height){for(let r=0;r<height&&width-2*r>0;r++)rect(x+r,RO
 // landlord kinds (they only act when OPTIONS > LANDLORDS FIGHT BACK is on):  ''  stands about, panics, taunts
 //   'walker' patrols his floor, scatters when the man flies close, and swings at a man on foot     'thrower' lobs briefcases at the man waiting in the sling
 //   'bat'    swats away any weak shot (the man must arrive faster than BAT_BREAK px/s to plough through)
-const tgt=(cx,row,kind,range)=>targets.push({x:cx*V+V/2,y:row*V-7,vy:0,r:7,alive:true,t:rnd()*6,kind:kind||'',range:(range||7)*V,hx:cx*V+V/2,face:rnd()<.5?-1:1,cd:2+rnd()*2,wind:0,swing:0,stun:0,pan:0,say:0,wk:0,blink:1+rnd()*3});
+const KHP={shield:2,boss:3,sprinter:1,healer:1};
+const tgt=(cx,row,kind,range)=>targets.push({hp:KHP[kind]||1,hpMax:KHP[kind]||1,armor:kind==='shield'?1:0,inv:0,dodge:0,cover:null,heal:3,b2:0,ckT:0,x:cx*V+V/2,y:row*V-7,vy:0,r:7,alive:true,t:rnd()*6,kind:kind||'',range:(range||7)*V,hx:cx*V+V/2,face:rnd()<.5?-1:1,cd:2+rnd()*2,wind:0,swing:0,stun:0,pan:0,say:0,wk:0,blink:1+rnd()*3});
 // pneumatic tube (chapter 2): fly into the mouth at (ax,ay) and you are posted out of the nozzle at (bx,by), shot along `ang` at `sp` px/s
 const tube=(col,ax,ay,bx,by,ang)=>tubes.push({col,ax,ay,bx,by,ang,r:30,sp:760});
 const LEVELS=[
@@ -538,7 +539,7 @@ function applyImpulse(ch,px,py,jx,jy){ch.vx+=jx/ch.m;ch.vy+=jy/ch.m;ch.w+=((px-c
 function shockwave(px,py,rpx,power){
   for(const ch of chunks){const dx=ch.x-px,dy=ch.y-py,d=Math.hypot(dx,dy)||1;if(d>rpx*1.9)continue;const f=(1-d/(rpx*1.9))*power;
     applyImpulse(ch,ch.x-dx*.3,ch.y-dy*.3,dx/d*f,dy/d*f-f*.35)}
-  for(const t of targets)if(t.alive&&Math.hypot(t.x-px,t.y-py)<rpx*1.05)killTarget(t);
+  for(const t of targets)if(t.alive&&Math.hypot(t.x-px,t.y-py)<rpx*1.05)killTarget(t,true);
   for(const p of parts){const dx=p.x-px,dy=p.y-py,d=Math.hypot(dx,dy)||1;if(d<rpx*1.6&&p.k!==5){p.vx+=dx/d*260;p.vy+=dy/d*260}}}
 function processExpl(){let n=0;
   while(explQ.length&&n++<80){const[x,y]=explQ.shift(),px=x*V+V/2,py=y*V+V/2;onBoom();
@@ -1067,7 +1068,9 @@ function dive(){
 //  TARGETS: grumpy landlords
 // =====================================================================
 function solidAt(px,py){if(!grid)return false;const gx=Math.floor(px/V),gy=Math.floor(py/V);if(gy>=ROWS)return true;return inb(gx,gy)&&grid[idx(gx,gy)]>0}
-function killTarget(t){if(!t.alive)return;t.alive=false;if(man&&man.mode==='walk'){man.wt=Math.min(man.wt+3,WALK_T+15);popText(t.x,t.y-38,'+3s','#7dff5a',18)}onLandlord();score+=5000;SFX.ding();slow=Math.max(slow,.25);
+function killTarget(t,hard){if(!t.alive)return;
+  if(!hard&&t.hp>1){if(t.inv>0)return;t.hp--;t.inv=.7;t.stun=.6;t.armor=0;shake=Math.max(shake,6);SFX.crunch(.6);spark(t.x,t.y-6,8,240);popText(t.x,t.y-40,'OOF!  '+t.hp+' LEFT','#ffd23f',16);return}
+  t.alive=false;if(man&&man.mode==='walk'){man.wt=Math.min(man.wt+3,WALK_T+15);popText(t.x,t.y-38,'+3s','#7dff5a',18)}onLandlord();score+=5000;SFX.ding();slow=Math.max(slow,.25);
   popText(t.x,t.y-14,'+5000','#ffd23f',24);
   for(let i=0;i<14;i++)parts.push({k:4,x:t.x,y:t.y,vx:(rnd()-.5)*300,vy:-rnd()*300-60,l:1.6,l0:1.6,s:3+rnd()*3,r:rnd()*6});
   for(let i=0;i<10;i++)chip(t.x,t.y,['#4a5568','#f2c7a1','#111'][i%3],(rnd()-.5)*260,-rnd()*260);dust(t.x,t.y,4,9)}
@@ -1081,10 +1084,23 @@ function hurtMan(dir){const m=man;if(!m||m.hurtCd>0)return false;
   else return false;
   shake=Math.max(shake,8);SFX.thud(.9);ring(m.x,m.y,46,'#ff6b6b');for(let i=0;i<8;i++)chip(m.x,m.y-6,['#ffd23f','#fff'][i&1],(rnd()-.5)*320,-rnd()*260);return true}
 function throwSol(t,tx,ty){const dx=Math.sign(tx-t.x)||t.face,sx=t.x+dx*9,sy=t.y-9;
-  for(const T of[.85,1.05,1.3,1.6]){const vx=(tx-sx)/T,vy=(ty-sy-.5*G*T*T)/T;if(Math.hypot(vx,vy)>980)continue;
+  for(const T of[.6,.75,.85,1.05,1.3,1.6,1.9]){const vx=(tx-sx)/T,vy=(ty-sy-.5*G*T*T)/T;if(Math.hypot(vx,vy)>980)continue;
     let ok=true;for(let u=.07;u<T-.04;u+=.03){if(solidAt(sx+vx*u,sy+vy*u+.5*G*u*u)){ok=false;break}}
     if(ok)return{vx,vy}}
   return null}
+const WALKS=['walker','shield','sprinter'],MOBILE=['walker','shield','sprinter','healer'];
+// try to walk one step; climbs a one-cell stair, hops down a one-cell drop, returns true if he moved
+function lordStep(t,dir,sp,dt){const ax=t.x+dir*9,gr=solidAt(t.x,t.y+t.r+1);if(!gr)return false;
+  let hit=solidAt(ax,t.y)||solidAt(ax,t.y-5);
+  if(hit&&!solidAt(ax,t.y-V)&&!solidAt(ax,t.y-V-6)&&!solidAt(t.x,t.y-V-8)){t.y-=V;t.x+=dir*3;return true}   // stairs
+  if(hit)return false;
+  if(!solidAt(ax,t.y+t.r+3)&&!solidAt(ax,t.y+t.r+3+V))return false;   // a drop bigger than one step: stay put
+  t.x+=dir*sp*dt;t.wk+=dt*sp/9;return true}
+// where is it dangerous to stand? returns -1/1 = run that way, 0 = fine
+function lordDanger(t){for(const ch of chunks){const dx=t.x-ch.x,dy=t.y-ch.y,sp=Math.hypot(ch.vx,ch.vy);if(sp<45||Math.abs(dx)>ch.rad+46||dy<-ch.rad-18||dy>ch.rad+120&&ch.vy<=0)continue;if(ch.vy<-20&&dy>0)continue;
+    if(Math.hypot(dx,dy)<ch.rad+70)return Math.sign(dx)||(t.face||1)}
+  return 0}
+function lordCover(t){let best=null;for(let d=1;d<=14;d++)for(const sg of[-1,1]){const x=t.x+sg*d*V;if(solidAt(x,t.y-34)&&!solidAt(x,t.y-6)&&solidAt(x,t.y+t.r+3)){best=x;break}}return best}
 function lordAI(t,dt){
   const m=man||{mode:'none',x:SX,y:SY},fight=fightOn(),tm=Math.hypot(m.x-t.x,m.y-t.y);
   if(t.say>0)t.say-=dt;if(t.stun>0)t.stun-=dt;if(t.swing>0)t.swing-=dt;if(t.pan>0)t.pan-=dt;
@@ -1092,38 +1108,50 @@ function lordAI(t,dt){
   // everybody flinches when a man comes screaming close (cosmetic: it never changes where they stand)
   if(m.mode==='fly'&&tm<210){if(t.pan<=0&&t.say<=0)lordSay(t,SCARES[(t.t*7|0)%SCARES.length],'#ffb0b0');t.pan=.7}
   let moving=0;
+  if(MOBILE.includes(t.kind)&&t.stun<=0&&t.wind<=0){
+    if(t.dodge>0)t.dodge-=dt;
+    const dg=lordDanger(t);
+    if(dg){t.dodge=.5;t.dd=dg;if(t.pan<=0&&t.say<=0)lordSay(t,'LOOK OUT!','#ffb0b0');t.pan=.5}
+    if(t.dodge>0){if(lordStep(t,t.dd,110,dt)){moving=2;t.face=t.dd}}
+    else if(m.mode==='fly'&&tm<260){t.ckT-=dt;if(t.ckT<=0){t.ckT=.4;t.cover=lordCover(t)}
+      const tx=t.cover!=null?t.cover:t.x+(Math.sign(t.x-m.x)||1)*60,d=Math.sign(tx-t.x);
+      if(d&&Math.abs(tx-t.x)>3&&lordStep(t,d,95,dt)){moving=2;t.face=d}}
+    else t.cover=null;
+    if(moving){t.mv=moving;return}}
+  if(t.kind==='healer'){t.heal-=dt;if(t.heal<=0){t.heal=3.5;for(const o of targets)if(o.alive&&o!==t&&o.hp<o.hpMax&&Math.hypot(o.x-t.x,o.y-t.y)<110){o.hp++;spark(o.x,o.y-10,6,120);popText(o.x,o.y-40,'+HP','#7dff5a',16);t.swing=.4;break}}
+    t.mv=0;t.face=(Math.sign(m.x-t.x)||t.face);return}
   if(fight&&t.kind){
-    if(t.kind==='thrower'){if(t.mid!==m){t.mid=m;t.cd=Math.max(t.cd,2.6)}if(m.mode==='aim'&&!m.chug&&!(m.stun>0))t.cd-=dt}else t.cd-=dt;
+    if(t.kind==='thrower'||t.kind==='boss'){if(t.mid!==m){t.mid=m;t.cd=Math.max(t.cd,2.6)}if(m.mode==='aim'&&!m.chug&&!(m.stun>0))t.cd-=dt}else t.cd-=dt;
     if(t.wind>0){t.wind-=dt;if(t.wind<=0){
-      if(t.kind==='thrower'){const sl=m.mode==='aim'?throwSol(t,m.x,m.y):null;if(sl){cases.push({x:t.x+t.face*9,y:t.y-9,vx:sl.vx,vy:sl.vy,rot:0,vr:t.face*9,l:4});SFX.whoosh();t.swing=.3}t.cd=4.2+Math.random()*1.6}
-      else if(t.kind==='walker'){t.swing=.3;SFX.whoosh();if(m.mode==='walk'&&Math.abs(m.x-t.x)<46&&Math.abs(m.y-t.y)<46)hurtMan(Math.sign(m.x-t.x)||1)}}}
-    else if(t.kind==='thrower'&&m.mode==='aim'&&!m.chug&&t.cd<=0&&!(m.stun>0)){if(throwSol(t,m.x,m.y)){t.wind=.6;t.face=Math.sign(m.x-t.x)||t.face;lordSay(t,'!','#ffd23f')}else t.cd=.7}
-    if(t.kind==='walker'&&t.wind<=0&&t.stun<=0){
-      let dir=0,sp=26;const flying=m.mode==='fly'&&tm<280,foot=m.mode==='walk'&&Math.abs(m.x-t.x)<340&&Math.abs(m.y-t.y)<50;
-      if(!foot)t.eng=0;if(foot){if(!t.eng){t.eng=1;t.cd=Math.min(t.cd,.6)}dir=Math.sign(m.x-t.x);sp=72;if(Math.abs(m.x-t.x)<38){dir=0;if(t.cd<=0){t.wind=.36;t.cd=1.2;lordSay(t,'TAKE THIS!','#ffd23f')}}}   // he stops just out of bump range and winds up
-      else if(flying){dir=Math.sign(t.x-m.x)||1;sp=90}
+      if(t.kind==='thrower'||t.kind==='boss'){const sl=m.mode==='aim'?throwSol(t,m.x,m.y):null;if(sl){cases.push({x:t.x+t.face*9,y:t.y-9,vx:sl.vx,vy:sl.vy,rot:0,vr:t.face*9,l:4});SFX.whoosh();t.swing=.3}
+        if(t.kind==='boss'&&sl&&!t.b2){t.b2=1;t.wind=.4}else{t.b2=0;t.cd=(t.kind==='boss'?3:4.2)+Math.random()*1.6}}
+      else if(WALKS.includes(t.kind)){t.swing=.3;SFX.whoosh();if(m.mode==='walk'&&Math.abs(m.x-t.x)<46&&Math.abs(m.y-t.y)<46)hurtMan(Math.sign(m.x-t.x)||1)}}}
+    else if((t.kind==='thrower'||t.kind==='boss')&&m.mode==='aim'&&!m.chug&&t.cd<=0&&!(m.stun>0)){if(throwSol(t,m.x,m.y)){t.wind=.6;t.face=Math.sign(m.x-t.x)||t.face;lordSay(t,'!','#ffd23f')}else t.cd=.7}
+    if(WALKS.includes(t.kind)&&t.wind<=0&&t.stun<=0){
+      let dir=0,sp=t.kind==='sprinter'?60:t.kind==='shield'?20:26;const flying=m.mode==='fly'&&tm<280,foot=m.mode==='walk'&&Math.abs(m.x-t.x)<340&&Math.abs(m.y-t.y)<50;
+      if(!foot)t.eng=0;if(foot){if(!t.eng){t.eng=1;t.cd=Math.min(t.cd,.6)}dir=Math.sign(m.x-t.x);sp=t.kind==='sprinter'?140:t.kind==='shield'?55:72;if(Math.abs(m.x-t.x)<38){dir=0;if(t.cd<=0){t.wind=.36;t.cd=1.2;lordSay(t,'TAKE THIS!','#ffd23f')}}}   // he stops just out of bump range and winds up
+      else if(flying){dir=Math.sign(t.x-m.x)||1;sp=t.kind==='shield'?60:90}
       else{dir=t.pdir||(t.pdir=t.face);if(Math.abs(t.x-t.hx)>t.range&&Math.sign(t.x-t.hx)===dir){t.pdir=dir=-dir}}
-      if(dir){const ax=t.x+dir*9,gr=solidAt(t.x,t.y+t.r+1),blocked=solidAt(ax,t.y)||solidAt(ax,t.y-5)||!solidAt(ax,t.y+t.r+3);
-        if(gr&&!blocked){t.x+=dir*sp*dt;t.wk+=dt*sp/9;moving=sp>50?2:1}
+      if(dir){if(lordStep(t,dir,sp,dt))moving=sp>50?2:1
         else if(!flying&&!foot){t.pdir=-dir;dir=-dir}
         t.face=dir}}
     else if(t.kind==='bat'&&t.stun<=0&&m.mode==='fly'&&tm<150&&t.swing<=0){t.swing=.35}}
   if(!moving&&!(t.swing>0)&&t.wind<=0)t.face=(Math.sign(m.x-t.x)||t.face);
   t.mv=moving}
-function batBlock(t,m){if(t.kind!=='bat'||!fightOn()||t.stun>0)return false;const sp=Math.hypot(m.vx,m.vy);if(sp>=BAT_BREAK)return false;
+function batBlock(t,m){const sh=t.armor>0&&Math.sign(m.x-t.x)===t.face;if((t.kind!=='bat'&&!sh)||!fightOn()||t.stun>0)return false;const sp=Math.hypot(m.vx,m.vy);if(sp>=BAT_BREAK){if(sh){t.armor=0;popText(t.x,t.y-40,'SHIELD SMASHED!','#ffd23f',16);SFX.crunch(.9)}return false}
   let nx=m.x-t.x,ny=m.y-t.y-8;const d=Math.hypot(nx,ny)||1;nx/=d;ny/=d;
   const out=Math.max(sp*.8,380);m.vx=nx*out+(m.vx<0?0:-240);m.vy=ny*out-120;m.x=t.x+nx*(m.R+t.r+5);m.y=t.y+ny*(m.R+t.r+5);
-  t.stun=1.1;t.swing=.35;t.face=Math.sign(m.x-t.x)||t.face;shake=Math.max(shake,7);SFX.crunch(.7);spark(t.x,t.y-6,8,260);ring(t.x,t.y,40,'#ffd23f');popText(t.x,t.y-40,'BONK!','#ffd23f',28);return true}
+  t.stun=1.1;t.swing=.35;t.face=Math.sign(m.x-t.x)||t.face;shake=Math.max(shake,7);SFX.crunch(.7);spark(t.x,t.y-6,8,260);ring(t.x,t.y,40,'#ffd23f');popText(t.x,t.y-40,sh?'CLANG!':'BONK!','#ffd23f',28);return true}
 function updCases(dt){for(let i=cases.length-1;i>=0;i--){const c=cases[i];c.vy+=G*dt;c.x+=c.vx*dt;c.y+=c.vy*dt;c.rot+=c.vr*dt;c.l-=dt;
     const m=man;let dead=c.l<=0||c.y>GY-4||c.x<-20||c.x>WW+20;
     if(!dead&&solidAt(c.x,c.y)){dead=true;SFX.thud(.4)}
     if(!dead&&m&&(m.mode==='aim'||m.mode==='walk')&&Math.hypot(m.x-c.x,m.y-c.y)<(m.mode==='walk'?22:m.R+6)&&hurtMan(Math.sign(c.vx)||1))dead=true;
     if(dead){for(let k=0;k<7;k++)parts.push({k:4,x:c.x,y:c.y,vx:(rnd()-.5)*160,vy:-rnd()*140,l:1.3,l0:1.3,s:2.5+rnd()*2,r:rnd()*6});cases.splice(i,1)}}}
 function updTargets(dt){
-  for(const t of targets){if(!t.alive)continue;t.t+=dt;lordAI(t,dt);
+  for(const t of targets){if(!t.alive)continue;t.t+=dt;if(t.inv>0)t.inv-=dt;lordAI(t,dt);
     const gr=solidAt(t.x,t.y+t.r+1)||solidAt(t.x-4,t.y+t.r+1)||solidAt(t.x+4,t.y+t.r+1);
-    if(gr){if(t.vy>330){killTarget(t);continue}t.vy=0}else{t.vy+=G*dt;t.y+=t.vy*dt}
-    if(solidAt(t.x,t.y)){killTarget(t);continue}
+    if(gr){if(t.vy>330){killTarget(t,true);continue}t.vy=0}else{t.vy+=G*dt;t.y+=t.vy*dt}
+    if(solidAt(t.x,t.y)){killTarget(t,true);continue}
     for(const ch of chunks){if(Math.hypot(ch.x-t.x,ch.y-t.y)>ch.rad+t.r+4)continue;let dead=false;
       for(const a of ch.cells){if(Math.hypot(a.wx-t.x,a.wy-t.y)<t.r+RC){const sp=Math.hypot(ch.vx-ch.w*(a.wy-ch.y),ch.vy+ch.w*(a.wx-ch.x));if(sp>70){dead=true;break}}}
       if(dead){killTarget(t);break}}}}
@@ -2636,13 +2664,15 @@ function renderMan(){
 function drawLandlord(t){
   const kind=t.kind||'',pan=t.pan>0,wind=t.wind>0,sw=t.swing>0,hop=pan?-Math.abs(Math.sin(t.t*18))*3:0,bob=pan?0:Math.sin(t.t*5)*.8,fc=t.face||1;
   const step=t.mv?Math.sin(t.wk*2.2)*(t.mv>1?3.4:2.4):0,lean=t.mv>1?.12*fc:0;
-  ctx.save();ctx.translate(t.x,t.y+bob+hop);ctx.scale(1.15*fc,1.15);if(lean)ctx.rotate(lean);
+  ctx.save();ctx.translate(t.x,t.y+bob+hop);const SZ=kind==='boss'?1.35:1.15;ctx.scale(SZ*fc,SZ);if(lean)ctx.rotate(lean);
   // little shoes (they only show when he is on the move)
   if(t.mv||wind||sw){ctx.fillStyle='#111';ctx.fillRect(-5+step,11.5,5,2.6);ctx.fillRect(1-step,11.5,5,2.6)}
-  ell(0,4,7.2,8.6,kind==='bat'?'#2f5d3a':kind==='thrower'?'#3a4a7a':'#4a5568',1.4);ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(-2.6,-3);ctx.lineTo(2.6,-3);ctx.lineTo(0,3);ctx.closePath();ctx.fill();
+  ell(0,4,7.2,8.6,kind==='bat'?'#2f5d3a':kind==='thrower'?'#3a4a7a':kind==='boss'?'#1c1c24':kind==='sprinter'?'#7a5a1c':kind==='healer'?'#f4f4f4':kind==='shield'?'#33413f':'#4a5568',1.4);ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(-2.6,-3);ctx.lineTo(2.6,-3);ctx.lineTo(0,3);ctx.closePath();ctx.fill();
   ctx.fillStyle='#d12b2b';ctx.beginPath();ctx.moveTo(-1.4,-2);ctx.lineTo(1.4,-2);ctx.lineTo(1.8,6);ctx.lineTo(0,8);ctx.lineTo(-1.8,6);ctx.closePath();ctx.fill();
   ell(0,-8,6.2,6.4,t.stun>0?'#e8b090':'#f2c7a1',1.4);ell(-6,-8,1.6,2.2,'#f2c7a1');ell(6,-8,1.6,2.2,'#f2c7a1');
-  ctx.fillStyle='#111';ctx.fillRect(-7,-17,14,2);ctx.fillRect(-4.6,-24,9.2,7.5);ctx.fillStyle=kind==='bat'?'#2a8a2a':kind==='thrower'?'#3a6ad1':'#d12b2b';ctx.fillRect(-4.6,-19.5,9.2,1.8);
+  ctx.fillStyle='#111';ctx.fillRect(-7,-17,14,2);ctx.fillRect(-4.6,-24,9.2,7.5);ctx.fillStyle=kind==='bat'?'#2a8a2a':kind==='thrower'?'#3a6ad1':kind==='boss'?'#ffd23f':kind==='sprinter'?'#ffd23f':kind==='healer'?'#2fbf4a':kind==='shield'?'#8a8f99':'#d12b2b';ctx.fillRect(-4.6,-19.5,9.2,1.8);
+  if(kind==='healer'){ctx.fillStyle='#2fbf4a';ctx.fillRect(-1,-1,2,7);ctx.fillRect(-3.5,1.5,7,2)}
+  if(kind==='boss'){ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(-1.4,-2);ctx.lineTo(1.4,-2);ctx.lineTo(1.8,6);ctx.lineTo(0,8);ctx.lineTo(-1.8,6);ctx.closePath();ctx.fill()}
   const blink=t.blink<0;
   if(t.stun>0){ctx.strokeStyle='#222';ctx.lineWidth=.9;for(const ex of[-2.3,2.3]){ctx.beginPath();ctx.moveTo(ex-1.3,-10);ctx.lineTo(ex+1.3,-7.6);ctx.moveTo(ex+1.3,-10);ctx.lineTo(ex-1.3,-7.6);ctx.stroke()}}   // dazed: X eyes
   else if(blink){ctx.strokeStyle='#222';ctx.lineWidth=.9;ctx.beginPath();ctx.moveTo(-3.8,-8.6);ctx.lineTo(-.8,-8.6);ctx.moveTo(.8,-8.6);ctx.lineTo(3.8,-8.6);ctx.stroke()}
@@ -2657,8 +2687,10 @@ function drawLandlord(t){
   else if(kind==='bat'){const a=sw?(.35-t.swing)/.35:wind?0:0;const ang=sw?-1.9+a*3.4:-.9;ctx.translate(5,0);ctx.rotate(ang);ctx.fillStyle='#b97a3c';ctx.beginPath();ctx.moveTo(0,-1.2);ctx.lineTo(15,-2.8);ctx.lineTo(15,2.8);ctx.lineTo(0,1.2);ctx.closePath();ctx.fill();ctx.strokeStyle='#5a3414';ctx.lineWidth=.8;ctx.stroke();ell(0,0,1.6,1.6,'#f2c7a1')}
   else{ctx.translate(8,2);ctx.rotate(sw?-.9:.3);ctx.fillStyle='#fff';ctx.fillRect(0,-4,6,8);ctx.strokeStyle='#999';ctx.lineWidth=.7;ctx.strokeRect(0,-4,6,8);ctx.fillStyle='#2a8a2a';ctx.fillRect(1.4,-1.5,3,1)}
   ctx.restore();
+  if(t.armor>0){ctx.fillStyle='#9aa4b2';ctx.strokeStyle='#222';ctx.lineWidth=1;ctx.beginPath();ctx.rect(7,-12,5,22);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.fillRect(8.4,-4,2.2,6)}   // riot shield
   ctx.restore();
-  if(wind&&t.kind==='thrower'){ctx.save();ctx.translate(t.x,t.y-42);ctx.fillStyle='#ffd23f';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-3,-9);ctx.lineTo(3,-9);ctx.lineTo(1.5,2);ctx.lineTo(-1.5,2);ctx.closePath();ctx.stroke();ctx.fill();ctx.beginPath();ctx.arc(0,6,1.8,0,7);ctx.fill();ctx.restore()}}
+  if(t.hpMax>1){ctx.save();ctx.translate(t.x,t.y-(kind==='boss'?42:36));ctx.fillStyle='#000';ctx.fillRect(-11,-3,22,6);for(let i=0;i<t.hpMax;i++){ctx.fillStyle=i<t.hp?'#e84040':'#552';ctx.fillRect(-10+i*(20/t.hpMax),-2,20/t.hpMax-1,4)}ctx.restore()}
+  if(wind&&(t.kind==='thrower'||t.kind==='boss')){ctx.save();ctx.translate(t.x,t.y-42);ctx.fillStyle='#ffd23f';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-3,-9);ctx.lineTo(3,-9);ctx.lineTo(1.5,2);ctx.lineTo(-1.5,2);ctx.closePath();ctx.stroke();ctx.fill();ctx.beginPath();ctx.arc(0,6,1.8,0,7);ctx.fill();ctx.restore()}}
 function drawCases(){for(const c of cases){ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.rot);ctx.fillStyle='#7a4a22';ctx.fillRect(-7,-5,14,10);ctx.strokeStyle='#3a220c';ctx.lineWidth=1.2;ctx.strokeRect(-7,-5,14,10);ctx.fillStyle='#ffd23f';ctx.fillRect(-1,-1.5,2,3);ctx.strokeRect(-3,-7.5,6,2.5);ctx.restore()}}
 
 // =====================================================================
