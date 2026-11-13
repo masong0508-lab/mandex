@@ -278,11 +278,49 @@ static void wob_blast(MxWorld *w, int cx, int cy, int r, real speed){
 #define MX_WOB_STEPS WOB_STEPS
 #endif
 static uint16_t wob_act[MX_ROWS * MX_COLS];
+static uint8_t wob_nb[MX_ROWS * MX_COLS];               /* per listed voxel: which of its 4 joints (bit d = +x, -x, +y, -y) are alive this frame */
+static uint8_t wob_cx[MX_ROWS * MX_COLS], wob_cy[MX_ROWS * MX_COLS];     /* per listed voxel: column and row (so the steps never divide) */
+static real wob_lean[MX_ROWS];                           /* the row's lean spring, which only depends on the height */
 static int wob_nact;
 static real KK[MX_NMAT][MX_NMAT];                       /* joint stiffness of every pair of kinds (the weaker one) */
+/* A voxel that is barely moving, with only such neighbours, has next to no force on it, so the sub-steps skip it (it keeps its tiny offset until the lattice
+   goes to sleep and is zeroed).  Anything kicked, blasted or next to a moving voxel is listed. */
+#ifndef MX_WOB_COLD_V
+#define MX_WOB_COLD_V R(0.05)      /* |vx| + |vy|, cells/s */
+#endif
+#ifndef MX_WOB_COLD_O
+#define MX_WOB_COLD_O R(0.004)     /* |ox| + |oy|, cells */
+#endif
+static uint8_t wob_hot[MX_ROWS * MX_COLS];             /* by cell index; only read for listed (standing) cells */
+static uint16_t occ_i[MX_ROWS * MX_COLS];              /* every standing cell of this frame, row by row */
+static uint8_t occ_nb[MX_ROWS * MX_COLS];
 static void wob_list(const MxWorld *w){
+  int no = 0;
+  for(int y = 0; y < MX_ROWS - 1; y++){
+    wob_lean[y] = rmul(LEANK, RI(MX_ROWS - 1 - y)) - HOMEK;
+    const uint8_t *row = &w->grid[y * MX_COLS];
+    for(int x0 = 0; x0 < MX_COLS; x0 += 4){                /* most of the grid is air: look at four cells at a time (MX_COLS is a multiple of 4, grid is 4-aligned) */
+      uint32_t q; memcpy(&q, __builtin_assume_aligned(row + x0, 4), 4);
+      if(!q) continue;
+      for(int x = x0; x < x0 + 4; x++){
+        if(!row[x]) continue;
+        int i = y * MX_COLS + x;
+        uint8_t bk = w->brk[i], nb = 0;                    /* the joints do not change during the sub-steps (wobble_check runs after them), so look them up once */
+        if(x + 1 < MX_COLS && !(bk & 1) && w->grid[i + 1]) nb |= 1;
+        if(x > 0 && !(bk & 2) && w->grid[i - 1]) nb |= 2;
+        if(!(bk & 4) && w->grid[i + MX_COLS]) nb |= 4;
+        if(y > 0 && !(bk & 8) && w->grid[i - MX_COLS]) nb |= 8;
+        wob_hot[i] = (rabs(w->ovx[i]) + rabs(w->ovy[i]) > MX_WOB_COLD_V) || (rabs(w->ox[i]) + rabs(w->oy[i]) > MX_WOB_COLD_O);
+        occ_i[no] = (uint16_t)i; occ_nb[no] = nb; no++;
+      }
+    }
+  }
   int n = 0;
-  for(int i = 0; i < (MX_ROWS - 1) * MX_COLS; i++) if(w->grid[i]) wob_act[n++] = (uint16_t)i;
+  for(int k = 0; k < no; k++){
+    int i = occ_i[k], nb = occ_nb[k];
+    if(!(wob_hot[i] || ((nb & 1) && wob_hot[i + 1]) || ((nb & 2) && wob_hot[i - 1]) || ((nb & 4) && wob_hot[i + MX_COLS]) || ((nb & 8) && wob_hot[i - MX_COLS]))) continue;
+    wob_act[n] = (uint16_t)i; wob_nb[n] = (uint8_t)nb; wob_cx[n] = (uint8_t)(i % MX_COLS); wob_cy[n] = (uint8_t)(i / MX_COLS); n++;
+  }
   wob_nact = n;
 }
 static MX_HOT void wobble_step(MxWorld *w, real dt){
@@ -291,17 +329,15 @@ static MX_HOT void wobble_step(MxWorld *w, real dt){
   if(KK[1][1] == 0) for(int a = 1; a < MX_NMAT; a++) for(int b = 1; b < MX_NMAT; b++) KK[a][b] = MATS[a].K < MATS[b].K ? MATS[a].K : MATS[b].K;
   /* pass 1: forces -> velocities (reads only positions, so the order does not matter) */
   for(int n = 0; n < wob_nact; n++){
-    int i = wob_act[n], x = i % MX_COLS, y = i / MX_COLS, m = w->grid[i];
-    real lean = rmul(LEANK, RI(MX_ROWS - 1 - y)) - HOMEK;
-    uint8_t bk = w->brk[i];
+    int i = wob_act[n], m = w->grid[i], nb = wob_nb[n];
+    real lean = wob_lean[wob_cy[n]];
     real ax = 0, ay = 0, oxi = w->ox[i], oyi = w->oy[i];
     const real *Km = KK[m];
-    int nj[4] = { (x + 1 < MX_COLS && !(bk & 1)) ? i + 1 : -1, (x > 0 && !(bk & 2)) ? i - 1 : -1,
-                  !(bk & 4) ? i + MX_COLS : -1, (y > 0 && !(bk & 8)) ? i - MX_COLS : -1 };
+    static const int JD[4] = { 1, -1, MX_COLS, -MX_COLS };
     for(int d = 0; d < 4; d++){                         /* every neighbour pulls in both axes (shear carries the sway up) */
-      int j = nj[d], mj;
-      if(j < 0 || !(mj = w->grid[j])) continue;
-      real K = Km[mj];
+      if(!(nb & (1 << d))) continue;
+      int j = i + JD[d];
+      real K = Km[w->grid[j]];
       ax += rmul(K, rclamp(w->ox[j] - oxi, -RI(2), RI(2))); ay += rmul(K, rclamp(w->oy[j] - oyi, -RI(2), RI(2)));
     }
     real a = invd[m];
@@ -321,7 +357,7 @@ static MX_HOT void wobble_step(MxWorld *w, real dt){
 static void wobble_check(MxWorld *w){
   real maxv = 0, maxo = 0;
   for(int n = 0; n < wob_nact; n++){
-    int i = wob_act[n], x = i % MX_COLS, m = w->grid[i];
+    int i = wob_act[n], x = wob_cx[n], m = w->grid[i];
     real sv = rabs(w->ovx[i]) + rabs(w->ovy[i]), so = rabs(w->ox[i]) + rabs(w->oy[i]);
     if(sv > maxv) maxv = sv;
     if(so > maxo) maxo = so;
@@ -557,7 +593,8 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
   int any = 0;
   for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active){ any = 1; break; }
   if(!any) return;
-  memset(w->bhead, 0xff, sizeof w->bhead);
+  if(w->bh_hi >= w->bh_lo) memset(&w->bhead[w->bh_lo * (MX_COLS + 4)], 0xff, (size_t)(w->bh_hi - w->bh_lo + 1) * (MX_COLS + 4) * sizeof w->bhead[0]);
+  int blo = MX_ROWS + 4, bhi = -1;
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
     MxChunk *ch = &w->chunks[c];
     if(!ch->active) continue;
@@ -581,9 +618,12 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
       if(gy < 0) gy = 0;
       if(gy > MX_ROWS + 3) gy = MX_ROWS + 3;
       int b = gy * (MX_COLS + 4) + gx, id = c * MX_CHUNK_CELLS + i;
+      if(gy < blo) blo = gy;
+      if(gy > bhi) bhi = gy;
       w->bnext[id] = w->bhead[b]; w->bhead[b] = (int16_t)id;
     }
   }
+  w->bh_lo = blo; w->bh_hi = bhi;
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
     MxChunk *ch = &w->chunks[c];
     if(!ch->active || ch->rest) continue;      /* sleepers do no work of their own: moving bodies test against them through the buckets */
@@ -1696,6 +1736,7 @@ void mx_load(MxWorld *w, int level){
   memset(w, 0, sizeof *w);
   w->nofight = keep_nofight; w->rng = 0x2545F491u;
   w->dz_lo = MX_ROWS * MX_COLS; w->dz_hi = -1;
+  w->bh_lo = 0; w->bh_hi = MX_ROWS + 3;               /* bhead starts zeroed, not -1: the first step clears all of it */
   w->valve_ok = keep_valve; w->collapse = keep_collapse;
   level %= MX_NUM_LEVELS;
   w->substeps = first ? SUBSTEPS : keep_sub;

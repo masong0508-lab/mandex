@@ -420,6 +420,12 @@ exercised with the host harnesses in `test/` and CI (compile only for the consol
 - Tests: `test/ch2_test.c` (float + fixed), `test/n3ds_walk.c`, DS `WALK_TEST=1/2/3`, Dreamcast `DC_WALK=1` render, the sweep and the solver now include walk bots, and the level parity check covers all 37 levels.
 - Verified only on the PC: nothing has been run on real hardware or an emulator, no sound has been heard, and the new levels have not been played by a human (a scripted bot clears the Walk-Up zig-zag; the fight-back levels were only watched). The Dreamcast landlord kinds are tinted copies of the one landlord sprite plus drawn props; the Dreamcast walk sprite is the man's turning frame scaled down.
 
+### Speed pass on the core (DS and 3DS use it; measured on the PC only)
+- `wob_list` now looks up each voxel's live joints once per frame (the three sub-steps no longer test bounds or divide), scans the grid four cells at a time (the grid is 4-aligned), and lists only voxels that are moving or next to one that is (`MX_WOB_COLD_V` 0.05 cells/s, `MX_WOB_COLD_O` 0.004 cells; a still voxel next to still voxels has no force on it). This last part changes results a little (the lattice sleep point and tiny leftover offsets): sweep win rates stayed in the same range, 0 hangs in all 6 configurations, all tests pass.
+- The chunk broad-phase grid (`bhead`) is cleared only over the rows used last step (`bh_lo`/`bh_hi`) instead of the whole 16 KB each sub-step. Bit-identical.
+- Benchmark `test/bench.c` (all 37 levels, one fixed shot, 600 frames, fixed point): 9.98 G instructions before, 6.71 G after (callgrind), about 25% less host time. Instruction counts on the PC do not include the DS's missing hardware divide or cache effects, so this is not a DS frame time: **DS speed has still never been measured on hardware or an emulator.**
+- Where a DS frame goes (callgrind of the real DS front-end on the host, level 7, 3000 frames): about half is drawing, mostly the man's sprite warp/rotate (`spr_man_jr`), voxel tiles (`gfx_tile`), `draw_world`, `gfx_rect` and the background copy. Not optimised yet.
+
 ### Pneumatic tubes (core + all three consoles)
 - `MxTube` (mouth, nozzle, exit velocity 95 cells/s), `MX_TUBE_R` 3.75 cells, `EV_TUBE`. A flying man within the
   radius is posted out of the nozzle, 10 % gravity for 0.55 s and a 0.35 s cooldown (the web game's numbers).

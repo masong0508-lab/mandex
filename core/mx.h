@@ -186,7 +186,7 @@ typedef struct {
 
 typedef struct {
   /* world */
-  uint8_t grid[MX_ROWS * MX_COLS];
+  uint8_t grid[MX_ROWS * MX_COLS] __attribute__((aligned(4)));   /* 4-aligned: wob_list scans it a word at a time */
   uint8_t anch[MX_ROWS * MX_COLS];
   real    hp  [MX_ROWS * MX_COLS];
   MxChunk chunks[MX_MAX_CHUNKS];
@@ -233,6 +233,7 @@ typedef struct {
   uint16_t queue[8192];
   uint16_t stack[MX_ROWS * MX_COLS];
   int16_t bhead[(MX_COLS + 4) * (MX_ROWS + 4)];
+  int bh_lo, bh_hi;             /* rows of bhead that hold entries (the rest are already -1), so a step clears only those */
   int16_t bnext[MX_MAX_CHUNKS * MX_CHUNK_CELLS];
   int16_t expl[64][2];
   int nexpl;
