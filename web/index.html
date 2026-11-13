@@ -3065,9 +3065,22 @@ function cutOnce(f){if(!cutFx){cutFx=1;f()}}
 function cutTie(){const OU='#5a2f1b';ctx.fillStyle='#fff';for(const s of[-1,1]){ctx.beginPath();ctx.moveTo(s*2,-32);ctx.lineTo(s*11,-28);ctx.lineTo(s*3,-22);ctx.closePath();ctx.fill();ctx.strokeStyle=OU;ctx.lineWidth=1;ctx.stroke()}
   ctx.fillStyle='#2a4d9c';ctx.strokeStyle=OU;ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(-3.4,-30);ctx.lineTo(3.4,-30);ctx.lineTo(2.6,-26);ctx.lineTo(7,8);ctx.lineTo(0,17);ctx.lineTo(-7,8);ctx.lineTo(-2.6,-26);ctx.closePath();ctx.fill();ctx.stroke();
   ctx.strokeStyle='#8fb0ff';ctx.lineWidth=1.4;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(-3.6+k*.3,-18+k*7);ctx.lineTo(3.6-k*.3,-14+k*7);ctx.stroke()}}
+// Gerald's office shirt: short sleeves over the shoulders, a body that strains over the dad-bod, collar, buttons (drawn after the head so it covers the torso)
+function cutShirt(){const OU='#5a2f1b';ctx.save();ctx.lineJoin='round';
+  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*16,-28);ctx.lineTo(q*30,-24);ctx.lineTo(q*33,-9);ctx.lineTo(q*21,-6);ctx.closePath();ctx.fillStyle='#e9f1fb';ctx.fill();ctx.strokeStyle=OU;ctx.lineWidth=1.3;ctx.stroke()}
+  ctx.beginPath();ctx.moveTo(-16,-28);ctx.quadraticCurveTo(0,-24,16,-28);ctx.bezierCurveTo(24,-12,29,4,26,14);ctx.quadraticCurveTo(24,24,12,25);ctx.quadraticCurveTo(0,28,-12,25);ctx.quadraticCurveTo(-24,24,-26,14);ctx.bezierCurveTo(-29,4,-24,-12,-16,-28);ctx.closePath();
+  ctx.fillStyle='#f4f8ff';ctx.fill();ctx.strokeStyle=OU;ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='#cfdcef';ctx.beginPath();ctx.moveTo(-5,-27);ctx.lineTo(0,-19);ctx.lineTo(5,-27);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.strokeStyle='#b8c8e0';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,-19);ctx.lineTo(0,25);ctx.stroke();
+  ctx.fillStyle='#9fb0cc';for(const y of[-10,0,10,19]){ctx.beginPath();ctx.arc(0,y,1.1,0,6.3);ctx.fill()}
+  ctx.strokeStyle='rgba(120,140,170,.55)';ctx.lineWidth=1;for(const y of[4,12]){ctx.beginPath();ctx.moveTo(-3,y);ctx.lineTo(-9,y+3);ctx.moveTo(3,y);ctx.lineTo(9,y+3);ctx.stroke()}   // fabric strain at the buttons
+  ctx.restore()}
+function cutShirtBack(){const OU='#5a2f1b';ctx.save();ctx.lineJoin='round';
+  ctx.beginPath();ctx.moveTo(-18,-25);ctx.quadraticCurveTo(0,-22,18,-25);ctx.bezierCurveTo(26,-12,29,4,26,14);ctx.quadraticCurveTo(24,22,12,23);ctx.quadraticCurveTo(0,26,-12,23);ctx.quadraticCurveTo(-24,22,-26,14);ctx.bezierCurveTo(-29,4,-26,-12,-18,-25);ctx.closePath();
+  ctx.fillStyle='#f4f8ff';ctx.fill();ctx.strokeStyle=OU;ctx.lineWidth=1.5;ctx.stroke();ctx.strokeStyle='#c6d4e8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-14,-18);ctx.quadraticCurveTo(0,-12,14,-18);ctx.stroke();ctx.restore()}
 // Gerald: the same body, no cape, khaki shorts (or boxers), optional tie.  feetY = where his feet land
 function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;THONG=!!o.wolf;WOLF=!!o.wolf;if(o.wolf){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
-  const op={nocape:true};if(o.belly)op.belly=o.belly;if(o.head)op.head=o.head;if(o.armL){op.armL=o.armL;op.armR=o.armR}if(o.tie)op.after=cutTie;
+  const op={nocape:true};if(o.belly)op.belly=o.belly;if(o.head)op.head=o.head;if(o.armL){op.armL=o.armL;op.armR=o.armR}const sh=!o.wolf&&!o.noshirt,ti=o.tie;if(sh||ti)op.after=()=>{if(sh)cutShirt();if(ti)cutTie()};
   ctx.save();ctx.translate(x+(o.dx||0),feetY-48*s+(o.dy||0));ctx.scale(s,s);drawFront(o.pose||'up',o.face||'cool',cutT*.8+.3,op);ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
 function cutFlag(k,f){const b=1<<k;if(!(cutFx&b)){cutFx|=b;f()}}
 function cutWork(f){applyOutfit(outfitById('workman'),time);try{f()}finally{applyOutfit(outfitCur,time)}}
@@ -3220,7 +3233,7 @@ function cutCam(i,t){const S=CUTS[i],c=S.cuts,k=cgK(c,t),dt=t-c[k],sk=((S.shake|
   return{z:1.04+Math.abs(r)*2.4,x:480,y:270,r:r,sx:Math.sin(t*93)*sk,sy:Math.cos(t*71)*sk,fl:k>0?Math.max(0,.45*(1-dt/.12)):0}}
 // Gerald seen from behind (over-the-shoulder shots)
 function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;THONG=!!o.wolf;WOLF=!!o.wolf;if(o.wolf){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
-  ctx.save();ctx.translate(x,feetY-48*s);ctx.scale(s,s);drawBack(null,cutT*.8+.3,{noflag:true});ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
+  ctx.save();ctx.translate(x,feetY-48*s);ctx.scale(s,s);drawBack(null,cutT*.8+.3,{noflag:true});if(!o.wolf&&!o.noshirt){ctx.save();ctx.translate(0,3);ctx.beginPath();ctx.rect(-40,-25,80,60);ctx.clip();cutShirtBack();ctx.restore()}ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
 function cgBill(t,x,y,sz){txt('$'+Math.floor(t*t*600).toLocaleString(),x,y,sz,'#7dff5a','center','#0a3a0a');txt('BILLED SO FAR',x,y+sz*.45,Math.max(12,sz*.26),'#cfd','center')}
 function cgBokeh(t,cols,n){ctx.save();for(let i=0;i<n;i++){const x=(cgRnd(i)*W+t*6*(i%3+1))%W,y=cgRnd(i+20)*H*.75,r=16+cgRnd(i+40)*36;ctx.globalAlpha=.1+.14*cgRnd(i+60);cgE(x,y,r,r,cols[i%cols.length])}ctx.restore()}
 function cgWood(c1,c2){ctx.fillStyle=cgLG(0,0,W,H,[0,c1,1,c2]);ctx.fillRect(0,0,W,H);for(let i=0;i<46;i++)cgLine(0,i*12+cgRnd(i)*8,W,i*12+cgRnd(i+5)*14,'rgba(0,0,0,.16)',1.4);for(let i=0;i<30;i++)cgLine(0,i*19+4,W,i*19+cgRnd(i+9)*7,'rgba(255,220,170,.05)',1.2)}
@@ -3371,7 +3384,9 @@ const CUT3=[
  {lines:["Gerald sneezes. The moon peeks through the window.","His ears grow. His nose grows. His mustache stays exactly the same.","Hair. Everywhere. Fangs. A thing happens to his tail area."],hl:1,cuts:[0,1.6,3.4],tr:'white',shake:[0,5,9],hold:3.4,draw(t){
    cgSky('#0a0d24','#2a3060',395);cgMoon(480,170,120,t);ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);
    const w=t>1.6;cutGerald(480,392,w?2.5:2.2,{face:w?'cool':'sad',wolf:t>3.4||(w&&((t*10|0)&1)),pose:'up',dy:Math.sin(t*40)*(w?4:1)});
-   if(t<1.6)cutBubble(700,110,"Ah... ah... AH-",0);else if(t<3.4)cutBubble(700,110,"AAAH-WOOOP!",0);else cutBubble(730,110,"I have a tail.",0)}},
+   if(t>1.6){cutFlag(2,()=>{SFX.whoosh();SFX.thud(.8)});if(t<2.4){ctx.fillStyle='rgba(255,255,230,'+(.6*(1-(t-1.6)/.8))+')';ctx.fillRect(0,0,W,H)}
+     for(let i=0;i<9;i++){const u=t-1.6,a=i*.7,x=480+Math.cos(a)*(40+u*220)*(i%2?1:-1),y=300+Math.sin(a*2)*30-u*60+u*u*190;ctx.save();ctx.translate(x,y);ctx.rotate(u*(4+i)*(i%2?1:-1));ctx.fillStyle=i%3?'#f4f8ff':'#2a4d9c';ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-12,-6);ctx.lineTo(10,-9);ctx.lineTo(13,5);ctx.lineTo(-6,10);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}}
+   if(t<1.6)cutBubble(700,110,"Ah... ah... AH-",0);else if(t<3.4)cutBubble(700,110,"AAAH-WOOOP!  (RIIIP)",0);else cutBubble(730,110,"I have a tail.",0)}},
  {lines:["The shorts did not survive.","The tail did not ask.","Gerald checked. Very round. Very furry."],hl:1,cuts:[0,1.5,3],tr:'iris',shake:[0,0,6],hold:3.6,draw(t){
    cgWood('#4a3a5a','#241a30');cgMoon(140,110,60,t);
    const k=cgK(this.cuts,t);if(k===0){cutGerald(480,392,2.5,{wolf:true,face:'sad',pose:'up'});cutBubble(760,150,"My pants!",0)}
