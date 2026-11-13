@@ -102,6 +102,8 @@ static void on_events(void){
     case EV_SLAM: for(int k = 0; k < 10; k++) spawn(x + (rand() % 9 - 4), y, (rand() % 21 - 10) * .35f, -(rand() % 5) * .2f, 24, RGB(220, 220, 230)); popup(x, y - 5, "BELLY SLAM!", RGB(255, 138, 58)); break;
     case EV_PAD: for(int k = 0; k < 8; k++) spawn_k(x, y, (rand() % 11 - 5) * .2f, -(rand() % 9) * .3f, 24, RGB(255, 126, 176), 2); popup(x, y - 5, "BOING!", RGB(255, 126, 176)); break;
     case EV_HURT: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, "OUCH!", RGB(255, 107, 107)); if(!e->m){ dragging = 0; pad_used = 0; } break;
+    case EV_OOF: for(int k = 0; k < 6; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, e->m ? "CRACK!" : "OOF!", RGB(255, 210, 63)); break;
+    case EV_HEAL: popup(x, y - 6, "+HP", RGB(255, 255, 255)); break;
     case EV_BONK: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, "BONK!", RGB(255, 210, 63)); break;
     default: break;
     }
@@ -222,7 +224,7 @@ static void draw_landlords(const View *v){
     real ox, oy; mx_target_offset(&world, t, &ox, &oy);
     int p = v->ppc, fc = t->face < 0 ? -1 : 1, stun = t->stun > 0, wind = t->wind > 0, swing = t->swing > 0;
     int x = VX(v, RTOF(t->x + ox)), y = VY(v, RTOF(t->y + oy)) - (t->mv && ((frame >> 2) & 1) ? 1 : 0);
-    rect(v->s, x - p, y - p / 2, p * 2, p * 2, t->kind == LK_BAT ? RGB(47, 93, 58) : t->kind == LK_THROWER ? RGB(58, 74, 122) : RGB(60, 70, 90));   /* suit */
+    rect(v->s, x - p, y - p / 2, p * 2, p * 2, t->kind == LK_BAT ? RGB(47, 93, 58) : t->kind == LK_THROWER ? RGB(58, 74, 122) : t->kind == LK_BOSS ? RGB(28, 28, 36) : t->kind == LK_SPRINTER ? RGB(122, 90, 28) : t->kind == LK_HEALER ? RGB(244, 244, 244) : t->kind == LK_SHIELD ? RGB(51, 65, 63) : RGB(60, 70, 90));   /* suit */
     rect(v->s, x - p / 3, y - p / 2, p * 2 / 3 + 1, p, RGB(255, 255, 255)); rect(v->s, x - 1 + 0, y - p / 2, 1, p + 1, RGB(209, 43, 43));   /* shirt + tie */
     disc(v->s, x, y - p, p, stun ? RGB(232, 176, 144) : RGB(240, 200, 160));                                                                  /* head */
     if(stun){ for(int k = -1; k <= 1; k += 2){ int ex = x + k * p / 2, ey = y - p; line(v->s, ex - 1, ey - 1, ex + 1, ey + 1, RGB(20, 20, 20)); line(v->s, ex + 1, ey - 1, ex - 1, ey + 1, RGB(20, 20, 20)); }
@@ -230,15 +232,18 @@ static void draw_landlords(const View *v){
     else { px(v->s, x - p / 2, y - p, RGB(20, 20, 20)); px(v->s, x + p / 2, y - p, RGB(20, 20, 20)); }
     rect(v->s, x - p, y - p * 2, p * 2, p / 2 + 1, RGB(20, 20, 20));       /* hat brim */
     rect(v->s, x - p / 2, y - p * 3, p, p + 1, RGB(20, 20, 20));           /* hat */
-    if(t->kind == LK_BAT || t->kind == LK_THROWER) rect(v->s, x - p / 2, y - p * 2 - p / 3 - 1, p, p / 3 + 2, t->kind == LK_BAT ? RGB(42, 138, 42) : RGB(58, 106, 209));   /* hat band */
+    if(t->kind >= LK_BAT) rect(v->s, x - p / 2, y - p * 2 - p / 3 - 1, p, p / 3 + 2, t->kind == LK_BAT ? RGB(42, 138, 42) : t->kind == LK_THROWER ? RGB(58, 106, 209) : (t->kind == LK_BOSS || t->kind == LK_SPRINTER) ? RGB(255, 210, 63) : t->kind == LK_HEALER ? RGB(47, 191, 74) : RGB(138, 143, 153));   /* hat band */
+    if(t->kind == LK_HEALER){ rect(v->s, x - 1, y - p / 2, 2, p + 1, RGB(47, 191, 74)); rect(v->s, x - p / 2, y, p, 2, RGB(47, 191, 74)); }   /* green cross */
+    if(t->armor){ int sx = x + fc * p * 2; rect(v->s, sx - 2, y - p, 5, p * 2 + 2, RGB(20, 20, 20)); rect(v->s, sx - 1, y - p + 1, 3, p * 2, RGB(154, 164, 178)); }   /* riot shield */
+    if(t->hpmax > 1){ int bw = t->hpmax * 5; rect(v->s, x - bw / 2 - 1, y - p * 4 - 3, bw + 2, 5, RGB(0, 0, 0)); for(int k = 0; k < t->hpmax; k++) rect(v->s, x - bw / 2 + k * 5, y - p * 4 - 2, 4, 3, k < t->hp ? RGB(232, 64, 64) : RGB(85, 85, 34)); }   /* health bar */
     if(t->kind == LK_BAT){                                                  /* the club: up, or swung out flat */
       int hx = x + fc * p, hy = y, ex = swing ? x + fc * p * 4 : x + fc * p * 3, ey = swing ? y + p / 2 : y - p * 3;
       line(v->s, hx, hy, ex, ey, RGB(90, 52, 20)); line(v->s, hx, hy + 1, ex, ey + 1, RGB(185, 122, 60)); line(v->s, hx + 1, hy, ex + 1, ey, RGB(185, 122, 60));
-    } else if(t->kind == LK_THROWER){                                       /* briefcase: raised over the head to throw */
+    } else if(t->kind == LK_THROWER || t->kind == LK_BOSS){                 /* briefcase: raised over the head to throw */
       int bx = wind ? x + fc * p : swing ? x + fc * p * 3 : x + fc * p * 2, by = wind ? y - p * 4 : swing ? y : y + p / 2;
       rect(v->s, bx - p, by - p / 2, p * 2, p + 1, RGB(58, 34, 12)); rect(v->s, bx - p + 1, by - p / 2 + 1, p * 2 - 2, p - 1, RGB(122, 74, 34)); px(v->s, bx, by, RGB(255, 210, 63));
       if(wind) textc(v->s, x, y - p * 6, "!", 2, RGB(255, 210, 63));
-    } else if(t->kind == LK_WALKER){                                        /* walker: papers in his hand */
+    } else if(t->kind == LK_WALKER || t->kind == LK_SHIELD || t->kind == LK_SPRINTER){   /* papers in his hand */
       int bx = swing ? x + fc * p * 3 : x + fc * p * 2; rect(v->s, bx - p / 2, y, p, p + 1, RGB(255, 255, 255)); rect(v->s, bx - p / 2, y + 1, p, 1, RGB(42, 138, 42));
     }
   }

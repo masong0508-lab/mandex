@@ -189,8 +189,18 @@ static void apply_impulse(MxChunk *ch, real px, real py, real jx, real jy){
   ch->sleep = 0;
 }
 
-static void kill_target(MxWorld *w, MxTarget *t){
+/* soft hit: a landlord with more than one hit point loses one (0.7 s of immunity, stunned, shield gone); hard (blast, crush, big fall) always kills */
+#define kill_target(w, t) kill_target_ex(w, t, 0)
+#define kill_hard(w, t) kill_target_ex(w, t, 1)
+static void kill_target_ex(MxWorld *w, MxTarget *t, int hard){
   if(!t->alive) return;
+  if(!hard && t->hp > 1){
+    if(t->inv > 0) return;
+    t->hp--; t->inv = R(0.7); t->stun = R(0.6); t->armor = 0;
+    if(w->shake < RI(6)) w->shake = RI(6);
+    ev(w, EV_OOF, t->x, t->y, 0, RI(t->hp), 0);
+    return;
+  }
   t->alive = 0; w->score += 5000; w->slow = R(0.25);
   if(w->man.mode == MAN_WALK){ w->man.wt += RI(3); if(w->man.wt > RI(MX_WALK_T + 15)) w->man.wt = RI(MX_WALK_T + 15); }   /* on foot, every landlord is worth +3 s */
   ev(w, EV_TARGET, t->x, t->y, 0, 0, 0);
@@ -212,7 +222,7 @@ static void shockwave(MxWorld *w, real px, real py, real rad, real power){
     MxTarget *t = &w->targets[i];
     if(!t->alive) continue;
     real dx = t->x - px, dy = t->y - py;
-    if(rmul(dx, dx) + rmul(dy, dy) < rmul(rmul(rad, R(1.05)), rmul(rad, R(1.05)))) kill_target(w, t);
+    if(rmul(dx, dx) + rmul(dy, dy) < rmul(rmul(rad, R(1.05)), rmul(rad, R(1.05)))) kill_hard(w, t);
   }
 }
 
@@ -883,7 +893,6 @@ void mx_set_collapse(MxWorld *w, int on){
 
 /* ============================================================ the man */
 static real damage_cell(MxWorld *w, int x, int y, real d);
-static void kill_target(MxWorld *w, MxTarget *t);
 static void enter_walk(MxWorld *w);
 static int bat_block(MxWorld *w, MxTarget *t);
 static void stick(MxWorld *w){
@@ -1165,16 +1174,56 @@ static int hurt_man(MxWorld *w, int dir){
 
 /* a lob from the landlord's hands to (tx,ty) that clears the walls; 0 if none of four flight times works */
 static int throw_sol(MxWorld *w, const MxTarget *t, real tx, real ty, real *ovx, real *ovy){
-  static const real TT[4] = {R(0.85), R(1.05), R(1.3), R(1.6)};
+  static const real TT[7] = {R(0.6), R(0.75), R(0.85), R(1.05), R(1.3), R(1.6), R(1.9)};
   int dx = tx > t->x ? 1 : tx < t->x ? -1 : t->face;
   real sx = t->x + (dx > 0 ? R(1.125) : -R(1.125)), sy = t->y - R(1.125), hg = rmul(R(0.5), GRAV);
-  for(int k = 0; k < 4; k++){
+  for(int k = 0; k < 7; k++){
     real T = TT[k], vx = rdiv(tx - sx, T), vy = rdiv(ty - sy - rmul(hg, rmul(T, T)), T);
     if(rmul(vx, vx) + rmul(vy, vy) > RI(15006)) continue;                      /* faster than 122.5 cells/s: he cannot throw that hard */
     int ok = 1;
     for(real u = R(0.07); u < T - R(0.04); u += R(0.03))
       if(solid_at(w, sx + rmul(vx, u), sy + rmul(vy, u) + rmul(hg, rmul(u, u)))){ ok = 0; break; }
     if(ok){ *ovx = vx; *ovy = vy; return 1; }
+  }
+  return 0;
+}
+
+#define IS_WALK(k)   ((k) == LK_WALKER || (k) == LK_SHIELD || (k) == LK_SPRINTER)
+#define IS_MOBILE(k) (IS_WALK(k) || (k) == LK_HEALER)
+#define IS_THROW(k)  ((k) == LK_THROWER || (k) == LK_BOSS)
+
+/* one step along the ground: climbs a one-cell stair, refuses a drop bigger than one cell, returns 1 if he moved (same numbers as the web game, px / 8) */
+static int lord_step(MxWorld *w, MxTarget *t, int dir, real sp, real dt){
+  real ax = t->x + (dir > 0 ? R(1.125) : -R(1.125));
+  if(!solid_at(w, t->x, t->y + R(1.0))) return 0;
+  int hit = solid_at(w, ax, t->y) || solid_at(w, ax, t->y - R(0.625));
+  if(hit && !solid_at(w, ax, t->y - RI(1)) && !solid_at(w, ax, t->y - R(1.75)) && !solid_at(w, t->x, t->y - RI(2))){
+    t->y -= RI(1); t->x += dir > 0 ? R(0.375) : -R(0.375); return 1;                   /* stairs */
+  }
+  if(hit) return 0;
+  if(!solid_at(w, ax, t->y + R(1.25)) && !solid_at(w, ax, t->y + R(2.25))) return 0;   /* a drop bigger than one step: stay put */
+  t->x += rmul(dir > 0 ? sp : -sp, dt); t->wk += rmul(dt, sp);
+  return 1;
+}
+/* is something heavy falling or flying at him?  returns the direction to run (-1/1) or 0 */
+static int lord_danger(MxWorld *w, const MxTarget *t){
+  for(int c = 0; c < MX_MAX_CHUNKS; c++){
+    const MxChunk *ch = &w->chunks[c];
+    if(!ch->active) continue;
+    real dx = t->x - ch->x, dy = t->y - ch->y;
+    if(rmul(ch->vx, ch->vx) + rmul(ch->vy, ch->vy) < R(31.6)) continue;            /* slower than 5.6 cells/s */
+    if(rabs(dx) > ch->rad + R(5.75) || dy < -ch->rad - R(2.25)) continue;
+    if(dy > ch->rad + RI(15) && ch->vy <= 0) continue;
+    if(ch->vy < -R(2.5) && dy > 0) continue;
+    { real lim = ch->rad + R(8.75); if(rmul(dx, dx) + rmul(dy, dy) < rmul(lim, lim)) return sgn(dx) ? sgn(dx) : (t->face ? t->face : 1); }
+  }
+  return 0;
+}
+/* the nearest spot (within 14 cells) with a roof over it, bare floor and ground: 1 and the x, else 0 */
+static int lord_cover(MxWorld *w, const MxTarget *t, real *ox){
+  for(int d = 1; d <= 14; d++) for(int sg = -1; sg <= 1; sg += 2){
+    real x = t->x + RI(sg * d);
+    if(solid_at(w, x, t->y - R(4.25)) && !solid_at(w, x, t->y - R(0.75)) && solid_at(w, x, t->y + R(1.25))){ *ox = x; return 1; }
   }
   return 0;
 }
@@ -1190,14 +1239,44 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
   if(t->pan > 0) t->pan -= dt;
   if(m->mode == MAN_FLY && tm < R(26.25)) t->pan = R(0.7);          /* everybody flinches when a man comes screaming close (cosmetic) */
   int moving = 0;
+  /* chapter 3: the mobile kinds look after themselves, fight switch or not: dodge debris, run for cover from a flying man, heal */
+  if(IS_MOBILE(t->kind) && t->stun <= 0 && t->wind <= 0){
+    if(t->dodge > 0) t->dodge -= dt;
+    int dg = lord_danger(w, t);
+    if(dg){ t->dodge = R(0.5); t->dd = (int8_t)dg; t->pan = R(0.5); }
+    if(t->dodge > 0){ if(lord_step(w, t, t->dd, R(13.75), dt)){ moving = 2; t->face = t->dd; } }
+    else if(m->mode == MAN_FLY && tm < R(32.5)){
+      t->ck -= dt;
+      if(t->ck <= 0){ real cx; t->ck = R(0.4); t->cover = lord_cover(w, t, &cx) ? cx : -RI(1); }
+      { real tx = t->cover >= 0 ? t->cover : t->x + (sgn(t->x - m->x) ? RI(sgn(t->x - m->x)) : RI(1)) * R(7.5);
+        int d = sgn(tx - t->x);
+        if(d && rabs(tx - t->x) > R(0.375) && lord_step(w, t, d, R(11.875), dt)){ moving = 2; t->face = (int8_t)d; } }
+    } else t->cover = -RI(1);
+    if(moving){ t->mv = (uint8_t)moving; return; }
+  }
+  if(t->kind == LK_HEALER){
+    t->heal -= dt;
+    if(t->heal <= 0){
+      t->heal = R(3.5);
+      for(int i = 0; i < w->ntargets; i++){
+        MxTarget *o = &w->targets[i];
+        if(!o->alive || o == t || o->hp >= o->hpmax) continue;
+        real hx = o->x - t->x, hy = o->y - t->y;
+        if(rmul(hx, hx) + rmul(hy, hy) < R(189)){ o->hp++; t->swing = R(0.4); ev(w, EV_HEAL, o->x, o->y, 0, 0, 0); break; }   /* within 13.75 cells */
+      }
+    }
+    t->mv = 0; if(sgn(mx_ - t->x)) t->face = (int8_t)sgn(mx_ - t->x);
+    return;
+  }
   if(fight){
-    if(t->kind == LK_THROWER){ if(m->mode == MAN_AIM && !(m->stun > 0)) t->cd -= dt; } else t->cd -= dt;
+    if(IS_THROW(t->kind)){ if(m->mode == MAN_AIM && !(m->stun > 0)) t->cd -= dt; } else t->cd -= dt;
     if(t->wind > 0){
       t->wind -= dt;
       if(t->wind <= 0){
-        if(t->kind == LK_THROWER){
-          real vx, vy;
+        if(IS_THROW(t->kind)){
+          real vx, vy; int sl = 0;
           if(m->mode == MAN_AIM && throw_sol(w, t, m->x, m->y, &vx, &vy)){
+            sl = 1;
             for(int k = 0; k < MX_MAX_CASES; k++) if(!w->cases[k].active){
               MxCase *c = &w->cases[k];
               c->active = 1; c->x = t->x + (t->face > 0 ? R(1.125) : -R(1.125)); c->y = t->y - R(1.125); c->vx = vx; c->vy = vy; c->rot = 0; c->l = RI(4);
@@ -1206,38 +1285,36 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
             }
             t->swing = R(0.3);
           }
-          t->cd = R(4.2) + rmul(rrand(w), R(1.6));
-        } else if(t->kind == LK_WALKER){
+          if(t->kind == LK_BOSS && sl && !t->b2){ t->b2 = 1; t->wind = R(0.4); }   /* the boss throws two in a row */
+          else { t->b2 = 0; t->cd = (t->kind == LK_BOSS ? RI(3) : R(4.2)) + rmul(rrand(w), R(1.6)); }
+        } else if(IS_WALK(t->kind)){
           t->swing = R(0.3);
           ev(w, EV_SWING, t->x, t->y, 0, 0, 0);
           if(m->mode == MAN_WALK && rabs(ddx) < R(5.75) && rabs(ddy) < R(5.75)) hurt_man(w, sgn(m->x - t->x) ? sgn(m->x - t->x) : 1);
         }
       }
-    } else if(t->kind == LK_THROWER && m->mode == MAN_AIM && !(m->stun > 0) && t->cd <= 0){
+    } else if(IS_THROW(t->kind) && m->mode == MAN_AIM && !(m->stun > 0) && t->cd <= 0){
       real vx, vy;
       if(throw_sol(w, t, m->x, m->y, &vx, &vy)){ t->wind = R(0.6); if(sgn(m->x - t->x)) t->face = (int8_t)sgn(m->x - t->x); }
       else t->cd = R(0.7);
     }
-    if(t->kind == LK_WALKER && t->wind <= 0 && t->stun <= 0){
-      int dir = 0; real sp = R(3.25);
+    if(IS_WALK(t->kind) && t->wind <= 0 && t->stun <= 0){
+      int dir = 0; real sp = t->kind == LK_SPRINTER ? R(7.5) : t->kind == LK_SHIELD ? R(2.5) : R(3.25);
       int flying = m->mode == MAN_FLY && tm < RI(35);
       int foot = m->mode == MAN_WALK && rabs(ddx) < RI(42) + R(0.5) && rabs(ddy) < R(6.25);
       if(!foot) t->eng = 0;
       if(foot){
         if(!t->eng){ t->eng = 1; if(t->cd > R(0.6)) t->cd = R(0.6); }
-        dir = sgn(ddx); sp = RI(9);
+        dir = sgn(ddx); sp = t->kind == LK_SPRINTER ? R(17.5) : t->kind == LK_SHIELD ? R(6.875) : RI(9);
         if(rabs(ddx) < R(4.75)){ dir = 0; if(t->cd <= 0){ t->wind = R(0.36); t->cd = R(1.2); } }       /* stops just out of bump range and winds up */
-      } else if(flying){ dir = sgn(t->x - m->x); if(!dir) dir = 1; sp = R(11.25); }
+      } else if(flying){ dir = sgn(t->x - m->x); if(!dir) dir = 1; sp = t->kind == LK_SHIELD ? R(7.5) : R(11.25); }
       else {
         if(!t->pdir) t->pdir = t->face;
         dir = t->pdir;
         if(rabs(t->x - t->hx) > t->range && sgn(t->x - t->hx) == dir){ t->pdir = (int8_t)(-dir); dir = -dir; }
       }
       if(dir){
-        real ax = t->x + (dir > 0 ? R(1.125) : -R(1.125));
-        int gr = solid_at(w, t->x, t->y + R(1.0));
-        int blocked = solid_at(w, ax, t->y) || solid_at(w, ax, t->y - R(0.625)) || !solid_at(w, ax, t->y + R(1.25));
-        if(gr && !blocked){ t->x += rmul(dir > 0 ? sp : -sp, dt); t->wk += rmul(dt, sp); moving = sp > R(6.25) ? 2 : 1; }
+        if(lord_step(w, t, dir, sp, dt)) moving = sp > R(6.25) ? 2 : 1;
         else if(!flying && !foot){ t->pdir = (int8_t)(-dir); dir = -dir; }
         t->face = (int8_t)dir;
       }
@@ -1252,9 +1329,10 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
 /* a bat landlord swats a man arriving slower than MX_BAT_BREAK: he rebounds, the bat is dazed for 1.1 s.  Returns 1 if the swat happened (no eviction). */
 static int bat_block(MxWorld *w, MxTarget *t){
   MxMan *m = &w->man;
-  if(t->kind != LK_BAT || w->nofight || w->state != MX_PLAY || t->stun > 0) return 0;
+  int sh = t->armor > 0 && sgn(m->x - t->x) == t->face;     /* a riot shield works like a bat: from the front only */
+  if((t->kind != LK_BAT && !sh) || w->nofight || w->state != MX_PLAY || t->stun > 0) return 0;
   real sp = rsqrt(rmul(m->vx, m->vx) + rmul(m->vy, m->vy));
-  if(sp >= MX_BAT_BREAK) return 0;
+  if(sp >= MX_BAT_BREAK){ if(sh){ t->armor = 0; ev(w, EV_OOF, t->x, t->y, 1, RI(t->hp), 0); } return 0; }
   real nx = m->x - t->x, ny = m->y - t->y - RI(1), d = rsqrt(rmul(nx, nx) + rmul(ny, ny));
   if(d <= 0) d = RI(1);
   nx = rdiv(nx, d); ny = rdiv(ny, d);
@@ -1263,7 +1341,7 @@ static int bat_block(MxWorld *w, MxTarget *t){
   m->x = t->x + rmul(nx, MAN_R + R(1.5)); m->y = t->y + rmul(ny, MAN_R + R(1.5));
   t->stun = R(1.1); t->swing = R(0.35); if(sgn(m->x - t->x)) t->face = (int8_t)sgn(m->x - t->x);
   if(w->shake < RI(7)) w->shake = RI(7);
-  ev(w, EV_BONK, t->x, t->y, 0, 0, 0);
+  ev(w, EV_BONK, t->x, t->y, sh, 0, 0);
   return 1;
 }
 
@@ -1434,13 +1512,21 @@ static void upd_targets(MxWorld *w, real dt){
   for(int i = 0; i < w->ntargets; i++){
     MxTarget *t = &w->targets[i];
     if(!t->alive) continue;
-    t->t += dt;
+    t->t += dt; if(t->inv > 0) t->inv -= dt;
     lord_ai(w, t, dt);
     real r = R(0.875);
     int gr = solid_at(w, t->x, t->y + r + R(0.125)) || solid_at(w, t->x - R(0.5), t->y + r + R(0.125)) || solid_at(w, t->x + R(0.5), t->y + r + R(0.125));
-    if(gr){ if(t->vy > R(41)){ kill_target(w, t); continue; } t->vy = 0; }
+    if(gr){
+      if(t->vy > R(53.75)){ kill_hard(w, t); continue; }                           /* a very hard landing kills */
+      if(t->vy > R(37.5) && t->inv <= 0){ t->stun = R(0.8); t->inv = R(0.8); ev(w, EV_OOF, t->x, t->y, 0, RI(t->hp), 0); }   /* a hard one only stuns */
+      t->vy = 0; }
     else { t->vy += rmul(GRAV, dt); t->y += rmul(t->vy, dt); }
-    if(solid_at(w, t->x, t->y)){ kill_target(w, t); continue; }
+    if(solid_at(w, t->x, t->y)){      /* buried by settling rubble: dig out if there is air within 3 cells above (a light collapse), else crushed */
+      real up = 0;
+      for(real d = R(0.25); d <= RI(3); d += R(0.25)) if(!solid_at(w, t->x, t->y - d) && !solid_at(w, t->x, t->y - d - r)){ up = d; break; }
+      if(up){ t->y -= up; t->vy = 0; t->stun = RI(1); t->inv = RI(1); }
+      else { kill_hard(w, t); continue; }
+    }
     for(int c = 0; c < MX_MAX_CHUNKS && t->alive; c++){
       MxChunk *ch = &w->chunks[c];
       if(!ch->active) continue;
@@ -1451,7 +1537,9 @@ static void upd_targets(MxWorld *w, real dt){
         real ddx = a->wx - t->x, ddy = a->wy - t->y, lim = r + RC;
         if(rmul(ddx, ddx) + rmul(ddy, ddy) >= rmul(lim, lim)) continue;
         real vx = ch->vx - rmul(ch->w, a->wy - ch->y), vy = ch->vy + rmul(ch->w, a->wx - ch->x);
-        if(rmul(vx, vx) + rmul(vy, vy) > R(76.6)){ kill_target(w, t); break; }
+        real sp2 = rmul(vx, vx) + rmul(vy, vy);
+        if(sp2 > R(351.6)){ kill_target(w, t); break; }                              /* fast rubble (> 18.75 cells/s) kills; a slower graze only stuns */
+        if(sp2 > R(76.6) && t->inv <= 0){ t->inv = R(0.8); t->stun = R(0.9); ev(w, EV_OOF, t->x, t->y, 0, RI(t->hp), 0); }
       }
     }
   }
@@ -1515,12 +1603,14 @@ static void hourglass(MxWorld *w, int c, int rn, int top, int bot, int sand_top)
   }
 }
 static void tnt(MxWorld *w, int x, int y){ rect_fill(w, x, y - 2, 2, 2, MX_TNT); }
-static void tgtk(MxWorld *w, int cx, int row, int kind){
+static void tgtr(MxWorld *w, int cx, int row, int kind, int range){
   if(w->ntargets >= MX_MAX_TARGETS) return;
   MxTarget *t = &w->targets[w->ntargets++];
   t->x = RI(cx) + R(0.5); t->y = RI(row) - R(0.875); t->vy = 0; t->t = 0; t->alive = 1;
-  t->kind = (uint8_t)kind; t->hx = t->x; t->range = RI(7); t->face = rrand(w) < R(0.5) ? -1 : 1; t->cd = RI(2) + rrand(w) * 2;
+  t->hp = t->hpmax = kind == LK_SHIELD ? 2 : kind == LK_BOSS ? 3 : 1; t->armor = kind == LK_SHIELD; t->cover = -RI(1); t->heal = RI(3);
+  t->kind = (uint8_t)kind; t->hx = t->x; t->range = RI(range); t->face = rrand(w) < R(0.5) ? -1 : 1; t->cd = RI(2) + rrand(w) * 2;
 }
+static void tgtk(MxWorld *w, int cx, int row, int kind){ tgtr(w, cx, row, kind, 7); }
 static void tgt(MxWorld *w, int cx, int row){ tgtk(w, cx, row, LK_NONE); }
 static void room(MxWorld *w, int x, int y, int ww, int hh, int pal){
   if(w->nrooms >= MX_MAX_ROOMS) return;
@@ -1539,11 +1629,45 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   "Skyscraper Special", "Bridge Troll", "Fort Knoxed", "Jenga Joe", "Moat Madness", "Glass Cannon", "Mandex Manor",
   "Special Delivery", "Hourglass Heights", "Walk-Up Wreckage", "Over the Top", "Needle Threader", "Collection Day", "Batter Up",
   "Leaning Loft", "Powder Keg Plaza", "Rubber Room", "Stairway to Eviction", "Sand Trap", "The Vault", "Triple Decker",
-  "Glass Menagerie", "Penthouse Panic", "Mail Room Mayhem", "Rent Strike", "Sand Standoff", "Landlord HQ"};
-static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  12};
+  "Glass Menagerie", "Penthouse Panic", "Mail Room Mayhem", "Rent Strike", "Sand Standoff", "Landlord HQ",
+  /* chapter 3: the Wolfman */
+  "Full Moon Rising", "Howling Heights", "Flea Market", "Fang Street", "Bad Moon Brick", "Wolf Pack Lofts", "Moonlit Mortgage", "Claw Foreclosure", "Growl Gardens", "Night Shift",
+  "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord"};
+static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  12,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
 const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
 
+
+/* ---- chapter 3 (the Wolfman): 20 levels built from two or three houses each, exactly as the web game's generator does (same formulas, same order) ---- */
+static void build_ch3(MxWorld *w, int i){
+  static const int MAT[5][2] = {{MX_WOOD, MX_WOOD}, {MX_BRICK, MX_WOOD}, {MX_STONE, MX_WOOD}, {MX_STEEL, MX_BRICK}, {MX_GLASS, MX_STONE}};
+  static const uint8_t KINDS[4][5] = {
+    {LK_WALKER, LK_THROWER, LK_BAT, 0, 0}, {LK_WALKER, LK_SHIELD, LK_SPRINTER, LK_THROWER, 0},
+    {LK_SHIELD, LK_SPRINTER, LK_HEALER, LK_BAT, LK_THROWER}, {LK_BOSS, LK_SHIELD, LK_HEALER, LK_SPRINTER, LK_THROWER}};
+  static const int NK[4] = {3, 4, 5, 5};
+  int tier = i / 5 > 3 ? 3 : i / 5;
+  struct { int x, w, floors, fh; } H[3] = {
+    {48 + (i % 3) * 4, 8 + (i % 4) * 2, 2 + (i % 4), 8 + (i % 3)},
+    {80 + (i % 2) * 4, 10 + (i % 5) * 2, 2 + ((i + 1) % 4), 9 + (i % 2)},
+    {108, 8, 2 + (i % 3), 8}};
+  const int *M[3] = {MAT[i % 5], MAT[(i * 2 + 1) % 5], MAT[(i * 3 + 2) % 5]};
+  int nh = i >= 8 ? 3 : 2;
+  for(int k = 0; k < nh; k++){
+    int wall = M[k][0], floor = M[k][1];
+    house_ex(w, H[k].x, MX_ROWS - 1, H[k].w, H[k].floors, H[k].fh, wall == MX_STEEL ? 2 : 1, 1, wall, floor, floor == MX_WOOD ? MX_WOOD : MX_STONE, 0, 0);
+    for(int f = 0; f < H[k].floors; f++){
+      int row = MX_ROWS - 1 - f * H[k].fh;
+      int cx = f == 0 ? H[k].x + H[k].w - 3 : H[k].w > 13 ? H[k].x + 3 + ((f & 1) ? H[k].w - 7 : 0) : H[k].x + (H[k].w >> 1) + ((f * 3 + k) % 3 - 1);
+      int kind = ((f + k + i) % 3 == 0 && i < 5) ? LK_NONE : KINDS[tier][(f * 2 + k + i) % NK[tier]];
+      int rg = (H[k].w >> 1) - 3; rg = rg > 6 ? 6 : rg; if(rg < 2) rg = 2;
+      if((f == H[k].floors - 1 && k == 0) || f == 0 || (f + k + i) % 2 == 0) tgtr(w, cx, row, kind, rg);
+    }
+    tnt(w, H[k].x + 2, MX_ROWS - 1);
+  }
+  if(w->ntargets < 4) tgtr(w, H[0].x + 3, MX_ROWS - 1 - H[0].fh, LK_WALKER, 2);
+}
+
 static void build(MxWorld *w, int l){
+  if(l >= MX_CH3_START){ build_ch3(w, l - MX_CH3_START); return; }
   const int W_ = MX_WOOD, B = MX_BRICK, S = MX_STONE, ST = MX_STEEL, RU = MX_RUBBER;
   switch(l){
   /* levels 0-19: the same layouts as the web game (house_ex args: x, ground row, width, floors, floor height, wall thickness, slab thickness, wall, floor, roof, gable, crenel) */

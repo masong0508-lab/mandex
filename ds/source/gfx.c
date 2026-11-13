@@ -598,16 +598,19 @@ void spr_landlord_k(u8 *b, int x, int y, int ppc, int ph, int scared, int kind, 
   if(st & 24) y -= ((ph >> 2) & 1);                                           /* a bounce in his step */
   spr_landlord(b, x, y, ppc, ph, scared);
   int by = y + ((ph >> 4) & 1 && ppc >= 4 ? 1 : 0), hy = by - S(16);
-  if(kind == 3 || kind == 2) gfx_rect(b, x - S(8), hy - S(15), S(16), SM(5), kind == 3 ? C_GRASS : C_UILINE);   /* hat band */
+  if(kind >= 2) gfx_rect(b, x - S(8), hy - S(15), S(16), SM(5), kind == 3 ? C_GRASS : (kind == 5 || kind == 6) ? C_GOLD : kind == 4 ? C_UIHI : kind == 7 ? C_GRASS : C_UILINE);   /* hat band: bat green, thrower blue, sprinter/boss gold, shield grey, healer green */
+  if(kind == 7){ gfx_rect(b, x - S(4), by - S(6), S(8), SM(8), C_WHITE); gfx_rect(b, x - 1, by - S(5), 2, SM(6), C_GRASS); gfx_rect(b, x - S(2), by - S(3), SM(4), 2, C_GRASS); }   /* healer: white coat, green cross */
+  if(kind == 6) gfx_rect(b, x - 1, by - S(8), 2, SM(10), C_GOLD);                                           /* boss: gold tie */
+  if(st & 32){ int sx = x + face * S(11); gfx_rect(b, sx - SM(2), by - S(8), SM(5), SM(22), C_BLACK); gfx_rect(b, sx - SM(1), by - S(7), SM(3), SM(20), C_UIHI); gfx_rect(b, sx - 1, by - S(2), 2, SM(5), C_GOLD); }   /* riot shield */
   if(kind == 3){                                                              /* the club: held up, or swung flat out in front of him */
     int hx = x + face * S(12), hyy = by + S(2), ex = (st & 4) ? x + face * S(30) : x + face * S(21), ey = (st & 4) ? by + S(4) : by - S(20);
     gfx_tline(b, hx, hyy, ex, ey, SM(3), C_DIRT2);
     gfx_tline(b, hx, hyy, ex, ey, SM(2), C_DIRT);
     gfx_ell(b, hx, hyy, SM(2), SM(2), C_SKIN);
-  } else if(kind == 2){                                                       /* briefcase thrower */
+  } else if(kind == 2 || kind == 6){                                          /* briefcase thrower (and the boss) */
     if(st & 2){ gfx_rect(b, x + face * S(8) - SM(5), by - S(32), SM(10), SM(7), C_GOLD2); gfx_rect(b, x + face * S(8) - SM(5), by - S(32), SM(10), 1, C_GOLD); gfx_rect(b, x + face * S(8) - SM(2), by - S(34), SM(4), 1, C_DARK); gfx_text_c(b, x, hy - S(30), "!", C_GOLD, C_BLACK, 1); }
     else if(st & 4){ gfx_rect(b, x + face * S(22), by + S(1), SM(10), SM(7), C_GOLD2); }
-  } else if(kind == 1){                                                       /* walker: papers in his hand */
+  } else if(kind == 1 || kind == 4 || kind == 5){                             /* walker, shield, sprinter: papers in his hand */
     int px = x + face * S(14); if(st & 4) px = x + face * S(24);
     gfx_rect(b, px - SM(3), by + S(4), SM(6), SM(8), C_WHITE); gfx_rect(b, px - SM(3), by + S(6), SM(6), 1, C_GRASS);
   }
@@ -616,6 +619,12 @@ void spr_landlord_k(u8 *b, int x, int y, int ppc, int ph, int scared, int kind, 
     for(int k = -1; k <= 1; k += 2){ int ex = x + k * S(3), ey = hy - S(1); gfx_line(b, ex - 1, ey - 1, ex + 1, ey + 1, C_BLACK); gfx_line(b, ex + 1, ey - 1, ex - 1, ey + 1, C_BLACK); }
     for(int k = 0; k < 3; k++){ int a = (ph * 3 + k * 85) & 255, sx = x + (a < 128 ? a - 64 : 192 - a) * ppc / 20, sy = hy - S(30) + (k & 1); gfx_px(b, sx, sy, C_STAR); gfx_px(b, sx + 1, sy, C_STAR2); }
   }
+}
+/* a health bar over a landlord who has more than one hit point */
+void spr_hpbar(u8 *b, int x, int y, int ppc, int hp, int hpmax){
+  int w = hpmax * SM(7);
+  gfx_rect(b, x - w / 2 - 1, y - S(38) - 1, w + 2, SM(4) + 2, C_BLACK);
+  for(int k = 0; k < hpmax; k++) gfx_rect(b, x - w / 2 + k * SM(7), y - S(38), SM(7) - 1, SM(4), k < hp ? C_RED : C_DARK);
 }
 /* a thrown briefcase, tumbling (turns in quarter steps) */
 void spr_case(u8 *b, int x, int y, int ppc, int turn){

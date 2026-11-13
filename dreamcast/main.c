@@ -206,6 +206,8 @@ static void handle_events(void){
     case EV_SLAM:  for(int k = 0; k < 14; k++) spawn(e->x, e->y + 2.3f, k & 1 ? argb(255, 255, 255, 255) : argb(200, 190, 170, 255), 380); break;
     case EV_PAD:   for(int k = 0; k < (e->m ? 16 : 8); k++) spawn(e->x, e->y, k & 1 ? argb(255, 126, 176, 255) : argb(255, 255, 255, 255), 460); break;
     case EV_HURT:  for(int k = 0; k < 12; k++) spawn(e->x, e->y, k & 1 ? argb(255, 74, 74, 255) : argb(255, 255, 255, 255), 420); break;
+    case EV_OOF:   for(int k = 0; k < 10; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), 520); break;
+    case EV_HEAL:  for(int k = 0; k < 8; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 520); break;
     case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), 520); break;
     case EV_THROW: case EV_SWING: for(int k = 0; k < 4; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 160); break;
     default: break;   /* TODO: AICA sound for EV_CRUNCH / EV_LAUNCH / EV_THUD / ... */
@@ -377,7 +379,7 @@ static int dmg(float hp, int m){ float r = hp / MAXHP[m]; return r > 0.66f ? 0 :
 static void draw_landlord(float x, float y, float z, const MxTarget *t){
   const short *r = DCA_LANDLORD;
   int k = t ? t->kind : LK_NONE, fc = t && t->face < 0 ? -1 : 1, stun = t && t->stun > 0, wind = t && t->wind > 0, swing = t && t->swing > 0;
-  uint32 c = k == LK_BAT ? argb(200, 255, 200, 255) : k == LK_THROWER ? argb(205, 220, 255, 255) : WHITE;
+  uint32 c = k == LK_BAT ? argb(200, 255, 200, 255) : k == LK_THROWER ? argb(205, 220, 255, 255) : k == LK_BOSS ? argb(120, 120, 140, 255) : k == LK_SPRINTER ? argb(255, 225, 160, 255) : k == LK_HEALER ? argb(235, 255, 235, 255) : k == LK_SHIELD ? argb(170, 190, 190, 255) : WHITE;   /* tints: bat green, thrower blue, boss dark, sprinter tan, healer white-green, shield grey */
   float w = r[2] * 0.5f, h = r[3] * 0.5f, lx = x - r[4] * 0.5f;
   if(k == LK_NONE) tquad(&hdr_atl, 512, 512, lx, y - r[5] * 0.5f, w, h, r[0], r[1], r[2], r[3], z, c);
   else if(fc > 0) tquad(&hdr_atl, 512, 512, lx, y - r[5] * 0.5f, w, h, r[0], r[1], r[2], r[3], z, c);
@@ -391,14 +393,19 @@ static void draw_landlord(float x, float y, float z, const MxTarget *t){
     float hx = x + fc * 5, hy = y + 2, ex = x + fc * (swing ? 26 : 16), ey = swing ? y + 4 : y - 18;
     seg(hx, hy, ex, ey, 3.2f, zz, argb(90, 52, 20, 255)); seg(hx, hy, ex, ey, 1.6f, zz + 0.01f, argb(185, 122, 60, 255));
     quad(x - 4, top + 2, 8, 2.5f, zz, argb(42, 138, 42, 255));
-  } else if(k == LK_THROWER){                                           /* briefcase, raised over the head to throw */
+  } else if(k == LK_THROWER || k == LK_BOSS){                           /* briefcase, raised over the head to throw */
     float bx = wind ? x + fc * 5 : swing ? x + fc * 16 : x + fc * 11, by = wind ? y - 24 : swing ? y : y + 3;
     quad(bx - 7, by - 4.5f, 14, 9, zz, argb(58, 34, 12, 255)); quad(bx - 6, by - 3.5f, 12, 7, zz + 0.01f, argb(122, 74, 34, 255)); quad(bx - 1, by - 1, 2, 2, zz + 0.02f, argb(255, 210, 63, 255));
-    quad(x - 4, top + 2, 8, 2.5f, zz, argb(58, 106, 209, 255));
+    quad(x - 4, top + 2, 8, 2.5f, zz, k == LK_BOSS ? argb(255, 210, 63, 255) : argb(58, 106, 209, 255));
     if(wind) text("!", x, y - 32, 14, argb(255, 210, 63, 255), 1, Z_HUD);
-  } else if(k == LK_WALKER){                                            /* papers in his hand */
+  } else if(k == LK_WALKER || k == LK_SHIELD || k == LK_SPRINTER){      /* papers in his hand */
     float bx = swing ? x + fc * 16 : x + fc * 11; quad(bx - 3, y, 6, 7, zz, WHITE); quad(bx - 3, y + 1, 6, 1.2f, zz + 0.01f, argb(42, 138, 42, 255));
+    quad(x - 4, top + 2, 8, 2.5f, zz, k == LK_SPRINTER ? argb(255, 210, 63, 255) : argb(138, 143, 153, 255));
+  } else if(k == LK_HEALER){                                            /* green cross and cap band */
+    quad(x - 1, y - 4, 2, 9, zz, argb(47, 191, 74, 255)); quad(x - 4.5f, y - 0.5f, 9, 2, zz, argb(47, 191, 74, 255)); quad(x - 4, top + 2, 8, 2.5f, zz, argb(47, 191, 74, 255));
   }
+  if(t->armor){ float sx = x + fc * 14; quad(sx - 3, y - 12, 6, 24, zz, argb(20, 20, 20, 255)); quad(sx - 2, y - 11, 4, 22, zz + 0.01f, argb(154, 164, 178, 255)); quad(sx - 0.8f, y - 4, 1.6f, 6, zz + 0.02f, argb(255, 210, 63, 255)); }   /* riot shield */
+  if(t->hpmax > 1){ float bw = t->hpmax * 7.0f, bx0 = x - bw * 0.5f; quad(bx0 - 1, top - 9, bw + 2, 6, zz, argb(0, 0, 0, 255)); for(int i = 0; i < t->hpmax; i++) quad(bx0 + i * 7, top - 8, 6, 4, zz + 0.01f, i < t->hp ? argb(232, 64, 64, 255) : argb(85, 85, 34, 255)); }   /* health bar */
 }
 
 static void draw_rooms(void){

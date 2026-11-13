@@ -9,6 +9,7 @@ static int fails;
 static MxWorld W;
 #define DT R(1.0/60.0)
 static double D(real v){ return RTOF(v); }
+static void set_cell_test(MxWorld *w, int x, int y, int m){ int i = y * MX_COLS + x; w->grid[i] = (uint8_t)m; w->hp[i] = RI(10); }
 static int saw[32];
 static void step(int n){ for(int f = 0; f < n; f++){ mx_update(&W, DT); for(int e = 0; e < W.nev; e++) if(W.ev[e].type < 32) saw[W.ev[e].type]++; } }
 static void clear_saw(void){ memset(saw, 0, sizeof saw); }
@@ -28,7 +29,7 @@ int main(void){
   mx_load(&W, 37); CHECK(W.walk == 1 && W.npads == 2 && W.ntargets == 8 && W.men == 4, "Rent Strike: walk level, 2 pads, 8 landlords, 4 men");
   { int walkers = 0; for(int i = 0; i < W.ntargets; i++) walkers += W.targets[i].kind == LK_WALKER; CHECK(walkers == 3, "Rent Strike: three walkers"); }
   mx_load(&W, 38); CHECK(W.ntargets == 6 && W.targets[0].kind == LK_BAT && W.targets[1].kind == LK_BAT && W.men == 7, "Sand Standoff: two bat guards, 6 landlords");
-  CHECK(MX_NUM_LEVELS == 40 && strcmp(mx_level_name(39), "Landlord HQ") == 0 && strcmp(mx_level_name(36), "Mail Room Mayhem") == 0, "40 levels, Landlord HQ last");
+  CHECK(MX_NUM_LEVELS == 60 && MX_CH3_START == 40 && strcmp(mx_level_name(39), "Landlord HQ") == 0 && strcmp(mx_level_name(36), "Mail Room Mayhem") == 0 && strcmp(mx_level_name(40), "Full Moon Rising") == 0 && strcmp(mx_level_name(59), "Alpha Landlord") == 0, "60 levels: chapter 2 ends with Landlord HQ, chapter 3 is 40-59");
 
   /* ---- a flight onto a walk level ends on his feet ---- */
   mx_load(&W, 22);
@@ -146,6 +147,46 @@ int main(void){
   CHECK(saw[EV_THROW] == 0 && saw[EV_HURT] == 0, "with fighting back off nobody throws anything");
   mx_set_fight(&W, 1);   /* leave the default */
 
+
+  /* ---- chapter 3: health, armor, new kinds, smarter movement, collapse margins ---- */
+  { int ok = 1, kinds_seen[8] = {0};
+    for(int l = 40; l < 60; l++){ mx_load(&W, l); if(W.ntargets < 4 || W.men < 5) ok = 0; for(int i = 0; i < W.ntargets; i++) kinds_seen[W.targets[i].kind]++; for(int f = 0; f < 120; f++) mx_update(&W, DT); if(mx_targets_alive(&W) != W.ntargets) ok = 0; }
+    CHECK(ok, "chapter 3: all 20 levels load with 4+ landlords and nobody dies while the buildings settle");
+    CHECK(kinds_seen[LK_SHIELD] && kinds_seen[LK_SPRINTER] && kinds_seen[LK_BOSS] && kinds_seen[LK_HEALER] && kinds_seen[LK_THROWER] && kinds_seen[LK_BAT], "chapter 3 uses every landlord kind"); }
+  { mx_load(&W, 40);                                                            /* a boss: three hits, immunity between them */
+    MxTarget *t = &W.targets[0]; t->kind = LK_BOSS; t->hp = t->hpmax = 3; t->armor = 0; t->inv = 0; t->y = RI(20); t->vy = 0;
+    W.state = MX_PLAY; clear_saw();
+    W.man.mode = MAN_FLY; W.man.x = t->x; W.man.y = t->y; W.man.vx = RI(60); W.man.vy = 0; W.man.rad = R(1.75);
+    step(1);
+    CHECK(t->alive && t->hp == 2 && t->stun > 0 && saw[EV_OOF] > 0, "a boss takes a hit and survives with 2 hp");
+    t->inv = 0; t->stun = 0; W.man.x = t->x; W.man.y = t->y; W.man.mode = MAN_FLY; W.man.vx = RI(60); step(1);
+    t->inv = 0; t->stun = 0; W.man.x = t->x; W.man.y = t->y; W.man.mode = MAN_FLY; W.man.vx = RI(60); step(1);
+    CHECK(!t->alive, "...and the third hit evicts him"); }
+  { mx_load(&W, 40);                                                            /* a shield landlord facing the man blocks a slow shot; a fast one smashes the shield */
+    MxTarget *t = &W.targets[0]; t->kind = LK_SHIELD; t->hp = t->hpmax = 2; t->armor = 1; t->face = 1; t->stun = 0; t->inv = 0; t->y = RI(20); t->vy = 0; W.state = MX_PLAY; W.nofight = 0;
+    W.man.mode = MAN_FLY; W.man.x = t->x + RI(1); W.man.y = t->y; W.man.vx = -RI(25); W.man.vy = 0; W.man.rad = R(1.75);
+    step(1);
+    CHECK(t->alive && t->hp == 2 && W.man.vx > 0, "a riot shield bounces a slow shot (from the front)");
+    t->stun = 0; t->inv = 0; t->armor = 1; W.man.mode = MAN_FLY; W.man.x = t->x + RI(1); W.man.y = t->y; W.man.vx = -RI(90); W.man.vy = 0; step(1);
+    CHECK((t->armor == 0 && t->hp == 1) || !t->alive, "a hard shot smashes the shield and hurts him"); }
+  { mx_load(&W, 40);                                                            /* a healer patches a hurt landlord up */
+    MxTarget *a = &W.targets[0], *h = &W.targets[1]; h->kind = LK_HEALER; h->x = a->x + RI(3); h->y = a->y; h->heal = R(0.05);
+    a->kind = LK_BOSS; a->hp = 1; a->hpmax = 3; clear_saw(); step(10);
+    CHECK(a->hp == 2 && saw[EV_HEAL] > 0, "a healer heals a hurt landlord +1 hp"); }
+  { mx_load(&W, 40);                                                            /* a walker dodges a falling chunk even with fighting back off */
+    mx_set_fight(&W, 0);
+    MxTarget *t = &W.targets[0]; t->kind = LK_WALKER; t->range = RI(2); real x0 = t->x;
+    for(int c = 0; c < MX_MAX_CHUNKS; c++) if(!W.chunks[c].active){ MxChunk *ch = &W.chunks[c]; memset(ch, 0, sizeof *ch); ch->active = 1; ch->x = t->x; ch->y = t->y - RI(6); ch->vy = RI(25); ch->rad = RI(1); ch->count = 1; ch->m = RI(1); ch->I = RI(1); ch->cells[0].wx = ch->x; ch->cells[0].wy = ch->y; ch->cells[0].m = MX_WOOD; break; }
+    mx_update(&W, DT);
+    CHECK(t->dodge > 0 || rabs(t->x - x0) > R(0.1), "a walker starts running from falling debris");
+    for(int c = 0; c < MX_MAX_CHUNKS; c++) W.chunks[c].active = 0; }
+  { mx_load(&W, 40);                                                            /* buried by light rubble: dig out instead of dying; a hard fall only stuns */
+    MxTarget *t = &W.targets[0]; real y0 = t->y;
+    for(int dy = 0; dy < 2; dy++) set_cell_test(&W, (int)D(t->x), (int)D(t->y) - dy, MX_WOOD);
+    step(2);
+    CHECK(t->alive && t->y < y0, "a landlord buried by a thin layer of rubble digs out");
+    mx_load(&W, 40); t = &W.targets[0]; t->vy = RI(42); t->y -= RI(1); step(40);
+    CHECK(t->alive, "a hard landing (not a huge fall) only stuns"); }
   printf(fails ? "CH2 TEST FAILED (%d)\n" : "CH2 TEST OK\n", fails);
   return fails != 0;
 }

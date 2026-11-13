@@ -60,9 +60,10 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #if MX_MAX_CHUNKS < 4 || MX_MAX_CHUNKS > 63
 #error "MX_MAX_CHUNKS must be 4..63 (bnext[] holds int16 cell indexes)"
 #endif
-#define MX_MAX_TARGETS   12
+#define MX_MAX_TARGETS   16
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    40
+#define MX_NUM_LEVELS    60
+#define MX_CH3_START     40      /* chapter 3 (the Wolfman): levels 40-59 */
 #define MX_STORY_LEVELS  20      /* chapter 1: the story achievements and outfits count only these, so adding levels never moves earned goalposts */
 #define MX_MAX_ROOMS     20
 
@@ -87,7 +88,7 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 enum { MX_EMPTY, MX_WOOD, MX_BRICK, MX_STONE, MX_GLASS, MX_TNT, MX_STEEL, MX_RUBBER, MX_SAND, MX_NMAT };
 enum { MX_PLAY, MX_WIN, MX_LOSE };
 enum { MAN_NONE, MAN_AIM, MAN_FLY, MAN_STUCK, MAN_WAIT, MAN_WALK };
-enum { LK_NONE, LK_WALKER, LK_THROWER, LK_BAT };   /* landlord kinds: only act when w->nofight is 0 */
+enum { LK_NONE, LK_WALKER, LK_THROWER, LK_BAT, LK_SHIELD, LK_SPRINTER, LK_BOSS, LK_HEALER };   /* landlord kinds: only act when w->nofight is 0 */
 
 /* Event types the front-end turns into particles and sound. */
 enum {
@@ -118,7 +119,9 @@ enum {
   EV_HURT,     /* a landlord hurt him at x,y: m = 1 on foot, 0 in the sling */
   EV_BONK,     /* a bat landlord swatted a weak shot at x,y */
   EV_THROW,    /* a landlord threw a briefcase from x,y */
-  EV_SWING     /* a landlord swung at x,y (walker punch / bat practice swing) */
+  EV_SWING,    /* a landlord swung at x,y (walker punch / bat practice swing) */
+  EV_HEAL,     /* a healer patched a landlord up at x,y */
+  EV_OOF       /* a tough landlord took a hit and survived at x,y: a = hp left, m = 1 if a shield was smashed */
 };
 /* power-ups: one use of each per level */
 enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT };
@@ -146,7 +149,10 @@ typedef struct {
 
 /* kind LK_*: walker patrols range cells around home hx and scatters when he flies close, chases and swings at a man on foot; thrower lobs briefcases at the man waiting in the sling;
    bat swats any shot slower than BAT_BREAK.  face = -1/1.  cd = attack cooldown, wind = wind-up left, swing = swing animation left, stun = dazed (bat after a swat), pan = scared (cosmetic), wk = walk phase (cosmetic), mv = 0 still / 1 strolling / 2 running. */
-typedef struct { real x, y, vy, t; uint8_t alive, kind, mv; int8_t face, pdir; uint8_t eng; real hx, range, cd, wind, swing, stun, pan, wk; } MxTarget;
+/* chapter 3: hp/hpmax (shield 2, boss 3, others 1; the front-ends draw a bar when hpmax > 1), armor (riot shield facing `face`), inv = hit immunity left,
+   shield = blocks a slow shot from the front; sprinter runs, boss throws two briefcases, healer patches the others up; all walkers dodge debris, run for cover and climb one-block stairs. */
+typedef struct { real x, y, vy, t; uint8_t alive, kind, mv; int8_t face, pdir; uint8_t eng; real hx, range, cd, wind, swing, stun, pan, wk;
+                 uint8_t hp, hpmax, armor, b2; int8_t dd; real inv, dodge, cover, ck, heal; } MxTarget;
 #define MX_MAX_CASES 4
 typedef struct { real x, y, vx, vy, rot, l; uint8_t active; } MxCase;      /* a thrown briefcase */
 #define MX_MAX_PADS 3

@@ -222,6 +222,13 @@ static void on_events(void){
       for(int k = 0; k < 8; k++) spawn(PT_SPARK, e->x, e->y - RI(1), rnd(41) - 20, -rnd(20), k & 1 ? C_GOLD : C_WHITE, 14 + rnd(8));
       spawn_ring(e->x, e->y, 5, C_GOLD); popup(e->x, e->y - RI(6), "BONK!", C_GOLD); sfx_play(SFX_SLAP, pan); sfx_play(SFX_CRUNCH, pan);
       break;
+    case EV_OOF:
+      for(int k = 0; k < 6; k++) spawn(PT_SPARK, e->x, e->y - RI(1), rnd(41) - 20, -rnd(20), k & 1 ? C_GOLD : C_WHITE, 14 + rnd(8));
+      popup(e->x, e->y - RI(6), e->m ? "CRACK!" : "OOF!", C_GOLD); sfx_play(SFX_CRUNCH, pan);
+      break;
+    case EV_HEAL:
+      spawn_ring(e->x, e->y, 4, C_WHITE); popup(e->x, e->y - RI(6), "+HP", C_WHITE); sfx_play(SFX_TARGET, pan);
+      break;
     case EV_THROW: case EV_SWING: sfx_play(SFX_WHOOSH, pan); break;
     case EV_THUD:   if(e->b > R(0.3)) sfx_play(SFX_THUD, pan); break;
     case EV_LAND:                                           /* ground touch: a puff of dust, and a hard landing adds a ring */
@@ -378,9 +385,10 @@ static void draw_targets(const View *v){
     if(!t->alive) continue;
     int scared = ((m->mode == MAN_FLY || m->mode == MAN_STUCK) && rabs(t->x - m->x) < RI(26)) || t->pan > 0;
     real wx, wy; mx_target_offset(&world, t, &wx, &wy);
-    int st = (t->stun > 0 ? 1 : 0) | (t->wind > 0 ? 2 : 0) | (t->swing > 0 ? 4 : 0) | (t->mv == 1 ? 8 : 0) | (t->mv == 2 ? 16 : 0);
+    int st = (t->stun > 0 ? 1 : 0) | (t->wind > 0 ? 2 : 0) | (t->swing > 0 ? 4 : 0) | (t->mv == 1 ? 8 : 0) | (t->mv == 2 ? 16 : 0) | (t->armor ? 32 : 0);
     if(t->kind || st) spr_landlord_k(v->buf, vx(v, t->x + wx), vy(v, t->y + wy), v->ppc, frame + i * 11, scared, t->kind, t->face < 0 ? -1 : 1, st);
     else spr_landlord(v->buf, vx(v, t->x + wx), vy(v, t->y + wy), v->ppc, frame + i * 11, scared);
+    if(t->hpmax > 1) spr_hpbar(v->buf, vx(v, t->x + wx), vy(v, t->y + wy), v->ppc, t->hp, t->hpmax);
   }
 }
 

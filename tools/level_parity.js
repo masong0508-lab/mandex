@@ -1,7 +1,7 @@
 // Compares every level the shared C core builds with the web game's: men, landlord positions and the whole grid after load().
 // usage: gcc -std=c99 -O2 -Icore core/mx.c test/level_dump.c -lm -o /tmp/level_dump && /tmp/level_dump > /tmp/c_levels.txt
 //        node tools/level_parity.js /tmp/c_levels.txt [first] [last] [webIndices]   (core level l is compared with web LEVELS[webIndices[l-first]]; default same index.
-//        Level 39 (Landlord HQ) is a 360-cell wide, three-sling level on the web only for now, so compare 0..38.  The consoles have levels 0..38, in the same order as the web game, so the default (same index) is the right mapping.
+//        Level 39 (Landlord HQ) is a 360-cell wide, three-sling level on the web only for now, so compare 0..38, then 40..59 (chapter 3).  The consoles have levels 0..38, in the same order as the web game, so the default (same index) is the right mapping.
 //        Targets are compared with their landlord kind, and the walk flag / number of bounce pads.)
 const {chromium}=require('playwright'),fs=require('fs'),path=require('path');
 (async()=>{
@@ -16,7 +16,7 @@ const {chromium}=require('playwright'),fs=require('fs'),path=require('path');
  let bad=0;
  for(let l=lo;l<=hi;l++){
   const H=await p.evaluate(`(function(){draw=function(){};load(${map.length?map[l-lo]:l});const rows=[];for(let y=0;y<ROWS;y++){let s='';for(let x=0;x<COLS;x++)s+=grid[y*COLS+x];rows.push(s)}
-    return{men:CL.men,name:CL.name,T:targets.map(t=>[Math.round(t.x/4),Math.round(t.y),({walker:1,thrower:2,bat:3})[t.kind]||0]),walk:CL.walk?1:0,pads:pads.length,rows}})()`);
+    return{men:CL.men,name:CL.name,T:targets.map(t=>[Math.round(t.x/4),Math.round(t.y),({walker:1,thrower:2,bat:3,shield:4,sprinter:5,boss:6,healer:7})[t.kind]||0]),walk:CL.walk?1:0,pads:pads.length,rows}})()`);
   const c=C[l];let msg=[];
   if(!c){console.log(l,'missing in C dump');bad++;continue}
   if(H.men!==c.men)msg.push(`men web ${H.men} core ${c.men}`);

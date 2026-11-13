@@ -82,7 +82,8 @@ void spr_man_j(u8 *b, int x, int y, int ppc, int face, int pose, int ph, const M
 void spr_man_jr(u8 *b, int x, int y, int ppc, int face, int pose, int ph, const ManJig *jg, int sn, int cs);
 void spr_man_bust(u8 *b, int x, int y, int ppc);   /* x = centre, y = top */
 void spr_landlord(u8 *b, int x, int y, int ppc, int ph, int scared);
-void spr_landlord_k(u8 *b, int x, int y, int ppc, int ph, int scared, int kind, int face, int st);   /* chapter 2: kind 0 plain 1 walker 2 thrower 3 bat; st bits 1 dazed 2 wind-up 4 swing 8 stroll 16 run */
+void spr_hpbar(u8 *b, int x, int y, int ppc, int hp, int hpmax);
+void spr_landlord_k(u8 *b, int x, int y, int ppc, int ph, int scared, int kind, int face, int st);   /* chapter 2: kind 0 plain 1 walker 2 thrower 3 bat; st bits 1 dazed 2 wind-up 4 swing 8 stroll 16 run 32 riot shield; kinds 4 shield 5 sprinter 6 boss 7 healer (chapter 3) */
 void spr_case(u8 *b, int x, int y, int ppc, int turn);                                                /* a thrown briefcase */
 void spr_man_walk(u8 *b, int x, int fy, int ppc, int face, int frame, const ManJig *jg);              /* the man on foot: fy = his feet */
 void spr_hat(u8 *b, int x, int y, int sc, int mode); /* 0 = real black hat, 1 = HUD icon alive, 2 = HUD icon evicted */
