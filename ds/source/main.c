@@ -1226,13 +1226,13 @@ int main(void){
       /* a hit wakes the wobble lattice, which is what costs time: the core caps the cells it walks (wob_budget) and this loop moves that cap with the measured cost,
          at once (one slow frame is enough) and back up slowly.  Only when the cap is already at its floor are the other quality switches touched. */
       { int load = phys_ticks + draw_ticks; lite = load > 520000 ? 1 : load < 390000 ? 0 : lite; }      /* a 60 Hz frame is ~560 000 ticks: what counts is physics + drawing, not physics alone */
-      if(phys_ticks > 330000 || phys_ticks + draw_ticks > 500000){ fast_frames = 0;
+      if(phys_ticks > 330000){ fast_frames = 0;
         if(wob_budget > DS_WOB_MIN){ wob_budget = wob_budget * 2 / 3; if(wob_budget < DS_WOB_MIN) wob_budget = DS_WOB_MIN; mx_set_wobble_budget(&world, wob_budget); slow_frames = 0; }
         else if(++slow_frames >= 2){ slow_frames = 0;
           if(world.collapse){ coll_shed = 1; mx_set_collapse(&world, 0); }
           else if(world.substeps > 2) mx_set_substeps(&world, world.substeps - 1);
           else if(world.wob_enabled) mx_set_wobble(&world, 0); } }
-      else if(phys_ticks < 180000 && phys_ticks + draw_ticks < 340000){ slow_frames = 0;
+      else if(phys_ticks < 180000){ slow_frames = 0;
         if(wob_budget < DS_WOB_MAX && (frame & 15) == 0){ wob_budget += 24; if(wob_budget > DS_WOB_MAX) wob_budget = DS_WOB_MAX; mx_set_wobble_budget(&world, wob_budget); }
         if(++fast_frames >= 120){ fast_frames = 0;
           if(!world.wob_enabled) mx_set_wobble(&world, 1);
