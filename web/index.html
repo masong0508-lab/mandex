@@ -124,11 +124,12 @@ function paintCell(x,m,v,d){
   if(d>=1){const cr=m===4?'rgba(255,255,255,.9)':'rgba(20,10,5,.75)';R(cr,2,1,1,3);R(cr,3,4,2,1);R(cr,5,5,1,3)}
   if(d>=2){const cr=m===4?'rgba(255,255,255,.9)':'rgba(20,10,5,.85)';if(m!==4)R('rgba(0,0,0,.22)',0,0,8,8);R(cr,0,2,3,1);R(cr,4,0,1,3);R(cr,1,5,4,1);R(cr,6,3,1,4)}
 }
-function buildSprites(){for(let m=1;m<MAT.length;m++){SPR[m]=[];for(let v=0;v<4;v++){SPR[m][v]=[];for(let d=0;d<3;d++){const c=mkCanvas(V,V);paintCell(c.getContext('2d'),m,v,d);SPR[m][v][d]=c}}}}
+function buildSprites(){for(let m=1;m<MAT.length;m++){SPR[m]=[];for(let v=0;v<4;v++){SPR[m][v]=[];for(let d=0;d<3;d++){const c=mkCanvas(V,V),cx=c.getContext('2d');paintCell(cx,m,v,d);if(m!==4){cx.globalCompositeOperation='source-atop';const g=cx.createLinearGradient(0,0,V*.35,V);g.addColorStop(0,'rgba(255,248,225,.22)');g.addColorStop(.5,'rgba(255,255,255,0)');g.addColorStop(1,'rgba(20,15,60,.26)');cx.fillStyle=g;cx.fillRect(0,0,V,V);cx.globalCompositeOperation='source-over'}SPR[m][v][d]=c}}}}
 
 // the world is normally 120 cells (960 px) wide; a level with `cols` is wider (the finale, 360).  Everything sized by COLS is rebuilt here, and the backdrop is redrawn at the new width.
 function setWorld(c){if(c===COLS)return;COLS=c;WW=c*V;hb=new Uint8Array(COLS*ROWS);dmg=new Uint8Array(COLS*ROWS);buildBG();
   clouds.length=4;if(c>120)for(let i=0;i<c/20;i++)clouds.push({x:(i*410+130)%WW,y:40+(hsh(i,9)%110),s:.7+(i%4)*.15,v:4+(i%5)*2})}
+function haze(x,y0,y1,c0,c1){const g=x.createLinearGradient(0,y0,0,y1);g.addColorStop(0,c0);g.addColorStop(1,c1);x.fillStyle=g;x.fillRect(0,y0,WW,y1-y0)}
 function buildBG(){
   bgA=mkCanvas(WW,WH);bgB=mkCanvas(WW,WH);
   let x=bgA.getContext('2d');
@@ -136,13 +137,15 @@ function buildBG(){
   g=x.createRadialGradient(800,90,6,800,90,190);g.addColorStop(0,'rgba(255,255,230,1)');g.addColorStop(.12,'rgba(255,240,170,.95)');g.addColorStop(.35,'rgba(255,230,150,.28)');g.addColorStop(1,'rgba(255,230,150,0)');x.fillStyle=g;x.fillRect(560,0,400,300);
   x=bgB.getContext('2d');
   // far mountains
-  x.fillStyle='#9ab9de';x.beginPath();x.moveTo(0,GY);for(let i=0;i<=WW;i+=24)x.lineTo(i,GY-120-Math.sin(i*.007+1)*55-Math.sin(i*.021)*18);x.lineTo(WW,GY);x.fill();
+  {const mg=x.createLinearGradient(0,GY-200,0,GY);mg.addColorStop(0,'#7f9fd2');mg.addColorStop(1,'#b8d0ea');x.fillStyle=mg}x.beginPath();x.moveTo(0,GY);for(let i=0;i<=WW;i+=24)x.lineTo(i,GY-120-Math.sin(i*.007+1)*55-Math.sin(i*.021)*18);x.lineTo(WW,GY);x.fill();
   x.fillStyle='#fff';x.globalAlpha=.55;for(let i=0;i<=WW;i+=24){const hgt=120+Math.sin(i*.007+1)*55+Math.sin(i*.021)*18;if(hgt>150){x.beginPath();x.moveTo(i-12,GY-hgt+14);x.lineTo(i,GY-hgt-2);x.lineTo(i+12,GY-hgt+14);x.fill()}}x.globalAlpha=1;
-  x.fillStyle='#7ea3cd';x.beginPath();x.moveTo(0,GY);for(let i=0;i<=WW;i+=20)x.lineTo(i,GY-70-Math.sin(i*.011+3)*38-Math.sin(i*.04)*8);x.lineTo(WW,GY);x.fill();
+  {const mg=x.createLinearGradient(0,GY-120,0,GY);mg.addColorStop(0,'#6f93c4');mg.addColorStop(1,'#a9c6e4');x.fillStyle=mg}x.beginPath();x.moveTo(0,GY);for(let i=0;i<=WW;i+=20)x.lineTo(i,GY-70-Math.sin(i*.011+3)*38-Math.sin(i*.04)*8);x.lineTo(WW,GY);x.fill();
+  haze(x,GY-170,GY-40,'rgba(235,242,255,.0)','rgba(235,242,255,.55)');
   // distant city
   x.fillStyle='#8fb0d4';for(let i=0;i<WW;i+=26){const h=22+(hsh(i,7)%46);x.fillRect(i,GY-48-h*.6,18,h*.6+48)}
+  haze(x,GY-120,GY-10,'rgba(235,245,255,0)','rgba(225,240,255,.42)');
   // rolling hills + trees
-  x.fillStyle='#78bf68';x.beginPath();x.moveTo(0,GY);for(let i=0;i<=WW;i+=16)x.lineTo(i,GY-30-Math.sin(i*.013)*18);x.lineTo(WW,GY);x.fill();
+  {const hg=x.createLinearGradient(0,GY-60,0,GY);hg.addColorStop(0,'#8ed070');hg.addColorStop(1,'#5aa854');x.fillStyle=hg}x.beginPath();x.moveTo(0,GY);for(let i=0;i<=WW;i+=16)x.lineTo(i,GY-30-Math.sin(i*.013)*18);x.lineTo(WW,GY);x.fill();
   for(let i=14;i<WW;i+=58+(hsh(i,3)%40)){if(i>520&&i<880)continue;const hh=GY-22-Math.sin(i*.013)*18,s=.8+(hsh(i,1)%5)*.12;
     x.fillStyle='#6b4a2b';x.fillRect(i-3,hh-8*s,6,12*s);x.fillStyle=(hsh(i,2)%2)?'#3f9e4a':'#4cae50';x.beginPath();x.arc(i,hh-20*s,16*s,0,7);x.arc(i-10*s,hh-12*s,11*s,0,7);x.arc(i+10*s,hh-12*s,11*s,0,7);x.fill()}
   // ground
@@ -2850,6 +2853,13 @@ const toWorld=(sx,sy)=>CAM.on?[sx/CAM.z+CAM.x,sy/CAM.z+CAM.y]:[sx,sy];
 const toScreen=(x,y)=>CAM.on?[(x-CAM.x)*CAM.z,(y-CAM.y)*CAM.z]:[x,y];
 let AIM0={sx:0,sy:0,wx:0,wy:0};
 
+// the last pass over the picture: a warm key light from the sun's corner, cooler shadows, a soft vignette and a hint of bloom, so the flat flash-game colours sit together
+let _vig=null;
+function grade(){ctx.save();ctx.setTransform(1,0,0,1,0,0);
+  if(!_vig||_vig.w!==W||_vig.h!==H){const c=mkCanvas(W,H),x=c.getContext('2d');let g=x.createRadialGradient(W*.5,H*.46,H*.35,W*.5,H*.5,H*.98);g.addColorStop(0,'rgba(20,30,70,0)');g.addColorStop(1,'rgba(15,20,55,.42)');x.fillStyle=g;x.fillRect(0,0,W,H);
+    g=x.createLinearGradient(W,0,0,H*.9);g.addColorStop(0,'rgba(255,214,150,.34)');g.addColorStop(.5,'rgba(255,214,150,0)');x.globalCompositeOperation='soft-light';x.fillStyle=g;x.fillRect(0,0,W,H);
+    g=x.createLinearGradient(0,H*.55,0,H);g.addColorStop(0,'rgba(60,70,140,0)');g.addColorStop(1,'rgba(60,70,140,.35)');x.fillStyle=g;x.fillRect(0,0,W,H);_vig=c;_vig.w=W;_vig.h=H}
+  ctx.drawImage(_vig,0,0);ctx.restore()}
 function draw(){
   hits=[];
   ctx.setTransform(1,0,0,1,0,0);const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
@@ -2886,6 +2896,7 @@ function draw(){
   drawParts();drawTexts();
   ctx.restore();
   if(camOn)ctx.restore();
+  grade();
   if(flash>0){ctx.fillStyle=`rgba(255,240,200,${flash*.9})`;ctx.fillRect(0,0,W,H)}
   drawHUD();drawToasts(frameDt)}
 function drawHUD(){
