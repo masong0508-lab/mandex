@@ -561,11 +561,12 @@ void spr_man_j(u8 *b, int x, int y, int ppc, int f, int pose, int ph, const ManJ
   spr_man_jr(b, x, y, ppc, f, pose, ph, jg, 0, 4096);
 }
 
+int gfx_man_fur;                                                  /* 1 while the Wolfman outfit is worn: the flying frames get the wolf head */
 void spr_man_jr(u8 *b, int x, int y, int ppc, int f, int pose, int ph, const ManJig *jg, int sn, int cs){
   int sw = (ph >> 2) & 1, slow = (ph >> 4) & 1, fr;
   switch(pose){
-  case POSE_FLY:   fr = sw ? MSF_FLY_A : MSF_FLY_B; break;
-  case POSE_DIVE:  fr = MSF_DIVE; break;
+  case POSE_FLY:   fr = gfx_man_fur ? (sw ? MSF_FLY_A_W : MSF_FLY_B_W) : (sw ? MSF_FLY_A : MSF_FLY_B); break;
+  case POSE_DIVE:  fr = gfx_man_fur ? MSF_DIVE_W : MSF_DIVE; break;
   case POSE_STUCK: fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; break;
   case POSE_DRAG:  fr = MSF_DRAG; break;
   case POSE_FLEX:  fr = slow ? MSF_FLEX_A : MSF_FLEX_B; break;

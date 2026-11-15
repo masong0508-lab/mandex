@@ -775,7 +775,7 @@ static void apply_outfit(int o){
     u16 c = RGB15(sh[k][0] >> 3, sh[k][1] >> 3, sh[k][2] >> 3);
     gfx_pal[C_MAN0 + idx[k]] = c; BG_PALETTE[C_MAN0 + idx[k]] = c; BG_PALETTE_SUB[C_MAN0 + idx[k]] = c;
   }
-  { uint8_t sk[4][3]; mx_outfit_skin(o, sk);                                   /* the Wolfman's skin is grey fur */
+  { uint8_t sk[4][3]; extern int gfx_man_fur; gfx_man_fur = mx_outfit_skin(o, sk);                                   /* the Wolfman's skin is grey fur */
     for(int k = 0; k < 4; k++){ u16 c = RGB15(sk[k][0] >> 3, sk[k][1] >> 3, sk[k][2] >> 3); gfx_pal[C_MAN0 + 1 + k] = c; BG_PALETTE[C_MAN0 + 1 + k] = c; BG_PALETTE_SUB[C_MAN0 + 1 + k] = c; } }
 }
 /* the air valve exists only while it is the start tool (and unlocked); NONE and the three power-ups hide it, as in the browser */

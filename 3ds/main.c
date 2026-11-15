@@ -68,10 +68,11 @@ static float pad_dx, pad_dy;
 static int new_best;                                     /* this win beat the level's old best score */
 static uint32_t prev_best;                              /* best[level] just before the win was recorded */
 static MxStats stats;                                   /* session achievements / outfits (no save on the 3DS yet) */
+static int man_fur;                                    /* the Wolfman outfit: flying frames get the wolf head */
 static unsigned char man_pal[MS_NPAL][3];              /* the man's palette, re-tinted for the worn outfit (boxers, towel, skin or the Wolfman's fur) */
 static void apply_outfit(int o){
   static const int idx[6] = { 5, 6, 7, 13, 14, 15 };
-  uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); mx_outfit_skin(o, sk);
+  uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); man_fur = mx_outfit_skin(o, sk);
   memcpy(man_pal, MS_PAL, sizeof man_pal);
   for(int k = 0; k < 6; k++) for(int c = 0; c < 3; c++) man_pal[idx[k]][c] = sh[k][c];
   for(int k = 0; k < 4; k++) for(int c = 0; c < 3; c++) man_pal[1 + k][c] = sk[k][c];
@@ -352,7 +353,7 @@ static void draw_man(const View *v){
     if(m->pT > 0){ for(int k = -3; k <= 3; k++) px(v->s, x + fc * (p * 5 - k * k * p * 5 / 18) + fc * p * 4, y + k * p * 3 / 4, RGB(255, 255, 255)); }
     return;
   }
-  if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : (((frame >> 2) & 1) ? MSF_FLY_A : MSF_FLY_B); }
+  if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? (man_fur ? MSF_DIVE_W : MSF_DIVE) : (((frame >> 2) & 1) ? (man_fur ? MSF_FLY_A_W : MSF_FLY_A) : (man_fur ? MSF_FLY_B_W : MSF_FLY_B)); }
   else if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); fr = ((frame >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
   else if(dragging) fr = MSF_DRAG;
   else fr = mi_frame(&mi, frame);                                            /* idle gags */

@@ -193,12 +193,17 @@ def main():
         frames = []
         has_towel = True
         legacy = {n: (c, pp) for n, c, pp in G.POSES}
-        names = [pp[0] for pp in G.POSES] + G.NEW_FRAMES
+        names = []
+        for n in [pp[0] for pp in G.POSES] + G.NEW_FRAMES:
+            names.append(n)
+            if n in G.WOLF_FRAMES: names.append(n + "_W")            # the Wolfman's own head, right after the frame it replaces (same order as art/manspr.h)
         for name in names:
-            if name in meta:
-                call, ppu, head = f"drawManFrame('{name}')", meta[name]["ppu"], meta[name].get("head")
-            elif name in legacy:
-                (call, ppu), head = legacy[name], None
+            wolf = name.endswith("_W"); name0 = name[:-2] if wolf else name
+            pg.evaluate("([w, t]) => { WOLF = w; setFur(w); time = t; }", [wolf, (-0.2856 if name == 'FLY_A_W' else 0.0634) if wolf else 0])
+            if name0 in meta:
+                call, ppu, head = f"drawManFrame('{name0}')", meta[name0]["ppu"], meta[name0].get("head")
+            elif name0 in legacy:
+                (call, ppu), head = legacy[name0], None
             else:
                 (call, ppu), head = legacy[G.ALIAS[name]], None
             sc = SS * ppu * K

@@ -198,10 +198,11 @@ static void toast_tick(void){
   if(toast_id < 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i - 1] = toast_q[i]; toast_nq--; toast_t = 0; }
 }
 /* the man's colours: boxers (red family) and towel (pink family) are re-tinted in the decoded atlas by hue, keeping each texel's brightness */
+static int man_fur;                                                          /* the Wolfman outfit: flying frames get the wolf head */
 static unsigned short *man_px;
 static void recolor_man(int o){
   if(!man_px || !tx_man) return;
-  uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); int fur = mx_outfit_skin(o, sk);
+  uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); int fur = mx_outfit_skin(o, sk); man_fur = fur;
   size_t tot = (size_t)DCT_MAN_W * DCT_MAN_H;
   unsigned short *tmp = (unsigned short *)malloc(tot * 2);
   if(!tmp) return;
@@ -585,7 +586,7 @@ static void draw_all(void){
     }
     else if(m->mode == MAN_WALK){ fr = -1; }
     else if(m->mode == MAN_STUCK){ puff(x, y + 6, 30, Z_MAN - 0.2f, argb(111, 227, 74, 200)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
-    else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
+    else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? (man_fur ? MSF_DIVE_W : MSF_DIVE) : ((ph >> 2) & 1 ? (man_fur ? MSF_FLY_A_W : MSF_FLY_A) : (man_fur ? MSF_FLY_B_W : MSF_FLY_B)); }
     if(m->mode == MAN_AIM || m->mode == MAN_FLY){                         /* his shadow on the ground: smaller and fainter the higher he is */
       float hgt = (MX_ROWS - m->y) / 40.0f; if(hgt < 0) hgt = 0; if(hgt > 1) hgt = 1;
       float rw = 30.0f * (1.0f - 0.55f * hgt); quad(XB(m->x) - rw, YB(MX_ROWS) + 1, rw * 2, 4, Z_SLING + 0.05f, argb(0, 0, 0, (int)(90 - 60 * hgt)));

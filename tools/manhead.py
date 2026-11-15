@@ -199,3 +199,40 @@ BACK_HALF = [
 def back_head(): return full(BACK_HALF)
 # a sideways glance over the shoulder: one eye at the right edge of the face
 PEEK = [".ow", "oBw", "ow."]
+
+
+# ---- the Wolfman in profile, facing right (fly / dive): 22 wide x 15 tall.  S/s/k = fur (the palette turns them grey for the wolf outfit), K = pale muzzle,
+#      t = pink inner ear, B = black (brow, nose, pupil), G = yellow eye, w = fang, m = mouth.  Two mouths: closed-ish snarl and open howl.
+_WOLF_TOP = [
+    "..oo..................",
+    ".oSSo.................",
+    ".oStSoo...............",
+    ".oStSSSoooooo.........",
+    ".oSSSSSSSSSSSooo......",
+    "oSSSSSSSSBBBSSKKooo...",
+    "oSSSSSSSSGGBSKKKKKKoo.",
+    "oSSSSSSSSSSSKKKKKKKKBBo",
+]
+_WOLF_MOUTH = {
+    "snarl": [
+        "oSSSSSSSSSSKKKKKKKKKKBBo"[:23],
+        ".oSSSSSSSSSKwKKwKKKKKooo",
+        ".oSSSSSSSSoommmmmmmmoo..",
+        "..oSSSSSSSSKKKKKKKKKo...",
+        "...ooSSSSSSSSKKKKKoo....",
+        ".....ooooooooooooo......",
+    ],
+    "howl": [
+        "oSSSSSSSSSSKKKKKKKKKKBBo",
+        ".oSSSSSSSSSKwKKwKKKKKooo",
+        ".oSSSSSSSSoommmmmmmmmo..",
+        "..oSSSSSSSommttttmmmmo..",
+        "..oSSSSSSSSoKKKKKKKKKoo.",
+        "...ooSSSSSSSKKKKKKKKKo..",
+        ".....ooSSSSSooooooooo...",
+    ],
+}
+def wolf_side_head(kind="snarl"):
+    rows = _WOLF_TOP + _WOLF_MOUTH[kind]
+    w = max(len(r) for r in rows)
+    return [r.ljust(w, '.') for r in rows]

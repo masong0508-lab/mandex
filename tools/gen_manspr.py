@@ -64,10 +64,11 @@ ALIAS.update({n: "IDLE_A" for n in CHEEKY})
 # jiggle blobs in design units (centre x, y, radius): belly and rear, per body family
 BLOBS = {"front": ((0, -2, 21), (0, 10, 21)), "back": ((0, -6, 20), (0, 10, 21)),
          "fly": ((2, -2, 19), (-13, 6, 14)), "dive": ((3, -2, 17), (-13, 6, 14)), "star": ((0, -2, 21), (0, 12, 20))}
+WOLF_FRAMES = ('FLY_A', 'FLY_B', 'DIVE')
 def family(name):
     if name.startswith("BACK") or name.startswith("FART") or (name.startswith("SPIN_") and spin_th(name)[0] >= 120) or name.startswith("OOPS_"): return "back"
     if name.startswith("FLY"): return "fly"
-    if name == "DIVE": return "dive"
+    if name.startswith("DIVE"): return "dive"
     if name.startswith("STUCK"): return "star"
     return "front"
 
@@ -237,6 +238,12 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
         hx, hy = ax + int(round(cx * ppu)), ay + int(round(cy * ppu))
         stamp(idx, rows, hx - 8, hy - 7, hk)
         return
+    if name in ("FLY_A_W", "FLY_B_W", "DIVE_W"):                   # the Wolfman's profile: ears, long muzzle, yellow eye, a fang; FLY_B / DIVE howl, FLY_A snarls
+        rows = manhead.wolf_side_head("snarl" if name == "FLY_A_W" else "howl")
+        hk = {k: PI[v] for k, v in manhead.KEY.items()}
+        hx, hy = ax + int(round(31 * ppu)), ay + int(round(-17 * ppu))
+        stamp(idx, rows, hx - 8, hy - 9, hk, 0.8)
+        return
     if name in ("STUCK_A", "STUCK_B"):                             # small dizzy head
         hy = ay - 12
         rows = manhead.scaled(manhead.head("dizzy", "tongue"), 15, 15)
@@ -334,6 +341,8 @@ def main():
             if has_api: pg.evaluate('(v) => { NOHEAD = v }', name in ('FLY_A', 'FLY_B', 'DIVE'))
             rgb, alpha, ax, ay = downsample(render(pg, call, ppu))
             frames.append((name, src, ppu, head) + outline(rgb, alpha, ax, ay))
+            if name in WOLF_FRAMES:                                   # the same body again, for the Wolfman (the runtime swaps this one in when the outfit is furry)
+                frames.append((name + "_W", name + "_W", ppu, head) + outline(rgb, alpha, ax, ay))
         b.close()
         if errs: print("page errors:", errs)
 
