@@ -271,19 +271,21 @@ static float g_pan_unused;                              /* camera drift in px: f
 static void star(Scr *s, int cx, int cy, int r, u32 c);
 static void hills(Scr *s, int base, int ox, int step, int r, int amp, int col0, int col1, int col2){
   for(int k = -2; k < s->w / step + 3; k++){ int x = ox + k * step, h = ((k * 37 + 11) & 7) * amp / 7;
-    disc(s, x, base - h + r / 2, r, (k & 1) ? col1 : col0); }
+    disc(s, x, base - h + r / 2, r, (k & 1) ? col1 : col0);
+    disc(s, x - r / 6, base - h + r / 2 + 3, r - 4, (k & 1) ? col0 : col1); }                              /* a softer inner lobe gives the crest a lit rim */
   rect(s, 0, base + r / 2, s->w, s->h, col2);
 }
 static void draw_sky(const View *v){
   Scr *s = v->s; int gy = VY(v, MX_ROWS);
-  for(int y = 0; y < s->h; y += 4){ int t = y * 90 / s->h; rect(s, 0, y, s->w, 4, RGB(90 + t / 2, 170 + t / 2, 240 - t / 3)); }
+  for(int y = 0; y < s->h; y += 2){ int t = y * 90 / s->h; rect(s, 0, y, s->w, 2, RGB(86 + t * 5 / 8, 164 + t * 5 / 8, 242 - t / 4)); }
   { int sx = 330 + LD(10) - (int)(g_pan * .02f); disc(s, sx, 44, 46, RGB(170, 215, 250)); disc(s, sx, 44, 36, RGB(205, 232, 250)); disc(s, sx, 44, 28, RGB(240, 244, 225)); disc(s, sx, 44, 22, RGB(255, 245, 190)); }   /* sun with a glow */                              /* sun: almost at infinity */
   for(int k = 0; k < 5; k++){ int cx = LD(-2 * (k & 1)) + ((k * 97 + (int)(frame * (.12f + .05f * (k & 1))) - (int)(g_pan * .06f)) % 480) - 40;   /* drifting clouds */
-    int cy = 30 + (k * 23) % 60; disc(s, cx, cy, 14, RGB(250, 252, 255)); disc(s, cx + 14, cy + 3, 11, RGB(244, 248, 255)); disc(s, cx - 13, cy + 4, 10, RGB(244, 248, 255)); }
+    int cy = 30 + (k * 23) % 60; disc(s, cx, cy + 3, 13, RGB(214, 226, 244)); disc(s, cx + 12, cy + 6, 9, RGB(214, 226, 244)); disc(s, cx, cy, 14, RGB(250, 252, 255)); disc(s, cx + 14, cy + 3, 11, RGB(244, 248, 255)); disc(s, cx - 13, cy + 4, 10, RGB(244, 248, 255)); }
   hills(s, gy - 30, v->ox + LD(-8) - (int)(g_pan * .10f), 120, 70, 28, RGB(146, 184, 216), RGB(156, 192, 220), RGB(146, 184, 216));   /* far hills, hazed toward the sky */
   hills(s, gy - 14, v->ox + LD(-4) - (int)(g_pan * .22f), 90, 52, 18, RGB(95, 150, 150), RGB(105, 160, 150), RGB(95, 150, 150));     /* near hills */
   for(int y = gy, k = 0; y < s->h; y += 10, k++){ int d = k > 8 ? 8 : k; rect(s, 0, y, s->w, 10, RGB(100 - d * 3, 68 - d * 3, 40 - d * 2)); }   /* soil darkens with depth */
-  rect(s, 0, gy - 2, s->w, 3, RGB(70, 170, 70)); rect(s, 0, gy - 3, s->w, 1, RGB(130, 210, 100));
+  for(int x = -((int)g_pan % 23); x < s->w; x += 23) for(int k = 0; k < 4; k++){ int yy = gy + 6 + k * 13 + ((x * 5 + k * 3) & 7), xx = x + k * 9 + ((k * 11) & 7); rect(s, xx, yy, 3, 2, RGB(78, 52, 30)); px(s, xx + 1, yy - 1, RGB(128, 96, 62)); }   /* pebbles and roots */
+  rect(s, 0, gy - 2, s->w, 4, RGB(70, 170, 70)); rect(s, 0, gy - 3, s->w, 1, RGB(150, 224, 110)); rect(s, 0, gy + 2, s->w, 2, RGB(44, 110, 48));
 }
 static void draw_fore(const View *v){               /* grass blades and a fence post in front of everything: the nearest layer */
   Scr *s = v->s; int gy = VY(v, MX_ROWS);
@@ -291,6 +293,7 @@ static void draw_fore(const View *v){               /* grass blades and a fence 
     rect(s, x + sw, gy - h + 6, 2, h, RGB(48, 140, 52)); rect(s, x + 4 + sw, gy - h / 2 + 6, 2, h / 2, RGB(70, 170, 70)); }
 }
 static void draw_shadow(const View *v, int cx, int cy_ground, int w){ rect(v->s, cx - w / 2, cy_ground, w, 3, RGB(60, 90, 40)); }
+static inline int min255(int v){ return v > 255 ? 255 : v; }
 static void draw_cells(const View *v){
   int p = v->ppc;
   /* per-material colour and 1/maxhp once per frame, not once per voxel (the core's lookups were ~600 000 calls in a short run) */
@@ -307,7 +310,15 @@ static void draw_cells(const View *v){
     float f = .55f + RTOF(world.hp[i]) * minv[m];                          /* darker as it takes damage */
     if(f > 1) f = 1;
     f *= g_dim; if(world.brk[i]) f *= .8f;
-    rect(v->s, sx, sy, p, p, RGB((int)(mrgb[m][0] * f), (int)(mrgb[m][1] * f), (int)(mrgb[m][2] * f)));
+    f *= 1.0f + (float)(((x * 7 + y * 13 + (x ^ y)) & 3) - 1) * .035f;                  /* grain: no two voxels quite alike */
+    int r0 = (int)(mrgb[m][0] * f), g0 = (int)(mrgb[m][1] * f), b0 = (int)(mrgb[m][2] * f);
+    rect(v->s, sx, sy, p, p, RGB(r0, g0, b0));
+    if(p >= 3){
+      int up = y > 0 ? world.grid[i - MX_COLS] : 1, dn = y < MX_ROWS - 1 ? world.grid[i + MX_COLS] : 1, lf = x > 0 ? world.grid[i - 1] : 1;
+      if(!up) rect(v->s, sx, sy, p, 1, RGB(min255(r0 + 46), min255(g0 + 46), min255(b0 + 40)));             /* sunlit top edge */
+      else if(!lf) rect(v->s, sx, sy, 1, p, RGB(min255(r0 + 22), min255(g0 + 22), min255(b0 + 20)));        /* lit left face */
+      if(!dn) rect(v->s, sx, sy + p - 1, p, 1, RGB(r0 * 6 / 10, g0 * 6 / 10, b0 * 6 / 10));                  /* shaded underside */
+    }
   }
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
     const MxChunk *ch = &world.chunks[c];
@@ -327,9 +338,10 @@ static void draw_landlords(const View *v){
     real ox, oy; mx_target_offset(&world, t, &ox, &oy);
     int p = v->ppc, fc = t->face < 0 ? -1 : 1, stun = t->stun > 0, wind = t->wind > 0, swing = t->swing > 0;
     int x = VX(v, RTOF(t->x + ox)), y = VY(v, RTOF(t->y + oy)) - (t->mv && ((frame >> 2) & 1) ? 1 : 0);
+    rect(v->s, x - p - 1, y - p / 2 - 1, p * 2 + 2, p * 2 + 2, RGB(14, 14, 22)); rect(v->s, x - p, y + p * 3 / 2, p * 2, 2, RGB(40, 64, 30));   /* outline + foot shadow */
     rect(v->s, x - p, y - p / 2, p * 2, p * 2, t->kind == LK_BAT ? RGB(47, 93, 58) : t->kind == LK_THROWER ? RGB(58, 74, 122) : t->kind == LK_BOSS ? RGB(28, 28, 36) : t->kind == LK_SPRINTER ? RGB(122, 90, 28) : t->kind == LK_HEALER ? RGB(244, 244, 244) : t->kind == LK_SHIELD ? RGB(51, 65, 63) : RGB(60, 70, 90));   /* suit */
     rect(v->s, x - p / 3, y - p / 2, p * 2 / 3 + 1, p, RGB(255, 255, 255)); rect(v->s, x - 1 + 0, y - p / 2, 1, p + 1, RGB(209, 43, 43));   /* shirt + tie */
-    disc(v->s, x, y - p, p, stun ? RGB(232, 176, 144) : RGB(240, 200, 160));                                                                  /* head */
+    disc(v->s, x, y - p, p + 1, RGB(14, 14, 22)); disc(v->s, x, y - p, p, stun ? RGB(232, 176, 144) : RGB(240, 200, 160)); disc(v->s, x - p / 3, y - p - p / 3, p / 2, RGB(250, 222, 190)); px(v->s, x + fc * p / 2, y - p / 2, RGB(214, 140, 120));   /* head: outline, highlight, cheek */                                                                  /* head */
     if(stun){ for(int k = -1; k <= 1; k += 2){ int ex = x + k * p / 2, ey = y - p; line(v->s, ex - 1, ey - 1, ex + 1, ey + 1, RGB(20, 20, 20)); line(v->s, ex + 1, ey - 1, ex - 1, ey + 1, RGB(20, 20, 20)); }
       for(int k = 0; k < 3; k++){ int a = (frame * 3 + k * 85) & 255; px(v->s, x + (a < 128 ? a - 64 : 192 - a) * p / 12, y - p * 3 - 3 - (k & 1), RGB(255, 235, 90)); } }
     else { px(v->s, x - p / 2, y - p, RGB(20, 20, 20)); px(v->s, x + p / 2, y - p, RGB(20, 20, 20)); }
@@ -493,7 +505,7 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
 /* ---------------------------------------------------------------- HUD / panels */
 static int alive(void){ return mx_targets_alive(&world); }
 static void draw_hud(void){
-  rect(&top, 0, 0, 400, 24, RGB(15, 18, 30));
+  rect(&top, 0, 0, 400, 24, RGB(15, 18, 30)); rect(&top, 0, 0, 400, 12, RGB(24, 28, 46)); rect(&top, 0, 23, 400, 1, RGB(255, 210, 63));
   char b[48];
   text(&top, 6, 8, "LV", 2, RGB(255, 210, 63)); itoa_(world.level + 1, b); text(&top, 30, 8, b, 2, RGB(255, 210, 63));
   text(&top, 56, 8, mx_level_name(world.level), 2, RGB(255, 255, 255));
@@ -502,7 +514,7 @@ static void draw_hud(void){
     rect(&top, 250, 6, 142, 12, RGB(255, 255, 255)); rect(&top, 251, 7, 140, 10, RGB(40, 40, 50)); rect(&top, 251, 7, k * 140 / 100, 10, k > 30 ? RGB(125, 255, 90) : RGB(255, 74, 74));
     text(&top, 206, 8, "TIME", 1, RGB(255, 255, 255));
   }
-  rect(&top, 0, 216, 400, 24, RGB(15, 18, 30));
+  rect(&top, 0, 216, 400, 24, RGB(15, 18, 30)); rect(&top, 0, 228, 400, 12, RGB(10, 12, 22)); rect(&top, 0, 216, 400, 1, RGB(255, 138, 138));
   text(&top, 6, 224, "MEN", 2, RGB(190, 190, 190)); itoa_(world.men, b); text(&top, 40, 224, b, 2, RGB(255, 255, 255));
   text(&top, 80, 224, "LANDLORDS", 2, RGB(255, 138, 138)); sprintf(b, "%d/%d", alive(), world.ntargets); text(&top, 168, 224, b, 2, RGB(255, 255, 255));
   sprintf(b, "%06d", world.score); text(&top, 394 - tw(b, 2), 224, b, 2, RGB(255, 255, 255));
