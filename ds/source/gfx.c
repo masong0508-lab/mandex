@@ -362,10 +362,12 @@ void gfx_ground(const View *v){
   if(gy >= 192) return;
   gfx_rect(v->buf, 0, gy, 256, 2, C_GRASS);
   gfx_rect(v->buf, 0, gy + 2, 256, 2, C_GRASS2);
-  for(int y = gy + 4; y < 192; y++){
-    memset(&v->buf[y * 256], (y - gy) & 4 ? C_DIRT2 : C_DIRT, 256);
-    for(int x = ((y * 37) & 15); x < 256; x += 23) gfx_px(v->buf, x, y, C_DIRT2);   /* pebbles */
+  static u8 rowtpl[2][16][256]; static int rowtpl_ok;                 /* the dirt rows only depend on (y - gy) & 4 and (y * 37) & 15: built once, then one memcpy per row */
+  if(!rowtpl_ok){
+    for(int b = 0; b < 2; b++) for(int o = 0; o < 16; o++){ memset(rowtpl[b][o], b ? C_DIRT2 : C_DIRT, 256); for(int x = o; x < 256; x += 23) rowtpl[b][o][x] = C_DIRT2; }   /* pebbles */
+    rowtpl_ok = 1;
   }
+  for(int y = gy + 4; y < 192; y++) memcpy(&v->buf[y * 256], rowtpl[((y - gy) & 4) ? 1 : 0][(y * 37) & 15], 256);
   /* grass blades and the odd flower along the edge (world anchored, so they scroll with the ground) */
   for(int x = 0; x < 256; x++){
     int wx = x + v->cx, hsh = (wx * 2654435761u) >> 28;

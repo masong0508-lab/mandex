@@ -399,6 +399,24 @@ static void draw_cells(const View *v){
     }
   }
 }
+static void draw_rooms(const View *v){                  /* the wallpaper behind the voxels; only where nothing has knocked it out */
+  static const unsigned char PAP[4][3] = { { 238, 214, 170 }, { 200, 225, 205 }, { 225, 190, 205 }, { 190, 205, 235 } };
+  int p = v->ppc;
+  for(int y = 0; y < MX_ROWS; y++){
+    int sy = VY(v, (float)y); if(sy + p < 0 || sy >= v->s->h) continue;
+    int x = 0;
+    while(x < MX_COLS){
+      int i = y * MX_COLS + x, n = world.paper[i];
+      if(!n || world.grid[i]){ x++; continue; }
+      int x2 = x; while(x2 < MX_COLS && world.paper[y * MX_COLS + x2] == n && !world.grid[y * MX_COLS + x2]) x2++;
+      int sx = VX(v, (float)x), w = VX(v, (float)x2) - sx; const unsigned char *c = PAP[(n - 1) & 3]; float g = g_dim;
+      rect(v->s, sx, sy, w, p, RGB((int)(c[0] * g), (int)(c[1] * g), (int)(c[2] * g)));
+      if(p >= 3) for(int k = 0; k < w; k += 5) rect(v->s, sx + k, sy, 2, p, RGB((int)(c[0] * g * .93f), (int)(c[1] * g * .93f), (int)(c[2] * g * .93f)));   /* wallpaper stripes */
+      if(y + 1 >= MX_ROWS || !world.paper[(y + 1) * MX_COLS + x]) rect(v->s, sx, sy + p - 1, w, 1, RGB((int)(c[0] * g * .7f), (int)(c[1] * g * .7f), (int)(c[2] * g * .7f)));
+      x = x2;
+    }
+  }
+}
 static void draw_landlords(const View *v){
   for(int i = 0; i < world.ntargets; i++){
     const MxTarget *t = &world.targets[i];
@@ -409,13 +427,20 @@ static void draw_landlords(const View *v){
     rect(v->s, x - p - 1, y - p / 2 - 1, p * 2 + 2, p * 2 + 2, RGB(14, 14, 22)); rect(v->s, x - p, y + p * 3 / 2, p * 2, 2, RGB(40, 64, 30));   /* outline + foot shadow */
     rect(v->s, x - p, y - p / 2, p * 2, p * 2, t->kind == LK_BAT ? RGB(47, 93, 58) : t->kind == LK_THROWER ? RGB(58, 74, 122) : t->kind == LK_BOSS ? RGB(28, 28, 36) : t->kind == LK_SPRINTER ? RGB(122, 90, 28) : t->kind == LK_HEALER ? RGB(244, 244, 244) : t->kind == LK_SHIELD ? RGB(51, 65, 63) : RGB(60, 70, 90));   /* suit */
     rect(v->s, x - p / 3, y - p / 2, p * 2 / 3 + 1, p, RGB(255, 255, 255)); rect(v->s, x - 1 + 0, y - p / 2, 1, p + 1, RGB(209, 43, 43));   /* shirt + tie */
-    disc(v->s, x, y - p, p + 1, RGB(14, 14, 22)); disc(v->s, x, y - p, p, stun ? RGB(232, 176, 144) : RGB(240, 200, 160)); disc(v->s, x - p / 3, y - p - p / 3, p / 2, RGB(250, 222, 190)); px(v->s, x + fc * p / 2, y - p / 2, RGB(214, 140, 120));   /* head: outline, highlight, cheek */                                                                  /* head */
+    rect(v->s, x - p / 3 - 1, y - p / 2, 1, p, RGB(34, 40, 56)); rect(v->s, x + p / 3 + 1, y - p / 2, 1, p, RGB(34, 40, 56));                 /* lapels */
+    rect(v->s, x - p, y + p * 3 / 2 - 1, p * 2, 1, RGB(20, 22, 32)); rect(v->s, x - p, y - p / 2, 1, p * 2, RGB(86, 96, 120));                  /* trouser hem, lit sleeve edge */
+    disc(v->s, x, y - p, p + 1, RGB(14, 14, 22)); disc(v->s, x, y - p, p, stun ? RGB(232, 176, 144) : RGB(240, 200, 160)); disc(v->s, x - p / 3, y - p - p / 3, p / 2, RGB(250, 222, 190)); px(v->s, x + fc * p / 2, y - p / 2, RGB(214, 140, 120));   /* head: outline, highlight, cheek */
     if(stun){ for(int k = -1; k <= 1; k += 2){ int ex = x + k * p / 2, ey = y - p; line(v->s, ex - 1, ey - 1, ex + 1, ey + 1, RGB(20, 20, 20)); line(v->s, ex + 1, ey - 1, ex - 1, ey + 1, RGB(20, 20, 20)); }
       for(int k = 0; k < 3; k++){ int a = (frame * 3 + k * 85) & 255; px(v->s, x + (a < 128 ? a - 64 : 192 - a) * p / 12, y - p * 3 - 3 - (k & 1), RGB(255, 235, 90)); } }
-    else { px(v->s, x - p / 2, y - p, RGB(20, 20, 20)); px(v->s, x + p / 2, y - p, RGB(20, 20, 20)); }
-    rect(v->s, x - p, y - p * 2, p * 2, p / 2 + 1, RGB(20, 20, 20));       /* hat brim */
-    rect(v->s, x - p / 2, y - p * 3, p, p + 1, RGB(20, 20, 20));           /* hat */
-    if(t->kind >= LK_BAT) rect(v->s, x - p / 2, y - p * 2 - p / 3 - 1, p, p / 3 + 2, t->kind == LK_BAT ? RGB(42, 138, 42) : t->kind == LK_THROWER ? RGB(58, 106, 209) : (t->kind == LK_BOSS || t->kind == LK_SPRINTER) ? RGB(255, 210, 63) : t->kind == LK_HEALER ? RGB(47, 191, 74) : RGB(138, 143, 153));   /* hat band */
+    else { int ey = y - p - p / 4, ex = p / 2 + 1;                                                                                           /* round glasses: dark rims, white glint, bridge */
+      for(int k = -1; k <= 1; k += 2){ rect(v->s, x + k * ex - 1, ey - 1, 3, 3, RGB(30, 30, 40)); px(v->s, x + k * ex, ey, RGB(210, 235, 255)); }
+      rect(v->s, x - ex + 1, ey, ex * 2 - 2, 1, RGB(30, 30, 40));
+      rect(v->s, x - p / 2, y - p / 2 - 1, p + 1, 1, RGB(60, 40, 30)); }                                                                     /* moustache */
+    rect(v->s, x - p - 1, y - p * 2, p * 2 + 2, 2, RGB(16, 14, 14)); rect(v->s, x - p - 1, y - p * 2, p * 2 + 2, 1, RGB(58, 46, 34));          /* fedora brim, lit edge */
+    rect(v->s, x - p / 2 - 1, y - p * 3, p + 2, p + 1, RGB(34, 30, 28)); rect(v->s, x - p / 2 - 1, y - p * 3, 1, p + 1, RGB(66, 56, 46));      /* crown */
+    rect(v->s, x - 1, y - p * 3, 2, 1, RGB(14, 12, 12));                                                                                    /* pinch */
+    rect(v->s, x - p / 2 - 1, y - p * 2 - 3, p + 2, 2, t->kind == LK_BAT ? RGB(42, 138, 42) : t->kind == LK_THROWER ? RGB(58, 106, 209) : (t->kind == LK_BOSS || t->kind == LK_SPRINTER) ? RGB(255, 210, 63) : t->kind == LK_HEALER ? RGB(47, 191, 74) : t->kind >= LK_BAT ? RGB(138, 143, 153) : RGB(150, 40, 40));   /* hat band */
+    if(t->kind < LK_BAT || t->kind == LK_WALKER){ int bx = x + fc * (p + p / 2 + 1), by = y + p; rect(v->s, bx - p / 2 - 1, by - 1, p + 3, p + 2, RGB(30, 18, 6)); rect(v->s, bx - p / 2, by, p + 1, p, RGB(122, 74, 34)); rect(v->s, bx, by - 2, 1, 2, RGB(30, 18, 6)); px(v->s, bx, by + 1, RGB(255, 210, 63)); }   /* briefcase */
     if(t->kind == LK_HEALER){ rect(v->s, x - 1, y - p / 2, 2, p + 1, RGB(47, 191, 74)); rect(v->s, x - p / 2, y, p, 2, RGB(47, 191, 74)); }   /* green cross */
     if(t->armor){ int sx = x + fc * p * 2; rect(v->s, sx - 2, y - p, 5, p * 2 + 2, RGB(20, 20, 20)); rect(v->s, sx - 1, y - p + 1, 3, p * 2, RGB(154, 164, 178)); }   /* riot shield */
     if(t->hpmax > 1){ int bw = t->hpmax * 5; rect(v->s, x - bw / 2 - 1, y - p * 4 - 3, bw + 2, 5, RGB(0, 0, 0)); for(int k = 0; k < t->hpmax; k++) rect(v->s, x - bw / 2 + k * 5, y - p * 4 - 2, 4, 3, k < t->hp ? RGB(232, 64, 64) : RGB(85, 85, 34)); }   /* health bar */
@@ -548,7 +573,7 @@ static void draw_valve(const View *v){
   if(m->mode == MAN_AIM && f > 0){ rect(v->s, x - p * 5, y - p * 9, p * 10, p, RGB(20, 24, 40)); rect(v->s, x - p * 5 + 1, y - p * 9 + 1, f * (p * 10 - 2) / 100, p - 2, f < 50 ? RGB(125, 255, 90) : f < 80 ? RGB(255, 210, 63) : RGB(255, 70, 70)); }
 }
 static void draw_world(const View *v){
-  draw_sky(v); draw_cells(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
+  draw_sky(v); draw_rooms(v); draw_cells(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
 }
 
 /* Stereoscopic top screen.  The slider sets how strong the depth is; each layer gets a horizontal disparity D (px at full slider):
@@ -563,6 +588,7 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
   g_pan += (tp - g_pan) * .08f;
   int fly = (m->mode == MAN_FLY) ? 1 : 0, dv = m->dive ? 3 : 0;
   a.ox = vt->ox + DX(14); draw_sky(&a);                                                   /* far plane (hills/clouds inside carry their own parallax) */
+  a.ox = vt->ox + DX(8); draw_rooms(&a);                                                  /* wallpaper sits deep inside the building */
   if(stereo){ a.ox = vt->ox + DX(4); g_dim = .45f; draw_cells(&a); g_dim = 1.0f; }       /* back faces */
   a.ox = vt->ox; draw_cells(&a);
   a.ox = vt->ox + DX(-3); draw_landlords(&a); draw_tubes(&a); draw_pads(&a); draw_cases(&a);
@@ -740,11 +766,11 @@ int main(void){
       if(app == ST_PLAY) mx_update(&world, R(1.0 / 60.0));
       on_events();
       mx_meta_events(&stats, &world);
-      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0);
+      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0);
       if(toast_t > 0){ if(++toast_t > 150){ toast_t = 0; toast_id = -1; } }
       if(toast_t == 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i-1] = toast_q[i]; toast_nq--; toast_t = 1; }
       tick_parts();
-      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ prev_best = stats.best[world.level]; mx_meta_win(&stats, &world); new_best = world.score > 0 && (uint32_t)world.score > prev_best; for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0); }
+      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ prev_best = stats.best[world.level]; mx_meta_win(&stats, &world); new_best = world.score > 0 && (uint32_t)world.score > prev_best; for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0); }
       was_state = world.state;
     }
 

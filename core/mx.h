@@ -226,6 +226,7 @@ typedef struct {
   uint32_t stat_cells;          /* chunk voxels processed by the solver (profiling) */
   MxRoom rooms[MX_MAX_ROOMS];
   int nrooms;
+  uint8_t paper[MX_ROWS * MX_COLS];   /* wallpaper per cell: palette+1 (0 = none). Blasts, broken walls and collapsing rubble knock it out (3x3 around every voxel lost), so interiors are destructible */
   MxTube tubes[MX_MAX_TUBES];
   int ntubes;
   int walk;                      /* level has walk mode: the man lands on his feet and you steer him */

@@ -464,16 +464,19 @@ static void draw_landlord(float x, float y, float z, const MxTarget *t){
 
 static void draw_rooms(void){
   static const unsigned char PAP[4][3] = { { 238, 214, 170 }, { 200, 225, 205 }, { 225, 190, 205 }, { 190, 205, 235 } };
-  for(int r = 0; r < world.nrooms; r++){
-    const MxRoom *rm = &world.rooms[r];
-    int fl = rm->y + rm->h, cover = 0;
-    if(fl < MX_ROWS) for(int x = rm->x; x < rm->x + rm->w; x++) cover += world.grid[fl * MX_COLS + x] != 0;
-    if(cover * 2 < rm->w) continue;                                      /* floor gone: no wallpaper left hanging */
-    float x0 = X(rm->x), y0 = Y(rm->y), w = rm->w * PXC, h = rm->h * PXC;
-    const unsigned char *p = PAP[rm->pal & 3];
-    gquad(x0, y0, w, h, Z_ROOM, argb(p[0], p[1], p[2], 255), argb(p[0] * 9 / 10, p[1] * 9 / 10, p[2] * 9 / 10, 255));
-    for(float k = 0; k < w; k += 10) quad(x0 + k, y0, 5, h, Z_ROOM + 0.01f, argb(0, 0, 0, 18));       /* wallpaper stripes */
-    quad(x0, y0 + h - 3, w, 3, Z_ROOM + 0.02f, argb(0, 0, 0, 46));                                  /* shadow along the floor */
+  for(int y = 0; y < MX_ROWS; y++){
+    int x = 0;
+    while(x < MX_COLS){
+      int i = y * MX_COLS + x, n = world.paper[i];
+      if(!n || world.grid[i]){ x++; continue; }
+      int x2 = x; while(x2 < MX_COLS && world.paper[y * MX_COLS + x2] == n && !world.grid[y * MX_COLS + x2]) x2++;     /* one quad per run of wallpaper */
+      float qx = X(x), qy = Y(y), w = (x2 - x) * PXC, h = PXC;
+      const unsigned char *p = PAP[(n - 1) & 3];
+      gquad(qx, qy, w, h, Z_ROOM, argb(p[0], p[1], p[2], 255), argb(p[0] * 9 / 10, p[1] * 9 / 10, p[2] * 9 / 10, 255));
+      for(float k = 0; k < w; k += 10) quad(qx + k, qy, 5, h, Z_ROOM + 0.01f, argb(0, 0, 0, 18));
+      if(y + 1 >= MX_ROWS || !world.paper[(y + 1) * MX_COLS + x]) quad(qx, qy + h - 3, w, 3, Z_ROOM + 0.02f, argb(0, 0, 0, 46));
+      x = x2;
+    }
   }
 }
 
@@ -812,8 +815,8 @@ int main(int argc, char **argv){
       mx_update(&world, DT);
       handle_events();
       mx_meta_events(&stats, &world);
-      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0);
-      { static int was = MX_PLAY; if(world.state == MX_WIN && was == MX_PLAY){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0); } was = world.state; }
+      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0);
+      { static int was = MX_PLAY; if(world.state == MX_WIN && was == MX_PLAY){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0); } was = world.state; }
       if(hint_t > 0) hint_t--;
       {
         int calm = st && world.state == MX_PLAY && world.man.mode == MAN_AIM && world.banner <= 0 && !st->buttons && abs(st->joyx) < 30 && abs(st->joyy) < 30;

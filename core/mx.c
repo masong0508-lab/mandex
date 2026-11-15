@@ -139,12 +139,13 @@ static void mark_dmg(MxWorld *w, int x, int y){
 }
 static void wob_zero(MxWorld *w, int i){ w->ox[i] = w->oy[i] = w->ovx[i] = w->ovy[i] = 0; }
 
+static void paper_hit(MxWorld *w, int x, int y){ for(int j = y - 1; j <= y + 1; j++) for(int i = x - 1; i <= x + 1; i++) if(i >= 0 && i < MX_COLS && j >= 0 && j < MX_ROWS) w->paper[IDX(i, j)] = 0; }
 static void wake_at(MxWorld *w, real px, real py, real r);
 static real kill(MxWorld *w, int x, int y, real bvx, real bvy){
   int i = IDX(x, y), m = w->grid[i];
   if(!m) return 0;
   real h = w->hp[i];
-  w->grid[i] = 0; w->hp[i] = 0; w->anch[i] = 0; w->need_support = 1; w->score += 10;
+  w->grid[i] = 0; w->hp[i] = 0; w->anch[i] = 0; w->need_support = 1; w->score += 10; paper_hit(w, x, y);
   wob_zero(w, i); clear_links(w, i); w->sand_on = 1; mark_dmg(w, x, y);
   if(w->collapse){ w->act_x = RI(x); w->act_y = RI(y); wake_at(w, RI(x) + R(0.5), RI(y) + R(0.5), RI(3)); }
   ev(w, EV_CELL, RI(x) + R(0.5), RI(y) + R(0.5), m, rmul(bvx, R(0.25)), rmul(bvy, R(0.25)));
@@ -545,7 +546,7 @@ static MX_HOT void support_pass(MxWorld *w){
       c->wx = w->ovx[gi]; c->wy = w->ovy[gi];            /* ... remembering its velocity (temporarily in wx/wy) */
       real d = MATS[c->m].d, px = c->lx + R(0.5), py = c->ly + R(0.5);
       M += d; cx += rmul(d, px); cy += rmul(d, py); mvx += rmul(d, c->wx); mvy += rmul(d, c->wy);
-      w->grid[gi] = 0; w->hp[gi] = 0; w->anch[gi] = 0;
+      w->grid[gi] = 0; w->hp[gi] = 0; w->anch[gi] = 0; paper_hit(w, gi % MX_COLS, gi / MX_COLS);
       wob_zero(w, gi); clear_links(w, gi);
     }
     cx = rdiv(cx, M); cy = rdiv(cy, M);
@@ -1947,6 +1948,7 @@ static void load_level(MxWorld *w, int level, int district){
   w->wob_enabled = first ? 1 : keep_wob;
   w->level = level; w->district = district; w->state = MX_PLAY; w->men = MEN[level]; w->banner = R(2.4);
   build(w, level);
+  for(int r = 0; r < w->nrooms; r++){ const MxRoom *rm = &w->rooms[r]; for(int y = rm->y; y < rm->y + rm->h; y++) for(int x = rm->x; x < rm->x + rm->w; x++) w->paper[IDX(x, y)] = (uint8_t)(rm->pal + 1); }
   unclip_targets(w);
   w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = 1;
   w->sand_on = 1;

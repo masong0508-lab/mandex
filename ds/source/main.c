@@ -342,15 +342,11 @@ static void draw_aim_dots(const View *v){
 
 static void draw_rooms(const View *v){
   int ppc = v->ppc;
-  for(int r = 0; r < world.nrooms; r++){
-    const MxRoom *rm = &world.rooms[r];
-    int px0 = rm->x * ppc - v->cx, py0 = rm->y * ppc - v->cy;
-    if(px0 + rm->w * ppc < 0 || px0 >= 256 || py0 + rm->h * ppc < 0 || py0 >= 192) continue;
-    int fl = rm->y + rm->h, cover = 0;
-    if(fl < MX_ROWS) for(int x = rm->x; x < rm->x + rm->w; x++) cover += world.grid[fl * MX_COLS + x] != 0;
-    if(cover * 2 < rm->w) continue;                                      /* floor gone: no wallpaper left hanging */
-    for(int y = rm->y; y < rm->y + rm->h; y++) for(int x = rm->x; x < rm->x + rm->w; x++)
-      if(!world.grid[y * MX_COLS + x]) gfx_wall(v, rm->pal, x * ppc - v->cx, y * ppc - v->cy);
+  int x0 = v->cx > 0 ? v->cx / ppc : 0, x1 = (v->cx + 256) / ppc + 1; if(x1 > MX_COLS) x1 = MX_COLS;
+  int y0 = v->cy > 0 ? v->cy / ppc : 0, y1 = (v->cy + 192) / ppc + 1; if(y1 > MX_ROWS) y1 = MX_ROWS;
+  for(int y = y0; y < y1; y++) for(int x = x0; x < x1; x++){
+    int i = y * MX_COLS + x;
+    if(world.paper[i] && !world.grid[i]) gfx_wall(v, world.paper[i] - 1, x * ppc - v->cx, y * ppc - v->cy);   /* wallpaper survives only where nothing has knocked it out */
   }
 }
 
@@ -1067,7 +1063,7 @@ int main(void){
   mx_meta_init(&stats); mx_options_default(&opt); save_load(); outfit_scan(1); apply_outfit(outfit_sel); outfit_swatches();   /* load before the first load_level(), as mx_meta_unpack asks */
   load_level(sel_level);
   STAGE(4, RGB15(31,31,0));                            /* yellow */
-  int slow_frames = 0, fast_frames = 0, phys_ticks = 0;
+  int slow_frames = 0, fast_frames = 0, phys_ticks = 0, draw_ticks = 0, lite = 0;   /* draw_ticks: last frame's drawing time; lite: the touch screen redraws every other frame while the DS is overloaded */
 
   for(;;){
     { static int last_app = ST_TITLE; if(app == ST_TITLE && last_app != ST_TITLE) save_sync(); last_app = app; }   /* back on the title: flush anything earned in a lost run */
@@ -1229,13 +1225,14 @@ int main(void){
          the reverse when there is headroom (the preference in `opt` is never touched, so it comes back by itself) */
       /* a hit wakes the wobble lattice, which is what costs time: the core caps the cells it walks (wob_budget) and this loop moves that cap with the measured cost,
          at once (one slow frame is enough) and back up slowly.  Only when the cap is already at its floor are the other quality switches touched. */
-      if(phys_ticks > 330000){ fast_frames = 0;
+      { int load = phys_ticks + draw_ticks; lite = load > 520000 ? 1 : load < 390000 ? 0 : lite; }      /* a 60 Hz frame is ~560 000 ticks: what counts is physics + drawing, not physics alone */
+      if(phys_ticks > 330000 || phys_ticks + draw_ticks > 500000){ fast_frames = 0;
         if(wob_budget > DS_WOB_MIN){ wob_budget = wob_budget * 2 / 3; if(wob_budget < DS_WOB_MIN) wob_budget = DS_WOB_MIN; mx_set_wobble_budget(&world, wob_budget); slow_frames = 0; }
         else if(++slow_frames >= 2){ slow_frames = 0;
           if(world.collapse){ coll_shed = 1; mx_set_collapse(&world, 0); }
           else if(world.substeps > 2) mx_set_substeps(&world, world.substeps - 1);
           else if(world.wob_enabled) mx_set_wobble(&world, 0); } }
-      else if(phys_ticks < 180000){ slow_frames = 0;
+      else if(phys_ticks < 180000 && phys_ticks + draw_ticks < 340000){ slow_frames = 0;
         if(wob_budget < DS_WOB_MAX && (frame & 15) == 0){ wob_budget += 24; if(wob_budget > DS_WOB_MAX) wob_budget = DS_WOB_MAX; mx_set_wobble_budget(&world, wob_budget); }
         if(++fast_frames >= 120){ fast_frames = 0;
           if(!world.wob_enabled) mx_set_wobble(&world, 1);
@@ -1244,10 +1241,10 @@ int main(void){
       else { slow_frames = 0; fast_frames = 0; }
       on_events();
       mx_meta_events(&stats, &world);
-      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0);
+      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0);
       update_parts();
       if(world.state != MX_PLAY){
-        if(was_state == MX_PLAY){ end_t = 0; if(world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0); } }
+        if(was_state == MX_PLAY){ end_t = 0; if(world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0); } }
         if(was_state == MX_PLAY) save_sync();                      /* win or lose: the one moment a short stall is harmless */
         end_t++;
       }
@@ -1281,6 +1278,7 @@ int main(void){
     top.cx += sx; top.cy += sy;
 
     /* ---------------- render ---------------- */
+    cpuStartTiming(0);
     View bot = { buf_bot, 2, -8, -40 };
     if(app == ST_TITLE){
       title_top(&top);
@@ -1293,6 +1291,7 @@ int main(void){
       top_hud(buf_top);
       banner(buf_top);
       end_panel(buf_top);
+      if(!(lite && (frame & 1) && app == ST_PLAY)){                     /* overloaded: the touch screen keeps last frame's picture every other frame */
       if(world.man.mode == MAN_AIM && world.state == MX_PLAY){
         bot = (View){ buf_bot, 4, 0, 56 };
         bot.cx += sx; bot.cy += sy;
@@ -1302,6 +1301,7 @@ int main(void){
         bottom_overview(&bot);
         if(world.state != MX_PLAY && end_t > 30 && (frame & 32))
           gfx_text_c(buf_bot, 128, 6, world.state == MX_WIN ? "TOUCH / START = NEXT LEVEL" : "TOUCH / START = TRY AGAIN", C_WHITE, C_BLACK, 1);
+      }
       }
       if(app == ST_PAUSE){
         panel(buf_top, 56, 64, 144, 60);
@@ -1323,6 +1323,7 @@ int main(void){
       gfx_text(buf_top, 150, 183, "COL", C_WHITE, 1);
       gfx_text(buf_top, 162, 183, world.collapse ? "ON" : coll_shed ? "SHED" : "OFF", C_GOLD, 1);
     }
+    draw_ticks = (int)cpuEndTiming();
     present();
   }
   return 0;
