@@ -17,13 +17,22 @@
 #include <stdbool.h>
 #include <math.h>
 #include "mx.h"
+#include "intro.h"
+extern u16 gfx_pal[256]; void gfx_init(void);      /* ds/source/gfx.c (built with -DMX_FIXED as its own unit; only the palette is used here) */
 #include "mx_meta.h"
 #include "manspr.h"                                /* the same pixel-art man as the DS and Dreamcast ports (generated from the web game) */
 #include "manidle.h"                                /* his idle gags, victory dance */
 
 static MxWorld world;
-enum { ST_TITLE, ST_PLAY, ST_PAUSE };
+enum { ST_TITLE, ST_PLAY, ST_PAUSE, ST_INTRO };
 static float g_dim = 1.0f;                      /* 1 = normal; <1 draws the dark back layer that gives blocks thickness in 3D */
+#ifdef MX_TEST_NO_CUTSCENES
+static int intro_seen = 1, wolf_seen = 1, intro_level;   /* host scripts that press A on the title and expect level 1 at once */
+#else
+static int intro_seen, wolf_seen, intro_level;
+#endif       /* the cutscenes (shared with the DS: ds/source/intro.c) play once per power-on */
+static u8 ic_top[256 * 192], ic_bot[256 * 192];       /* the cutscene is drawn into two 256x192 palette buffers, then scaled up to the 3DS screens */
+void sfx_play(int id, int pan){ (void)id; (void)pan; }   /* the 3DS build has no sound; the shared cutscene code calls this */
 static int app = ST_TITLE, sel = 0, frame, dragging, pad_used, cells0 = 1;
 static float pad_dx, pad_dy;
 static int new_best;                                     /* this win beat the level's old best score */
@@ -33,7 +42,16 @@ static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
 static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
 
 /* ---------------------------------------------------------------- pixels */
-typedef struct { u8 *fb; int w, h; } Scr;                       /* w x h in screen terms (400x240 or 320x240) */
+typedef struct { u8 *fb; int w, h; } Scr;
+/* palette buffer (256x192) -> screen, scaled 1.25x with nearest pixels (320x240), centred in x; the framebuffer is column-major, bottom row first, 3 bytes per pixel (BGR) */
+static void blit_pal(Scr *s, const u8 *src){
+  int x0 = (s->w - 320) / 2;
+  for(int X = 0; X < 320; X++){
+    const u8 *col = src + (X * 4 / 5);
+    u8 *p = s->fb + ((x0 + X) * s->h) * 3;
+    for(int Y = 0; Y < 240; Y++, p += 3){ u16 c = gfx_pal[col[(239 - Y) * 4 / 5 * 256]]; p[0] = (u8)(((c >> 10) & 31) * 255 / 31); p[1] = (u8)(((c >> 5) & 31) * 255 / 31); p[2] = (u8)((c & 31) * 255 / 31);   /* RGB15: red in the low bits; byte 0 of the pixel is blue */ }
+  }
+}                       /* w x h in screen terms (400x240 or 320x240) */
 static Scr top, bot;
 static inline void px(Scr *s, int x, int y, u32 rgb){
   if((unsigned)x >= (unsigned)s->w || (unsigned)y >= (unsigned)s->h) return;
@@ -448,6 +466,7 @@ int main(void){
   gfxInitDefault();
   gfxSetDoubleBuffering(GFX_TOP, true); gfxSetDoubleBuffering(GFX_BOTTOM, true);
   srand(1234);
+  gfx_init();                                         /* the shared DS drawing library builds its palette in RAM (used by the cutscenes) */
   load_level(0);
   View vt = {&top, 3, 20, 28, 0, 0};                 /* whole level: 360x180 centred on the top screen */
   View vb = {&bot, 4, 0, 0, -24, 0};                 /* the sling at 4 px per voxel; touch maps straight back to cells */
@@ -457,12 +476,25 @@ int main(void){
     touchPosition t; hidTouchRead(&t);
     frame++;
 
+    if(app == ST_INTRO){                      /* the cutscene: its own tiny loop, then on to the level that started it */
+      if(intro_tick((int)down, t.px * 4 / 5, t.py * 4 / 5)){ app = ST_PLAY; load_level(intro_level); }
+      else {
+        intro_draw(ic_top, ic_bot);
+        top.fb = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL); top.w = 400; top.h = 240; memset(top.fb, 0, 400 * 240 * 3); blit_pal(&top, ic_top);
+        bot.fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL); bot.w = 320; bot.h = 240; blit_pal(&bot, ic_bot);
+      }
+      gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();
+      continue;
+    }
     if(app == ST_TITLE){
       if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } }
       if(down & KEY_Y){ nofight = !nofight; mx_set_fight(&world, !nofight); }
-      if(down & (KEY_A | KEY_START | KEY_TOUCH)){ app = ST_PLAY; load_level(sel); }
+      if(down & (KEY_A | KEY_START | KEY_TOUCH)){
+        if(sel == 0 && !intro_seen){ intro_seen = 1; intro_level = 0; app = ST_INTRO; intro_start(); }
+        else if(sel == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_level = sel; app = ST_INTRO; intro_start_wolf(); }
+        else { app = ST_PLAY; load_level(sel); } }
     } else if(app == ST_PAUSE){
       if(down & KEY_START) app = ST_PLAY;
       if(down & KEY_SELECT){ load_level(world.level); app = ST_PLAY; }

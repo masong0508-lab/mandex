@@ -7,8 +7,8 @@ include $(DEVKITARM)/3ds_rules
 
 TARGET   := mandex
 BUILD    := build
-SOURCES  := . ../core
-INCLUDES := ../core ../art
+SOURCES  := . ../core ../ds/source
+INCLUDES := shim ../core ../art ../ds/source
 APP_TITLE       := Mandex
 APP_DESCRIPTION := Landlord smasher
 APP_AUTHOR      := Mandex
@@ -24,7 +24,7 @@ export OUTPUT  := $(CURDIR)/$(TARGET)
 export TOPDIR  := $(CURDIR)
 export VPATH   := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR := $(CURDIR)/$(BUILD)
-export CFILES  := main.c mx.c mx_meta.c cloth.c
+export CFILES  := main.c mx.c mx_meta.c cloth.c gfx.c intro.c
 export LD      := $(CC)
 export OFILES  := $(CFILES:.c=.o)
 export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) $(foreach dir,$(LIBDIRS),-I$(dir)/include) -I$(CURDIR)/$(BUILD)
@@ -38,6 +38,8 @@ $(BUILD):
 clean:
 	@rm -rf $(BUILD) $(TARGET).3dsx $(TARGET).elf $(TARGET).smdh
 else
+# the shared DS cutscene code is a separate unit built for the DS's fixed-point core; main.c only exchanges plain buffers with it
+gfx.o intro.o: CFLAGS += -DMX_FIXED
 DEPENDS := $(OFILES:.o=.d)
 $(OUTPUT).3dsx: $(OUTPUT).elf $(OUTPUT).smdh
 $(OUTPUT).elf: $(OFILES)

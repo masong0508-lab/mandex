@@ -5,6 +5,17 @@
  * Controls: A / touch = next (first finishes the typing), START or the SKIP button = straight to level 1.
  */
 #include <nds.h>
+#if defined(__3DS__) || defined(MX_SHARED_CUTSCENE)                      /* shared with the 3DS build: the caller passes libctru key bits (A = bit 0, B = bit 1, START = bit 3, TOUCH = bit 20) */
+#define IK_A (1 << 0)
+#define IK_B (1 << 1)
+#define IK_START (1 << 3)
+#define IK_TOUCH (1 << 20)
+#else
+#define IK_A KEY_A
+#define IK_B KEY_B
+#define IK_START KEY_START
+#define IK_TOUCH KEY_TOUCH
+#endif
 #include <string.h>
 #include "gfx.h"
 #include "sfx.h"
@@ -84,9 +95,9 @@ static void cue(void){
 static int next_scene(void){ sc++; t = 0; fxdone = 0; if(sc >= NSC()) return 1; sfx_play(SFX_CLICK, 64); return 0; }
 
 int intro_tick(int down, int tx, int ty){
-  if(down & KEY_START) return 1;
-  if((down & KEY_TOUCH) && tx >= 184 && ty >= 170) return 1;                    /* SKIP >> */
-  if(down & (KEY_A | KEY_B | KEY_TOUCH)){
+  if(down & IK_START) return 1;
+  if((down & IK_TOUCH) && tx >= 184 && ty >= 170) return 1;                    /* SKIP >> */
+  if(down & (IK_A | IK_B | IK_TOUCH)){
     if(t < type_end(sc)) t = type_end(sc);                                      /* first press finishes the typing... */
     else return next_scene();                                                   /* ...the next goes on */
   }
@@ -132,39 +143,59 @@ static void bubble(u8 *b, int x, int y, const char *s, int tail){      /* speech
   gfx_text(b, x - gfx_text_w(s, 1) / 2, y + 4, s, C_BLACK, 1);
 }
 enum { GF_TIE = 1, GF_BOXERS = 2, GF_SAD = 4, GF_WAVE = 8, GF_COOL = 16, GF_ANGRY = 32, GF_FUR = 64, GF_EARS = 128, GF_SNOUT = 256, GF_TAIL = 512, GF_HOWL = 1024 };
+static int g_t;                                                   /* the frame counter of the shot being drawn: blinks, breathing, sway */
 static void face(u8 *b, int x, int y, int s, int fl){       /* head centred x,y, radius ~5 units */
-  const u8 hc = (fl & GF_FUR) ? C_GRAY : C_SKIN;
+  const u8 hc = (fl & GF_FUR) ? C_GRAY : C_SKIN, hs2 = (fl & GF_FUR) ? C_DARK : C_SKIN2;
+  const int big = s >= 3, blink = (g_t % 110) < 4;
   if(fl & GF_EARS){ gfx_tri(b, x - 5 * s, y - 3 * s, x - s, y - 5 * s, x - 5 * s, y - 11 * s, C_GRAY); gfx_tri(b, x + 5 * s, y - 3 * s, x + s, y - 5 * s, x + 5 * s, y - 11 * s, C_GRAY); gfx_tri(b, x - 4 * s, y - 4 * s, x - 2 * s, y - 5 * s, x - 4 * s, y - 8 * s, C_PINK); gfx_tri(b, x + 4 * s, y - 4 * s, x + 2 * s, y - 5 * s, x + 4 * s, y - 8 * s, C_PINK); }
+  gfx_ell(b, x, y + (big ? 1 : 0), 5 * s + 1, 5 * s + 1, C_HAIR);                                                          /* outline */
   gfx_ell(b, x, y, 5 * s, 5 * s, hc); gfx_ell(b, x, y + s, 5 * s, 4 * s, hc);
-  gfx_ell(b, x + 5 * s, y, s, 2 * s, C_SKIN2); gfx_ell(b, x - 5 * s, y, s, 2 * s, C_SKIN2);                      /* ears */
+  gfx_ell(b, x + 2 * s, y + 2 * s, 3 * s, 3 * s, hs2);  gfx_ell(b, x, y + s, 4 * s, 3 * s, hc);                           /* soft shadow down the right side, face front */
+  gfx_ell(b, x + 5 * s, y, s, 2 * s, hs2); gfx_ell(b, x - 5 * s, y, s, 2 * s, hs2);                                         /* ears */
   gfx_ell(b, x, y - 5 * s, 5 * s, 2 * s, C_HAIR); gfx_rect(b, x - 5 * s, y - 5 * s, s, 3 * s, C_HAIR); gfx_rect(b, x + 4 * s, y - 5 * s, s, 3 * s, C_HAIR);
+  if(big){ gfx_tline(b, x - 3 * s, y - 5 * s, x - 2 * s, y - 4 * s, 1, C_HAIR2); gfx_tline(b, x + s, y - 5 * s, x + 2 * s, y - 4 * s, 1, C_HAIR2); }  /* thinning hair: a few strands */
   int ey = y - s / 2, ew = s / 3 + 1;
   if(fl & GF_ANGRY){ gfx_tline(b, x - 4 * s, y - 3 * s, x - s, y - s, ew, C_BLACK); gfx_tline(b, x + 4 * s, y - 3 * s, x + s, y - s, ew, C_BLACK); ey = y; }
   else if(fl & GF_SAD){ gfx_tline(b, x - 4 * s, y - 2 * s, x - s, y - 3 * s, ew, C_BLACK); gfx_tline(b, x + 4 * s, y - 2 * s, x + s, y - 3 * s, ew, C_BLACK); }
-  gfx_rect(b, x - 3 * s, ey, 2 * s > 2 ? 2 * s - 1 : 2, 2 * s > 2 ? 2 * s - 1 : 2, C_BLACK); gfx_rect(b, x + s, ey, 2 * s > 2 ? 2 * s - 1 : 2, 2 * s > 2 ? 2 * s - 1 : 2, C_BLACK);
+  else if(big){ gfx_tline(b, x - 4 * s, y - 2 * s, x - s, y - 2 * s - s / 2, ew, C_HAIR); gfx_tline(b, x + s, y - 2 * s - s / 2, x + 4 * s, y - 2 * s, ew, C_HAIR); }   /* eyebrows */
+  const int ew2 = 2 * s > 2 ? 2 * s - 1 : 2;
+  if(blink){ gfx_tline(b, x - 3 * s, ey + ew2 / 2, x - 3 * s + ew2, ey + ew2 / 2, 1, C_BLACK); gfx_tline(b, x + s, ey + ew2 / 2, x + s + ew2, ey + ew2 / 2, 1, C_BLACK); }
+  else if(big){                                                                                                                   /* eyes: whites with a pupil that drifts */
+    int dx = wv(g_t, 150, 1);
+    gfx_rect(b, x - 3 * s, ey - 1, ew2 + 1, ew2 + 2, C_WHITE); gfx_rect(b, x + s, ey - 1, ew2 + 1, ew2 + 2, C_WHITE);
+    gfx_rect(b, x - 3 * s + (ew2 + 1) / 2 - 1 + dx, ey + 1, s - 1 + (s > 3), ew2 - 1, C_BLACK); gfx_rect(b, x + s + (ew2 + 1) / 2 - 1 + dx, ey + 1, s - 1 + (s > 3), ew2 - 1, C_BLACK);
+  } else { gfx_rect(b, x - 3 * s, ey, ew2, ew2, C_BLACK); gfx_rect(b, x + s, ey, ew2, ew2, C_BLACK); }
+  if(big && !(fl & GF_FUR)){ gfx_ell(b, x - 4 * s, y + 2 * s, s, s / 2 + 1, C_PINK); gfx_ell(b, x + 4 * s, y + 2 * s, s, s / 2 + 1, C_PINK); }   /* blush */
   if(fl & GF_SAD){ gfx_tline(b, x - 2 * s, y + 3 * s, x + 2 * s, y + 3 * s, ew, C_BLACK); gfx_tline(b, x - 2 * s, y + 3 * s, x - 3 * s, y + 4 * s, ew, C_BLACK); gfx_tline(b, x + 2 * s, y + 3 * s, x + 3 * s, y + 4 * s, ew, C_BLACK); }
   else if(fl & GF_ANGRY){ gfx_rect(b, x - 2 * s, y + 2 * s, 4 * s, 2 * s, C_BLACK); gfx_rect(b, x - 2 * s + 1, y + 2 * s + 1, 4 * s - 2, s, C_WHITE); }
   else { gfx_tline(b, x - 2 * s, y + 3 * s, x, y + 3 * s + s, ew, C_BLACK); gfx_tline(b, x, y + 3 * s + s, x + 3 * s, y + 2 * s, ew, C_BLACK); }
   if(fl & GF_SNOUT){ gfx_ell(b, x, y + 2 * s, 3 * s, 2 * s, C_SKIN3); gfx_ell(b, x, y + s, (s + 1) / 2 + 1, (s + 1) / 2 + 1, C_BLACK); }
-  else gfx_ell(b, x, y + s, s, s, C_SKIN2);                                                                              /* nose */
+  else { gfx_ell(b, x, y + s, s, s, hs2); if(big && !(fl & GF_FUR)){ gfx_ell(b, x - s, y + 2 * s - 1, 2 * s, s / 2 + 1, C_HAIR); gfx_ell(b, x + s, y + 2 * s - 1, 2 * s, s / 2 + 1, C_HAIR); } }   /* nose, and the moustache */
   if(fl & GF_HOWL){ gfx_rect(b, x - 2 * s, y + 2 * s, 4 * s, 3 * s, C_BLACK); gfx_rect(b, x - s, y + 4 * s, 2 * s, s, C_RED); }
 }
 /* Gerald: centre x, feet at fy, s pixels per unit (about 30 units tall) */
 static void gerald(u8 *b, int x, int fy, int s, int fl){
-  int boxers = fl & GF_BOXERS; const u8 lc = (fl & GF_FUR) ? C_GRAY : C_SKIN;
-  if(fl & GF_TAIL){ gfx_tline(b, x + 4 * s, fy - 10 * s, x + 11 * s, fy - 16 * s, 3 * s, C_GRAY); gfx_ell(b, x + 11 * s, fy - 17 * s, 2 * s, 2 * s, C_CLOUD2); }
+  int boxers = fl & GF_BOXERS; const u8 lc = (fl & GF_FUR) ? C_GRAY : C_SKIN, ld = (fl & GF_FUR) ? C_DARK : C_SKIN2;
+  const u8 sh = boxers ? lc : C_WHITE, shd = boxers ? ld : C_CLOUD2;                                                       /* torso/sleeve colour and its shade */
+  const int br = s >= 2 ? wv(g_t, 90, 1) : 0;                                                                           /* breathing: the chest and head rise by a pixel */
+  if(fl & GF_TAIL){ gfx_tline(b, x + 4 * s, fy - 10 * s, x + 11 * s + wv(g_t, 60, 2), fy - 16 * s, 3 * s, C_GRAY); gfx_ell(b, x + 11 * s + wv(g_t, 60, 2), fy - 17 * s, 2 * s, 2 * s, C_CLOUD2); }
+  /* outline pass: one dark pixel around legs, torso and arms */
+  gfx_rect(b, x - 5 * s - 1, fy - 8 * s - 1, 4 * s + 2, 8 * s + 1, C_HAIR); gfx_rect(b, x + s - 1, fy - 8 * s - 1, 4 * s + 2, 8 * s + 1, C_HAIR);
+  gfx_rect(b, x - 7 * s - 1, fy - 23 * s - 1 + br, 14 * s + 2, 10 * s + 1, C_HAIR);
   gfx_rect(b, x - 4 * s, fy - 8 * s, 3 * s, 8 * s, lc); gfx_rect(b, x + s, fy - 8 * s, 3 * s, 8 * s, lc);           /* legs */
-  gfx_rect(b, x - 5 * s, fy - s, 4 * s, s, C_BLACK); gfx_rect(b, x + s, fy - s, 4 * s, s, C_BLACK);                         /* shoes */
+  gfx_rect(b, x + 2 * s, fy - 8 * s, s, 8 * s, ld);                                                                  /* shaded inner edge of the right leg */
+  gfx_rect(b, x - 5 * s, fy - s, 4 * s, s, C_BLACK); gfx_rect(b, x + s, fy - s, 4 * s, s, C_BLACK); gfx_rect(b, x - 5 * s, fy - s, 4 * s, 1, C_GRAY); gfx_rect(b, x + s, fy - s, 4 * s, 1, C_GRAY);   /* shoes with a shine */
   gfx_rect(b, x - 5 * s, fy - 13 * s, 10 * s, 6 * s, boxers ? C_RED : C_GOLD2);                                             /* khaki shorts / red boxers */
+  gfx_rect(b, x + 2 * s, fy - 13 * s, 3 * s, 6 * s, boxers ? C_RED2 : C_DIRT); gfx_rect(b, x - s / 2, fy - 13 * s, 1, 6 * s, boxers ? C_RED2 : C_DIRT);   /* shade, and the seam between the legs */
   if(boxers) gfx_rect(b, x - 5 * s, fy - 13 * s, 10 * s, s, C_RED2);
-  if(boxers){ gfx_rect(b, x - 5 * s, fy - 23 * s, 10 * s, 10 * s, C_SKIN); gfx_ell(b, x, fy - 14 * s, 6 * s, 3 * s, C_SKIN2); }   /* shirtless, belly */
-  else { gfx_rect(b, x - 5 * s, fy - 23 * s, 10 * s, 10 * s, C_WHITE); gfx_rect(b, x + 3 * s, fy - 23 * s, 2 * s, 10 * s, C_CLOUD2); }
-  if(fl & GF_TIE){ gfx_tri(b, x - s, fy - 23 * s, x + s, fy - 23 * s, x, fy - 21 * s, C_BLACK); gfx_tri(b, x - s, fy - 22 * s, x + s, fy - 22 * s, x + s, fy - 14 * s, C_SKY0 + 4); gfx_tri(b, x - s, fy - 22 * s, x + s, fy - 14 * s, x - s, fy - 14 * s, C_SKY0 + 6); }
-  gfx_rect(b, x - 7 * s, fy - 23 * s, 2 * s, 9 * s, boxers ? C_SKIN : C_WHITE);                                            /* left arm */
-  if(fl & GF_WAVE){ gfx_tline(b, x + 5 * s, fy - 22 * s, x + 9 * s, fy - 31 * s, 2 * s, boxers ? C_SKIN : C_WHITE); gfx_ell(b, x + 9 * s, fy - 32 * s, s + 1, s + 1, C_SKIN); }
-  else gfx_rect(b, x + 5 * s, fy - 23 * s, 2 * s, 9 * s, boxers ? C_SKIN : C_WHITE);
-  gfx_rect(b, x - 7 * s, fy - 14 * s, 2 * s, 2 * s, C_SKIN); if(!(fl & GF_WAVE)) gfx_rect(b, x + 5 * s, fy - 14 * s, 2 * s, 2 * s, C_SKIN);
-  face(b, x, fy - 28 * s, s, fl);
+  if(boxers){ gfx_rect(b, x - 5 * s, fy - 23 * s + br, 10 * s, 10 * s, lc); gfx_ell(b, x, fy - 14 * s, 6 * s, 3 * s, ld); gfx_ell(b, x, fy - 15 * s, 5 * s, 2 * s, lc); if(s >= 2) gfx_px(b, x, fy - 14 * s, C_HAIR); }   /* shirtless, belly, navel */
+  else { gfx_rect(b, x - 5 * s, fy - 23 * s + br, 10 * s, 10 * s - br, C_WHITE); gfx_rect(b, x + 3 * s, fy - 23 * s + br, 2 * s, 10 * s - br, C_CLOUD2); if(s >= 2){ for(int i = 0; i < 4; i++) gfx_px(b, x - s, fy - 22 * s + i * 2 * s + br, C_GRAY); } gfx_ell(b, x, fy - 14 * s, 5 * s, 2 * s, C_WHITE); }
+  if(fl & GF_TIE){ gfx_tri(b, x - s, fy - 23 * s, x + s, fy - 23 * s, x, fy - 21 * s, C_BLACK); gfx_tri(b, x - s, fy - 22 * s, x + s, fy - 22 * s, x + s, fy - 14 * s, C_SKY0 + 4); gfx_tri(b, x - s, fy - 22 * s, x + s, fy - 14 * s, x - s, fy - 14 * s, C_SKY0 + 3); }
+  gfx_rect(b, x - 7 * s, fy - 23 * s + br, 2 * s, 9 * s, sh);                                                              /* left arm */
+  if(fl & GF_WAVE){ int wy = wv(g_t, 24, 2 * s); gfx_tline(b, x + 5 * s, fy - 22 * s + br, x + 9 * s + wy / 2, fy - 31 * s, 2 * s, sh); gfx_ell(b, x + 9 * s + wy / 2, fy - 32 * s, s + 1, s + 1, lc); }
+  else { gfx_rect(b, x + 5 * s, fy - 23 * s + br, 2 * s, 9 * s, sh); gfx_rect(b, x + 6 * s, fy - 23 * s + br, s, 9 * s, shd); }
+  gfx_ell(b, x - 6 * s, fy - 13 * s, s + 1, s + 1, lc); if(!(fl & GF_WAVE)) gfx_ell(b, x + 6 * s, fy - 13 * s, s + 1, s + 1, lc);   /* round hands */
+  face(b, x, fy - 28 * s + br, s, fl);
 }
 static void towel(u8 *b, int x, int y, int w, int h, int ph, int th){         /* the pink towel, rippling, with two terry stripes */
   (void)th;
@@ -480,7 +511,7 @@ static void narration(u8 *b){
 }
 
 void intro_draw(u8 *top, u8 *bot){
-  int k = shot_of(), tt = shot_t(k);
+  int k = shot_of(), tt = shot_t(k); g_t = tt;
   if(wolf){
     switch(sc){ case 0: w_walk(top, k, tt); break; case 1: w_fridge(top, k, tt); break; case 2: w_itch(top, k, tt); break; case 3: w_ears(top, k, tt); break;
                 case 4: w_tail(top, k, tt); break; case 5: w_howl(top, k, tt); break; case 6: w_visit(top, k, tt); break; default: w_title(top, k, tt); break; }

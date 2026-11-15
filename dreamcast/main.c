@@ -58,6 +58,20 @@ static float MAXHP[MX_NMAT];                 /* filled from the core's material 
 static uint32 argb(int r, int g, int b, int a){ return ((uint32)a << 24) | ((uint32)r << 16) | ((uint32)g << 8) | (uint32)b; }
 #define WHITE argb(255, 255, 255, 255)
 
+/* ---- the cutscenes (ds/source/intro.c, shared with the DS and 3DS): drawn into two 256x192 palette buffers, expanded to RGB565 and shown as two textured quads ---- */
+#include "intro.h"
+extern unsigned short gfx_pal[256]; void ds_gfx_init(void);       /* ds/source/gfx.c (built with -DMX_FIXED -Dgfx_init=ds_gfx_init as its own unit: only its palette is used here) */
+void sfx_play(int id, int pan){ (void)id; (void)pan; }           /* the Dreamcast build has no sound */
+static unsigned char ic_top[256 * 192], ic_bot[256 * 192];
+static unsigned short ic_rgb[256 * 256];
+static pvr_ptr_t tx_ic_top, tx_ic_bot;
+static pvr_poly_hdr_t hdr_ic_top, hdr_ic_bot;
+static int in_intro, intro_seen, wolf_seen, intro_level;
+static void ic_upload(pvr_ptr_t tx, const unsigned char *src){                 /* palette index -> RGB565, 256 texels wide, 192 of 256 rows used */
+  for(int y = 0; y < 192; y++) for(int x = 0; x < 256; x++){ unsigned c = gfx_pal[src[y * 256 + x]]; unsigned r = c & 31, g = (c >> 5) & 31, b = (c >> 10) & 31; ic_rgb[y * 256 + x] = (unsigned short)((r << 11) | (g << 6 << 0) | b); }
+  pvr_txr_load(ic_rgb, tx, 256 * 256 * 2);
+}
+
 /* ---- textures ---- */
 static pvr_ptr_t tx_bga, tx_bgb, tx_atl, tx_man, tx_ttl;
 static pvr_poly_hdr_t hdr_col, hdr_bga, hdr_bgb, hdr_atl, hdr_man, hdr_ttl;
@@ -651,6 +665,12 @@ static void draw_all(void){
 
 static void load_level(int n){ mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats); hint_t = 420; }
 
+static void draw_intro(void){
+  intro_draw(ic_top, ic_bot); ic_upload(tx_ic_top, ic_top); ic_upload(tx_ic_bot, ic_bot);
+  quad(0, 0, 640, 480, Z_BG, argb(255, 0, 0, 0));
+  tquad(&hdr_ic_top, 256, 256, 128, 2, 384, 288, 0, 0, 256, 192, Z_HUD, WHITE);                   /* the picture, 1.5x */
+  tquad(&hdr_ic_bot, 256, 256, 128, 292, 384, 171, 0, 18, 256, 114, Z_HUD, WHITE);                /* the typed narration under it (rows 18..132 of the text screen) */
+}
 static void gfx_init(void){
   pvr_init_defaults();
   { pvr_poly_cxt_t cxt;
@@ -669,6 +689,10 @@ static void gfx_init(void){
   make_hdr(&hdr_atl, PVR_TXRFMT_ARGB4444, DCT_ATL_W, DCT_ATL_H, tx_atl);
   make_hdr(&hdr_man, PVR_TXRFMT_ARGB4444, DCT_MAN_W, DCT_MAN_H, tx_man);
   make_hdr(&hdr_ttl, PVR_TXRFMT_RGB565, DCT_TTL_W, DCT_TTL_H, tx_ttl);
+  ds_gfx_init();
+  tx_ic_top = pvr_mem_malloc(256 * 256 * 2); tx_ic_bot = pvr_mem_malloc(256 * 256 * 2);
+  if(tx_ic_top) make_hdr(&hdr_ic_top, PVR_TXRFMT_RGB565, 256, 256, tx_ic_top);
+  if(tx_ic_bot) make_hdr(&hdr_ic_bot, PVR_TXRFMT_RGB565, 256, 256, tx_ic_bot);
 }
 
 int main(int argc, char **argv){
@@ -683,7 +707,10 @@ int main(int argc, char **argv){
     cont_state_t *st = dev ? (cont_state_t *)maple_dev_status(dev) : NULL;
     if(st){
       uint32 pressed = st->buttons & ~prev; prev = st->buttons;
-      if(on_title){
+      if(in_intro){                                       /* a cutscene: A / B / START moves on (START skips), then the level that started it */
+        int dn = ((pressed & CONT_A) ? 1 : 0) | ((pressed & CONT_B) ? 2 : 0) | ((pressed & CONT_START) ? 8 : 0);
+        if(intro_tick(dn, 0, 0)){ in_intro = 0; load_level(intro_level); }
+      } else if(on_title){
         if(pressed & (CONT_DPAD_RIGHT | CONT_DPAD_LEFT)) title_lv = (title_lv + ((pressed & CONT_DPAD_RIGHT) ? 1 : MX_NUM_LEVELS - 1)) % MX_NUM_LEVELS;
         { int tl = (st->ltrig > 128 && !(prev_trig & 1)), tr = (st->rtrig > 128 && !(prev_trig & 2)); prev_trig = (st->ltrig > 128) | ((st->rtrig > 128) << 1);
         if(tl || tr){
@@ -691,7 +718,10 @@ int main(int argc, char **argv){
           recolor_man(outfit_sel);
         } }
         if(pressed & CONT_Y) nofight = !nofight;
-        if(pressed & (CONT_START | CONT_A)){ on_title = 0; load_level(title_lv); if(tx_ttl){ pvr_mem_free(tx_ttl); tx_ttl = 0; } }
+        if(pressed & (CONT_START | CONT_A)){ on_title = 0; if(tx_ttl){ pvr_mem_free(tx_ttl); tx_ttl = 0; }
+          if(title_lv == 0 && !intro_seen && tx_ic_top && tx_ic_bot){ intro_seen = 1; intro_level = 0; in_intro = 1; intro_start(); }
+          else if(title_lv == MX_CH3_START && !wolf_seen && tx_ic_top && tx_ic_bot){ wolf_seen = 1; intro_level = title_lv; in_intro = 1; intro_start_wolf(); }
+          else load_level(title_lv); }
       } else if(world.state != MX_PLAY){
         if(pressed & CONT_START) load_level(world.state == MX_WIN ? world.level + 1 : world.level);
       } else if(paused){
@@ -738,7 +768,8 @@ int main(int argc, char **argv){
     pvr_scene_begin();
     pvr_list_begin(PVR_LIST_TR_POLY);
     cur_hdr = 0;
-    if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART", 320, 270, 24, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
+    if(in_intro){ draw_intro();
+    } else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART", 320, 270, 24, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
     pvr_list_finish();
     pvr_scene_finish();
   }

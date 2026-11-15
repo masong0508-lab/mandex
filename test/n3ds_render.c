@@ -23,6 +23,7 @@ void hidScanInput(void){ g_dn = g_keys & ~g_prev; g_up = g_prev & ~g_keys; g_pre
 u32 hidKeysDown(void){ return g_dn; } u32 hidKeysHeld(void){ return g_keys; } u32 hidKeysUp(void){ return g_up; }
 void hidTouchRead(touchPosition *t){ *t = g_touch; }
 
+#define MX_TEST_NO_CUTSCENES 1
 #define main n3ds_main
 #include "../3ds/main.c"
 #undef main

@@ -55,6 +55,13 @@ int main(void){
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
   memset(fb,0,sizeof fb); title_t=0; cur_hdr=0; draw_title(); dump("/tmp/dc_title.ppm"); title_t=40; cur_hdr=0; draw_title(); dump("/tmp/dc_title_blink.ppm");   /* the title, and the half of the blink with no PRESS START */
   { const int T[3] = { 30, 170, 330 }; for(int k = 0; k < 3; k++){ char fn[48]; snprintf(fn, sizeof fn, "/tmp/dc_tpan%d.ppm", k); memset(fb,0,sizeof fb); title_t = T[k]; cur_hdr=0; draw_title(); dump(fn); } }   /* the pan: logo end, mid glide, the man */
+  if(getenv("DC_INTRO")){                                                  /* the shared cutscene player through the real draw_intro() */
+    ds_gfx_init(); tx_ic_top = pvr_mem_malloc(256 * 256 * 2); tx_ic_bot = pvr_mem_malloc(256 * 256 * 2); make_hdr(&hdr_ic_top, PVR_TXRFMT_RGB565, 256, 256, tx_ic_top); make_hdr(&hdr_ic_bot, PVR_TXRFMT_RGB565, 256, 256, tx_ic_bot);
+    for(int w = 0; w < 2; w++){ if(w) intro_start_wolf(); else intro_start(); int lastsc = -1, done = 0, f;
+      for(f = 0; f < 6000 && !done; f++){ int dn = (f % 400 == 399) ? 1 : 0; done = intro_tick(dn, 0, 0);
+        if(!done && (intro_scene() != lastsc || f % 150 == 149)){ lastsc = intro_scene(); char fn[64]; snprintf(fn, sizeof fn, "/tmp/dc_intro%d_%d_%d.ppm", w, lastsc, f); memset(fb, 0, sizeof fb); cur_hdr = 0; draw_intro(); dump(fn); } }
+      printf("dc intro %s: %s after %d frames, %d scenes\n", w ? "wolf" : "origin", done ? "finished" : "NOT finished", f, intro_count()); }
+    return 0; }
   load_level(4);
   for(int i=0;i<90;i++) tick(0);
   mx_set_pull(&world,-11.5f*cosf(0.45f),11.5f*sinf(0.45f)); frame("/tmp/dc_pull.ppm");

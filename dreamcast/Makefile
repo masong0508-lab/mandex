@@ -8,9 +8,12 @@
 # mode here (SH-4 has an FPU), unlike the DS build.
 
 TARGET = mandex.elf
-OBJS   = main.o ../core/mx.o ../core/mx_meta.o ../core/cloth.o
+OBJS   = main.o ../core/mx.o ../core/mx_meta.o ../core/cloth.o ../ds/source/gfx.o ../ds/source/intro.o
 
-KOS_CFLAGS += -std=gnu99 -O2 -I../core -I../art
+KOS_CFLAGS += -std=gnu99 -O2 -I../core -I../art -Ishim -I../ds/source
+
+# the shared DS cutscene code (ds/source) is its own units, built for the DS's fixed-point core; main.c only exchanges plain buffers with it
+../ds/source/gfx.o ../ds/source/intro.o: KOS_CFLAGS += -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -I../ds/source
 
 all: rm-elf $(TARGET)
 
