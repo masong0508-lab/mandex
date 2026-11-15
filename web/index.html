@@ -1239,7 +1239,8 @@ function update(dt){
 // =====================================================================
 //  CHARACTER ART
 // =====================================================================
-const SK='#f4b78e',SKD='#d98f64',SKH='#ffd5b4',OUT='#5a2f1b',HAIR='#4a2d1a';
+let SK='#f4b78e',SKD='#d98f64',SKH='#ffd5b4';const OUT='#5a2f1b',HAIR='#4a2d1a';
+function setFur(on){if(on){SK='#8c909e';SKD='#656979';SKH='#b9bdc9'}else{SK='#f4b78e';SKD='#d98f64';SKH='#ffd5b4'}}   // the wolfman's whole body is grey fur
 let WORK=false,WOLF=false,WOLFH=0;let THONG=false,TG='#ff2d6f';   // the thong outfit: skin-coloured 'shorts' plus thin straps and a little pouch in TG
 let BR='#e0243a',BRD='#a8162a',TOW='#ff7eb0',TOWS='#ff4f8f';   // the outfit colours (boxers, boxer shading, towel, towel edge); see OUTFITS
 function limb(x,y,x1,y1,w,col,hi){ctx.lineCap='round';ctx.strokeStyle=OUT;ctx.lineWidth=w+2.4;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x1,y1);ctx.stroke();
@@ -1309,7 +1310,11 @@ function wolfFront(){ctx.save();ctx.lineJoin='round';
   ctx.strokeStyle='#5a3515';ctx.lineWidth=1;for(const x of[-14,-6,9,17]){ctx.beginPath();ctx.moveTo(x,17);ctx.lineTo(x+1,24);ctx.stroke()}
   ctx.fillStyle='#d5a86a';ctx.beginPath();ctx.moveTo(-23,14);ctx.lineTo(-18,17);ctx.lineTo(-22,20);ctx.closePath();ctx.fill();   // a flap of cloth hanging loose
   ctx.restore();
-  furTufts([[-9,-8,1],[0,-4,1],[9,-8,1],[-14,3,1],[14,3,1],[-4,5,1],[5,6,1],[0,12,1]],WFD)}
+  // fur: a pale chest ruff and belly patch, tufts down the middle, a bushy tail swinging out behind the hip
+  ctx.save();ctx.fillStyle=WFL;ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(-13,-22);for(let i=0;i<7;i++){ctx.lineTo(-13+i*4.3+2.1,(i&1?-10:-18)+i*.6);ctx.lineTo(-13+(i+1)*4.3,-22+(i+1)*.5)}ctx.lineTo(0,-6);ctx.closePath();ctx.globalAlpha=.9;ctx.fill();ctx.globalAlpha=1;ctx.stroke();
+  ctx.beginPath();ctx.ellipse(0,4,10,12,0,0,7);ctx.fillStyle='rgba(185,189,201,.55)';ctx.fill();ctx.restore();
+  ctx.save();ctx.translate(26,18);ctx.rotate(.5+Math.sin(time*5)*.14);ctx.beginPath();ctx.moveTo(-2,2);ctx.bezierCurveTo(8,-4,22,-14,28,-8);ctx.bezierCurveTo(32,-2,24,8,12,10);ctx.bezierCurveTo(6,10,2,8,-2,2);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke();ctx.beginPath();ctx.moveTo(22,-11);ctx.bezierCurveTo(30,-8,30,0,23,5);ctx.bezierCurveTo(26,-1,25,-6,22,-11);ctx.fillStyle=WFL;ctx.fill();ctx.restore();
+  furTufts([[-9,-8,1],[0,-4,1],[9,-8,1],[-14,3,1],[14,3,1],[-4,5,1],[5,6,1],[0,12,1],[-20,-14,1],[20,-14,1],[-8,16,1],[8,16,1]],WFD)}
 function wolfBack(bx,cy0){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
   // what is left of the shorts: two shreds on the hips and a torn waistband, cheeks completely out
   for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*24,14);ctx.lineTo(bx+q*15,16);ctx.lineTo(bx+q*18,23);ctx.lineTo(bx+q*22,20);ctx.lineTo(bx+q*26,27);ctx.closePath();ctx.fillStyle='#8a5a2b';ctx.fill();ctx.strokeStyle='#3a220c';ctx.lineWidth=1.3;ctx.stroke()}
@@ -1320,12 +1325,20 @@ function wolfBack(bx,cy0){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
   ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke();
   ctx.beginPath();ctx.moveTo(bx+11,-1.4);ctx.bezierCurveTo(bx+19,0,bx+21,8,bx+14.4,9.6);ctx.bezierCurveTo(bx+17,6,bx+17,2,bx+11,-1.4);ctx.fillStyle=WFL;ctx.fill();
   ctx.restore()}
-function wolfHeadF(lv){lv=lv||3;ctx.save();ctx.lineJoin='round';
-  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5,-54);ctx.lineTo(q*13,-68);ctx.lineTo(q*17,-52);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke();
-    ctx.beginPath();ctx.moveTo(q*8,-54);ctx.lineTo(q*13,-63);ctx.lineTo(q*15,-54);ctx.closePath();ctx.fillStyle='#e8a0a8';ctx.fill()}
+function wolfHeadF(lv){lv=lv||3;ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  // big pointed ears with a pink inside and a tuft
+  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*4,-53);ctx.lineTo(q*12,-73);ctx.lineTo(q*19,-50);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(q*7.5,-54);ctx.lineTo(q*12.5,-67);ctx.lineTo(q*16,-53);ctx.closePath();ctx.fillStyle='#e8a0a8';ctx.fill();
+    ctx.strokeStyle=WFL;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(q*12,-73);ctx.lineTo(q*13,-77);ctx.stroke()}
   if(lv<2){ctx.restore();return}
-  furTufts([[-14,-36,1],[14,-36,1],[-12,-31,1],[12,-31,1],[-6,-57,-1],[0,-58,-1],[6,-57,-1]],WFD);
-  ell(0,-36.5,8.5,5.6,WFL,1.5);ell(0,-40,3.2,2.1,'#15151c',1);ctx.fillStyle='#fff';ctx.strokeStyle='#222';ctx.lineWidth=.8;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*3.2,-33.6);ctx.lineTo(q*4.4,-30);ctx.lineTo(q*1.6,-33.4);ctx.closePath();ctx.fill();ctx.stroke()}
+  // fur-covered head: a grey cap over the forehead, cheek ruffs, pale brow patches
+  ctx.fillStyle=WF;ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.2;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*17,-44);ctx.lineTo(q*25,-39);ctx.lineTo(q*18,-37);ctx.lineTo(q*24,-31);ctx.lineTo(q*15,-30);ctx.lineTo(q*19,-24);ctx.lineTo(q*10,-27);ctx.closePath();ctx.fill();ctx.stroke()}   // cheek ruffs
+  furTufts([[-12,-58,-1],[-6,-60,-1],[0,-61,-1],[6,-60,-1],[12,-58,-1],[-17,-46,1],[17,-46,1]],WFD);
+  // a long muzzle: pale, protruding, big black nose, fangs, a grin
+  ell(0,-34,12.5,8.6,WFL,1.6);ell(0,-40.5,5,3.4,'#15151c',1.2);ctx.fillStyle='rgba(255,255,255,.7)';ctx.beginPath();ctx.ellipse(-1.6,-41.4,1.6,.9,-.3,0,7);ctx.fill();
+  ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(0,-37.4);ctx.lineTo(0,-33);ctx.moveTo(-9,-30.5);ctx.quadraticCurveTo(-4.5,-26.6,0,-32);ctx.quadraticCurveTo(4.5,-26.6,9,-30.5);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.strokeStyle='#222';ctx.lineWidth=.8;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5.4,-29.6);ctx.lineTo(q*6.4,-24.6);ctx.lineTo(q*3.4,-29.4);ctx.closePath();ctx.fill();ctx.stroke()}
+  ctx.strokeStyle='rgba(30,30,40,.55)';ctx.lineWidth=.8;for(const q of[-1,1])for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(q*10,-37+i*1.6);ctx.lineTo(q*20,-40+i*3.4);ctx.stroke()}   // whiskers
   ctx.restore()}
 function wolfHeadB(){ctx.save();ctx.lineJoin='round';for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5,-54);ctx.lineTo(q*13,-68);ctx.lineTo(q*17,-52);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke()}
   furTufts([[-9,-30,1],[0,-28,1],[9,-30,1],[-15,-40,1],[15,-40,1]],WFD);ctx.restore()}
@@ -3034,7 +3047,7 @@ function paintOutfit(br,brd,tow,tows){BR=br;BRD=brd;TOW=tow;TOWS=tows;const f=he
 const _hx=document.createElement('canvas').getContext('2d');
 const hslHex=s=>{_hx.fillStyle=s;return _hx.fillStyle};
 function applyOutfit(o,tm){
-  WORK=!!o.work;WOLF=!!o.wolf;THONG=!!o.thong||WOLF;TG=o.tg||'#ff2d6f';
+  WORK=!!o.work;WOLF=!!o.wolf;setFur(WOLF);THONG=!!o.thong||WOLF;TG=o.tg||'#ff2d6f';
   if(o.rainbow){const h=(tm*60)%360,c=(hh,l)=>`hsl(${hh},85%,${l}%)`;paintOutfit(hslHex(c(h,52)),hslHex(c(h,36)),hslHex(c((h+180)%360,72)),hslHex(c((h+180)%360,56)))}
   else paintOutfit(o.br,o.brd,o.tow,o.tows)}
 let outfitCur=outfitById(PD.outfit);
@@ -3112,12 +3125,12 @@ function cutShirtBack(mode){const OU='#5a2f1b';ctx.save();ctx.lineJoin='round';c
   for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(q*22.5,-19,6.4,7.2,q*.5,0,6.3);ctx.fillStyle=mode===2?'#e6ecf4':'#f6f9ff';ctx.fill();ctx.strokeStyle=OU;ctx.stroke()}
   ctx.restore()}
 // Gerald: the same body, no cape, khaki shorts (or boxers), optional tie.  feetY = where his feet land
-function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;if(o.wolf>=3){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
+function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;setFur(WOLF);if(o.wolf>=3){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
   const op={nocape:true},T=cutT;if(o.belly)op.belly=o.belly;op.head=o.head||[Math.sin(T*1.3)*.5,Math.sin(T*2.6)*.5,Math.sin(T*1.1)*.035];
   if(o.armL){op.armL=o.armL;op.armR=o.armR}
   else if((o.pose||'up')==='up'){const a=Math.sin(T*2.1),b=Math.sin(T*2.1+1.2);op.armL=[-35-a*1.2,-12+b*1.5,-33-a*2.2,-34+b*3];op.armR=[35+a*1.2,-12+b*1.5,33+a*2.2,-34+b*3]}   // arms drift with the breathing
   if(o.walk!=null){const ph=o.walk;for(const q of[-1,1]){const w=ph+(q>0?Math.PI:0),sn=Math.sin(w),lf=Math.max(0,Math.cos(w));const L=[q*(12+3*sn),39-lf*3,q*(13+9*sn),55-lf*7];if(q<0)op.legL=L;else op.legR=L}}const shm=o.wolf>=3||o.noshirt?0:(o.shirt!=null?o.shirt:(CUTS&&CUTS[cutI]&&CUTS[cutI].shirt!=null?CUTS[cutI].shirt:1)),ti=o.tie;if(shm||ti)op.after=()=>{if(shm)cutShirt(shm);if(ti)cutTie()};WOLFH=o.wolf&&o.wolf<3?o.wolf:0;
-  const bz=Math.sin(cutT*3.1)*.012+(o.sq||0);ctx.save();ctx.translate(x+(o.dx||0),feetY-48*s+(o.dy||0));ctx.scale(s*(1-bz*.6),s*(1+bz));drawFront(o.pose||'up',o.face||'cool',cutT*.8+.3,op);ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf;WOLFH=0}
+  const bz=Math.sin(cutT*3.1)*.012+(o.sq||0);ctx.save();ctx.translate(x+(o.dx||0),feetY-48*s+(o.dy||0));ctx.scale(s*(1-bz*.6),s*(1+bz));drawFront(o.pose||'up',o.face||'cool',cutT*.8+.3,op);ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf;WOLFH=0;setFur(WOLF)}
 function cutFlag(k,f){const b=1<<k;if(!(cutFx&b)){cutFx|=b;f()}}
 function cutWork(f){applyOutfit(outfitById('workman'),time);try{f()}finally{applyOutfit(outfitCur,time)}}
 function cutGear(x,fy,s,t){if(t>.7)cutFlag(10,()=>SFX.thud(.6));if(t>1.3)cutFlag(11,()=>SFX.thud(.6));if(t>1.9)cutFlag(12,()=>SFX.thud(.7));ctx.save();ctx.translate(x,fy-48*s);ctx.scale(s,s);const e=u=>{u=Math.max(0,Math.min(1,u));return 1-Math.pow(1-u,3)};
@@ -3357,7 +3370,7 @@ function cutCam(i,t){const S=CUTS[i],c=S.cuts,k=cgK(c,t),dt=t-c[k],sk=((S.shake|
   const pu=S.push!=null?S.push:.016,pn=(S.pan||[])[k]||[0,0];
   return{z:1.04+Math.abs(r)*2.4+Math.min(.12,pu*dt),x:480+pn[0]*dt,y:270+pn[1]*dt,r:r,sx:Math.sin(t*93)*sk,sy:Math.cos(t*71)*sk,fl:k>0?Math.max(0,.45*(1-dt/.12)):0}}
 // Gerald seen from behind (over-the-shoulder shots)
-function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;if(o.wolf>=3){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
+function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;setFur(WOLF);if(o.wolf>=3){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
   ctx.save();ctx.translate(x,feetY-48*s);ctx.scale(s,s);drawBack(null,cutT*.8+.3,{noflag:true});WOLFH=o.wolf&&o.wolf<3?o.wolf:0;if(!(o.wolf>=3)&&!o.noshirt){const sm=o.shirt!=null?o.shirt:(CUTS&&CUTS[cutI]&&CUTS[cutI].shirt!=null?CUTS[cutI].shirt:1);if(sm){ctx.save();ctx.translate(0,3);ctx.beginPath();ctx.rect(-40,-25,80,60);ctx.clip();cutShirtBack(sm);ctx.restore()}}ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
 function cgBill(t,x,y,sz){txt('$'+Math.floor(t*t*600).toLocaleString(),x,y,sz,'#7dff5a','center','#0a3a0a');txt('BILLED SO FAR',x,y+sz*.45,Math.max(12,sz*.26),'#cfd','center')}
 function cgBokeh(t,cols,n){ctx.save();for(let i=0;i<n;i++){const x=(cgRnd(i)*W+t*6*(i%3+1))%W,y=cgRnd(i+20)*H*.75,r=16+cgRnd(i+40)*36;ctx.globalAlpha=.1+.14*cgRnd(i+60);cgE(x,y,r,r,cols[i%cols.length])}ctx.restore()}
