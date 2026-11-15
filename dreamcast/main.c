@@ -278,6 +278,7 @@ static float blob(float dx, float dy, float rad){ float d2 = dx * dx + dy * dy, 
    mesh whose vertices are pushed by the belly / rear springs (the same weights as the pixel version had) and squashed about the anchor. */
 #define MG_X 8
 #define MG_Y 10
+static float man_rot;                                                       /* radians the next draw_frame turns the sprite by (flight pitch, tumble, a stuck man's rock) */
 static void draw_frame(int fr, float cx, float cy, int face, float z, const Jig *jg){
   if(man_fur && fr >= 0 && fr < MSF_NBASE) fr += MSF_NBASE;                  /* the Wolfman's frames follow the human ones */
   const short *f = DCM_FR[fr];
@@ -293,9 +294,10 @@ static void draw_frame(int fr, float cx, float cy, int face, float z, const Jig 
       float wb = blob(u - f[6], v - f[7], (float)f[8]), wr = blob(u - f[9], v - f[10], (float)f[11]);
       dx = (jg->bx * wb + jg->rx * wr) * s; dy = (jg->by * wb + jg->ry * wr) * s;
     }
-    float ex = (u - f[4]) * sc * sx;
+    float ex = (u - f[4]) * sc * sx, ey = (v - f[5]) * sc * sy;
+    if(man_rot != 0){ float c = cosf(man_rot), sn = sinf(man_rot), rx = ex * c - ey * sn; ey = ex * sn + ey * c; ex = rx; }
     px[j][i] = cx + (face > 0 ? ex : -ex) + dx;
-    py[j][i] = cy + (v - f[5]) * sc * sy + dy;
+    py[j][i] = cy + ey + dy;
   }
   use(&hdr_man);
   for(int j = 0; j < gy; j++) for(int i = 0; i < gx; i++){
@@ -602,7 +604,9 @@ static void draw_all(void){
         if(m->pT > 0) for(int k = -3; k <= 3; k++) puff(x + fc * (24 - k * k * 1.4f) + fc * 18, y + k * 3.4f, 1.8f, Z_MAN + 0.3f, WHITE);
       }
     } else
+    if(m->mode == MAN_FLY) man_rot = (m->dive ? m->spin : m->ang) * face; else if(m->mode == MAN_STUCK) man_rot = mx_man_wobble(m) * 0.17f;
     man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
+    man_rot = 0;
     if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){               /* only the belly swells; the face flushes as the pressure builds */
       float f = m->inf, rx = 11 + f * 28, ry = 10 + f * 24, bx = x + face * f * 10, by = y + 6 + f * 4;
       puff(bx, by, (rx > ry ? rx : ry) + 2, Z_MAN + 0.3f, argb(205, 135, 100, 255)); puff(bx, by, (rx > ry ? rx : ry), Z_MAN + 0.4f, argb(244, 183, 142, 255));

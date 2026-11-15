@@ -208,6 +208,24 @@ static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
     }
   }
 }
+/* the same sprite turned by angle a (radians, in the sprite's own facing; mirrored with it): flight pitches toward the path, the belly flop tumbles, a stuck man rocks.
+   Inverse-mapped, so a turned sprite has no pin-holes; the outline pixels are kept as they are. */
+static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, float a){
+  if(man_fur && fr < MSF_NBASE) fr += MSF_NBASE;
+  const MsFrame *f = &MS_FRAMES[fr];
+  float ca = cosf(a), sa = sinf(a), q = 4.0f / ppc, R = (float)ppc * 0.25f * (f->w > f->h ? f->w : f->h) * 1.5f;
+  int x0 = cx - (int)R - 1, x1 = cx + (int)R + 1, y0 = cy - (int)R - 1, y1 = cy + (int)R + 1;
+  if(x0 < 0) x0 = 0; if(y0 < 0) y0 = 0; if(x1 > s->w) x1 = s->w; if(y1 > s->h) y1 = s->h;
+  for(int y = y0; y < y1; y++) for(int x = x0; x < x1; x++){
+    float dx = (x - cx) * q, dy = (y - cy) * q;                       /* destination offset in sprite pixels */
+    if(face < 0) dx = -dx;
+    float ux = dx * ca + dy * sa, uy = -dx * sa + dy * ca;            /* undo the turn */
+    int sx = (int)floorf(ux + f->ax + 0.5f), sy = (int)floorf(uy + f->ay + 0.5f);
+    if(sx < 0 || sy < 0 || sx >= f->w || sy >= f->h) continue;
+    int c = f->px[sy * f->w + sx]; if(!c) continue;
+    rect(s, x, y, 1, 1, RGB(man_pal[c - 1][0], man_pal[c - 1][1], man_pal[c - 1][2]));
+  }
+}
 static MiState mi;                                             /* idle gag state, see art/manidle.h */
 static void idle_fx(int fx, float wx, float wy){
   switch(fx){ case FX_SLAP: sfx_play(SFX_SLAP, 64); break; case FX_GRUNT: sfx_play(SFX_GRUNT, 64); break; case FX_BURP: sfx_play(SFX_BURP, 64); break; case FX_FART: sfx_play(SFX_FART, 64); break;
@@ -358,7 +376,9 @@ static void draw_man(const View *v){
   else if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); fr = ((frame >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
   else if(dragging) fr = MSF_DRAG;
   else fr = mi_frame(&mi, frame);                                            /* idle gags */
-  blit_frame(v->s, fr, x, y, p, face);
+  { float a = 0;
+    if(m->mode == MAN_FLY) a = (m->dive ? RTOF(m->spin) : RTOF(m->ang)) * face; else if(m->mode == MAN_STUCK) a = RTOF(mx_man_wobble(m)) * 0.17f;
+    if(a > 0.03f || a < -0.03f) blit_frame_rot(v->s, fr, x, y, p, face, a); else blit_frame(v->s, fr, x, y, p, face); }
   if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){             /* only the belly swells */
     float f = RTOF(m->inf); int r = (int)(p * (2 + f * 3.2f)), bx = x + face * (int)(p * f * 1.5f);
     disc(v->s, bx, y + p / 2, r + 1, RGB(205, 135, 100)); disc(v->s, bx, y + p / 2, r, RGB(244, 183, 142));
