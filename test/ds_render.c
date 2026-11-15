@@ -48,9 +48,9 @@ int soundPlayNoise(u16 f,u8 v,u8 p){
   return -1;
 }
 static int wave_used[8], wave_peak, wave_vol_calls, wave_bad_vol;
-int soundPlayWave(const signed char *t,u16 f,u8 v,u8 p){                 /* PCM channels 0..7 (the music) */
+int soundPlayWave(const signed char *t,u16 f,u8 v,u8 p){                 /* PCM channels 0..7 (the two music voices and the soft-tone effects) */
   (void)p; sound_calls++;
-  if(!t || ((unsigned long)t & 3) || f < 100 || f > 1200 || v == 0 || v > 127){ wave_bad_vol++; }
+  if(!t || ((unsigned long)t & 3) || f < 50 || f > 1700 || v == 0 || v > 127){ wave_bad_vol++; }
   for(int i = 0; i < 8; i++){ if(wave_used[i]) continue; wave_used[i] = 1; int n = 0; for(int k = 0; k < 8; k++) n += wave_used[k]; if(n > wave_peak) wave_peak = n; return 200 + i; }
   sound_dropped++; return -1;
 }
