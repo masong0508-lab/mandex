@@ -1642,7 +1642,7 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   /* chapter 3: the Wolfman */
   "Full Moon Rising", "Howling Heights", "Flea Market", "Fang Street", "Bad Moon Brick", "Wolf Pack Lofts", "Moonlit Mortgage", "Claw Foreclosure", "Growl Gardens", "Night Shift",
   "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord"};
-static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  12,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
+static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
 const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
 
 
@@ -1881,11 +1881,32 @@ static void build(MxWorld *w, int l){
     HX(64, GR, 26, 2, 10, 1, 1, B, W_, W_, 0, 0);
     rect_fill(w, 63, 25, 2, 12, MX_GLASS); rect_fill(w, 89, 25, 2, 12, MX_GLASS); rect_fill(w, 65, 25, 24, 12, MX_SAND);
     tgtk(w, 58, 59, LK_BAT); tgtk(w, 61, 59, LK_BAT); tgt(w, 69, 59); tgt(w, 84, 59); tgt(w, 69, 49); tgt(w, 84, 49); tnt(w, 76, 49); break;
-  case 39:      /* the real finale: head office */
-    house(w, 46, 10, 4, B, W_, W_, 1, 0); house(w, 60, 18, 5, S, ST, ST, 0, 1); house(w, 82, 12, 6, MX_GLASS, S, ST, 0, 0); house(w, 98, 10, 3, RU, W_, W_, 1, 0);
-    tgt(w, 50, 59); tgt(w, 52, 32); tgt(w, 66, 59); tgt(w, 72, 50); tgt(w, 66, 41); tgt(w, 72, 32); tgt(w, 68, 23); tgt(w, 86, 59); tgt(w, 90, 41);
-    tgt(w, 86, 23); tgt(w, 88, 14); tgt(w, 102, 59);
-    tnt(w, 70, 59); tnt(w, 74, 41); tnt(w, 88, 50); tnt(w, 90, 32); tnt(w, 100, 50); tnt(w, 48, 50); break;
+  case 39:      /* the real finale: head office, three districts one after another (the browser lays them end to end in a 360-cell world with three slings;
+                   a console grid is 120 wide, so each district gets the grid in turn.  Coordinates are the browser's minus 0 / 110 / 236) */
+    if(w->district == 0){
+      house(w, 46, 10, 4, B, W_, W_, 1, 0); house(w, 60, 18, 5, S, ST, ST, 0, 1); house(w, 82, 12, 6, MX_GLASS, S, ST, 0, 0); house(w, 98, 10, 3, RU, W_, W_, 1, 0);
+      tgt(w, 50, 59); tgt(w, 52, 32); tgt(w, 66, 59); tgt(w, 72, 50); tgt(w, 66, 41); tgt(w, 72, 32); tgt(w, 68, 23); tgt(w, 86, 59); tgt(w, 90, 41);
+      tgt(w, 86, 23); tgt(w, 88, 14); tgt(w, 102, 59);
+      tnt(w, 70, 59); tnt(w, 74, 41); tnt(w, 88, 50); tnt(w, 90, 32); tnt(w, 100, 50); tnt(w, 48, 50);
+    } else if(w->district == 1){            /* the bank quarter: a steel vault with a wooden lid, a glass tower of throwers, a dune-top villa, a keg yard */
+      HX(42, GR, 20, 3, 9, 2, 2, ST, ST, W_, 0, 0);
+      tgtk(w, 48, 59, LK_BAT); tgt(w, 56, 59); tgt(w, 48, 50); tgt(w, 56, 41); tnt(w, 55, 50);
+      HX(68, GR, 12, 7, 8, 1, 1, MX_GLASS, S, ST, 0, 0);
+      tgt(w, 73, 59); tgtk(w, 73, 43, LK_THROWER); tgt(w, 73, 27); tgt(w, 73, 11);
+      mound(w, 86, 30, 10); house_ex(w, 90, 49, 14, 3, 9, 1, 1, W_, W_, W_, 1, 0);
+      tgt(w, 95, 49); tgtk(w, 99, 40, LK_WALKER); tgt(w, 95, 31);
+      for(int k = 0; k < 3; k++) rect_fill(w, 104 + k * 4, 52 + k * 2, 3, 8 - k * 2, MX_TNT);
+      tgt(w, 83, 59);
+    } else {                                 /* head office proper: a stone castle with bat guards, a steel-roofed tower, a bouncy annexe */
+      HX(36, GR, 40, 5, 9, 3, 2, S, ST, ST, 0, 1);
+      tgtk(w, 30, 59, LK_BAT); tgtk(w, 33, 59, LK_BAT); tgt(w, 44, 59); tgtk(w, 60, 59, LK_WALKER); tgt(w, 70, 59); tgtk(w, 48, 50, LK_THROWER); tgt(w, 64, 50);
+      tgt(w, 54, 41); tgtk(w, 62, 32, LK_THROWER); tgt(w, 48, 23); tnt(w, 52, 50); tnt(w, 60, 41); tnt(w, 54, 32);
+      HX(82, GR, 14, 6, 8, 1, 1, B, ST, ST, 0, 0);
+      tgt(w, 88, 59); tgtk(w, 88, 43, LK_THROWER); tgt(w, 88, 27); tgt(w, 88, 19); tnt(w, 91, 43);
+      HX(102, GR, 12, 3, 9, 1, 1, RU, W_, W_, 1, 0);
+      tgt(w, 107, 59); tgt(w, 107, 50); tgt(w, 107, 41);
+    }
+    break;
   default:      /* houses perched on sand: dig out the foundations and everything slumps */
     mound(w, 46, 30, 9); house_at(w, 56, 50, 10, 2, S, W_, S, 1, 0);
     mound(w, 86, 28, 9); house_at(w, 95, 50, 10, 2, B, W_, W_, 1, 0);
@@ -1894,7 +1915,7 @@ static void build(MxWorld *w, int l){
   }
 }
 
-void mx_load(MxWorld *w, int level){
+static void load_level(MxWorld *w, int level, int district){
   init_tables(); init_mats();
   int keep_sub = w->substeps, keep_wob = w->wob_enabled ? 1 : 0, first = !w->substeps;   /* front-end quality choices survive a reload */
   int keep_valve = w->valve_ok, keep_collapse = w->collapse, keep_nofight = w->nofight, keep_budget = w->wob_budget;
@@ -1906,7 +1927,7 @@ void mx_load(MxWorld *w, int level){
   level %= MX_NUM_LEVELS;
   w->substeps = first ? SUBSTEPS : keep_sub;
   w->wob_enabled = first ? 1 : keep_wob;
-  w->level = level; w->state = MX_PLAY; w->men = MEN[level]; w->banner = R(2.4);
+  w->level = level; w->district = district; w->state = MX_PLAY; w->men = MEN[level]; w->banner = R(2.4);
   build(w, level);
   w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = 1;
   w->sand_on = 1;
@@ -1915,6 +1936,17 @@ void mx_load(MxWorld *w, int level){
   for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active){ settle(w, &w->chunks[c], 1); }
   w->need_support = 0;
   next_man(w);
+}
+
+void mx_load(MxWorld *w, int level){ load_level(w, level, 0); }
+/* Landlord HQ: the district is cleared; build the next one in the same grid, keeping the score, the men left (plus a bonus) and the session counters. */
+static void hq_next_district(MxWorld *w){
+  int men = w->men + MX_HQ_BONUS_MEN, score = w->score + 3000, d = w->district + 1;
+  int inf = w->st_inflated, pops = w->st_pops, pw[4] = { w->st_pw[0], w->st_pw[1], w->st_pw[2], w->st_pw[3] };
+  uint32_t rng = w->rng;
+  load_level(w, MX_HQ_LEVEL, d);
+  w->men = men; w->score = score; w->st_inflated = inf; w->st_pops = pops; for(int i = 0; i < 4; i++) w->st_pw[i] = pw[i]; w->rng ^= rng; w->banner = R(2.4);
+  ev(w, EV_DISTRICT, 0, 0, d, 0, 0);
 }
 
 void mx_set_wobble_budget(MxWorld *w, int cells){ w->wob_budget = cells < 0 ? 0 : cells; if(!cells) w->wob_shift = 0; }
@@ -2069,6 +2101,7 @@ void mx_update(MxWorld *w, real dt){
     int nch = busy_count(w);
     if(mx_targets_alive(w) == 0){
       w->winT += dt;
+      if(w->winT > R(1.6) && w->level == MX_HQ_LEVEL && w->district < MX_HQ_DISTRICTS - 1){ hq_next_district(w); return; }
       if(w->winT > R(1.6)){ w->state = MX_WIN; w->score += w->men * 3000; ev(w, EV_WIN, 0, 0, 0, 0, 0); }
     } else if(w->men == 0 && m->mode == MAN_NONE){
       if(nch == 0){

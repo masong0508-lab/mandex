@@ -286,6 +286,9 @@ static void on_events(void){
       popup(e->x, e->y - RI(4), "CRUMBLE!", C_GOLD);
       ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
       break; }
+    case EV_DISTRICT:                                       /* Landlord HQ: the next district is built in the same grid, with fresh men */
+      cells0 = mx_cells_left(&world); dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); ev_ft = 0;
+      sfx_play(SFX_WIN, 64); break;
     case EV_WIN:    sfx_play(SFX_WIN, 64); music_set(0); break;
     case EV_LOSE:   sfx_play(SFX_LOSE, 64); music_set(0); break;
     }
@@ -674,7 +677,8 @@ static void banner(u8 *b){
   int slide = t > 120 ? (t - 120) * 8 : (t < 24 ? (24 - t) * 12 : 0);
   gfx_rect(b, 0, 70, 256, 44, C_UIBG);
   gfx_rect(b, 0, 69, 256, 1, C_UILINE); gfx_rect(b, 0, 114, 256, 1, C_UILINE);
-  gfx_text_c(b, 128 - slide, 76, "LEVEL", C_GOLD, C_BLACK, 1);
+  { static const char *const DN[MX_HQ_DISTRICTS] = { "DISTRICT 1 OF 3", "DISTRICT 2 OF 3", "DISTRICT 3 OF 3" };
+    gfx_text_c(b, 128 - slide, 76, world.level == MX_HQ_LEVEL ? DN[world.district % MX_HQ_DISTRICTS] : "LEVEL", C_GOLD, C_BLACK, 1); }
   gfx_text_c(b, 128 + slide, 84, mx_level_name(world.level), C_WHITE, C_BLACK, 2);
   gfx_text_c(b, 128 - slide, 102, "EVICT EVERY LANDLORD", C_PINK, C_BLACK, 1);
 }

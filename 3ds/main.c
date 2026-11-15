@@ -99,9 +99,11 @@ static inline void px(Scr *s, int x, int y, u32 rgb){
 #define RGB(r, g, b) ((u32)(r) << 16 | (u32)(g) << 8 | (u32)(b))   /* low byte = blue = framebuffer byte 0 (was r in the low byte, which showed red and blue swapped) */
 static void rect(Scr *s, int x, int y, int w, int h, u32 c){
   int x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y, x1 = x + w > s->w ? s->w : x + w, y1 = y + h > s->h ? s->h : y + h;
+  if(x1 <= x0 || y1 <= y0) return;
+  const u8 b0 = c & 255, b1 = (c >> 8) & 255, b2 = (c >> 16) & 255;
   for(int i = x0; i < x1; i++){
     u8 *p = s->fb + (i * s->h + (s->h - 1 - y0)) * 3;
-    for(int j = y0; j < y1; j++, p -= 3){ p[0] = c & 255; p[1] = (c >> 8) & 255; p[2] = (c >> 16) & 255; }
+    for(int j = y0; j < y1; j++, p -= 3){ p[0] = b0; p[1] = b1; p[2] = b2; }
   }
 }
 static void disc(Scr *s, int cx, int cy, int r, u32 c){      /* one vertical run per column (the framebuffer is column-major): same pixels as the old per-pixel test */
@@ -169,6 +171,8 @@ static void on_events(void){
     case EV_HURT: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, "OUCH!", RGB(255, 107, 107)); if(!e->m){ dragging = 0; pad_used = 0; } break;
     case EV_OOF: for(int k = 0; k < 6; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, e->m ? "CRACK!" : "OOF!", RGB(255, 210, 63)); break;
     case EV_HEAL: popup(x, y - 6, "+HP", RGB(255, 255, 255)); break;
+    case EV_DISTRICT: cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1; dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts);   /* Landlord HQ: next district, fresh men */
+      popup(60, 20, world.district == 1 ? "DISTRICT 2 OF 3!" : "DISTRICT 3 OF 3!", RGB(255, 210, 63)); break;
     case EV_BONK: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, "BONK!", RGB(255, 210, 63)); break;
     default: break;
     }
@@ -260,20 +264,21 @@ static void draw_fore(const View *v){               /* grass blades and a fence 
 static void draw_shadow(const View *v, int cx, int cy_ground, int w){ rect(v->s, cx - w / 2, cy_ground, w, 3, RGB(60, 90, 40)); }
 static void draw_cells(const View *v){
   int p = v->ppc;
+  /* per-material colour and 1/maxhp once per frame, not once per voxel (the core's lookups were ~600 000 calls in a short run) */
+  static float mrgb[MX_NMAT][3], minv[MX_NMAT]; static int mready;
+  if(!mready){ for(int m = 1; m < MX_NMAT; m++){ const uint8_t *c = mx_material_rgb(m); for(int k = 0; k < 3; k++) mrgb[m][k] = c[k]; minv[m] = .45f / (float)mx_material_hp(m); } mready = 1; }
+  const int sw = v->s->w, sh = v->s->h;
   for(int y = 0; y < MX_ROWS; y++) for(int x = 0; x < MX_COLS; x++){
     int i = y * MX_COLS + x, m = world.grid[i];
     if(!m) continue;
     float fx = x, fy = y;
     if(world.wob_on){ fx += RTOF(world.ox[i]); fy += RTOF(world.oy[i]); }
     int sx = VX(v, fx), sy = VY(v, fy);
-    if(sx + p < 0 || sx >= v->s->w || sy + p < 0 || sy >= v->s->h) continue;
-    const uint8_t *c = mx_material_rgb(m);
-    float f = .55f + .45f * RTOF(world.hp[i]) / (float)mx_material_hp(m);   /* darker as it takes damage */
+    if(sx + p < 0 || sx >= sw || sy + p < 0 || sy >= sh) continue;
+    float f = .55f + RTOF(world.hp[i]) * minv[m];                          /* darker as it takes damage */
     if(f > 1) f = 1;
-    f *= g_dim;
-    u32 col = RGB((int)(c[0] * f), (int)(c[1] * f), (int)(c[2] * f));
-    if(world.brk[i]) col = RGB((int)(c[0] * f * .8f), (int)(c[1] * f * .8f), (int)(c[2] * f * .8f));
-    rect(v->s, sx, sy, p, p, col);
+    f *= g_dim; if(world.brk[i]) f *= .8f;
+    rect(v->s, sx, sy, p, p, RGB((int)(mrgb[m][0] * f), (int)(mrgb[m][1] * f), (int)(mrgb[m][2] * f)));
   }
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
     const MxChunk *ch = &world.chunks[c];

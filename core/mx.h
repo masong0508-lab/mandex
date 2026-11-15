@@ -60,7 +60,7 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #if MX_MAX_CHUNKS < 4 || MX_MAX_CHUNKS > 63
 #error "MX_MAX_CHUNKS must be 4..63 (bnext[] holds int16 cell indexes)"
 #endif
-#define MX_MAX_TARGETS   16
+#define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
 #define MX_NUM_LEVELS    60
 #define MX_CH3_START     40      /* chapter 3 (the Wolfman): levels 40-59 */
@@ -121,7 +121,8 @@ enum {
   EV_THROW,    /* a landlord threw a briefcase from x,y */
   EV_SWING,    /* a landlord swung at x,y (walker punch / bat practice swing) */
   EV_HEAL,     /* a healer patched a landlord up at x,y */
-  EV_OOF       /* a tough landlord took a hit and survived at x,y: a = hp left, m = 1 if a shield was smashed */
+  EV_OOF,      /* a tough landlord took a hit and survived at x,y: a = hp left, m = 1 if a shield was smashed */
+  EV_DISTRICT  /* Landlord HQ: the district was cleared and the next one is up (m = its number, 1 or 2); +MX_HQ_BONUS_MEN men and +3000 were added */
 };
 /* power-ups: one use of each per level */
 enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT };
@@ -204,6 +205,7 @@ typedef struct {
   MxMan man;
   /* game */
   int level, state, men, score;
+  int district;                  /* Landlord HQ (level 39) is three 120-cell districts played one after another; 0..2 (always 0 on other levels) */
   real time, shake, slow, banner, flash, waitT, winT, loseT;
   int freeze, need_support, support_cd, substeps, nhouses;
   int wob_budget, wob_shift;                   /* wobble cost cap: max cells walked per step (0 = unlimited); wob_shift = how much the 'cold' limits are scaled up (0..6) to stay under it */
@@ -251,6 +253,9 @@ typedef struct {
 #define MX_ANCHOR_Y R(45.25)
 #define MX_PULL_MAX R(11.5)
 
+#define MX_HQ_LEVEL        39
+#define MX_HQ_DISTRICTS    3
+#define MX_HQ_BONUS_MEN    4
 void mx_load(MxWorld *w, int level);
 void mx_update(MxWorld *w, real dt);          /* dt ~ 1/60 s */
 void mx_set_pull(MxWorld *w, real dx, real dy); /* drag offset from anchor, cells */

@@ -59,7 +59,7 @@ int mx_event_sfx(const MxEvent *e, int *o){
   case EV_POP:     o[0] = SFX_POP; return 1;
   case EV_FART:    o[0] = SFX_FART; return 1;
   case EV_CRUMBLE: o[0] = SFX_THUD; o[1] = SFX_CRACK; return 2;
-  case EV_WIN:     o[0] = SFX_WIN; return 1;
+  case EV_WIN: case EV_DISTRICT: o[0] = SFX_WIN; return 1;
   case EV_LOSE:    o[0] = SFX_LOSE; return 1;
   default: return 0;
   }

@@ -40,7 +40,9 @@ int main(int argc, char **argv){
     mx_load(&W, l);
     for(int i = 0; i < 120; i++) mx_update(&W, DT);
     men0 = W.men; used = 0;
-    while(W.state == MX_PLAY && W.man.mode == MAN_AIM && used < men0 + 1){
+    while(W.state == MX_PLAY && used < men0 + 1 + MX_HQ_BONUS_MEN * W.district){
+      for(int f = 0; f < 240 && W.state == MX_PLAY && W.man.mode != MAN_AIM; f++) mx_update(&W, DT);       /* a new Landlord HQ district: wait for the man at the sling */
+      if(W.state != MX_PLAY || W.man.mode != MAN_AIM) break;
       struct { long sc; double p; int d, v; } cand[256]; int nc = 0;
       memcpy(&S, &W, sizeof S);
       int alive0 = mx_targets_alive(&S);
@@ -64,6 +66,7 @@ int main(int argc, char **argv){
       if(W.state == MX_WIN){ ok = 1; break; }
     }
     }
+    if(!ok && l == MX_HQ_LEVEL) printf("   (Landlord HQ: stopped in district %d with %d landlords left after %d shots)\n", W.district + 1, mx_targets_alive(&W), used);
     n++; solved += ok;
     printf("%2d %-22s men %2d: %s%s\n", l, mx_level_name(l), men0, ok ? "solved in " : "NOT solved by the greedy search", ok ? (char[4]){(char)('0' + used / 10 % 10 ? '0' + used / 10 % 10 : ' '), (char)('0' + used % 10), 0, 0} : "");
     fflush(stdout);

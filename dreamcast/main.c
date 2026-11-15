@@ -250,6 +250,7 @@ static void handle_events(void){
     case EV_PAD:   for(int k = 0; k < (e->m ? 16 : 8); k++) spawn(e->x, e->y, k & 1 ? argb(255, 126, 176, 255) : argb(255, 255, 255, 255), 460); break;
     case EV_HURT:  for(int k = 0; k < 12; k++) spawn(e->x, e->y, k & 1 ? argb(255, 74, 74, 255) : argb(255, 255, 255, 255), 420); break;
     case EV_OOF:   for(int k = 0; k < 10; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), 520); break;
+    case EV_DISTRICT: break;                               /* Landlord HQ: next district; the banner (below) announces it */
     case EV_HEAL:  for(int k = 0; k < 8; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 520); break;
     case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), 520); break;
     case EV_THROW: case EV_SWING: for(int k = 0; k < 4; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 160); break;
@@ -662,6 +663,7 @@ static void draw_all(void){
     quad(190, y, 260, 44, Z_HUD + 1, argb(20, 24, 40, 230)); text("ACHIEVEMENT", 320, y + 17, 12, argb(255, 210, 63, 255), 1, Z_HUD + 1.1f); text(mx_ach_name(toast_id), 320, y + 36, 16, WHITE, 1, Z_HUD + 1.1f); }
   if(world.banner > 0 && world.state == MX_PLAY){
     int a = (int)(255 * (world.banner > 1 ? 1.0f : world.banner));
+    if(world.level == MX_HQ_LEVEL){ char dn[32]; snprintf(dn, sizeof dn, "DISTRICT %d OF %d", world.district + 1, MX_HQ_DISTRICTS); text(dn, 320, 150, 22, argb(255, 126, 176, a), 1, Z_HUD); }
     text(nm, 320, 180, 40, argb(255, 255, 255, a), 1, Z_HUD);
     text("EVICT EVERY LANDLORD!", 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
   }

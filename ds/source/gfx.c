@@ -123,20 +123,49 @@ static int glyph_index(int c){
   return -1;
 }
 int gfx_text_w(const char *s, int sc){ int n = 0; while(*s++) n++; return n ? n * 4 * sc - sc : 0; }
+/* Text is the busiest thing on the screens (HUD, popups, buttons, every label drawn with an outline), so it writes pixels itself instead of one gfx_rect
+   per font pixel.  At scale 1 a glyph is at most 15 single-pixel writes; at larger scales neighbouring font pixels of a row are merged into one rect. */
+static inline void tput(u8 *b, int x, int y, u8 c){ if((unsigned)x < 256u && (unsigned)y < 192u) b[y * 256 + x] = c; }
+static void glyph1(u8 *b, int x, int y, u16 g, u8 col){
+  if(x >= 0 && y >= 0 && x + 3 <= 256 && y + 5 <= 192){
+    u8 *d = &b[y * 256 + x];
+    for(int r = 0; r < 5; r++, d += 256){ unsigned bits = (g >> (12 - r * 3)) & 7; if(bits & 4) d[0] = col; if(bits & 2) d[1] = col; if(bits & 1) d[2] = col; }
+  } else {
+    for(int r = 0; r < 5; r++) for(int k = 0; k < 3; k++) if(g & (1 << (14 - r * 3 - k))) tput(b, x + k, y + r, col);
+  }
+}
+static void glyphN(u8 *b, int x, int y, u16 g, u8 col, int sc){
+  for(int r = 0; r < 5; r++){
+    unsigned bits = (g >> (12 - r * 3)) & 7;
+    for(int k = 0; k < 3; k++){
+      if(!(bits & (4 >> k))) continue;
+      int run = 1; while(k + run < 3 && (bits & (4 >> (k + run)))) run++;
+      gfx_rect(b, x + k * sc, y + r * sc, run * sc, sc, col); k += run - 1;
+    }
+  }
+}
 void gfx_text(u8 *b, int x, int y, const char *s, u8 col, int sc){
   for(; *s; s++, x += 4 * sc){
     int gi = glyph_index(*s);
     if(gi < 0) continue;
-    u16 g = FONT[gi];
-    for(int r = 0; r < 5; r++) for(int k = 0; k < 3; k++)
-      if(g & (1 << (14 - r * 3 - k))) gfx_rect(b, x + k * sc, y + r * sc, sc, sc, col);
+    if(sc == 1) glyph1(b, x, y, FONT[gi], col); else glyphN(b, x, y, FONT[gi], col, sc);
   }
 }
+/* the outline: the glyph shifted by (-1,0) (+1,0) (0,-1) (0,+1) (+1,+1) in the outline colour, then the glyph itself.  Done glyph by glyph (the 1 px outline
+   never reaches the next glyph's fill, there is a gap of `sc` pixels), which gives exactly the pixels the five-pass version produced. */
 void gfx_text_o(u8 *b, int x, int y, const char *s, u8 col, u8 outline, int sc){
-  gfx_text(b, x - 1, y, s, outline, sc); gfx_text(b, x + 1, y, s, outline, sc);
-  gfx_text(b, x, y - 1, s, outline, sc); gfx_text(b, x, y + 1, s, outline, sc);
-  gfx_text(b, x + 1, y + 1, s, outline, sc);
-  gfx_text(b, x, y, s, col, sc);
+  for(; *s; s++, x += 4 * sc){
+    int gi = glyph_index(*s);
+    if(gi < 0) continue;
+    u16 g = FONT[gi];
+    if(sc == 1){
+      glyph1(b, x - 1, y, g, outline); glyph1(b, x + 1, y, g, outline); glyph1(b, x, y - 1, g, outline); glyph1(b, x, y + 1, g, outline); glyph1(b, x + 1, y + 1, g, outline);
+      glyph1(b, x, y, g, col);
+    } else {
+      glyphN(b, x - 1, y, g, outline, sc); glyphN(b, x + 1, y, g, outline, sc); glyphN(b, x, y - 1, g, outline, sc); glyphN(b, x, y + 1, g, outline, sc); glyphN(b, x + 1, y + 1, g, outline, sc);
+      glyphN(b, x, y, g, col, sc);
+    }
+  }
 }
 void gfx_text_c(u8 *b, int cx, int y, const char *s, u8 col, u8 outline, int sc){
   gfx_text_o(b, cx - gfx_text_w(s, sc) / 2, y, s, col, outline, sc);
@@ -367,6 +396,11 @@ void gfx_wall(const View *v, int pal, int px, int py){
   int n = v->ppc;
   if(px + n <= 0 || py + n <= 0 || px >= 256 || py >= 192) return;
   const u8 *t = walltiles[n - 2][pal & 3];
+  if(px >= 0 && py >= 0 && px + n <= 256 && py + n <= 192){        /* the usual case: wholly on screen, copy rows without a bounds test per pixel */
+    u8 *d = &v->buf[py * 256 + px];
+    for(int j = 0; j < n; j++, d += 256, t += n) for(int i = 0; i < n; i++) d[i] = t[i];
+    return;
+  }
   for(int j = 0; j < n; j++) for(int i = 0; i < n; i++) gfx_px(v->buf, px + i, py + j, t[j * n + i]);
 }
 
