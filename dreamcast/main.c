@@ -665,8 +665,13 @@ static void draw_all(void){
     if(m->inf <= 0) text(buf, 628, 466, 11, argb(255, 255, 255, 150), 2, Z_HUD);
   }
   toast_tick();
-  if(toast_id >= 0){ float y = toast_t < 0.25f ? -60 + toast_t * 4 * 100 : toast_t > 2.55f ? (2.8f - toast_t) * 4 * 100 - 60 : 40;
-    quad(190, y, 260, 44, Z_HUD + 1, argb(20, 24, 40, 230)); text("ACHIEVEMENT", 320, y + 17, 12, argb(255, 210, 63, 255), 1, Z_HUD + 1.1f); text(mx_ach_name(toast_id), 320, y + 36, 16, WHITE, 1, Z_HUD + 1.1f); }
+  if(toast_id >= 0){                                                          /* achievement popup: drops in, gold frame, star badge, time bar */
+    float y = toast_t < 0.25f ? -70 + toast_t * 4 * 110 : toast_t > 2.55f ? (2.8f - toast_t) * 4 * 110 - 70 : 40, x = 170, w = 300, h = 56, k = 1.0f - toast_t / 2.8f;
+    quad(x - 3, y - 3, w + 6, h + 6, Z_HUD + 1, argb(255, 210, 63, 255)); quad(x, y, w, h, Z_HUD + 1.02f, argb(22, 26, 48, 245)); quad(x, y, w, h / 2, Z_HUD + 1.03f, argb(40, 46, 80, 120));
+    puff(x + 30, y + 28, 19, Z_HUD + 1.05f, argb(255, 236, 140, 255)); puff(x + 30, y + 28, 15, Z_HUD + 1.06f, argb(255, 210, 63, 255));
+    text("*", x + 30, y + 38, 26, argb(60, 40, 10, 255), 1, Z_HUD + 1.1f);
+    text("ACHIEVEMENT", x + 62, y + 20, 12, argb(255, 210, 63, 255), 0, Z_HUD + 1.1f); text(mx_ach_name(toast_id), x + 62, y + 43, 18, WHITE, 0, Z_HUD + 1.1f);
+    quad(x, y + h - 4, w * k, 4, Z_HUD + 1.05f, argb(255, 210, 63, 255)); }
   if(world.banner > 0 && world.state == MX_PLAY){
     int a = (int)(255 * (world.banner > 1 ? 1.0f : world.banner));
     if(world.level == MX_HQ_LEVEL){ char dn[32]; snprintf(dn, sizeof dn, "DISTRICT %d OF %d", world.district + 1, MX_HQ_DISTRICTS); text(dn, 320, 150, 22, argb(255, 126, 176, a), 1, Z_HUD); }

@@ -663,11 +663,13 @@ static void top_hud(u8 *b){
     gfx_text_c(b, 128, 183, "PAD MOVE  A JUMP  B PUNCH  DOWN SLAM  L GIVE UP", C_WHITE, C_BLACK, 1);
   }
   toast_tick();
-  if(toast_t >= 0){
-    int y = toast_t < 12 ? toast_t * 3 - 36 : toast_t > 138 ? (150 - toast_t) * 3 - 36 : 0;      /* slides down, waits, slides up */
-    gfx_rect(b, 28, 100 + y - 34 + 34, 200, 26, C_UIBG); gfx_rect(b, 28, 100 + y, 200, 1, C_GOLD); gfx_rect(b, 28, 125 + y, 200, 1, C_GOLD);
-    gfx_text_c(b, 128, 104 + y, "ACHIEVEMENT", C_GOLD, C_UIBG, 1);
-    gfx_text_c(b, 128, 114 + y, mx_ach_name(toast_id), C_WHITE, C_UIBG, 1);
+  if(toast_t >= 0){                                                             /* achievement popup: drops in, gold frame, star badge, time bar */
+    int y = toast_t < 12 ? toast_t * 4 - 48 : toast_t > 138 ? (150 - toast_t) * 4 - 48 : 0;
+    gfx_rect(b, 26, 100 + y - 1, 204, 32, C_GOLD); gfx_rect(b, 27, 101 + y - 1, 202, 30, C_UIBG);
+    gfx_ell(b, 44, 116 + y, 10, 10, C_GOLD2); gfx_ell(b, 44, 116 + y, 8, 8, C_GOLD); gfx_text_c(b, 44, 112 + y, "*", C_BLACK, C_GOLD, 1);
+    gfx_text(b, 62, 105 + y, "ACHIEVEMENT", C_GOLD, 1);
+    gfx_text(b, 62, 116 + y, mx_ach_name(toast_id), C_WHITE, 1);
+    gfx_rect(b, 27, 128 + y, 202 * (150 - toast_t) / 150, 2, C_GOLD);
   }
 }
 

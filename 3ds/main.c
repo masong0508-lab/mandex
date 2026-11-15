@@ -266,6 +266,7 @@ static inline int VY(const View *v, float c){ return v->oy + (int)floorf((c - v-
 static float g_pan, g_sl; static int g_sgn;   /* eye sign and slider, so layers inside the sky can have their own disparity */
 #define LD(D) ((int)lroundf(g_sgn * (D) * g_sl * 0.5f))
 static float g_pan_unused;                              /* camera drift in px: follows the man, each layer scrolls by its own fraction */
+static void star(Scr *s, int cx, int cy, int r, u32 c);
 static void hills(Scr *s, int base, int ox, int step, int r, int amp, int col0, int col1, int col2){
   for(int k = -2; k < s->w / step + 3; k++){ int x = ox + k * step, h = ((k * 37 + 11) & 7) * amp / 7;
     disc(s, x, base - h + r / 2, r, (k & 1) ? col1 : col0); }
@@ -503,7 +504,16 @@ static void draw_hud(void){
   text(&top, 6, 224, "MEN", 2, RGB(190, 190, 190)); itoa_(world.men, b); text(&top, 40, 224, b, 2, RGB(255, 255, 255));
   text(&top, 80, 224, "LANDLORDS", 2, RGB(255, 138, 138)); sprintf(b, "%d/%d", alive(), world.ntargets); text(&top, 168, 224, b, 2, RGB(255, 255, 255));
   sprintf(b, "%06d", world.score); text(&top, 394 - tw(b, 2), 224, b, 2, RGB(255, 255, 255));
-  if(toast_t > 0 && toast_id >= 0){ rect(&top, 100, 30, 200, 30, RGB(20, 24, 40)); textc(&top, 200, 33, "ACHIEVEMENT", 1, RGB(255, 210, 63)); textc(&top, 200, 45, mx_ach_name(toast_id), 2, RGB(255, 255, 255)); }
+  if(toast_t > 0 && toast_id >= 0){                                          /* achievement popup: drops in, gold frame, star badge, time bar */
+    int t = toast_t, off = t < 10 ? (10 - t) * 5 : t > 140 ? (t - 140) * 5 : 0, y = 24 - off, x = 84, w = 232, h = 36;
+    rect(&top, x - 2, y - 2, w + 4, h + 4, RGB(255, 210, 63)); rect(&top, x, y, w, h, RGB(22, 26, 48)); rect(&top, x, y, w, h / 2, RGB(32, 38, 68));
+    disc(&top, x + 20, y + 18, 13, RGB(255, 236, 140)); disc(&top, x + 20, y + 18, 10, RGB(255, 210, 63));
+    star(&top, x + 20, y + 18, 7, RGB(60, 40, 10));
+    const char *nm = mx_ach_name(toast_id); int k = tw(nm, 2) <= w - 52 ? 2 : 1;
+    text(&top, x + 42, y + 6, "ACHIEVEMENT", 1, RGB(255, 210, 63)); text(&top, x + 42, y + 17 + (k == 1 ? 3 : 0), nm, k, RGB(255, 255, 255));
+    rect(&top, x, y + h - 3, (w * (150 - t)) / 150, 3, RGB(255, 210, 63));
+    int gx = x - 20 + (t < 40 ? t * (w + 40) / 40 : 9999); if(gx < x + w) rect(&top, gx > x ? gx : x, y, 6, h - 3, RGB(70, 78, 112));   /* the glint */
+  }
 }
 /* 4-point sparkle star built from rows: half-width (r-|dy|)^2 / r gives the concave points */
 static void star(Scr *s, int cx, int cy, int r, u32 c){
