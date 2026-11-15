@@ -37,7 +37,8 @@ static u8 ic_top[256 * 192], ic_bot[256 * 192];       /* the cutscene is drawn i
 /* Sound: every effect is synthesised once at start (core/mx_snd.c, the DS's own effect table) into linear memory and played on the DSP's
    8 channels round-robin.  Without the DSP firmware (dspfirm.cdc) ndspInit fails and the game is simply silent. */
 static short *snd_buf[SFX_COUNT]; static int snd_len[SFX_COUNT], snd_ok, snd_cool[SFX_COUNT], snd_next;
-static ndspWaveBuf snd_wb[8]; static int snd_err;        /* snd_err: the ndspInit result (0 = ok), shown on the title so a silent run explains itself */
+static ndspWaveBuf snd_wb[8], mus_wb; static int snd_err;
+static short *mus_buf; static int mus_n, mus_playing, mus_pref = 1;                /* the theme: a pre-rendered 12.8 s loop (core/mx_snd.c) */        /* snd_err: the ndspInit result (0 = ok), shown on the title so a silent run explains itself */
 static void sound_init(void){
   if((snd_err = (int)ndspInit()) != 0) return;
   ndspSetOutputMode(NDSP_OUTPUT_STEREO);
@@ -52,12 +53,22 @@ static void sound_init(void){
     ndspChnReset(c); ndspChnSetInterp(c, NDSP_INTERP_LINEAR); ndspChnSetRate(c, (float)MX_SND_RATE); ndspChnSetFormat(c, NDSP_FORMAT_MONO_PCM16); ndspChnSetMix(c, mix);
   }
   snd_ok = 1;
+  { mus_buf = (short *)linearAlloc(MX_MUS_SAMPLES * 2);
+    if(mus_buf){ int n = 0; short *tmpm = (short *)malloc(MX_MUS_SAMPLES * 2); if(tmpm){ n = mx_music_render(tmpm, MX_MUS_SAMPLES); if(n) memcpy(mus_buf, tmpm, n * 2); free(tmpm); }
+      if(n){ DSP_FlushDataCache(mus_buf, n * 2); mus_n = n; float mix[12] = { 0 }; mix[0] = mix[1] = 0.32f;
+        ndspChnReset(7); ndspChnSetInterp(7, NDSP_INTERP_LINEAR); ndspChnSetRate(7, (float)MX_SND_RATE); ndspChnSetFormat(7, NDSP_FORMAT_MONO_PCM16); ndspChnSetMix(7, mix); } } }
+}
+static void music_update(int want){                       /* the theme loops on DSP channel 7 while a level is being played */
+  if(!snd_ok || !mus_n || want == mus_playing) return;
+  mus_playing = want;
+  ndspChnWaveBufClear(7);
+  if(want){ memset(&mus_wb, 0, sizeof mus_wb); mus_wb.data_vaddr = mus_buf; mus_wb.nsamples = mus_n; mus_wb.looping = true; ndspChnWaveBufAdd(7, &mus_wb); }
 }
 static void sound_tick(void){ for(int i = 0; i < SFX_COUNT; i++) if(snd_cool[i] > 0) snd_cool[i]--; }
 void sfx_play(int id, int pan){
   if(!snd_ok || id < 0 || id >= SFX_COUNT || snd_cool[id] > 0) return;
   snd_cool[id] = mx_snd_cooldown(id);
-  int c = snd_next++ & 7;
+  int c = snd_next++ % 7;
   float mix[12] = { 0 }; mix[0] = 0.45f * (127 - pan) / 64.0f; mix[1] = 0.45f * pan / 64.0f; if(mix[0] > 0.6f) mix[0] = 0.6f; if(mix[1] > 0.6f) mix[1] = 0.6f;
   ndspChnWaveBufClear(c); ndspChnSetMix(c, mix);
   memset(&snd_wb[c], 0, sizeof snd_wb[c]); snd_wb[c].data_vaddr = snd_buf[id]; snd_wb[c].nsamples = snd_len[id];
@@ -680,6 +691,7 @@ int main(void){
   View vb = {&bot, 4, 0, 0, -24, 0};                 /* the sling at 4 px per voxel; touch maps straight back to cells */
   while(aptMainLoop()){
     sound_tick();
+    music_update(mus_pref && app == ST_PLAY && world.state == MX_PLAY);
     hidScanInput();
     u32 down = hidKeysDown(), held = hidKeysHeld(), up = hidKeysUp();
     touchPosition t; hidTouchRead(&t);
@@ -713,6 +725,7 @@ int main(void){
     } else {
       MxMan *m = &world.man;
       if((down & KEY_START) && world.state == MX_PLAY) app = ST_PAUSE;
+      if(down & KEY_SELECT) mus_pref = !mus_pref;                                            /* SELECT: music on / off */
       if(down & KEY_SELECT) load_level(world.level);
       if((down & KEY_X) && m->mode == MAN_AIM){ int nx = world.pw_sel; for(int k = 0; k < 4; k++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; }
         if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); }

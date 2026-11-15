@@ -65,7 +65,7 @@ static uint32 argb(int r, int g, int b, int a){ return ((uint32)a << 24) | ((uin
 extern unsigned short gfx_pal[256]; void ds_gfx_init(void);       /* ds/source/gfx.c (built with -DMX_FIXED -Dgfx_init=ds_gfx_init as its own unit: only its palette is used here) */
 /* Sound: each effect is synthesised once at start (core/mx_snd.c, the DS's own effect table), wrapped in a WAV header in memory and handed to KOS's
    sound-effect player, which copies it into the AICA's RAM.  If the sound system will not start the game is simply silent. */
-static sfxhnd_t snd_h[SFX_COUNT]; static int snd_ok, snd_cool[SFX_COUNT];
+static sfxhnd_t snd_h[SFX_COUNT], mus_h; static int snd_ok, snd_cool[SFX_COUNT], mus_ch = -1, mus_pref = 1; static uint64 mus_t0;
 static void le32(unsigned char *p, unsigned v){ p[0] = v; p[1] = v >> 8; p[2] = v >> 16; p[3] = v >> 24; }
 static void sound_init(void){
   if(snd_stream_init() < 0) return;
@@ -79,6 +79,19 @@ static void sound_init(void){
     if(snd_h[i] == SFXHND_INVALID){ snd_ok = 0; return; }
   }
   snd_ok = 1;
+  { static short mpcm[MX_MUS_SAMPLES]; static unsigned char mwav[44 + MX_MUS_SAMPLES * 2];          /* the theme: one 12.8 s loop */
+    int n = mx_music_render(mpcm, MX_MUS_SAMPLES);
+    if(n){ memcpy(mwav, "RIFF\0\0\0\0WAVEfmt \x10\0\0\0\1\0\1\0\0\0\0\0\0\0\0\0\2\0\x10\0data\0\0\0\0", 44);
+      le32(mwav + 4, 36 + n * 2); le32(mwav + 24, MX_SND_RATE); le32(mwav + 28, MX_SND_RATE * 2); le32(mwav + 40, n * 2);
+      for(int k = 0; k < n; k++){ mwav[44 + k * 2] = (unsigned char)mpcm[k]; mwav[45 + k * 2] = (unsigned char)((unsigned short)mpcm[k] >> 8); }
+      mus_h = snd_sfx_load_buf((char *)mwav); } }                                                   /* if it does not fit in sound RAM there is simply no music */
+}
+static void music_update(int want){                       /* plays the loop while a level runs; restarted every 12.8 s (the AICA effect player does not loop) */
+  uint64 now = timer_ms_gettime64();
+  if(!snd_ok || mus_h == SFXHND_INVALID || mus_h == 0){ return; }
+  if(want && mus_ch >= 0 && now - mus_t0 >= 12800 - 20){ mus_ch = -1; }
+  if(want && mus_ch < 0){ mus_ch = snd_sfx_play(mus_h, 120, 128); mus_t0 = now; }
+  else if(!want && mus_ch >= 0){ snd_sfx_stop(mus_ch); mus_ch = -1; }
 }
 static void sound_tick(void){ for(int i = 0; i < SFX_COUNT; i++) if(snd_cool[i] > 0) snd_cool[i]--; }
 void sfx_play(int id, int pan){
@@ -757,6 +770,7 @@ int main(int argc, char **argv){
   uint32 prev = 0; int prev_trig = 0;
   while(1){
     sound_tick();
+    music_update(mus_pref && !on_title && !in_intro && !paused && world.state == MX_PLAY);
     maple_device_t *dev = maple_enum_type(0, MAPLE_FUNC_CONTROLLER);
     cont_state_t *st = dev ? (cont_state_t *)maple_dev_status(dev) : NULL;
     if(st){
@@ -788,6 +802,7 @@ int main(int argc, char **argv){
         if(pressed & CONT_START) paused = 0;
         if(pressed & CONT_Y){ load_level(world.level); paused = 0; }
         if(pressed & CONT_X){ nofight = !nofight; mx_set_fight(&world, !nofight); }
+        if(pressed & CONT_B) mus_pref = !mus_pref;                                      /* B in the pause menu: music on / off */
       } else {
         if(pressed & CONT_START) paused = 1;
         if(pressed & CONT_Y) load_level(world.level);
@@ -829,7 +844,7 @@ int main(int argc, char **argv){
     pvr_list_begin(PVR_LIST_TR_POLY);
     cur_hdr = 0;
     if(in_intro){ draw_intro();
-    } else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART", 320, 270, 24, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
+    } else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART   B MUSIC", 320, 270, 24, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
     pvr_list_finish();
     pvr_scene_finish();
   }

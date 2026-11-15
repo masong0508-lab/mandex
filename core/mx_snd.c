@@ -1,6 +1,7 @@
 #include "mx_snd.h"
 #include "mx.h"
 #include "../ds/source/sfx_tab.h"
+#include "../ds/source/mus_tab.h"
 
 /* Each table segment lasts len[i] sixtieths of a second and (when `glide`) slides to the next note's pitch; the last note just holds.
    Tones are a 50% square run through a one-pole low-pass (a bare square at 22 kHz is shrill), noise is a 15-bit LFSR held at the note rate.
@@ -66,4 +67,32 @@ int mx_event_sfx(const MxEvent *e, int *o){
   case EV_LOSE:    o[0] = SFX_LOSE; return 1;
   default: return 0;
   }
+}
+
+/* ---- the theme as one seamless loop (3DS / Dreamcast): the same notes and plucked decay the DS plays on its two PCM channels.
+   Melody and bass loop a 32-point soft wave (a sine with a little 2nd/3rd harmonic); each note decays 100% -> 40%, with a short attack and release. */
+static const signed char MWAVE[32] = {
+    0,  34,  64,  88, 102, 108, 106,  99,  88,  77,  65,  55,  45,  34,  23,  12,
+    0, -12, -23, -34, -45, -55, -65, -77, -88, -99,-106,-108,-102, -88, -64, -34 };
+static void mus_voice(short *out, int n, int start, int len, int hz, int vol){        /* start/len in samples */
+  long ph = 0;
+  for(int k = 0; k < len && start + k < n; k++){
+    ph += (long)hz * 32 * 256; int idx = (int)((ph / MX_SND_RATE) & 0x1FFF);           /* 32 points, 8 fractional bits */
+    int i0 = (idx >> 8) & 31, i1 = (i0 + 1) & 31, fr = idx & 255, w = MWAVE[i0] + (MWAVE[i1] - MWAVE[i0]) * fr / 256;
+    int e = 100 - 60 * k / len;
+    int att = MX_SND_RATE / 30, rel = MX_SND_RATE / 20;
+    if(k < att) e = e * (k + 1) / (att + 1);
+    if(len - k < rel) e = e * (len - k) / (rel + 1);
+    out[start + k] = (short)(out[start + k] + w * 256 / 127 * vol * e / 100);
+  }
+}
+int mx_music_render(short *out, int max){
+  const int step = MUS_STEP_FRAMES * MX_SND_RATE / 60, total = MUS_BARS * 8 * step;
+  if(max < total) return 0;
+  for(int i = 0; i < total; i++) out[i] = 0;
+  for(int t = 0; t < MUS_BARS * 8; t++){
+    if(TUNE[t] >= 0){ int k = 1; while(t + k < MUS_BARS * 8 && TUNE[t + k] < 0) k++; mus_voice(out, total, t * step, k * step, NF[(int)TUNE[t]], 38); }
+    if((t & 3) == 0) mus_voice(out, total, t * step, 4 * step, BASS[t >> 3][(t >> 2) & 1], 28);
+  }
+  return total;
 }

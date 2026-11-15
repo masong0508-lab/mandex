@@ -11,6 +11,7 @@
 #include "sfx.h"
 
 #include "sfx_tab.h"
+#include "mus_tab.h"
 
 #define NV 6
 static struct { int id, seg, left, freq, active; const Sfx *s; } vo[NV];
@@ -46,18 +47,10 @@ void sfx_play(int id, int pan){
 
 /* ------------------------------------------------------------------ music */
 static int mus_on, mus_step, mus_t, mus_id = -1, mus_len;
-#define MUS_STEP_FRAMES 12
-static const u16 NF[] = { 220, 233, 247, 262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494, 523, 554, 587, 622, 659, 698, 740, 784, 831, 880 };
+
 #define MUS_VOL 40
 /* A little theme in A minor, 8 bars of 8 steps (Am F C G Am F G Am): a melody on one PCM channel and a bass on another, each note decaying like a plucked
    marimba. Melody values are semitones above A3 (-1 = hold the last note); bass is a root and a fifth per bar in Hz. */
-#define MUS_BARS 8
-static const signed char TUNE[MUS_BARS * 8] = {
-  12, -1, 15, -1, 19, -1, 17, 15,   17, -1, 15, -1, 12, -1, -1, -1,
-  15, -1, 19, -1, 22, -1, 19, 15,   17, -1, 14, -1, 10, -1, -1, -1,
-  12, -1, 15, -1, 19, -1, 20, 19,   17, -1, 20, -1, 24, -1, 20, 17,
-  22, -1, 19, -1, 17, -1, 14, -1,   12, -1, 15, -1, 12, -1, -1, -1 };
-static const u16 BASS[MUS_BARS][2] = { {110,165}, {87,131}, {131,196}, {98,147}, {110,165}, {87,131}, {98,147}, {110,165} };
 static struct { int id, t, len, vol; } mv[2] = { { -1, 0, 0, 0 }, { -1, 0, 0, 0 } };      /* 0 melody, 1 bass */
 static void mus_note(int v, int hz, int steps, int vol){
   if(mv[v].id >= 0) soundKill(mv[v].id);

@@ -18,7 +18,7 @@ void gfxSet3D(bool); void gfxFlushBuffers(void); void gfxSwapBuffers(void); void
 bool aptMainLoop(void); void hidScanInput(void); u32 hidKeysDown(void); u32 hidKeysHeld(void); u32 hidKeysUp(void);
 void hidTouchRead(touchPosition *); float osGet3DSliderState(void);
 /* DSP audio: record what the game asks for so the tests can see sound being played */
-typedef struct { const void *data_vaddr; uint32_t nsamples; } ndspWaveBuf;
+typedef struct { const void *data_vaddr; uint32_t nsamples; bool looping; } ndspWaveBuf;
 enum { NDSP_OUTPUT_STEREO, NDSP_INTERP_LINEAR, NDSP_FORMAT_MONO_PCM16 };
 extern int stub_snd_plays;
 static inline int ndspInit(void){ return 0; } static inline void ndspExit(void){} static inline void ndspSetOutputMode(int m){ (void)m; }

@@ -52,6 +52,20 @@ function setMuted(b){muted=!!b;OPT().muted=muted;pdTouch();pdSave()}
 const shakeScale=()=>{const v=OPT().shake;return v==null?1:v};   // OPTIONS: screen shake 0 / .5 / 1
 function audioInit(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.55*optVol();master.connect(AC.destination);setTimeout(crackLoad,0)}catch(e){AC=null}}
 function can(k,ms){const n=performance.now();if(lastSnd[k]&&n-lastSnd[k]<ms)return false;lastSnd[k]=n;return true}
+// ---- music: the same 8-bar theme as the consoles (A minor, melody + bass, plucked decay), scheduled ahead on the WebAudio clock
+const MUS_T=[12,-1,15,-1,19,-1,17,15, 17,-1,15,-1,12,-1,-1,-1, 15,-1,19,-1,22,-1,19,15, 17,-1,14,-1,10,-1,-1,-1, 12,-1,15,-1,19,-1,20,19, 17,-1,20,-1,24,-1,20,17, 22,-1,19,-1,17,-1,14,-1, 12,-1,15,-1,12,-1,-1,-1];
+const MUS_B=[[110,165],[87,131],[131,196],[98,147],[110,165],[87,131],[98,147],[110,165]],MUS_STEP=.2;
+let musWave=null,musNext=0,musStep=0,musOn=false,musTimer=0;
+function musNote(hz,t,dur,g){const o=AC.createOscillator(),gn=AC.createGain();if(!musWave)musWave=AC.createPeriodicWave(new Float32Array([0,0,0,0]),new Float32Array([0,1,.3,.08]));
+  o.setPeriodicWave(musWave);o.frequency.value=hz;gn.gain.setValueAtTime(0,t);gn.gain.linearRampToValueAtTime(g,t+.03);gn.gain.linearRampToValueAtTime(g*.4,t+dur-.06);gn.gain.linearRampToValueAtTime(0,t+dur);
+  o.connect(gn);gn.connect(master);o.start(t);o.stop(t+dur+.02)}
+function musPump(){if(!musOn||!AC)return;if(document.hidden||musNext<AC.currentTime-.3)musNext=AC.currentTime+.1;if(document.hidden)return;while(musNext<AC.currentTime+.4){const n=MUS_T[musStep];
+    if(n>=0){let k=1;while(musStep+k<64&&MUS_T[musStep+k]<0)k++;musNote(220*Math.pow(2,n/12),musNext,k*MUS_STEP,.2)}
+    if((musStep&3)===0)musNote(MUS_B[musStep>>3][(musStep>>2)&1],musNext,4*MUS_STEP,.17);
+    musNext+=MUS_STEP;musStep=(musStep+1)%64}}
+function musUpdate(){const want=!!AC&&!muted&&state==='play';
+  if(want&&!musOn){musOn=true;musStep=0;musNext=AC.currentTime+.1;musTimer=setInterval(musPump,80);musPump()}
+  else if(!want&&musOn){musOn=false;clearInterval(musTimer)}}
 function noise(dur,f0,f1,g,type){if(!AC||muted)return;const n=(AC.sampleRate*dur)|0,b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);
   for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);const s=AC.createBufferSource();s.buffer=b;const f=AC.createBiquadFilter();f.type=type||'lowpass';
   f.frequency.setValueAtTime(f0,AC.currentTime);f.frequency.exponentialRampToValueAtTime(Math.max(30,f1),AC.currentTime+dur);
@@ -3985,6 +3999,6 @@ setInterval(()=>{if(pdDirty)pdSave();if(state==='play'||state==='win')achCheck()
 
 buildSprites();buildBG();
 let last=performance.now(),frameDt=.016;
-function loop(t){const dt=Math.min(.033,(t-last)/1000);last=t;frameDt=dt;try{layoutTick();update(dt);camTick(dt);draw()}catch(e){console.error(e)}requestAnimationFrame(loop)}   // one bad frame must never stop the game
+function loop(t){const dt=Math.min(.033,(t-last)/1000);last=t;frameDt=dt;try{layoutTick();update(dt);camTick(dt);musUpdate();draw()}catch(e){console.error(e)}requestAnimationFrame(loop)}   // one bad frame must never stop the game
 requestAnimationFrame(loop);
 </script></body></html>

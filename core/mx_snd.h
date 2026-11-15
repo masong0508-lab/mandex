@@ -7,6 +7,8 @@
 #define MX_SND_MAX  (MX_SND_RATE * 11 / 10)   /* the longest effect (WIN, 0.9 s) plus its release */
 int mx_snd_render(int id, short *out, int max);
 int mx_snd_cooldown(int id);                    /* frames before the same effect may be played again (same rate-limit as the DS) */
+#define MX_MUS_SAMPLES (8 * 8 * (12 * MX_SND_RATE / 60))   /* the theme's loop: 12.8 s */
+int mx_music_render(short *out, int max);       /* the whole theme as mono s16 at MX_SND_RATE, seamless when looped; returns samples (0 if max < MX_MUS_SAMPLES) */
 #include "mx.h"
 /* Which effects a world event makes (the same mapping as the DS front-end): fills out[] (room for 2) and returns how many. */
 int mx_event_sfx(const MxEvent *e, int *out);

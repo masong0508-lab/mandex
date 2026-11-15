@@ -22,5 +22,7 @@ maple_device_t *maple_enum_type(int,int); void *maple_dev_status(maple_device_t*
 typedef int sfxhnd_t; enum { SFXHND_INVALID = 0 };
 extern int stub_snd_plays;
 static inline int snd_stream_init(void){ return 0; } static inline sfxhnd_t snd_sfx_load_buf(char *b){ static int n; (void)b; return ++n; }
+static inline void snd_sfx_stop(int c){ (void)c; } static inline unsigned long long timer_ms_gettime64(void){ static unsigned long long t; return t += 17; }
 static inline int snd_sfx_play(sfxhnd_t h, int v, int p){ (void)h; (void)v; (void)p; stub_snd_plays++; return 0; }
+typedef unsigned long long uint64;
 #endif
