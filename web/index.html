@@ -1240,7 +1240,7 @@ function update(dt){
 //  CHARACTER ART
 // =====================================================================
 let SK='#f4b78e',SKD='#d98f64',SKH='#ffd5b4';const OUT='#5a2f1b',HAIR='#4a2d1a';
-function setFur(on){if(on){SK='#c49a76';SKD='#9a7352';SKH='#e2c3a2'}else{SK='#f4b78e';SKD='#d98f64';SKH='#ffd5b4'}}   // the wolfman's whole body is grey fur
+function setFur(on){if(on){SK='#8c909e';SKD='#656979';SKH='#b9bdc9'}else{SK='#f4b78e';SKD='#d98f64';SKH='#ffd5b4'}}   // the wolfman's whole body is grey fur
 let WORK=false,WOLF=false,WOLFH=0;let THONG=false,TG='#ff2d6f';   // the thong outfit: skin-coloured 'shorts' plus thin straps and a little pouch in TG
 let BR='#e0243a',BRD='#a8162a',TOW='#ff7eb0',TOWS='#ff4f8f';   // the outfit colours (boxers, boxer shading, towel, towel edge); see OUTFITS
 function limb(x,y,x1,y1,w,col,hi){ctx.lineCap='round';ctx.strokeStyle=OUT;ctx.lineWidth=w+2.4;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x1,y1);ctx.stroke();
@@ -1301,7 +1301,7 @@ function ribbonStripes(xa,xb,yc,hw,step,col){if(THONG)return;ctx.save();ctx.stro
   for(let x=xa+step/2;x<xb;x+=step){const u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u)*.82;ctx.beginPath();ctx.moveTo(x,yc(x)-h);ctx.quadraticCurveTo(x+.5,yc(x),x+.2,yc(x)+h);ctx.stroke()}ctx.restore()}
 // a soft cloth band that follows a quadratic curve P0 -> C -> P1 (a waistband seen from the side), with stitched stripes across it
 // ---- WOLFMAN: grey fur, ears, snout, tail, and shorts that did not survive the transformation (the cartoon rear stays bare and fully drawn)
-const WF='#a98467',WFD='#5e3a24',WFL='#e2c3a2';
+const WF='#7b7f8c',WFD='#6a3f28',WFL='#b9bdc9';
 function furTufts(pts,col){ctx.save();ctx.strokeStyle=col||WFD;ctx.lineWidth=1.3;ctx.lineCap='round';for(const[x,y,d]of pts){ctx.beginPath();ctx.moveTo(x-2.2,y);ctx.lineTo(x,y+3.2*(d||1));ctx.lineTo(x+2.2,y);ctx.stroke()}ctx.restore()}
 // the reference's spiky, bushy tail: a fat curl ending in three pointed tufts (local origin = where it grows out, pointing +x)
 function wolfTail(len,rot,flip){ctx.save();ctx.rotate(rot||0);ctx.scale(flip||1,1);const L=len||30;
@@ -1342,9 +1342,14 @@ function wolfHeadF(lv){lv=lv||3;ctx.save();ctx.lineJoin='round';ctx.lineCap='rou
     ctx.beginPath();ctx.moveTo(q*7.5,-54);ctx.lineTo(q*12.5,-67);ctx.lineTo(q*16,-53);ctx.closePath();ctx.fillStyle='#e8a0a8';ctx.fill();
     ctx.strokeStyle=WFL;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(q*12,-73);ctx.lineTo(q*13,-77);ctx.stroke()}
   if(lv<2){ctx.restore();return}
-  // a person with a wolf's ears: only a little cheek fur and one fang showing at the mouth, so the face stays his
-  furTufts([[-17,-40,1],[17,-40,1],[-19,-33,1],[19,-33,1]],WFD);
-  ctx.fillStyle='#fff';ctx.strokeStyle='#222';ctx.lineWidth=.8;for(const q of[-1]){ctx.beginPath();ctx.moveTo(q*4.6,-30.2);ctx.lineTo(q*5.4,-26.2);ctx.lineTo(q*2.8,-30);ctx.closePath();ctx.fill();ctx.stroke()}
+  // fur-covered head: a grey cap over the forehead, cheek ruffs, pale brow patches
+  ctx.fillStyle=WF;ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.2;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*17,-44);ctx.lineTo(q*25,-39);ctx.lineTo(q*18,-37);ctx.lineTo(q*24,-31);ctx.lineTo(q*15,-30);ctx.lineTo(q*19,-24);ctx.lineTo(q*10,-27);ctx.closePath();ctx.fill();ctx.stroke()}   // cheek ruffs
+  furTufts([[-12,-58,-1],[-6,-60,-1],[0,-61,-1],[6,-60,-1],[12,-58,-1],[-17,-46,1],[17,-46,1]],WFD);
+  // a long muzzle: pale, protruding, big black nose, fangs, a grin
+  ell(0,-34,12.5,8.6,WFL,1.6);ell(0,-40.5,5,3.4,'#15151c',1.2);ctx.fillStyle='rgba(255,255,255,.7)';ctx.beginPath();ctx.ellipse(-1.6,-41.4,1.6,.9,-.3,0,7);ctx.fill();
+  ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(0,-37.4);ctx.lineTo(0,-33);ctx.moveTo(-9,-30.5);ctx.quadraticCurveTo(-4.5,-26.6,0,-32);ctx.quadraticCurveTo(4.5,-26.6,9,-30.5);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.strokeStyle='#222';ctx.lineWidth=.8;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5.4,-29.6);ctx.lineTo(q*6.4,-24.6);ctx.lineTo(q*3.4,-29.4);ctx.closePath();ctx.fill();ctx.stroke()}
+  ctx.strokeStyle='rgba(30,30,40,.55)';ctx.lineWidth=.8;for(const q of[-1,1])for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(q*10,-37+i*1.6);ctx.lineTo(q*20,-40+i*3.4);ctx.stroke()}   // whiskers
   ctx.restore()}
 function wolfEarS(cx,cy){if(!WOLF&&!WOLFH)return;ctx.save();ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(cx-6,cy-9);ctx.lineTo(cx-4,cy-25);ctx.lineTo(cx+5,cy-10);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.5;ctx.stroke();ctx.beginPath();ctx.moveTo(cx-4,cy-12);ctx.lineTo(cx-3,cy-20);ctx.lineTo(cx+2,cy-12);ctx.closePath();ctx.fillStyle='#e8a0a8';ctx.fill();ctx.restore()}
 function wolfHeadB(){ctx.save();ctx.lineJoin='round';for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5,-54);ctx.lineTo(q*13,-68);ctx.lineTo(q*17,-52);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke()}
@@ -1583,7 +1588,7 @@ function drawSide(t,fk){
     ctx.strokeStyle='#e33';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx,sy-4);ctx.quadraticCurveTo(sx+1.2,sy,sx,sy+4);ctx.stroke();
     blob([pEll(ax-4,ay+1,6.5,3.2,'#8a5a2b',.5+fl*.3)],{ow:1.5,shc:'rgba(60,30,10,.4)',hl:0})};
   // far arm (darker, behind the torso): reaching forward with the other one, like a hero in flight
-  blob([pTap(12,-12,5.2,26,-30+fl*2,4.6,SKD),pTap(26,-30+fl*2,4.6,44,-31+fl*3,4,SKD),pEll(26,-30+fl*2,4.8,4.7,SKD)],{ow:1.7,hl:0});blob([pEll(46.5,-31+fl*3,5,4.7,SKD)],{ow:1.6,hl:0});
+  blob([pTap(12,-11,5.4,44,-26+fl*2,4.2,SKD)],{ow:1.7,hl:0});blob([pEll(47,-27+fl*2,5,4.7,SKD)],{ow:1.6,hl:0});
   {const LG=JIG&&JIG.legs,L0=LG?LG[0]:[-27,12+fl*2,-44,4+fl*4],L1=LG?LG[1]:[-24,16-fl*2,-42,13-fl*3];leg(-12,8,L0[0],L0[1],L0[2],L0[3],WORK?BRD:SKD);leg(-10,6,L1[0],L1[1],L1[2],L1[3],WORK?BR:SK)}
   {const f=INF,sl=(man&&man.mode==='fly')?Math.min(1,Math.hypot(man.vx||0,man.vy||0)/1100):0,   // sl: how fast he is going; the belly slumps back and down with it
    bsh=f>.02?[pEll(10+f*4-sl*f*1.5,-1+f*2,12+f*3,9+f*2),pEll(12+f*9-sl*f*4,4+f*6+sl*f*2,10+f*11,9+f*9+sl*f*1.5),pEll(-2+f*3-sl*f*2,8+f*3+sl*f,12+f*4,8+f*3)]:[];
@@ -1601,8 +1606,8 @@ function drawSide(t,fk){
     ctx.strokeStyle='rgba(110,10,32,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(-6,9,8,2.1,3.7);ctx.stroke();
     bandAlong([-22,-3],BG?[-2+INF*4,2+INF*6]:[-2,1],BG?[BG[0]+BG[2]*.6,BG[1]+BG[3]*.62]:[15,13],2.7,2)});                                                                                         // the waistband: a soft striped strip that follows the body
   blob([pTap(15,-8,8.4,28,-15,6.6)],{ow:1.8});                                                                       // neck + shoulder line: the head sits ON a body
-  blob([pTap(15,-14,6.4,28,-38+fl*2,5.2),pTap(28,-38+fl*2,5.2,48,-41+fl*3,4.6),pEll(28,-38+fl*2,5.4,5.3)],{ow:1.8});     // near arm: straight out in front, above the head
-  blob([pEll(51,-41.5+fl*3,5.8,5.4)],{ow:1.6});ctx.strokeStyle='rgba(120,60,30,.55)';ctx.lineWidth=1;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(53.5,-45+fl*3);ctx.lineTo(53.5,-38+fl*3);ctx.moveTo(50,-45.5+fl*3);ctx.lineTo(50,-38+fl*3);ctx.stroke();   // a clenched fist
+  blob([pTap(15,-13,6.6,52,-35+fl*2,4.8)],{ow:1.8});     // near arm: straight out in front, above the head
+  blob([pEll(55,-36.5+fl*2,5.8,5.4)],{ow:1.6});ctx.strokeStyle='rgba(120,60,30,.55)';ctx.lineWidth=1;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(57.5,-40+fl*2);ctx.lineTo(57.5,-33+fl*2);ctx.moveTo(50,-45.5+fl*3);ctx.lineTo(50,-38+fl*3);ctx.stroke();   // a clenched fist
   if(!NOHEAD){
   blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});blob([pEll(25.5,-16,3,4)],{ow:1.3,sd:1,hl:0});
   sideHair(31,-17,11.2);wolfEarS(31,-17);
