@@ -1098,7 +1098,7 @@ function killTarget(t,hard){if(!t.alive)return;
   for(let i=0;i<10;i++)chip(t.x,t.y,['#4a5568','#f2c7a1','#111'][i%3],(rnd()-.5)*260,-rnd()*260);dust(t.x,t.y,4,9)}
 // ---------- landlords fight back ----------
 const BAT_BREAK=560,fightOn=()=>OPT().fight!==false&&state==='play';
-const TAUNTS=['RENT IS DUE!','EVICTED!','NO PETS!','LATE FEE!','PAY UP!','NO REFUNDS!'],SCARES=['EEK!','HELP!','MY RENT!','NOT THE TENANT!'];
+const TAUNTS=['RENT IS DUE!','EVICTED!','NO PETS!','LATE FEE!','PAY UP!','NO REFUNDS!','PUT SOME PANTS ON!','NO GUESTS AFTER 10!','THESE WALLS ARE THIN!','NICE CHEEKS. PAY UP!','SIZE DOES MATTER: SECURITY DEPOSIT!'],SCARES=['EEK!','HELP!','MY RENT!','NOT THE TENANT!','HE\'S SO... STICKY!','COVER YOURSELF!','MY EYES! (OKAY, ONE EYE.)','I\'M MARRIED TO MY RENT ROLL!'];
 function lordSay(t,s,c){if(t.say>0)return;t.say=2.6;popText(t.x,t.y-36,s,c||'#fff',15)}
 function hurtMan(dir){const m=man;if(!m||m.hurtCd>0)return false;
   if(m.mode==='walk'){m.hurtCd=.8;m.wt=Math.max(0,m.wt-3);m.vx=dir*280;m.vy=-210;m.gr=false;popText(m.x,m.y-48,'OUCH!  -3s','#ff6b6b',22)}
@@ -2641,7 +2641,7 @@ function gagReset(Q){if(!Q)return;Q.gag=null;Q.idleT=0;Q.quiet=0;Q.gap=MAN_IDLE.
 const OOPS_CHANCE=.2;     // 1 in 5 cape taunts ends up as the boxers-fall-off version
 function gagStart(Q,i){
   Q.last=i;if(MAN_GAGS[i].name==='cape_taunt'&&rnd()<OOPS_CHANCE){const j=MAN_GAGS.findIndex(g=>g.name==='cape_oops');if(j>=0)i=j}
-  Q.gag=MAN_GAGS[i];Q.gi=i;Q.step=0;Q.st=0;gagFx(Q,Q.gag.steps[0][2])}
+  Q.gag=MAN_GAGS[i];Q.gi=i;Q.step=0;Q.st=0;gagFx(Q,Q.gag.steps[0][2]);if(Q.gag.name==='cape_oops')setTimeout(()=>{popText(Q.ox,Q.oy-60*Q.sc,'\u25AE\u25AE\u25AE CENSORED \u25AE\u25AE\u25AE','#ff2d6f',22);SFX.taunt&&SFX.taunt()},900)}
 function gagTick(Q,dt,canSleep){
   Q.idleT+=dt;
   if(Q.gag){Q.st+=dt;
@@ -3023,6 +3023,9 @@ const OUTFITS=[
  {id:'gold',    n:'Golden Boy',    br:'#f0b92a',brd:'#b8851a',tow:'#fff0a8',tows:'#e6c34a', h:'three stars on 8 levels',      t:()=>threeStarCount()>=8},
  {id:'bare',    n:'Birthday Suit', br:'#f4b78e',brd:'#e2a077',tow:'#ffffff',tows:'#d8d8e0', h:'unlock 25 achievements',       t:()=>achCount()>=25},
  {id:'thong',   n:'Cheeky Thong',  br:'#f4b78e',brd:'#e2a077',tow:'#ff7eb0',tows:'#ff4f8f', tg:'#ff2d6f', thong:true, h:'chug sodas with Burpburster 5 times', t:()=>ST().pw_burp>=5},
+ {id:'leopard', n:'Leopard Lover',  br:'#d9a441',brd:'#7a4a12',tow:'#2b2b2b',tows:'#111111', h:'evict 100 landlords', t:()=>ST().kills>=100},
+ {id:'velvet',  n:'Velvet Smoothie',br:'#7a1a4a',brd:'#4a0f2c',tow:'#ff4f8f',tows:'#c92a78', h:'earn 40 stars in total', t:()=>totalStars()>=40},
+ {id:'lacelava',n:'Lace & Lava',    br:'#1a1a1a',brd:'#000',tow:'#ff3b2f',tows:'#b81d14', h:'watch the wolfman cutscene', t:()=>!!PD.seenWolf},
  {id:'rainbow', n:'Rainbow Rump',  br:'#e0243a',brd:'#a8162a',tow:'#ff7eb0',tows:'#ff4f8f', h:'beat every story level',       t:()=>storyDone()>=CH1, rainbow:true}
 ];
 const ownedCount=()=>OUTFITS.reduce((n,o)=>n+(PD.own[o.id]?1:0),0);
@@ -3554,6 +3557,14 @@ const CUT3=[
      ctx.save();ctx.translate(480,330);ctx.scale(2.6,2.6);drawLandlordScared(t);ctx.restore();
      const g=Math.min(1,u*1.4);ctx.fillStyle='#bfe8ff';ctx.beginPath();ctx.moveTo(540,260+g*160);ctx.lineTo(580,260+g*160);ctx.lineTo(570,300+g*160);ctx.lineTo(550,300+g*160);ctx.closePath();ctx.fill();if(u>.7){cutFlag(6,()=>SFX.glass());for(let i=0;i<8;i++){cgE(560+Math.cos(i)*u*40,440+Math.sin(i*3)*10+u*10,3,3,'#bfe8ff')}}
      cutBubble(740,130,"Not again.",0)}}},
+ // 6b. a visitor
+ {lines:["A knock. Brenda, back for \"the good towels\".","She looked at the wolf. The wolf looked at her. Eyebrows did things.","The door closed. The camera, a gentleman, looked at the moon."],hl:2,cuts:[0,2.4,5],tr:'wipe',hold:3.8,shake:[0,4,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
+   if(k===0){cgStreetNight(t);cgGrass(395,H-395,'#2a3a2a','#162016');ctx.save();ctx.translate(300,300);ctx.scale(2.2,2.2);cgBrenda(0,0,t);ctx.restore();cutGerald(690,396,2.1,{wolf:true,face:'flirt'});cutBubble(330,250,"Hi, Gerald.",1)}
+   else if(k===1){cgWood('#4a2438','#24101e');cgBokeh(t,['#ff4f8f','#ffd23f'],14);ctx.save();ctx.translate(230,250);ctx.scale(3.4,3.4);cgBrenda(0,0,t);ctx.restore();cutGerald(700,430,2.9,{wolf:true,face:'kiss'});
+     for(let i=0;i<6;i++){const ph=(t*.5+i*.17)%1;cgSpark(430+Math.sin(i*2+t*3)*70+i*14,330-ph*230,8+i%3*3,'#ff6fa8')}
+     cutBubble(300,120,"You've been working out.",1);if(u>1.5)cutBubble(800,150,"It's fur.",0)}
+   else{ctx.fillStyle='#0a0d24';ctx.fillRect(0,0,W,H);cgMoon(480,230,130,t);const c=Math.min(1,u*.7);ctx.fillStyle='#1a0a22';ctx.fillRect(0,0,W*.5*c,H);ctx.fillRect(W-W*.5*c,0,W*.5*c,H);
+     if(u>1.3){txt('...the moon is very interesting tonight.',480,470,22,'#ffe9a8','center','#1a1030')}}}},
  // 7. title card
  {lines:["CHAPTER 3: THE WOLFMAN","Landlords now have health bars, riot shields and a healer. Nobody asked the healer.","EVICT. EVERY. LANDLORD. AWOOOO."],hl:2,cuts:[0],tr:'iris',hold:4,shake:[8],draw(t){
    cgSky('#0a0d24','#3a2a60',395);const rr=ctx.createRadialGradient(480,260,20,480,260,620);rr.addColorStop(0,'rgba(255,240,170,.9)');rr.addColorStop(1,'rgba(255,240,170,0)');ctx.fillStyle=rr;ctx.fillRect(0,0,W,H);
@@ -3685,7 +3696,7 @@ function drawOutfits(){
   panel(30,70,330,430);
   ctx.save();ctx.translate(195,370);ctx.scale(1.4,1.4);if(outfitCur.rainbow)applyOutfit(outfitCur,time);const sw=Math.sin(time*5);drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');ctx.restore();
   txt(outfitCur.n,195,110,24,'#fff','center');
-  const cols=2,cw=268,ch=58,x0=384,y0=72;
+  const cols=2,cw=268,ch=OUTFITS.length>14?48:58,x0=384,y0=72;
   OUTFITS.forEach((o,i)=>{const c=i%cols,r=(i/cols)|0,x=x0+c*(cw+10),y=y0+r*(ch+4),own=PD.own[o.id],sel=outfitCur===o;
     hits.push({x,y,w:cw,h:ch,fn:()=>{if(own){equip(o);SFX.ding()}else SFX.pop()}});const hov=mouseX>=x&&mouseX<x+cw&&mouseY>=y&&mouseY<y+ch;
     ctx.save();rrect(x,y,cw,ch,10);ctx.fillStyle=sel?'rgba(60,90,40,.9)':hov&&own?'rgba(255,255,255,.28)':'rgba(15,18,30,.78)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=sel?'#7dff5a':'rgba(255,255,255,.3)';ctx.stroke();
