@@ -31,6 +31,7 @@ def ov(base_rows, over):
     rows = [list(r) for r in base_rows]
     for y, s in over.items():
         for x, ch in enumerate(s):
+            if ch == 'h' and x > 4: ch = 'S'                      # thinning like the front view: hair only in the tuft behind the ear
             if ch != '.': rows[y][x] = ch
     return ["".join(r) for r in rows]
 
@@ -100,21 +101,21 @@ FRAME_HEADS = {
 KEY = {'B': 'BLK', 'G': 'GOLD', 'g': 'GOLD2', 'w': 'WH', 'h': 'HAIR', 'H': 'HAIR2', 'o': 'RIM', 'm': 'MOUTH', 't': 'TONG', 's': 'SKD', 'k': 'SKM', 'S': 'SK', 'r': 'GR', 'l': 'HAIRL', 'p': 'BLUSH', 'i': 'IRIS', 'L': 'LIP', 'T': 'TOOTH', 'K': 'SKH'}
 
 # ---- side view, facing right (flying / diving): 16 wide x 15 tall ----
-SIDE_BASE = [
+SIDE_BASE = [      # thinning, like the front view: a bare shiny crown, a tuft behind the ear, a few combed-over strands
     "....oooooo......",
-    "...ohhhhhho.....",
-    "..ohhhHhhhhoo...",
-    ".ohhhhhhhhhhho..",
-    ".ohhhhhhhhhhSSo.",
-    ".ohhhhhhhhSSSSSo",
-    ".ohhhhhhhHHHSSSo",
-    ".ohhhhhhhSSSSSSo",
-    "..ohhhhhSSSSSSkko",
-    "..ohhhhSSSSSSSSko",
-    "...ohhhSSSSSSSSo.",
-    "...oohhSSSSSSSo..",
-    ".....oSSSSSSo....",
-    "......oooooo.....",
+    "...oSKKSSSo.....",
+    "..ohhhhhhSSoo...",
+    ".ohhSSSSSSSSSo..",
+    ".ohhSSSSSSSSSSo.",
+    ".ohhSSSSSSSSSSSo",
+    ".ohhhSSSSSSSSSSo",
+    ".ohhhSSSsSSSSSSo",
+    "..ohhSSsSSSSSkko",
+    "..ohhSSSSSSSSSko",
+    "...ohhSSSSSSSSo.",
+    "...oohhSSSSSSo..",
+    ".....oSSSSSSo...",
+    "......oooooo....",
 ]
 def _pad(rows, w=17): return [r.ljust(w, '.') for r in rows]
 SIDE_BASE = _pad(SIDE_BASE)
@@ -132,6 +133,7 @@ def side_head(kind):
     for y, s in SIDE_OVER[kind].items():
         s = s.ljust(17, '.')
         for x, ch in enumerate(s):
+            if ch == 'h' and x > 4: ch = 'S'                      # thinning like the front view: hair only in the tuft behind the ear
             if ch != '.': rows[y][x] = ch
     return ["".join(r) for r in rows]
 

@@ -230,10 +230,11 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
                 for i, ch in enumerate(r):
                     if ch != '.': put(idx, l + w_ - 3 + i, t + h_ // 2 - 1 + j, hk[ch])
         return
-    if name in ("FLY_A", "FLY_B", "DIVE"):                         # side-view big head, facing right
+    if name in ("FLY_A", "FLY_B", "DIVE"):                         # side-view big head, facing right, pixelled over the head only (the web head sits at (31,-17) / (18,-14))
         rows = manhead.side_head("fly" if name != "DIVE" else "dive")
         hk = {k: PI[v] for k, v in manhead.KEY.items()}
-        idx[max(0, hy - 9):hy + 7, max(0, hx - 7):hx + 10] = 0
+        cx, cy = (31, -17) if name != "DIVE" else (18, -14)
+        hx, hy = ax + int(round(cx * ppu)), ay + int(round(cy * ppu))
         stamp(idx, rows, hx - 8, hy - 7, hk)
         return
     if name in ("STUCK_A", "STUCK_B"):                             # small dizzy head
@@ -330,6 +331,7 @@ def main():
             else:
                 src = ALIAS[name]; (call, ppu), head = legacy[src], None
                 print("  (no HTML art yet for %s, aliasing %s)" % (name, src))
+            if has_api: pg.evaluate('(v) => { NOHEAD = v }', name in ('FLY_A', 'FLY_B', 'DIVE'))
             rgb, alpha, ax, ay = downsample(render(pg, call, ppu))
             frames.append((name, src, ppu, head) + outline(rgb, alpha, ax, ay))
         b.close()
