@@ -54,6 +54,8 @@ static int coll_shed, was_aim;       /* coll_shed: the speed safety net switched
 static int out_open, out_cur;        /* outfits screen shown on the title's bottom screen; out_cur = the highlighted outfit (outfit_sel = the one worn) */
 static int outfit_sel, toast_t = -1, toast_id, toast_q[4], toast_nq;
 static void toast_push(int id){ if(toast_nq < 4) toast_q[toast_nq++] = id; }
+static unsigned outfit_seen = 1;                                   /* outfits already owned (bit per outfit): a new one pops a "NEW OUTFIT" toast, ids 100+ */
+static void outfit_scan(int quiet){ for(int i = 0; i < MX_NUM_OUTFITS; i++){ if(mx_outfit_unlocked(&stats, i) && !((outfit_seen >> i) & 1)){ outfit_seen |= 1u << i; if(!quiet) toast_push(100 + i); } } }
 static void toast_tick(void){
   if(toast_t >= 0){ if(++toast_t > 150) toast_t = -1; }
   if(toast_t < 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i-1] = toast_q[i]; toast_nq--; toast_t = 0; sfx_play(SFX_TARGET, 64); }
@@ -665,11 +667,12 @@ static void top_hud(u8 *b){
   toast_tick();
   if(toast_t >= 0){                                                             /* achievement popup: drops in, gold frame, star badge, time bar */
     int y = toast_t < 12 ? toast_t * 4 - 48 : toast_t > 138 ? (150 - toast_t) * 4 - 48 : 0;
-    gfx_rect(b, 26, 100 + y - 1, 204, 32, C_GOLD); gfx_rect(b, 27, 101 + y - 1, 202, 30, C_UIBG);
-    gfx_ell(b, 44, 116 + y, 10, 10, C_GOLD2); gfx_ell(b, 44, 116 + y, 8, 8, C_GOLD); gfx_text_c(b, 44, 112 + y, "*", C_BLACK, C_GOLD, 1);
-    gfx_text(b, 62, 105 + y, "ACHIEVEMENT", C_GOLD, 1);
-    gfx_text(b, 62, 116 + y, mx_ach_name(toast_id), C_WHITE, 1);
-    gfx_rect(b, 27, 128 + y, 202 * (150 - toast_t) / 150, 2, C_GOLD);
+    int oc = toast_id >= 100; u8 fr = oc ? C_GRASS : C_GOLD;
+    gfx_rect(b, 26, 100 + y - 1, 204, 32, fr); gfx_rect(b, 27, 101 + y - 1, 202, 30, C_UIBG);
+    gfx_ell(b, 44, 116 + y, 10, 10, oc ? C_GRASS2 : C_GOLD2); gfx_ell(b, 44, 116 + y, 8, 8, fr); gfx_text_c(b, 44, 112 + y, oc ? "+" : "*", C_BLACK, fr, 1);
+    gfx_text(b, 62, 105 + y, oc ? "NEW OUTFIT" : "ACHIEVEMENT", fr, 1);
+    gfx_text(b, 62, 116 + y, oc ? mx_outfit(toast_id - 100)->name : mx_ach_name(toast_id), C_WHITE, 1);
+    gfx_rect(b, 27, 128 + y, 202 * (150 - toast_t) / 150, 2, fr);
   }
 }
 
@@ -1061,7 +1064,7 @@ int main(void){
   music_set(music_pref);
   STAGE(3, RGB15(0,0,31));                             /* blue */
 
-  mx_meta_init(&stats); mx_options_default(&opt); save_load(); apply_outfit(outfit_sel); outfit_swatches();   /* load before the first load_level(), as mx_meta_unpack asks */
+  mx_meta_init(&stats); mx_options_default(&opt); save_load(); outfit_scan(1); apply_outfit(outfit_sel); outfit_swatches();   /* load before the first load_level(), as mx_meta_unpack asks */
   load_level(sel_level);
   STAGE(4, RGB15(31,31,0));                            /* yellow */
   int slow_frames = 0, fast_frames = 0, phys_ticks = 0;
@@ -1241,10 +1244,10 @@ int main(void){
       else { slow_frames = 0; fast_frames = 0; }
       on_events();
       mx_meta_events(&stats, &world);
-      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a);
+      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0);
       update_parts();
       if(world.state != MX_PLAY){
-        if(was_state == MX_PLAY){ end_t = 0; if(world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); } }
+        if(was_state == MX_PLAY){ end_t = 0; if(world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0); } }
         if(was_state == MX_PLAY) save_sync();                      /* win or lose: the one moment a short stall is harmless */
         end_t++;
       }

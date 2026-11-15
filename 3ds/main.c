@@ -79,6 +79,8 @@ static void apply_outfit(int o){
 }
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
 static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
+static unsigned outfit_seen = 1;                                   /* outfits already owned (bit per outfit): a new one pops a "NEW OUTFIT" toast, ids 100+ */
+static void outfit_scan(int quiet){ for(int i = 0; i < MX_NUM_OUTFITS; i++){ if(mx_outfit_unlocked(&stats, i) && !((outfit_seen >> i) & 1)){ outfit_seen |= 1u << i; if(!quiet) toast_push(100 + i); } } }
 
 /* ---------------------------------------------------------------- pixels */
 typedef struct { u8 *fb; int w, h; } Scr;
@@ -506,12 +508,13 @@ static void draw_hud(void){
   sprintf(b, "%06d", world.score); text(&top, 394 - tw(b, 2), 224, b, 2, RGB(255, 255, 255));
   if(toast_t > 0 && toast_id >= 0){                                          /* achievement popup: drops in, gold frame, star badge, time bar */
     int t = toast_t, off = t < 10 ? (10 - t) * 5 : t > 140 ? (t - 140) * 5 : 0, y = 24 - off, x = 84, w = 232, h = 36;
-    rect(&top, x - 2, y - 2, w + 4, h + 4, RGB(255, 210, 63)); rect(&top, x, y, w, h, RGB(22, 26, 48)); rect(&top, x, y, w, h / 2, RGB(32, 38, 68));
-    disc(&top, x + 20, y + 18, 13, RGB(255, 236, 140)); disc(&top, x + 20, y + 18, 10, RGB(255, 210, 63));
+    int oc = toast_id >= 100; u32 fc = oc ? RGB(125, 255, 90) : RGB(255, 210, 63);
+    rect(&top, x - 2, y - 2, w + 4, h + 4, fc); rect(&top, x, y, w, h, RGB(22, 26, 48)); rect(&top, x, y, w, h / 2, RGB(32, 38, 68));
+    disc(&top, x + 20, y + 18, 13, RGB(255, 236, 140)); disc(&top, x + 20, y + 18, 10, fc);
     star(&top, x + 20, y + 18, 7, RGB(60, 40, 10));
-    const char *nm = mx_ach_name(toast_id); int k = tw(nm, 2) <= w - 52 ? 2 : 1;
-    text(&top, x + 42, y + 6, "ACHIEVEMENT", 1, RGB(255, 210, 63)); text(&top, x + 42, y + 17 + (k == 1 ? 3 : 0), nm, k, RGB(255, 255, 255));
-    rect(&top, x, y + h - 3, (w * (150 - t)) / 150, 3, RGB(255, 210, 63));
+    const char *nm = oc ? mx_outfit(toast_id - 100)->name : mx_ach_name(toast_id); int k = tw(nm, 2) <= w - 52 ? 2 : 1;
+    text(&top, x + 42, y + 6, oc ? "NEW OUTFIT" : "ACHIEVEMENT", 1, fc); text(&top, x + 42, y + 17 + (k == 1 ? 3 : 0), nm, k, RGB(255, 255, 255));
+    rect(&top, x, y + h - 3, (w * (150 - t)) / 150, 3, fc);
     int gx = x - 20 + (t < 40 ? t * (w + 40) / 40 : 9999); if(gx < x + w) rect(&top, gx > x ? gx : x, y, 6, h - 3, RGB(70, 78, 112));   /* the glint */
   }
 }
@@ -651,11 +654,11 @@ int main(void){
       if(app == ST_PLAY) mx_update(&world, R(1.0 / 60.0));
       on_events();
       mx_meta_events(&stats, &world);
-      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a);
+      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0);
       if(toast_t > 0){ if(++toast_t > 150){ toast_t = 0; toast_id = -1; } }
       if(toast_t == 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i-1] = toast_q[i]; toast_nq--; toast_t = 1; }
       tick_parts();
-      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ prev_best = stats.best[world.level]; mx_meta_win(&stats, &world); new_best = world.score > 0 && (uint32_t)world.score > prev_best; for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); }
+      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ prev_best = stats.best[world.level]; mx_meta_win(&stats, &world); new_best = world.score > 0 && (uint32_t)world.score > prev_best; for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0); }
       was_state = world.state;
     }
 

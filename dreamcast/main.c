@@ -193,6 +193,8 @@ static void spawn(float x, float y, uint32 c, float spd){
 static MxStats stats;
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq; static float toast_t;
 static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
+static unsigned outfit_seen = 1;                                   /* outfits already owned (bit per outfit): a new one pops a "NEW OUTFIT" toast, ids 100+ */
+static void outfit_scan(int quiet){ for(int i = 0; i < MX_NUM_OUTFITS; i++){ if(mx_outfit_unlocked(&stats, i) && !((outfit_seen >> i) & 1)){ outfit_seen |= 1u << i; if(!quiet) toast_push(100 + i); } } }
 static void toast_tick(void){
   if(toast_id >= 0){ toast_t += DT; if(toast_t > 2.8f) toast_id = -1; }
   if(toast_id < 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i - 1] = toast_q[i]; toast_nq--; toast_t = 0; }
@@ -667,11 +669,12 @@ static void draw_all(void){
   toast_tick();
   if(toast_id >= 0){                                                          /* achievement popup: drops in, gold frame, star badge, time bar */
     float y = toast_t < 0.25f ? -70 + toast_t * 4 * 110 : toast_t > 2.55f ? (2.8f - toast_t) * 4 * 110 - 70 : 40, x = 170, w = 300, h = 56, k = 1.0f - toast_t / 2.8f;
-    quad(x - 3, y - 3, w + 6, h + 6, Z_HUD + 1, argb(255, 210, 63, 255)); quad(x, y, w, h, Z_HUD + 1.02f, argb(22, 26, 48, 245)); quad(x, y, w, h / 2, Z_HUD + 1.03f, argb(40, 46, 80, 120));
-    puff(x + 30, y + 28, 19, Z_HUD + 1.05f, argb(255, 236, 140, 255)); puff(x + 30, y + 28, 15, Z_HUD + 1.06f, argb(255, 210, 63, 255));
-    text("*", x + 30, y + 38, 26, argb(60, 40, 10, 255), 1, Z_HUD + 1.1f);
-    text("ACHIEVEMENT", x + 62, y + 20, 12, argb(255, 210, 63, 255), 0, Z_HUD + 1.1f); text(mx_ach_name(toast_id), x + 62, y + 43, 18, WHITE, 0, Z_HUD + 1.1f);
-    quad(x, y + h - 4, w * k, 4, Z_HUD + 1.05f, argb(255, 210, 63, 255)); }
+    int oc = toast_id >= 100; uint32 fc = oc ? argb(125, 255, 90, 255) : argb(255, 210, 63, 255);
+    quad(x - 3, y - 3, w + 6, h + 6, Z_HUD + 1, fc); quad(x, y, w, h, Z_HUD + 1.02f, argb(22, 26, 48, 245)); quad(x, y, w, h / 2, Z_HUD + 1.03f, argb(40, 46, 80, 120));
+    puff(x + 30, y + 28, 19, Z_HUD + 1.05f, argb(255, 236, 140, 255)); puff(x + 30, y + 28, 15, Z_HUD + 1.06f, fc);
+    text(oc ? "+" : "*", x + 30, y + 38, 26, argb(60, 40, 10, 255), 1, Z_HUD + 1.1f);
+    text(oc ? "NEW OUTFIT" : "ACHIEVEMENT", x + 62, y + 20, 12, fc, 0, Z_HUD + 1.1f); text(oc ? mx_outfit(toast_id - 100)->name : mx_ach_name(toast_id), x + 62, y + 43, 18, WHITE, 0, Z_HUD + 1.1f);
+    quad(x, y + h - 4, w * k, 4, Z_HUD + 1.05f, fc); }
   if(world.banner > 0 && world.state == MX_PLAY){
     int a = (int)(255 * (world.banner > 1 ? 1.0f : world.banner));
     if(world.level == MX_HQ_LEVEL){ char dn[32]; snprintf(dn, sizeof dn, "DISTRICT %d OF %d", world.district + 1, MX_HQ_DISTRICTS); text(dn, 320, 150, 22, argb(255, 126, 176, a), 1, Z_HUD); }
@@ -809,8 +812,8 @@ int main(int argc, char **argv){
       mx_update(&world, DT);
       handle_events();
       mx_meta_events(&stats, &world);
-      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a);
-      { static int was = MX_PLAY; if(world.state == MX_WIN && was == MX_PLAY){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); } was = world.state; }
+      for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0);
+      { static int was = MX_PLAY; if(world.state == MX_WIN && was == MX_PLAY){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ) toast_push(a); outfit_scan(0); } was = world.state; }
       if(hint_t > 0) hint_t--;
       {
         int calm = st && world.state == MX_PLAY && world.man.mode == MAN_AIM && world.banner <= 0 && !st->buttons && abs(st->joyx) < 30 && abs(st->joyy) < 30;
