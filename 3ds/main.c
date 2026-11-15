@@ -37,14 +37,14 @@ static u8 ic_top[256 * 192], ic_bot[256 * 192];       /* the cutscene is drawn i
 /* Sound: every effect is synthesised once at start (core/mx_snd.c, the DS's own effect table) into linear memory and played on the DSP's
    8 channels round-robin.  Without the DSP firmware (dspfirm.cdc) ndspInit fails and the game is simply silent. */
 static short *snd_buf[SFX_COUNT]; static int snd_len[SFX_COUNT], snd_ok, snd_cool[SFX_COUNT], snd_next;
-static ndspWaveBuf snd_wb[8];
+static ndspWaveBuf snd_wb[8]; static int snd_err;        /* snd_err: the ndspInit result (0 = ok), shown on the title so a silent run explains itself */
 static void sound_init(void){
-  if(ndspInit() != 0) return;
+  if((snd_err = (int)ndspInit()) != 0) return;
   ndspSetOutputMode(NDSP_OUTPUT_STEREO);
   static short tmp[MX_SND_MAX];
   for(int i = 0; i < SFX_COUNT; i++){
     int n = mx_snd_render(i, tmp, MX_SND_MAX);
-    snd_buf[i] = (short *)linearAlloc(n * 2); if(!snd_buf[i]) return;
+    snd_buf[i] = (short *)linearAlloc(n * 2); if(!snd_buf[i]){ snd_err = -2; return; }
     memcpy(snd_buf[i], tmp, n * 2); snd_len[i] = n; DSP_FlushDataCache(snd_buf[i], n * 2);
   }
   for(int c = 0; c < 8; c++){
@@ -633,6 +633,7 @@ int main(void){
       rect(&top, 140, 161, 120, 9, RGB(15, 18, 30));
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
+      if(!snd_ok){ char sb[48]; sprintf(sb, "NO SOUND (ndsp %08X) - NEEDS dspfirm.cdc", (unsigned)snd_err); textc(&top, 200, 212, sb, 1, RGB(255, 90, 90)); }
       { char fb[48]; sprintf(fb, "Y: LANDLORDS FIGHT BACK  %s", nofight ? "OFF" : "ON"); textc(&top, 200, 190, fb, 1, nofight ? RGB(150, 150, 165) : RGB(125, 255, 90)); }
       { char ob[64]; sprintf(ob, "L/R: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {
