@@ -532,7 +532,7 @@ static void rubble(u8 *b, int x, int gy, int s, int seed){
 }
 static void smoke(u8 *b, int x, int gy, int tt, int n){ for(int i = 0; i < n; i++){ int ph = (tt + i * 240 / n) % 240; gfx_dither(b, x + wv(ph + i * 13, 90, 12) + (i - n / 2) * 5, gy - ph * 3 / 4, 8 + ph / 12, 6 + ph / 14, C_CLOUD2); } }
 static void confetti(u8 *b, int tt, int n){ static const u8 col[5] = { C_GOLD, C_PINK, C_GRASS2, C_SKY0 + 6, C_WHITE }; for(int i = 0; i < n; i++){ int x = (int)(hs(i) % 256) + wv(tt + i * 7, 40, 6), y = (int)(((u32)tt * (2 + (hs(i + 9) % 3)) + hs(i + 3)) % 200) - 4; gfx_rect(b, x, y, 3, 2, col[i % 5]); } }
-static void folk(u8 *b, int x, int gy, int tt, u8 c, int sign){ int j = iabs(wv(tt * 3 + x, 24, 2)); gfx_rect(b, x - 3, gy - 11 - j, 6, 11, c); gfx_ell(b, x, gy - 14 - j, 3, 3, C_SKIN);
+static void folk(u8 *b, int x, int gy, int tt, u8 c, int sign){ int j = iabs(wv(tt * 3 + x, 24, 2)); gfx_rect(b, x - 3, gy - 11 - j, 6, 11, c); gfx_rect(b, x - 3, gy - 11 - j, 2, 11, C_DARK); gfx_ell(b, x, gy - 14 - j, 3, 3, C_SKIN); gfx_rect(b, x - 3, gy - 18 - j, 6, 2, (u8)((x / 9) & 1 ? C_HAIR : C_GOLD2)); gfx_px(b, x - 1, gy - 14 - j, C_BLACK); gfx_px(b, x + 1, gy - 14 - j, C_BLACK);
   gfx_tline(b, x - 3, gy - 9 - j, x - 6, gy - 17 - j + wv(tt + x, 20, 2), 2, C_SKIN); gfx_tline(b, x + 3, gy - 9 - j, x + 6, gy - 17 - j - wv(tt + x, 20, 2), 2, C_SKIN);
   if(sign){ gfx_rect(b, x + 6, gy - 30 - j, 14, 9, C_WHITE); gfx_rect(b, x + 7, gy - 28 - j, 12, 2, C_RED); gfx_rect(b, x + 12, gy - 21 - j, 2, 12, C_DIRT2); } }
 static void tower(u8 *b, int x, int gy, int lean, int fall){      /* HQ: lean in 1/64 of a unit per row, fall 0..64 shrinks it */
