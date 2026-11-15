@@ -381,6 +381,19 @@ def main():
         idx[A] = index_of(C[A].astype(np.int32))
         idx = np.pad(idx, ((6, 0), (5, 5))); ax += 5; ay += 6         # room for the bigger head, trimmed again below
         paint_face(src, idx, int(ax), int(ay), PI, ppu, head)
+        if name.endswith("_W"):                                   # close the 1-2 px slits the bigger wolf head leaves beside / under it (the human head wipe box is wider than the wolf's)
+            for _ in range(2):
+                new = idx.copy()
+                for y in range(1, idx.shape[0] - 1):
+                    if y > int(ay) + 2: break
+                    for x in range(2, idx.shape[1] - 2):
+                        if idx[y, x]: continue
+                        for d in (1, 2):
+                            if idx[y, x - d] and idx[y, x + d if d == 1 else x + 1] or idx[y, x - 1] and idx[y, x + d]:
+                                new[y, x] = idx[y, x - 1] or idx[y, x - d]; break
+                            if y - d >= 0 and y + d < idx.shape[0] and idx[y - d, x] and idx[y + 1, x] if d == 1 else (idx[y - 1, x] and idx[y + 2, x] if y + 2 < idx.shape[0] else 0):
+                                new[y, x] = idx[y - 1, x] or idx[y - d, x]; break
+                idx = new
         if name.startswith("BACK") or name.startswith("FART") or name.startswith("SPIN_"): shade_butt(idx, PI, int(ay))   # (the oops frames keep the HTML's own bare / boxer shading)
         ys, xs = np.nonzero(idx); y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
         idx = idx[y0:y1, x0:x1]; ax -= x0; ay -= y0; h, w = idx.shape
