@@ -274,13 +274,13 @@ static void hills(Scr *s, int base, int ox, int step, int r, int amp, int col0, 
 static void draw_sky(const View *v){
   Scr *s = v->s; int gy = VY(v, MX_ROWS);
   for(int y = 0; y < s->h; y += 4){ int t = y * 90 / s->h; rect(s, 0, y, s->w, 4, RGB(90 + t / 2, 170 + t / 2, 240 - t / 3)); }
-  disc(s, 330 + LD(10) - (int)(g_pan * .02f), 44, 22, RGB(255, 245, 190));                              /* sun: almost at infinity */
+  { int sx = 330 + LD(10) - (int)(g_pan * .02f); disc(s, sx, 44, 46, RGB(170, 215, 250)); disc(s, sx, 44, 36, RGB(205, 232, 250)); disc(s, sx, 44, 28, RGB(240, 244, 225)); disc(s, sx, 44, 22, RGB(255, 245, 190)); }   /* sun with a glow */                              /* sun: almost at infinity */
   for(int k = 0; k < 5; k++){ int cx = LD(-2 * (k & 1)) + ((k * 97 + (int)(frame * (.12f + .05f * (k & 1))) - (int)(g_pan * .06f)) % 480) - 40;   /* drifting clouds */
     int cy = 30 + (k * 23) % 60; disc(s, cx, cy, 14, RGB(250, 252, 255)); disc(s, cx + 14, cy + 3, 11, RGB(244, 248, 255)); disc(s, cx - 13, cy + 4, 10, RGB(244, 248, 255)); }
-  hills(s, gy - 30, v->ox + LD(-8) - (int)(g_pan * .10f), 120, 70, 28, RGB(128, 170, 205), RGB(138, 180, 210), RGB(128, 170, 205));   /* far hills */
+  hills(s, gy - 30, v->ox + LD(-8) - (int)(g_pan * .10f), 120, 70, 28, RGB(146, 184, 216), RGB(156, 192, 220), RGB(146, 184, 216));   /* far hills, hazed toward the sky */
   hills(s, gy - 14, v->ox + LD(-4) - (int)(g_pan * .22f), 90, 52, 18, RGB(95, 150, 150), RGB(105, 160, 150), RGB(95, 150, 150));     /* near hills */
-  rect(s, 0, gy, s->w, s->h, RGB(96, 64, 38));
-  rect(s, 0, gy - 2, s->w, 3, RGB(70, 170, 70));
+  for(int y = gy, k = 0; y < s->h; y += 10, k++){ int d = k > 8 ? 8 : k; rect(s, 0, y, s->w, 10, RGB(100 - d * 3, 68 - d * 3, 40 - d * 2)); }   /* soil darkens with depth */
+  rect(s, 0, gy - 2, s->w, 3, RGB(70, 170, 70)); rect(s, 0, gy - 3, s->w, 1, RGB(130, 210, 100));
 }
 static void draw_fore(const View *v){               /* grass blades and a fence post in front of everything: the nearest layer */
   Scr *s = v->s; int gy = VY(v, MX_ROWS);
