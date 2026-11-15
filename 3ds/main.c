@@ -223,7 +223,13 @@ static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, fl
     int sx = (int)floorf(ux + f->ax + 0.5f), sy = (int)floorf(uy + f->ay + 0.5f);
     if(sx < 0 || sy < 0 || sx >= f->w || sy >= f->h) continue;
     int c = f->px[sy * f->w + sx]; if(!c) continue;
-    rect(s, x, y, 1, 1, RGB(man_pal[c - 1][0], man_pal[c - 1][1], man_pal[c - 1][2]));
+    int r = man_pal[c - 1][0], g = man_pal[c - 1][1], b = man_pal[c - 1][2], n = 4;     /* soften the edge: 2x2 samples, empty ones blend toward what is behind (drawn at half strength) */
+    float o = 0.5f * q * 0.5f; int hit = 0;
+    for(int k = 0; k < 4; k++){ float jx = (k & 1 ? o : -o), jy = (k & 2 ? o : -o);
+      int tx = (int)floorf((dx + jx) * ca + (dy + jy) * sa + f->ax + 0.5f), ty = (int)floorf(-(dx + jx) * sa + (dy + jy) * ca + f->ay + 0.5f);
+      if(tx >= 0 && ty >= 0 && tx < f->w && ty < f->h && f->px[ty * f->w + tx]) hit++; }
+    (void)n; if(hit < 2) continue;                                                     /* a lone corner sample is just a jaggy: drop it */
+    rect(s, x, y, 1, 1, RGB(r, g, b));
   }
 }
 static MiState mi;                                             /* idle gag state, see art/manidle.h */
@@ -376,6 +382,11 @@ static void draw_man(const View *v){
   else if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); fr = ((frame >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
   else if(dragging) fr = MSF_DRAG;
   else fr = mi_frame(&mi, frame);                                            /* idle gags */
+  if(m->mode == MAN_FLY || (m->mode == MAN_AIM && dragging)){                  /* a soft shadow on the ground, smaller and fainter the higher he is */
+    float hg = (MX_ROWS - RTOF(m->y)) / 40.0f; if(hg < 0) hg = 0; if(hg > 1) hg = 1;
+    int rw = (int)(p * 6 * (1.0f - 0.55f * hg)), sy2 = VY(v, (float)MX_ROWS) + 1;
+    for(int k = -2; k <= 2; k++){ int hw = rw * (3 - (k < 0 ? -k : k)) / 3; rect(v->s, x - hw, sy2 + k, hw * 2, 1, RGB(20 + (int)(30 * hg), 40 + (int)(40 * hg), 40 + (int)(30 * hg))); }
+  }
   { float a = 0;
     if(m->mode == MAN_FLY) a = (m->dive ? RTOF(m->spin) : RTOF(m->ang)) * face; else if(m->mode == MAN_STUCK) a = RTOF(mx_man_wobble(m)) * 0.17f;
     if(a > 0.03f || a < -0.03f) blit_frame_rot(v->s, fr, x, y, p, face, a); else blit_frame(v->s, fr, x, y, p, face); }

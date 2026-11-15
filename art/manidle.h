@@ -11,7 +11,7 @@
 #define MX_MANIDLE_H
 
 enum { FX_NONE, FX_SLAP, FX_BOING, FX_GRUNT, FX_BURP, FX_FART, FX_FLICK, FX_YAWN, FX_SNORE, FX_SNIFF, FX_WHOOSH, FX_TAUNT, FX_EEK, FX_SNAP, FX_WHEW, FX_KISS, FX_SPARKLE, FX_DISCO, FX_POP, FX_COUNT };
-enum { GAG_BELLY, GAG_WIGGLE, GAG_SCRATCH, GAG_BURP, GAG_FART, GAG_PICK, GAG_YAWN, GAG_CAPE, GAG_KISS, GAG_PINUP, GAG_DISCO, GAG_PECS, GAG_SHIMMY, GAG_COUNT,
+enum { GAG_BELLY, GAG_WIGGLE, GAG_SCRATCH, GAG_BURP, GAG_FART, GAG_PICK, GAG_YAWN, GAG_CAPE, GAG_KISS, GAG_PINUP, GAG_DISCO, GAG_PECS, GAG_SHIMMY, GAG_HOWL, GAG_COUNT,
        GAG_OOPS };                  /* GAG_COUNT = the pickable gags (and the "asleep" marker); GAG_OOPS is only ever a rare version of the cape taunt */
 
 typedef struct { unsigned char frame, ticks, fx; } MiStep;
@@ -59,6 +59,8 @@ static const MiStep MI_GAGS[GAG_OOPS + 1][MI_MAXSTEPS] = {
   /* belly shimmy: quick shakes, a slap to finish */
   MI_STEPS({ MSF_BELLY_B, 5, FX_BOING }, { MSF_IDLE_A, 5, 0 }, { MSF_BELLY_B, 5, FX_BOING }, { MSF_IDLE_B, 5, 0 }, { MSF_BELLY_B, 5, FX_BOING },
            { MSF_IDLE_A, 5, 0 }, { MSF_BELLY_B, 5, FX_BOING }, { MSF_IDLE_B, 5, 0 }, { MSF_BELLY_A, 12, FX_SLAP }, { MSF_IDLE_A, 10, 0 }),
+  /* howl: arms up, head back, a long AWOOO (the taunt cry), then a satisfied flex */
+  MI_STEPS({ MSF_IDLE_A, 8, 0 }, { MSF_FLEX_B, 14, FX_GRUNT }, { MSF_HOWL, 16, FX_TAUNT }, { MSF_FLEX_B, 6, 0 }, { MSF_HOWL, 20, 0 }, { MSF_FLEX_B, 6, 0 }, { MSF_HOWL, 26, 0 }, { MSF_FLEX_A, 18, 0 }, { MSF_IDLE_A, 10, 0 }),
   /* (row GAG_COUNT is unused: that number means "asleep") */
   MI_STEPS({ 0, 0, 0 }),
   /* the rare cape taunt (1 in MI_OOPS_ODDS): same turn and butt wag, then the boxers slip, he wobbles, notices (EEK), covers up, hauls them back on (SNAP) and turns back */

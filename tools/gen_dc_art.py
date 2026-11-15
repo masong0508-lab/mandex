@@ -207,7 +207,7 @@ def main():
             elif name0 in legacy:
                 (call, ppu), head = legacy[name0], None
             else:
-                (call, ppu), head = legacy[G.ALIAS[name]], None
+                (call, ppu), head = legacy[G.ALIAS[name0]], None
             sc = SS * ppu * K
             js = f"""() => {{ ctx.setTransform(1,0,0,1,0,0); cv.width=960; cv.height=540; ctx.clearRect(0,0,960,540);
               ctx.save(); ctx.translate({CX},{CY}); ctx.scale({sc},{sc}); {call}; ctx.restore(); return cv.toDataURL('image/png'); }}"""

@@ -89,7 +89,7 @@ FRAME_HEADS = {
     "SCRATCH_A": ("bliss", "smile", None), "SCRATCH_B": ("happy", "grin2", None),
     "BURP_A": ("tight", "puff", EXTRA["puff"]), "BURP_B": ("open", "burp", None),
     "PICK_A": ("cross", "smile", None), "PICK_B": ("open", "smile", None),
-    "YAWN": ("tight", "yawn", None),
+    "YAWN": ("tight", "yawn", None), "HOWL": ("tight", "yawn", None),
     "SLEEP_A": ("sleep", "snore", None), "SLEEP_B": ("sleep", "snore", None),
     "SAD": ("sad", "frown", None),
     "CAPE_A": ("wink", "grin2", None),
