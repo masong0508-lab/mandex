@@ -29,9 +29,9 @@ static MxWorld world;
 enum { ST_TITLE, ST_PLAY, ST_PAUSE, ST_INTRO };
 static float g_dim = 1.0f;                      /* 1 = normal; <1 draws the dark back layer that gives blocks thickness in 3D */
 #ifdef MX_TEST_NO_CUTSCENES
-static int intro_seen = 1, wolf_seen = 1, intro_level;   /* host scripts that press A on the title and expect level 1 at once */
+static int intro_seen = 1, wolf_seen = 1, end_seen = 6, intro_level;   /* host scripts that press A on the title and expect level 1 at once */
 #else
-static int intro_seen, wolf_seen, intro_level;
+static int intro_seen, wolf_seen, end_seen, intro_level;
 #endif       /* the cutscenes (shared with the DS: ds/source/intro.c) play once per power-on */
 static u8 ic_top[256 * 192], ic_bot[256 * 192];       /* the cutscene is drawn into two 256x192 palette buffers, then scaled up to the 3DS screens */
 /* Sound: every effect is synthesised once at start (core/mx_snd.c, the DS's own effect table) into linear memory and played on the DSP's
@@ -528,7 +528,9 @@ int main(void){
     frame++;
 
     if(app == ST_INTRO){                      /* the cutscene: its own tiny loop, then on to the level that started it */
-      if(intro_tick((int)down, t.px * 4 / 5, t.py * 4 / 5)){ app = ST_PLAY; load_level(intro_level); }
+      if(intro_tick((int)down, t.px * 4 / 5, t.py * 4 / 5)){
+        if(intro_mode() == 3 && intro_level == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_start_wolf(); }       /* the chapter 2 closer hands over to the wolfman cutscene */
+        else { app = ST_PLAY; load_level(intro_level); } }
       else {
         intro_draw(ic_top, ic_bot);
         top.fb = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, NULL, NULL); top.w = 400; top.h = 240; memset(top.fb, 0, 400 * 240 * 3); blit_pal(&top, ic_top);
@@ -560,7 +562,9 @@ int main(void){
       if(world.state != MX_PLAY){
         if(down & (KEY_A | KEY_START | KEY_TOUCH)){
           int next = world.state == MX_WIN ? world.level + 1 : world.level;
-          if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel = 0; load_level(0); } else { sel = next; load_level(next); }
+          int ce = (world.state == MX_WIN && next == MX_CH2_START) ? 1 : (world.state == MX_WIN && next == MX_CH3_START) ? 2 : 0;   /* the closing cutscene of the chapter just finished */
+          if(ce && !(end_seen & (1 << ce))){ end_seen |= 1 << ce; sel = next; intro_level = next; app = ST_INTRO; intro_start_end(ce); }
+          else if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel = 0; load_level(0); } else { sel = next; load_level(next); }
         }
       } else if(m->mode == MAN_AIM){
         world.valve_ok = mx_valve_unlocked(&stats);

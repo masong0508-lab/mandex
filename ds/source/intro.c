@@ -55,14 +55,40 @@ static const short HOLDW[WOLF_SCENES] = { 216, 204, 192, 216, 216, 216, 228, 240
 static const short CUTSW[WOLF_SCENES][4] = { { 0, 168, 9999, 9999 }, { 0, 90, 198, 9999 }, { 0, 78, 156, 9999 }, { 0, 66, 144, 228 }, { 0, 90, 192, 9999 }, { 0, 108, 210, 9999 }, { 0, 144, 300, 9999 }, { 0, 9999, 9999, 9999 } };
 static const signed char TRANSW[WOLF_SCENES] = { 0, 1, 2, 3, 2, 1, 1, 2 };
 static const signed char SHAKEW[WOLF_SCENES][3] = { {0,3,0}, {0,0,5}, {0,2,12}, {10,6,8}, {0,6,0}, {6,10,0}, {0,4,0}, {8,0,0} };
-static int wolf;
-#define NSC() (wolf ? WOLF_SCENES : INTRO_SCENES)
-#define TXT(s) (wolf ? TXTW[s] : TXT8[s])
-#define HL(s) (wolf ? HLW[s] : HL8[s])
-#define HOLD(s) (wolf ? HOLDW[s] : HOLD8[s])
-#define CUTS(s, k) (wolf ? CUTSW[s][k] : CUTS8[s][k])
-#define TRANS(s) (wolf ? TRANSW[s] : TRANS8[s])
-#define SHAKE(s, k) (wolf ? SHAKEW[s][k] : SHAKE8[s][k])
+/* closing cutscenes: the end of chapter 1 (Mandex Manor) and of chapter 2 (Landlord HQ), four scenes each, same story as the browser's CUT_E1 / CUT_E2 */
+static const char *TXTE1[END_SCENES][3] = {
+  { "The manor came down in eleven seconds.", "Gerald stood on top of it for the other four hours. For the view.", "Somewhere under the bricks, a top hat gave up." },
+  { "Word got round the street faster than a rent increase.", "Brenda brought the neighbours. The neighbours brought signs.", "Gerald brought the belly, as requested." },
+  { "Thump. The mailbox coughed up a metal tube.", "Inside: one letter, on very expensive paper.", "\"We noticed. Come to the office. Bring the belly.\"" },
+  { "CHAPTER 1 COMPLETE", "Every landlord on Maple Street has been evicted.", "Next: the paperwork. So much paperwork." },
+};
+static const char *TXTE2[END_SCENES][3] = {
+  { "Landlord HQ had forty floors, three districts and a plant called Kevin.", "It had a lobby fountain, a gift shop, and no insurance.", "It leaned. It thought about it. It came down." },
+  { "The Head Landlord crawled out of the lobby, carrying his mug.", "\"WORLD'S OKAYEST LANDLORD\", it said. It was still full.", "He took a sip. It was cold. It had always been cold." },
+  { "The neighbourhood threw a party. Dennis from accounts cried quietly.", "Gerald ate one slice of pizza. Then another. Then Dennis's.", "Above the rubble, something large and pale was rising." },
+  { "CHAPTER 2 COMPLETE", "Landlord HQ is now a very large rubble pile with a gift shop.", "Next: the moon. It has opinions." },
+};
+static const signed char HLE1[END_SCENES] = { 1, 2, 2, 0 }, HLE2[END_SCENES] = { 2, 2, 2, 0 };
+static const short HOLDE[END_SCENES] = { 204, 204, 228, 240 };
+static const short CUTSE1[END_SCENES][4] = { { 0, 156, 9999, 9999 }, { 0, 132, 252, 9999 }, { 0, 96, 204, 9999 }, { 0, 9999, 9999, 9999 } };
+static const short CUTSE2[END_SCENES][4] = { { 0, 144, 252, 9999 }, { 0, 144, 9999, 9999 }, { 0, 144, 276, 9999 }, { 0, 9999, 9999, 9999 } };
+static const signed char TRANSE1[END_SCENES] = { 0, 1, 2, 3 }, TRANSE2[END_SCENES] = { 0, 1, 2, 3 };
+static const signed char SHAKEE1[END_SCENES][3] = { {0,4,0}, {0,3,0}, {0,6,0}, {6,0,0} }, SHAKEE2[END_SCENES][3] = { {0,10,18}, {0,0,0}, {0,0,5}, {6,0,0} };
+static const char *(*const TXTP[4])[3] = { TXT8, TXTW, TXTE1, TXTE2 };
+static const signed char *const HLP[4] = { HL8, HLW, HLE1, HLE2 };
+static const short *const HOLDP[4] = { HOLD8, HOLDW, HOLDE, HOLDE };
+static const short (*const CUTSP[4])[4] = { CUTS8, CUTSW, CUTSE1, CUTSE2 };
+static const signed char *const TRANSP[4] = { TRANS8, TRANSW, TRANSE1, TRANSE2 };
+static const signed char (*const SHAKEP[4])[3] = { SHAKE8, SHAKEW, SHAKEE1, SHAKEE2 };
+static const unsigned char NSCP[4] = { INTRO_SCENES, WOLF_SCENES, END_SCENES, END_SCENES };
+static int wolf, mode;                                                   /* mode: 0 opening, 1 wolfman, 2 end of chapter 1, 3 end of chapter 2 */
+#define NSC() ((int)NSCP[mode])
+#define TXT(s) (TXTP[mode][s])
+#define HL(s) (HLP[mode][s])
+#define HOLD(s) (HOLDP[mode][s])
+#define CUTS(s, k) (CUTSP[mode][s][k])
+#define TRANS(s) (TRANSP[mode][s])
+#define SHAKE(s, k) (SHAKEP[mode][s][k])
 
 #define CPS 58
 static int sc, t, fxdone;
@@ -72,13 +98,17 @@ static int type_end(int s){ return total_chars(s) * 60 / CPS + 24; }          /*
 static int shot_of(void){ int k = 0; while(k < 3 && t >= CUTS(sc, k + 1)) k++; return k; }
 static int shot_t(int k){ return t - CUTS(sc, k); }
 
-void intro_start(void){ wolf = 0; sc = 0; t = 0; fxdone = 0; sfx_play(SFX_WHOOSH, 64); }
-void intro_start_wolf(void){ wolf = 1; sc = 0; t = 0; fxdone = 0; sfx_play(SFX_WHOOSH, 64); }
+void intro_start(void){ wolf = 0; mode = 0; sc = 0; t = 0; fxdone = 0; sfx_play(SFX_WHOOSH, 64); }
+void intro_start_end(int chapter){ wolf = 0; mode = chapter == 1 ? 2 : 3; sc = 0; t = 0; fxdone = 0; sfx_play(SFX_WHOOSH, 64); }
+void intro_start_wolf(void){ wolf = 1; mode = 1; sc = 0; t = 0; fxdone = 0; sfx_play(SFX_WHOOSH, 64); }
+int  intro_mode(void){ return mode; }
 int  intro_count(void){ return NSC(); }
 int  intro_scene(void){ return sc; }
 
 /* sound cues, frame exact */
 static void cue(void){
+  if(mode == 2){ switch(sc){ case 0: if(t == 0) sfx_play(SFX_BOOM, 64); if(t == 156) sfx_play(SFX_EEK, 64); break; case 1: if(t == 0) sfx_play(SFX_WIN, 64); if(t == 132) sfx_play(SFX_POP, 64); break; case 2: if(t == 8) sfx_play(SFX_THUD, 64); if(t == 96) sfx_play(SFX_CLICK, 64); break; default: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
+  if(mode == 3){ switch(sc){ case 0: if(t == 144) sfx_play(SFX_THUD, 64); if(t == 252){ sfx_play(SFX_BOOM, 64); sfx_play(SFX_CRUNCH, 64); } break; case 1: if(t == 144) sfx_play(SFX_EEK, 64); break; case 2: if(t == 0) sfx_play(SFX_WIN, 64); if(t == 276) sfx_play(SFX_TARGET, 64); break; default: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
   if(wolf){ switch(sc){ case 0: if(t == 168) sfx_play(SFX_TAUNT, 64); break; case 1: if(t == 90) sfx_play(SFX_POP, 64); break; case 2: if(t == 156) sfx_play(SFX_FART, 64); break; case 3: if(t == 20) sfx_play(SFX_BOING, 64); if(t == 144) sfx_play(SFX_CRACK, 64); if(t == 228) sfx_play(SFX_BOOM, 64); break; case 4: if(t == 0) sfx_play(SFX_CRACK, 64); if(t == 90) sfx_play(SFX_WHOOSH, 64); break; case 5: if(t == 0) sfx_play(SFX_YAWN, 64); if(t == 230) sfx_play(SFX_CRACK, 64); break; case 6: if(t == 0) sfx_play(SFX_POP, 64); if(t == 144) sfx_play(SFX_BOING, 64); if(t == 300) sfx_play(SFX_THUD, 64); break; case 7: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
   switch(sc){
   case 0: if(t < 130 && t % 14 == 6) sfx_play(SFX_CLICK, 40); if(t == 138) sfx_play(SFX_TARGET, 64); break;
@@ -458,15 +488,17 @@ static void brenda(u8 *b, int x, int fy, int s, int t){      /* Brenda: big yell
   gfx_ell(b, x - 7 * s, hy + 7 * s, 3 * s, 4 * s, C_GOLD2); gfx_ell(b, x + 7 * s, hy + 7 * s, 3 * s, 4 * s, C_GOLD2);        /* curls on the shoulders */
   gfx_rect(b, x - 4 * s, fy - 10 * s, 2 * s, 10 * s, C_SKIN); gfx_rect(b, x + 2 * s, fy - 10 * s, 2 * s, 10 * s, C_SKIN);     /* legs */
   gfx_rect(b, x - 4 * s, fy - s, 3 * s, s, C_RED); gfx_rect(b, x + s, fy - s, 3 * s, s, C_RED);                              /* heels */
-  gfx_rect(b, x - s, fy - 28 * s + bob + 8 * s, 2 * s, 3 * s, C_SKIN2);                                                       /* neck */
+  gfx_rect(b, x - 3 * s / 2, hy + 4 * s, 3 * s, 5 * s, C_SKIN); gfx_rect(b, x + s / 2, hy + 4 * s, s, 5 * s, C_SKIN2);                  /* neck, shaded on one side */
   gfx_tri(b, x - 8 * s, fy - 8 * s + bob, x + 8 * s, fy - 8 * s + bob, x, fy - 22 * s + bob, C_PINK);                         /* skirt */
   gfx_rect(b, x - 6 * s, fy - 12 * s + bob, 12 * s, 3 * s, C_PINK); gfx_rect(b, x - 6 * s, fy - 13 * s + bob, 12 * s, s, C_RED);   /* hem, belt */
   gfx_rect(b, x - 5 * s, fy - 21 * s + bob, 10 * s, 8 * s, C_PINK); gfx_tri(b, x - 2 * s, fy - 21 * s + bob, x + 2 * s, fy - 21 * s + bob, x, fy - 18 * s + bob, C_SKIN);   /* bodice, neckline */
   for(int i = 0; i < 4; i++) gfx_rect(b, x - 7 * s + i * 4 * s + (i & 1) * s, fy - 11 * s + bob + (i & 1) * s, s, s, C_WHITE);        /* polka dots on the hem */
   int wave = wv(t, 24, 1);
   gfx_rect(b, x - 7 * s, fy - 20 * s + bob, 2 * s, 7 * s, C_SKIN); gfx_rect(b, x + 5 * s, fy - 20 * s + bob - (wave > 0 ? s : 0), 2 * s, 7 * s, C_SKIN);   /* arms, one waving */
+  gfx_ell(b, x - 6 * s, fy - 20 * s + bob, s + s / 2, s + s / 2, C_SKIN); gfx_ell(b, x + 6 * s, fy - 20 * s + bob - (wave > 0 ? s : 0), s + s / 2, s + s / 2, C_SKIN);   /* round shoulders */
+  gfx_ell(b, x - 6 * s, fy - 12 * s + bob, s + s / 2, s, C_SKIN); gfx_ell(b, x + 6 * s, fy - 12 * s + bob - (wave > 0 ? s : 0), s + s / 2, s, C_SKIN);                                     /* round hands */
   gfx_rect(b, x + 8 * s, fy - 14 * s + bob, 5 * s, 4 * s, C_DIRT); gfx_rect(b, x + 8 * s, fy - 14 * s + bob, 5 * s, s, C_DIRT2); gfx_rect(b, x + 10 * s, fy - 16 * s + bob, s, 2 * s, C_DIRT2);   /* the handbag, its strap */
-  gfx_ell(b, x, hy + s, 5 * s + s / 2, 6 * s, C_SKIN); gfx_ell(b, x, hy + 5 * s, 4 * s, s, C_SKIN2);                           /* face, a hint of chin shadow */
+  gfx_ell(b, x, hy + s, 5 * s + s / 2, 6 * s, C_SKIN);                                                                       /* face (no chin shadow: it read as a beard) */
   gfx_ell(b, x, hy - 4 * s, 7 * s, 3 * s, C_GOLD); gfx_tri(b, x - 6 * s, hy - 3 * s, x, hy - 3 * s, x - 5 * s, hy + 2 * s, C_GOLD); gfx_tri(b, x + 6 * s, hy - 3 * s, x, hy - 3 * s, x + 5 * s, hy + 2 * s, C_GOLD);   /* fringe */
   gfx_rect(b, x - 3 * s, hy - 5 * s, s, s, C_WHITE);                                                                         /* a shine on the hair */
   int blink = (t % 90) > 86;
@@ -490,6 +522,80 @@ static void w_title(u8 *b, int k, int tt){
   (void)k; stars_night(b); moon(b, 128, 80, 50 + wv(tt, 120, 3)); night_hills(b, 150);
   gerald(b, 128, 182, 3, GF_EARS | GF_FUR | GF_SNOUT | GF_TAIL | GF_HOWL);
   gfx_text_c(b, 128, 12, "CHAPTER 3", C_GOLD, C_BLACK, 2); gfx_text_c(b, 128, 34, "THE WOLFMAN", C_WHITE, C_BLACK, 3);
+}
+
+
+/* ---- closing scenes ---- */
+static void rubble(u8 *b, int x, int gy, int s, int seed){
+  for(int i = 0; i < 9; i++){ int bx = x + (int)(hs(seed + i) % 120) * s / 2 - 30 * s, bw = (10 + (int)(hs(seed + i + 30) % 14)) * s / 2, bh = (6 + (int)(hs(seed + i + 60) % 12)) * s / 2, by = gy - bh - (i % 3) * 3 * s;
+    gfx_tri(b, bx, by + bh, bx + bw / 2, by, bx + bw, by + bh, (i % 3) ? C_DIRT : C_RED2); gfx_rect(b, bx, by + bh, bw, 3 * s, (i % 3) ? C_DIRT2 : C_RED2); }
+}
+static void smoke(u8 *b, int x, int gy, int tt, int n){ for(int i = 0; i < n; i++){ int ph = (tt + i * 240 / n) % 240; gfx_dither(b, x + wv(ph + i * 13, 90, 12) + (i - n / 2) * 5, gy - ph * 3 / 4, 8 + ph / 12, 6 + ph / 14, C_CLOUD2); } }
+static void confetti(u8 *b, int tt, int n){ static const u8 col[5] = { C_GOLD, C_PINK, C_GRASS2, C_SKY0 + 6, C_WHITE }; for(int i = 0; i < n; i++){ int x = (int)(hs(i) % 256) + wv(tt + i * 7, 40, 6), y = (int)(((u32)tt * (2 + (hs(i + 9) % 3)) + hs(i + 3)) % 200) - 4; gfx_rect(b, x, y, 3, 2, col[i % 5]); } }
+static void folk(u8 *b, int x, int gy, int tt, u8 c, int sign){ int j = iabs(wv(tt * 3 + x, 24, 2)); gfx_rect(b, x - 3, gy - 11 - j, 6, 11, c); gfx_ell(b, x, gy - 14 - j, 3, 3, C_SKIN);
+  gfx_tline(b, x - 3, gy - 9 - j, x - 6, gy - 17 - j + wv(tt + x, 20, 2), 2, C_SKIN); gfx_tline(b, x + 3, gy - 9 - j, x + 6, gy - 17 - j - wv(tt + x, 20, 2), 2, C_SKIN);
+  if(sign){ gfx_rect(b, x + 6, gy - 30 - j, 14, 9, C_WHITE); gfx_rect(b, x + 7, gy - 28 - j, 12, 2, C_RED); gfx_rect(b, x + 12, gy - 21 - j, 2, 12, C_DIRT2); } }
+static void tower(u8 *b, int x, int gy, int lean, int fall){      /* HQ: lean in 1/64 of a unit per row, fall 0..64 shrinks it */
+  int th = 120 - fall * 55 / 64, w = 46;
+  for(int y = 0; y < th; y++){ int dx = lean * y / 64; gfx_rect(b, x - w / 2 + dx, gy - y, w, 1, y % 14 < 2 ? C_UIHI : C_UILINE); }
+  for(int r = 0; r < 6; r++) for(int c = 0; c < 4; c++){ int y = 12 + r * 17; if(y + 8 >= th) continue; int dx = lean * y / 64; gfx_rect(b, x - w / 2 + 5 + c * 10 + dx, gy - y - 8, 6, 8, hs(r * 4 + c) % 3 ? C_GOLD : C_DARK); }
+  int dx = lean * th / 64; gfx_rect(b, x - w / 2 - 3 + dx, gy - th - 4, w + 6, 5, C_DARK);
+}
+static void e1_rubble(u8 *b, int k, int tt){
+  if(k == 0){ sky(b, 0, 150, 1); sun(b, 190, 100, 20); hills(b, 140, 0); ground(b, 150); smoke(b, 70, 150, tt, 4); smoke(b, 170, 150, tt + 40, 4); rubble(b, 128, 170, 3, 3);
+    spr_man(b, 118, 112, 6, 1, POSE_FLEX, tt >> 3); if(tt > 80) bubble(b, 190, 24, "...IS THAT ALL OF IT?", 0); }
+  else { sky(b, 0, 150, 1); sun(b, 190, 100, 20); hills(b, 140, 0); ground(b, 150); smoke(b, 190, 150, tt, 4); rubble(b, 70, 172, 3, 9);
+    spr_man(b, 70, 120, 5, 1, POSE_IDLE, tt >> 3); landlord(b, 180, 148, 8, tt, 1);
+    { int w = tt < 30 ? tt : 30; gfx_rect(b, 210, 40, 2, 60, C_DIRT2); gfx_rect(b, 212, 40, w * 22 / 30, 16, C_WHITE); }
+    if(tt > 50) bubble(b, 120, 14, "I SURRENDER. JUST A MAN IN A HAT.", 0); }
+}
+static void e1_street(u8 *b, int k, int tt){
+  static const u8 col[5] = { C_SKY0 + 4, C_RED, C_GRASS2, C_DIRT, C_PINK };
+  sky(b, 0, 150, 1); sun(b, 40, 80, 18); hills(b, 140, 0); ground(b, 150); gfx_rect(b, 0, 164, 256, 20, C_SKIN3);
+  for(int i = 0; i < 7; i++) folk(b, 18 + i * 36, 172 + (i & 1) * 8, tt + i * 7, col[i % 5], i & 1);
+  confetti(b, tt, 30);
+  if(k == 0){ brenda(b, 100, 176, 3, tt); spr_man(b, 190, 130, 6, 1, POSE_FLEX, tt >> 3); bubble(b, 90, 16, "YOU DID IT, GERALD!", 0); }
+  else if(k == 1){ brenda(b, 60, 186, 4, tt); spr_man(b, 170, 140, 8, 1, POSE_IDLE, tt >> 3); for(int i = 0; i < 4; i++) gfx_text(b, 100 + i * 20 + wv(tt + i * 9, 50, 6), 70 - ((tt + i * 26) % 60), "<3", C_PINK, 2);
+    bubble(b, 60, 14, "FOR THE NEIGHBOURHOOD.", 0); if(tt > 80) bubble(b, 190, 56, "FOR THE BELLY.", 0); }
+  else { spr_man(b, 128, 136, 8, 1, POSE_FLEX, tt >> 3); bubble(b, 128, 12, "RENT IS CANCELLED!", 0); }
+}
+static void e1_letter(u8 *b, int k, int tt){
+  stars_night(b); night_hills(b, 150);
+  if(k == 0){ gfx_rect(b, 60, 118, 4, 40, C_DIRT2); gfx_rect(b, 48, 104, 28, 18, C_SKY0 + 3); { int pop = tt < 20 ? tt : 20; gfx_rect(b, 52, 110 - pop, 20, 8, C_GRAY); }
+    spr_man(b, 190, 150, 6, 1, POSE_IDLE, tt >> 3); bubble(b, 120, 20, "...THAT'S NOT MAIL.", 0); }
+  else if(k == 1){ gfx_rect(b, 44, 18, 168, 144, C_WHITE); gfx_rect(b, 44, 18, 168, 2, C_BLACK); gfx_rect(b, 44, 160, 168, 2, C_BLACK); gfx_rect(b, 44, 18, 2, 144, C_BLACK); gfx_rect(b, 210, 18, 2, 144, C_BLACK);
+    gfx_text_c(b, 128, 26, "LANDLORD HQ", C_RED2, C_WHITE, 2); gfx_rect(b, 56, 46, 144, 2, C_RED);
+    gfx_text_c(b, 128, 62, "DEAR MR. FITZGERALD,", C_BLACK, C_WHITE, 1); gfx_text_c(b, 128, 78, "YOUR WORK HAS BEEN NOTICED.", C_BLACK, C_WHITE, 1); gfx_text_c(b, 128, 94, "YOUR PAPERWORK HAS NOT", C_BLACK, C_WHITE, 1); gfx_text_c(b, 128, 104, "BEEN FILED.", C_BLACK, C_WHITE, 1); gfx_text_c(b, 128, 124, "PLEASE REPORT TO HQ.", C_BLACK, C_WHITE, 1);
+    if(tt > 54) gfx_text_c(b, 150, 142, "URGENT", C_RED, C_WHITE, 2); }
+  else { spr_man(b, 128, 150, 8, 1, POSE_SAD, tt >> 3); bubble(b, 128, 16, "DO THEY VALIDATE PARKING?", 0); }
+}
+static void e_title(u8 *b, int k, int tt, int ch){
+  (void)k;
+  if(ch == 1){ sky(b, 0, 192, 1); rays(b, 128, 150, tt, 14, C_GOLD); confetti(b, tt, 36); gfx_text_c(b, 128, 12, "CHAPTER 1", C_GOLD, C_RED2, 3); gfx_text_c(b, 128, 38, "COMPLETE", C_WHITE, C_RED2, 2); gfx_rect(b, 0, 160, 256, 32, C_GRASS2); }
+  else { stars_night(b); moon(b, 128, 90, 44 + wv(tt, 120, 3)); night_hills(b, 150); gfx_text_c(b, 128, 12, "CHAPTER 2", C_GOLD, C_DARK, 3); gfx_text_c(b, 128, 38, "COMPLETE", C_WHITE, C_DARK, 2); }
+  spr_man(b, 128, ch == 1 ? 130 : 138, 7, 1, POSE_FLEX, tt >> 3);
+}
+static void e2_tower(u8 *b, int k, int tt){
+  sky(b, 0, 150, 1); sun(b, 50, 110, 20); hills(b, 140, 0); gfx_rect(b, 0, 150, 256, 42, C_DARK);
+  int lean = k == 0 ? 0 : k == 1 ? 2 + tt / 12 : 14 + tt * 2, fall = k < 2 ? 0 : (tt > 60 ? 64 : tt * 64 / 60);
+  tower(b, 170, 150, lean > 90 ? 90 : lean, fall);
+  if(k == 2){ for(int i = 0; i < 12; i++){ int ph = (tt * 3 + i * 17) % 100; gfx_rect(b, 170 + (int)(hs(i) % 120) - 60 + ph / 2 * ((i & 1) ? 1 : -1), 90 + ph - (int)(hs(i + 5) % 60), 4, 3, C_DIRT); } smoke(b, 170, 150, tt, 5); }
+  spr_man(b, 56, 118, 5, 1, k == 1 ? POSE_IDLE : POSE_FLEX, tt >> 3);
+  bubble(b, 86, 18, k == 0 ? "..." : k == 1 ? "TIMBER?" : "...TIMBER.", 0);
+}
+static void e2_boss(u8 *b, int k, int tt){
+  sky(b, 0, 150, 1); hills(b, 140, 0); ground(b, 150); smoke(b, 60, 150, tt, 4); smoke(b, 200, 150, tt + 30, 4); rubble(b, 40, 172, 3, 21); rubble(b, 210, 176, 3, 5);
+  if(k == 0){ landlord(b, 130, 150, 9, tt, 0); gfx_rect(b, 168, 108, 16, 14, C_WHITE); gfx_rect(b, 184, 112, 5, 8, C_WHITE); gfx_rect(b, 170, 112, 12, 2, C_GOLD); bubble(b, 90, 14, "MY... PAPERWORK.", 0); }
+  else { landlord(b, 128, 150, 14, tt, 1); if(tt > 40) bubble(b, 80, 10, "IS GERALD STILL OUT THERE?", 0); if(tt > 100) bubble(b, 180, 40, "I CAN HEAR THE BELLY.", 0); }
+}
+static void e2_dusk(u8 *b, int k, int tt){
+  static const u8 col[6] = { C_SKY0 + 4, C_RED, C_GRASS2, C_DIRT, C_PINK, C_SKIN2 };
+  stars_night(b); int mr = k < 2 ? 22 : 22 + (tt > 90 ? 90 : tt) / 3; moon(b, k < 2 ? 210 : 150, k < 2 ? 70 : 76, mr); night_hills(b, 150);
+  gfx_rect(b, 0, 164, 256, 28, C_UIBG); confetti(b, tt, 16);
+  for(int i = 0; i < 6; i++) folk(b, 16 + i * 44, 180 + (i & 1) * 6, tt + i * 9, col[i], i % 3 == 0);
+  if(k == 0){ pizza(b, 150, 176, 3); spr_man(b, 100, 140, 6, 1, POSE_IDLE, tt >> 3); bubble(b, 150, 16, "BEST PIZZA OF MY LIFE.", 0); }
+  else if(k == 1){ spr_man(b, 110, 142, 7, 1, POSE_FLEX, tt >> 3); bubble(b, 160, 16, "EVICTION COMPLETE.", 0); }
+  else { spr_man(b, 90, 146, 7, 1, POSE_SAD, tt >> 3); bubble(b, 90, 12, "...HUH. WEIRD MOON.", 0); }
 }
 
 /* transitions (the first 30 frames of a scene) */
@@ -545,7 +651,9 @@ static void narration(u8 *b){
 
 void intro_draw(u8 *top, u8 *bot){
   int k = shot_of(), tt = shot_t(k); g_t = tt;
-  if(wolf){
+  if(mode == 2){ switch(sc){ case 0: e1_rubble(top, k, tt); break; case 1: e1_street(top, k, tt); break; case 2: e1_letter(top, k, tt); break; default: e_title(top, k, tt, 1); break; } }
+  else if(mode == 3){ switch(sc){ case 0: e2_tower(top, k, tt); break; case 1: e2_boss(top, k, tt); break; case 2: e2_dusk(top, k, tt); break; default: e_title(top, k, tt, 2); break; } }
+  else if(wolf){
     switch(sc){ case 0: w_walk(top, k, tt); break; case 1: w_fridge(top, k, tt); break; case 2: w_itch(top, k, tt); break; case 3: w_ears(top, k, tt); break;
                 case 4: w_tail(top, k, tt); break; case 5: w_howl(top, k, tt); break; case 6: w_visit(top, k, tt); break; default: w_title(top, k, tt); break; }
   } else

@@ -42,7 +42,7 @@ static u8 buf_top[256 * 192], buf_bot[256 * 192];
 
 enum { ST_TITLE, ST_PLAY, ST_PAUSE, ST_INTRO };
 static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
-static int intro_seen, wolf_seen, intro_level;   /* wolf_seen: the chapter 3 wolfman cutscene, once per power-on too */
+static int intro_seen, wolf_seen, intro_level, end_seen;   /* wolf_seen: the chapter 3 wolfman cutscene, once per power-on too */
 static int intro_seen_unused;               /* the opening cutscene (ds/source/intro.c) plays once per power-on, the first time level 1 is started from the title */
 static int disp_score, cells0 = 1, end_t, was_state;      /* best scores live in stats.best[] (core, saved by port 5) */
 static MxStats stats;                 /* achievements / outfits / best scores; loaded from the cartridge backup chip at boot, written by save_sync() */
@@ -1124,7 +1124,9 @@ int main(void){
         else { app = ST_PLAY; load_level(sel_level); sfx_play(SFX_CLICK, 64); music_set(music_pref); }
       }
     } else if(app == ST_INTRO){
-      if(intro_tick(down, t.px, t.py)){ app = ST_PLAY; apply_outfit(outfit_sel); load_level(intro_level); music_set(music_pref); sfx_play(SFX_CLICK, 64); }   /* finished or skipped: straight into level 1 */
+      if(intro_tick(down, t.px, t.py)){
+        if(intro_mode() == 3 && intro_level == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_start_wolf(); sfx_play(SFX_CLICK, 64); }   /* the closer of chapter 2 hands over to the wolfman cutscene */
+        else { app = ST_PLAY; apply_outfit(outfit_sel); load_level(intro_level); music_set(music_pref); sfx_play(SFX_CLICK, 64); } }   /* finished or skipped: straight into level 1 */
     } else if(app == ST_PAUSE){
       if(down & KEY_START) app = ST_PLAY;
       if(down & KEY_SELECT){ load_level(world.level); app = ST_PLAY; music_set(music_pref); }
@@ -1133,7 +1135,9 @@ int main(void){
       if(down & KEY_B){ app = ST_TITLE; sel_level = world.level; load_level(sel_level); }
       else if((down & (KEY_START | KEY_A)) || ((down & KEY_TOUCH) && end_t > 30)){
         int next = world.state == MX_WIN ? world.level + 1 : world.level;
-        if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel_level = 0; load_level(0); }
+        int ce = (world.state == MX_WIN && next == MX_CH2_START) ? 1 : (world.state == MX_WIN && next == MX_CH3_START) ? 2 : 0;   /* the closing cutscene of the chapter just finished */
+        if(ce && !(end_seen & (1 << ce))){ end_seen |= 1 << ce; intro_level = next; app = ST_INTRO; intro_start_end(ce); apply_outfit(0); }
+        else if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel_level = 0; load_level(0); }
         else { load_level(next); music_set(music_pref); }
         sfx_play(SFX_CLICK, 64);
       }

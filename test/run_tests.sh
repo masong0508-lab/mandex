@@ -74,6 +74,8 @@ CHEAT_TEST=1 ./ds_render /tmp/dscheat 400 0 | grep -v "^ok:"
 echo "--- DS opening cutscene: plays once per power-on before level 1; all 8 scenes run and hand over to level 1; A finishes the typing then goes on; SKIP and START jump to level 1; the worn outfit comes back ---"
 INTRO_TEST=1 ./ds_render /tmp/dsintro 9000 0 | grep -v "^ok:"
 INTRO_SKIP=1 ./ds_render /tmp/dsintro2 600 0 | grep -v "^ok:"
+END_TEST=1 ./ds_render /tmp/dsend1 9000 0 | grep -v "^ok:"
+END_TEST=2 ./ds_render /tmp/dsend2 9000 0 | grep -v "^ok:"
 echo "--- idle gags: every step valid, every gag ends and plays, he falls asleep, input wakes him ---"
 gcc -std=c99 -O2 -Wall -Wno-unused-function -I../art idle_test.c -o idle_test && ./idle_test
 echo "--- Dreamcast front-end drawing on the host (software rasteriser instead of the PVR): jiggle, gags, win/lose ---"

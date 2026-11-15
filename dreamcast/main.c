@@ -90,7 +90,7 @@ static unsigned char ic_top[256 * 192], ic_bot[256 * 192];
 static unsigned short ic_rgb[256 * 256];
 static pvr_ptr_t tx_ic_top, tx_ic_bot;
 static pvr_poly_hdr_t hdr_ic_top, hdr_ic_bot;
-static int in_intro, intro_seen, wolf_seen, intro_level;
+static int in_intro, intro_seen, wolf_seen, intro_level, end_seen;
 static void ic_upload(pvr_ptr_t tx, const unsigned char *src){                 /* palette index -> RGB565, 256 texels wide, 192 of 256 rows used */
   for(int y = 0; y < 192; y++) for(int x = 0; x < 256; x++){ unsigned c = gfx_pal[src[y * 256 + x]]; unsigned r = c & 31, g = (c >> 5) & 31, b = (c >> 10) & 31; ic_rgb[y * 256 + x] = (unsigned short)((r << 11) | (g << 6 << 0) | b); }
   pvr_txr_load(ic_rgb, tx, 256 * 256 * 2);
@@ -746,7 +746,9 @@ int main(int argc, char **argv){
       uint32 pressed = st->buttons & ~prev; prev = st->buttons;
       if(in_intro){                                       /* a cutscene: A / B / START moves on (START skips), then the level that started it */
         int dn = ((pressed & CONT_A) ? 1 : 0) | ((pressed & CONT_B) ? 2 : 0) | ((pressed & CONT_START) ? 8 : 0);
-        if(intro_tick(dn, 0, 0)){ in_intro = 0; load_level(intro_level); }
+        if(intro_tick(dn, 0, 0)){
+          if(intro_mode() == 3 && intro_level == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_start_wolf(); }       /* the chapter 2 closer hands over to the wolfman cutscene */
+          else { in_intro = 0; load_level(intro_level); } }
       } else if(on_title){
         if(pressed & (CONT_DPAD_RIGHT | CONT_DPAD_LEFT)) title_lv = (title_lv + ((pressed & CONT_DPAD_RIGHT) ? 1 : MX_NUM_LEVELS - 1)) % MX_NUM_LEVELS;
         { int tl = (st->ltrig > 128 && !(prev_trig & 1)), tr = (st->rtrig > 128 && !(prev_trig & 2)); prev_trig = (st->ltrig > 128) | ((st->rtrig > 128) << 1);
@@ -760,7 +762,11 @@ int main(int argc, char **argv){
           else if(title_lv == MX_CH3_START && !wolf_seen && tx_ic_top && tx_ic_bot){ wolf_seen = 1; intro_level = title_lv; in_intro = 1; intro_start_wolf(); }
           else load_level(title_lv); }
       } else if(world.state != MX_PLAY){
-        if(pressed & CONT_START) load_level(world.state == MX_WIN ? world.level + 1 : world.level);
+        if(pressed & CONT_START){
+          int next = world.state == MX_WIN ? world.level + 1 : world.level;
+          int ce = (world.state == MX_WIN && next == MX_CH2_START) ? 1 : (world.state == MX_WIN && next == MX_CH3_START) ? 2 : 0;   /* the closing cutscene of the chapter just finished */
+          if(ce && !(end_seen & (1 << ce)) && tx_ic_top && tx_ic_bot){ end_seen |= 1 << ce; intro_level = next; in_intro = 1; intro_start_end(ce); }
+          else load_level(next); }
       } else if(paused){
         if(pressed & CONT_START) paused = 0;
         if(pressed & CONT_Y){ load_level(world.level); paused = 0; }

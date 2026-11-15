@@ -3559,7 +3559,7 @@ const CUT3=[
  // 6. the howl
  {lines:["Naturally, he howled.","At a moon he had called \"a lot\" two minutes earlier.","Three blocks away, a landlord's wine glass cracked."],hl:2,cuts:[0,1.8,3.5],tr:'wipe',hold:3.6,shake:[6,10,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
    if(k<2){cgSky('#0a0d24','#3a2a60',395);cgMoon(480,k===0?210:150,k===0?200:130,t);if(k===0){cgHowl(t,300,300);cgHowl(t+.5,660,300)}
-     if(k===1){cgStreetNight(t);cgMoon(480,150,120,t);for(let i=0;i<3;i++)cgHowl(u+i*.5,480,200)}
+     if(k===1){cgStreetNight(t);cgMoon(480,150,120,t);for(let i=0;i<3;i++)cgHowl(u+i*.5,480,200);cgR(-20,378,420,200,'#1a1630',3);cgR(-20,370,420,12,'#2a2448',2.4);const up=Math.min(1,u*1.6);cutGerald(180,378,2.2,{wolf:true,face:'cool',pose:'up',armR:[40,-22,46,-46-up*14],armL:[-40,-22,-46,-46-up*14]});cutBubble(420,300,"(distant howling)",0,16)}   // the howl, on a rooftop, so the wolf is in the shot
      if(k===0){ctx.fillStyle='#10132a';ctx.fillRect(0,420,W,H-420);const up=Math.min(1,t*1.5);cutGerald(480,392,2.7,{wolf:true,face:'cool',pose:'up',armR:[40,-22,46,-46-up*14],armL:[-40,-22,-46,-46-up*14],dy:-up*6});cutBubble(740,170,"AWOOOOO!",0,28)}}
    else{cgWood('#3a3060','#1a1430');cgR(240,40,480,330,'#ffe9a8',4,10);cgR(264,64,432,282,'#2a3060',3);cgMoon(480,200,120,t);cgLine(480,64,480,346,'#ffe9a8',8);cgLine(264,205,696,205,'#ffe9a8',8);
      ctx.save();ctx.translate(480,330);ctx.scale(2.6,2.6);drawLandlordScared(t);ctx.restore();
@@ -3578,8 +3578,8 @@ const CUT3=[
  {lines:["CHAPTER 3: THE WOLFMAN","Landlords now have health bars, riot shields and a healer. Nobody asked the healer.","EVICT. EVERY. LANDLORD. AWOOOO."],hl:2,cuts:[0],tr:'iris',hold:4,shake:[8],draw(t){
    cgSky('#0a0d24','#3a2a60',395);const rr=ctx.createRadialGradient(480,260,20,480,260,620);rr.addColorStop(0,'rgba(255,240,170,.9)');rr.addColorStop(1,'rgba(255,240,170,0)');ctx.fillStyle=rr;ctx.fillRect(0,0,W,H);
    for(let i=0;i<14;i++){ctx.save();ctx.translate(480,260);ctx.rotate(i*.45+t*.1);ctx.fillStyle='rgba(255,230,140,.12)';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(900,-30);ctx.lineTo(900,30);ctx.closePath();ctx.fill();ctx.restore()}
-   const z=Math.min(1,t*2.2);ctx.save();ctx.translate(480,100);ctx.scale(.6+.4*z,.6+.4*z);ctx.rotate(-.04);txt('THE WOLFMAN',0,10,72,'#fff','center','#1a1030');ctx.restore();
-   cutGerald(480,420,2.5,{wolf:true,face:'cool',pose:'flex',armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]})}}
+   const z=Math.min(1,t*2.2);ctx.save();ctx.translate(480,84);ctx.scale(.6+.4*z,.6+.4*z);ctx.rotate(-.04);txt('THE WOLFMAN',0,10,66,'#fff','center','#1a1030');ctx.restore();
+   cutGerald(480,452,2.4,{wolf:true,face:'cool',pose:'flex',armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]})}}
 ];
 // ---------- CLOSING CUTSCENES: they play after the last level of chapter 1 (Mandex Manor) and of chapter 2 (Landlord HQ), before the credits ----------
 function cgRubble(x,gy,s,seed){ctx.save();ctx.translate(x,gy);ctx.scale(s,s);cgShadow(0,2,150,10,.3);

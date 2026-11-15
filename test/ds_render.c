@@ -119,7 +119,8 @@ void swiWaitForVBlank(void){
   vf++;
   g_keys = 0; /* default: nothing held; script sets below */
   int mode = world.man.mode;
-  if(vf == 1 && !getenv("INTRO_TEST") && !getenv("INTRO_SKIP")) intro_seen = 1;                  /* the other scripted runs press A on the title and expect level 1 at once */
+  if(vf == 1 && !getenv("INTRO_TEST") && !getenv("INTRO_SKIP")) intro_seen = 1;
+  if(vf == 1 && !getenv("END_TEST")) end_seen = 6;                  /* the other scripted runs press A on the title and expect level 1 at once */
   if(getenv("OPTIONS_LOAD")){                                      /* second boot after OPTIONS_TEST: the options come back from the chip (collapse off, splat) */
     if(vf == 3){ int ok = opt.collapse == 0 && opt.tool == MX_TOOL_SPLAT; printf(ok ? "ok: options loaded from the chip at boot\n" : "FAIL: options not loaded (collapse=%d tool=%d)\n", opt.collapse, opt.tool); exit(!ok); }
   } else if(getenv("OPTIONS_TEST")){                                       /* port 13: the options screen, the start tool, the speed safety net, saving */
@@ -227,6 +228,25 @@ void swiWaitForVBlank(void){
       WCHECK(last_sc == WOLF_SCENES - 1 && played > 1500, "all seven scenes played out on their own");
       WCHECK(world.level == MX_CH3_START && world.state == MX_PLAY, "...and handed over to the first chapter 3 level");
       printf(fails ? "wolf: %d FAILED\n" : "wolf: all passed\n", fails); exit(fails != 0); }
+  } else if(getenv("END_TEST")){                                           /* the closing cutscenes of chapter 1 / 2 (END_TEST=1|2): fit, play out alone, hand over (chapter 2's also runs the wolfman cutscene) */
+    static int fails, lf, last_sc = -1, played, wolf_after;
+    int ch = atoi(getenv("END_TEST"));
+#define ECHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
+    if(vf == 2){ int ok = 1; for(int c = 1; c <= 2; c++){ intro_start_end(c); if(intro_count() != END_SCENES) ok = 0; for(int s = 0; s < END_SCENES; s++) if(intro_text_rows(s) >= 9) ok = 0; }
+      ECHECK(ok, "four scenes each, and the narration of every closing scene fits the bottom screen");
+      wolf_seen = 0; intro_level = ch == 1 ? MX_CH2_START : MX_CH3_START; sel_level = intro_level; load_level(intro_level); app = ST_INTRO; intro_start_end(ch); }
+    if(app == ST_INTRO){
+      if(intro_mode() >= 2 && intro_scene() != last_sc){ last_sc = intro_scene(); lf = 0; }
+      if(intro_mode() == 1) wolf_after = 1;
+      lf++; played++;
+      static const int LFS[] = { 15, 100, 190, 260, 330 };
+      for(unsigned i = 0; i < sizeof LFS / sizeof LFS[0]; i++) if(intro_mode() >= 2 && lf == LFS[i]){ char nm[32]; snprintf(nm, sizeof nm, "end%d_s%d_%03d", ch, last_sc, lf); shot(nm); }
+    }
+    if(vf > 10 && app == ST_PLAY){
+      ECHECK(last_sc == END_SCENES - 1 && played > 800, "all four closing scenes played out on their own");
+      ECHECK(ch == 1 ? !wolf_after : wolf_after, ch == 1 ? "chapter 1's closer goes straight to the next level" : "chapter 2's closer hands over to the wolfman cutscene");
+      ECHECK(world.level == intro_level && world.state == MX_PLAY, "...and then the first level of the next chapter is loaded");
+      printf(fails ? "end: %d FAILED\n" : "end: all passed\n", fails); exit(fails != 0); }
   } else if(getenv("INTRO_SKIP")){                                         /* A, SKIP, START, and when the cutscene does NOT play */
     static int fails;
     if(vf == 2) g_keys |= KEY_A;

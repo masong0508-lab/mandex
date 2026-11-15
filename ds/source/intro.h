@@ -6,8 +6,11 @@
 
 #define INTRO_SCENES 8
 #define WOLF_SCENES 8
+#define END_SCENES 4
 void intro_start(void);
+void intro_start_end(int chapter);   /* 1 / 2: the closing cutscene after the last level of chapter 1 / 2 */
 void intro_start_wolf(void);          /* chapter 3: the wolfman cutscene */
+int  intro_mode(void);                /* 0 opening, 1 wolfman, 2 / 3 the closers of chapter 1 / 2 */
 int  intro_count(void);               /* scenes in the cutscene now playing */
 /* call once per frame while the intro is up.  `down` = keysDown(), (tx,ty) = the stylus.  Returns 1 when the intro is over (finished or skipped). */
 int  intro_tick(int down, int tx, int ty);
