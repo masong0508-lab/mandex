@@ -206,6 +206,7 @@ typedef struct {
   int level, state, men, score;
   real time, shake, slow, banner, flash, waitT, winT, loseT;
   int freeze, need_support, support_cd, substeps, nhouses;
+  int wob_budget, wob_shift;                   /* wobble cost cap: max cells walked per step (0 = unlimited); wob_shift = how much the 'cold' limits are scaled up (0..6) to stay under it */
   /* wobble lattice: every standing voxel is a mass on springs to its 4 neighbours.  Offsets are in cells
      (a voxel is DRAWN at x+ox, y+oy); brk bit d (0:+x 1:-x 2:+y 3:-y) = joint to that neighbour has snapped. */
   real    ox [MX_ROWS * MX_COLS], oy [MX_ROWS * MX_COLS];
@@ -275,6 +276,7 @@ void mx_set_fight(MxWorld *w, int on);          /* landlords fight back (default
 int  mx_targets_alive(const MxWorld *w);
 int  mx_cells_left(const MxWorld *w);
 const char *mx_level_name(int level);
+void mx_set_wobble_budget(MxWorld *w, int cells);   /* handhelds: cap the lattice work per frame (0 = off); hits then wake fewer cells instead of stalling the frame */
 void mx_set_substeps(MxWorld *w, int n);       /* 2..4: physics steps per frame */
 /* Ballistic preview of the current pull: position after t seconds (for aim dots). */
 void mx_preview_point(const MxWorld *w, real t, real *ox, real *oy);

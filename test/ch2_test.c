@@ -187,6 +187,17 @@ int main(void){
     CHECK(t->alive && t->y < y0, "a landlord buried by a thin layer of rubble digs out");
     mx_load(&W, 40); t = &W.targets[0]; t->vy = RI(42); t->y -= RI(1); step(40);
     CHECK(t->alive, "a hard landing (not a huge fall) only stuns"); }
+  { /* handheld wobble budget: a capped lattice still plays every level out sanely, and the cap survives a reload */
+    int ok = 1;
+    for(int l = 0; l < MX_NUM_LEVELS; l += 7){
+      mx_load(&W, l); mx_set_wobble_budget(&W, 60);
+      for(int i = 0; i < 90; i++) mx_update(&W, DT);
+      mx_set_pull(&W, -RI(8), RI(4)); mx_release(&W);
+      for(int i = 0; i < 900; i++) mx_update(&W, DT);
+      if(W.wob_budget != 60 || W.wob_shift < 0 || W.wob_shift > 6 || mx_cells_left(&W) < 0) ok = 0;
+      mx_load(&W, l); if(W.wob_budget != 60) ok = 0; mx_set_wobble_budget(&W, 0);
+    }
+    CHECK(ok, "wobble budget 60: levels play out, shift stays in range, the budget survives a reload"); }
   printf(fails ? "CH2 TEST FAILED (%d)\n" : "CH2 TEST OK\n", fails);
   return fails != 0;
 }

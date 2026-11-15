@@ -34,7 +34,10 @@ static const MxOutfit OUT[MX_NUM_OUTFITS] = {
   {"Birthday Suit",  "unlock 20 achievements", {244,183,142}, {226,160,119}, {255,255,255}, {216,216,224}, 0},
   {"Rainbow Rump",   "beat every level",       {224,36,58},   {168,22,42},   {255,126,176}, {255,79,143},  1, 0},
   {"Working Man",    "always yours",           {63,95,143},   {43,68,104},   {201,206,214}, {143,152,166}, 0, 1},
-  {"Wolfman",        "clear Landlord HQ",      {122,104,92},  {84,70,60},    {185,189,201}, {123,127,140}, 0}};   /* the browser's wolf also has fur; the console sprites only recolour the boxers and towel */
+  {"Wolfman",        "clear Landlord HQ",      {122,104,92},  {84,70,60},    {185,189,201}, {123,127,140}, 0},
+  {"Leopard Lover",  "evict 100 landlords",    {217,164,65},  {122,74,18},   {43,43,43},    {17,17,17},    0},
+  {"Velvet Smoothie","earn 40 stars in total", {122,26,74},   {74,15,44},    {255,79,143},  {201,42,120},  0},
+  {"Lace & Lava",    "clear Landlord HQ",      {26,26,26},    {0,0,0},       {255,59,47},   {184,29,20},   0}};   /* the browser's wolf also has fur; the console sprites only recolour the boxers and towel */
 const MxOutfit *mx_outfit(int i){ return &OUT[(unsigned)i % MX_NUM_OUTFITS]; }
 int mx_outfit_unlocked(const MxStats *s, int i){
   switch(i){
@@ -51,6 +54,9 @@ int mx_outfit_unlocked(const MxStats *s, int i){
   case 10: return story_done(s) >= MX_STORY_LEVELS;
   case 11: return 1;                 /* Working Man */
   case 12: return s->stars[MX_CH3_START - 1] > 0;   /* Wolfman: Landlord HQ beaten, so chapter 3 and its cutscene are open */
+  case 13: return s->kills >= 100;
+  case 14: return total_stars(s) >= 40;
+  case 15: return s->stars[MX_CH3_START - 1] > 0;    /* Lace & Lava */
   }
   return 0;
 }

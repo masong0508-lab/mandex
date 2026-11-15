@@ -5,7 +5,7 @@
 #include <nds.h>
 
 #define INTRO_SCENES 8
-#define WOLF_SCENES 7
+#define WOLF_SCENES 8
 void intro_start(void);
 void intro_start_wolf(void);          /* chapter 3: the wolfman cutscene */
 int  intro_count(void);               /* scenes in the cutscene now playing */

@@ -287,6 +287,9 @@ static void wob_blast(MxWorld *w, int cx, int cy, int r, real speed){
 #ifndef MX_WOB_STEPS
 #define MX_WOB_STEPS WOB_STEPS
 #endif
+#ifdef MX_STATS
+int mx_stat_wob;
+#endif
 static uint16_t wob_act[MX_ROWS * MX_COLS];
 static uint8_t wob_nb[MX_ROWS * MX_COLS];               /* per listed voxel: which of its 4 joints (bit d = +x, -x, +y, -y) are alive this frame */
 static uint8_t wob_cx[MX_ROWS * MX_COLS], wob_cy[MX_ROWS * MX_COLS];     /* per listed voxel: column and row (so the steps never divide) */
@@ -304,8 +307,9 @@ static real KK[MX_NMAT][MX_NMAT];                       /* joint stiffness of ev
 static uint8_t wob_hot[MX_ROWS * MX_COLS];             /* by cell index; only read for listed (standing) cells */
 static uint16_t occ_i[MX_ROWS * MX_COLS];              /* every standing cell of this frame, row by row */
 static uint8_t occ_nb[MX_ROWS * MX_COLS];
-static void wob_list(const MxWorld *w){
+static void wob_list(MxWorld *w){
   int no = 0;
+  const real cv = MX_WOB_COLD_V * (1 << w->wob_shift), co = MX_WOB_COLD_O * (1 << w->wob_shift);   /* over budget: only clearly moving cells are walked, the rest keep their tiny offsets */
   for(int y = 0; y < MX_ROWS - 1; y++){
     wob_lean[y] = rmul(LEANK, RI(MX_ROWS - 1 - y)) - HOMEK;
     const uint8_t *row = &w->grid[y * MX_COLS];
@@ -320,7 +324,7 @@ static void wob_list(const MxWorld *w){
         if(x > 0 && !(bk & 2) && w->grid[i - 1]) nb |= 2;
         if(!(bk & 4) && w->grid[i + MX_COLS]) nb |= 4;
         if(y > 0 && !(bk & 8) && w->grid[i - MX_COLS]) nb |= 8;
-        wob_hot[i] = (rabs(w->ovx[i]) + rabs(w->ovy[i]) > MX_WOB_COLD_V) || (rabs(w->ox[i]) + rabs(w->oy[i]) > MX_WOB_COLD_O);
+        wob_hot[i] = (rabs(w->ovx[i]) + rabs(w->ovy[i]) > cv) || (rabs(w->ox[i]) + rabs(w->oy[i]) > co);
         occ_i[no] = (uint16_t)i; occ_nb[no] = nb; no++;
       }
     }
@@ -331,6 +335,11 @@ static void wob_list(const MxWorld *w){
     if(!(wob_hot[i] || ((nb & 1) && wob_hot[i + 1]) || ((nb & 2) && wob_hot[i - 1]) || ((nb & 4) && wob_hot[i + MX_COLS]) || ((nb & 8) && wob_hot[i - MX_COLS]))) continue;
     wob_act[n] = (uint16_t)i; wob_nb[n] = (uint8_t)nb; wob_cx[n] = (uint8_t)(i % MX_COLS); wob_cy[n] = (uint8_t)(i / MX_COLS); n++;
   }
+  if(w->wob_budget){                                   /* closed loop on the cell count: tighten at once when over, relax slowly when well under */
+    if(n > 2 * w->wob_budget && w->wob_shift < 5) w->wob_shift += 2; else if(n > w->wob_budget && w->wob_shift < 6) w->wob_shift++; else if(n < w->wob_budget / 2 && w->wob_shift > 0 && (w->sand_t & 7) == 0) w->wob_shift--;
+    if(w->wob_shift > 6) w->wob_shift = 6;
+    if(n > 2 * w->wob_budget) n = 2 * w->wob_budget;     /* one frame's hard ceiling */
+  } else w->wob_shift = 0;
   wob_nact = n;
 }
 static MX_HOT void wobble_step(MxWorld *w, real dt){
@@ -1888,9 +1897,9 @@ static void build(MxWorld *w, int l){
 void mx_load(MxWorld *w, int level){
   init_tables(); init_mats();
   int keep_sub = w->substeps, keep_wob = w->wob_enabled ? 1 : 0, first = !w->substeps;   /* front-end quality choices survive a reload */
-  int keep_valve = w->valve_ok, keep_collapse = w->collapse, keep_nofight = w->nofight;
+  int keep_valve = w->valve_ok, keep_collapse = w->collapse, keep_nofight = w->nofight, keep_budget = w->wob_budget;
   memset(w, 0, sizeof *w);
-  w->nofight = keep_nofight; w->rng = 0x2545F491u;
+  w->nofight = keep_nofight; w->wob_budget = keep_budget; w->rng = 0x2545F491u;
   w->dz_lo = MX_ROWS * MX_COLS; w->dz_hi = -1;
   w->bh_lo = 0; w->bh_hi = MX_ROWS + 3;               /* bhead starts zeroed, not -1: the first step clears all of it */
   w->valve_ok = keep_valve; w->collapse = keep_collapse;
@@ -1908,6 +1917,7 @@ void mx_load(MxWorld *w, int level){
   next_man(w);
 }
 
+void mx_set_wobble_budget(MxWorld *w, int cells){ w->wob_budget = cells < 0 ? 0 : cells; if(!cells) w->wob_shift = 0; }
 void mx_set_substeps(MxWorld *w, int n){ w->substeps = n < 2 ? 2 : n > 4 ? 4 : n; }
 void mx_preview_point(const MxWorld *w, real t, real *ox, real *oy){
   const MxMan *m = &w->man;
@@ -2041,6 +2051,9 @@ void mx_update(MxWorld *w, real dt){
   clean_chunks(w, dt);
   if(w->wob_on){
     wob_list(w);
+#ifdef MX_STATS
+    mx_stat_wob = wob_nact;
+#endif
     for(int i = 0; i < MX_WOB_STEPS; i++) wobble_step(w, dt / MX_WOB_STEPS);
     wobble_check(w);
   }

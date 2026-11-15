@@ -29,6 +29,9 @@
 #define MX_TITLE_DS
 #include "title.h"
 
+#define DS_WOB_MIN 48      /* wobble cells walked per step: the floor and the ceiling of the adaptive cap (a calm lattice is far below both) */
+#define DS_WOB_MAX 200
+static int wob_budget = DS_WOB_MAX;
 #ifndef MX_DS_MAX_SUBSTEPS
 #define MX_DS_MAX_SUBSTEPS 3
 #endif
@@ -775,6 +778,7 @@ static void apply_options(void){ mx_set_collapse(&world, opt.collapse && !coll_s
 static void load_level(int l){
   mx_load(&world, l); mx_meta_level_start(&stats, &world); apply_options(); was_aim = 0;
   mx_set_substeps(&world, world.substeps > MX_DS_MAX_SUBSTEPS ? MX_DS_MAX_SUBSTEPS : world.substeps);
+  mx_set_wobble_budget(&world, wob_budget);
   cells0 = mx_cells_left(&world); disp_score = 0; end_t = 0; was_state = MX_PLAY; dragging = 0; pad_used = 0;
   memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops);
   ev_ft = 0; fx = RI(88); fy = RI(38);
@@ -1208,12 +1212,16 @@ int main(void){
       /* adaptive quality: fewer substeps when the solver eats too much of the frame, more when there is headroom */
       /* order of sacrifice when the solver is slow: collapsible buildings first (the cheapest thing to lose), then chunk substeps, then the wobble lattice;
          the reverse when there is headroom (the preference in `opt` is never touched, so it comes back by itself) */
-      if(phys_ticks > 300000){ fast_frames = 0;
-        if(++slow_frames >= 3){ slow_frames = 0;
+      /* a hit wakes the wobble lattice, which is what costs time: the core caps the cells it walks (wob_budget) and this loop moves that cap with the measured cost,
+         at once (one slow frame is enough) and back up slowly.  Only when the cap is already at its floor are the other quality switches touched. */
+      if(phys_ticks > 330000){ fast_frames = 0;
+        if(wob_budget > DS_WOB_MIN){ wob_budget = wob_budget * 2 / 3; if(wob_budget < DS_WOB_MIN) wob_budget = DS_WOB_MIN; mx_set_wobble_budget(&world, wob_budget); slow_frames = 0; }
+        else if(++slow_frames >= 2){ slow_frames = 0;
           if(world.collapse){ coll_shed = 1; mx_set_collapse(&world, 0); }
           else if(world.substeps > 2) mx_set_substeps(&world, world.substeps - 1);
           else if(world.wob_enabled) mx_set_wobble(&world, 0); } }
-      else if(phys_ticks < 150000){ slow_frames = 0;
+      else if(phys_ticks < 180000){ slow_frames = 0;
+        if(wob_budget < DS_WOB_MAX && (frame & 15) == 0){ wob_budget += 24; if(wob_budget > DS_WOB_MAX) wob_budget = DS_WOB_MAX; mx_set_wobble_budget(&world, wob_budget); }
         if(++fast_frames >= 120){ fast_frames = 0;
           if(!world.wob_enabled) mx_set_wobble(&world, 1);
           else if(world.substeps < MX_DS_MAX_SUBSTEPS) mx_set_substeps(&world, world.substeps + 1);
