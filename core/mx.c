@@ -1915,6 +1915,24 @@ static void build(MxWorld *w, int l){
   }
 }
 
+/* a landlord's body is about five cells wide and six tall: any whose box touches a wall, pillar or floor slab is moved sideways to the nearest clear spot
+   (the web game does exactly the same, in unclipTargets()), so nobody stands half inside the masonry and the hit box matches what is drawn */
+static int body_clear(const MxWorld *w, int cx, int row){
+  for(int y = row - 5; y <= row - 1; y++) for(int x = cx - 2; x <= cx + 2; x++) if(solid_cell(w, x, y)) return 0;
+  return row >= MX_ROWS - 1 || solid_cell(w, cx, row + 1);
+}
+static void unclip_targets(MxWorld *w){
+  for(int i = 0; i < w->ntargets; i++){
+    MxTarget *t = &w->targets[i];
+    int row = rfloor(t->y + R(0.875)), cx = rfloor(t->x);
+    if(body_clear(w, cx, row)) continue;
+    for(int d = 1; d <= 3; d++){
+      int pick = 0;
+      if(body_clear(w, cx - d, row)) pick = -d; else if(body_clear(w, cx + d, row)) pick = d;
+      if(pick){ t->x += RI(pick); t->hx = t->x; break; }
+    }
+  }
+}
 static void load_level(MxWorld *w, int level, int district){
   init_tables(); init_mats();
   int keep_sub = w->substeps, keep_wob = w->wob_enabled ? 1 : 0, first = !w->substeps;   /* front-end quality choices survive a reload */
@@ -1929,6 +1947,7 @@ static void load_level(MxWorld *w, int level, int district){
   w->wob_enabled = first ? 1 : keep_wob;
   w->level = level; w->district = district; w->state = MX_PLAY; w->men = MEN[level]; w->banner = R(2.4);
   build(w, level);
+  unclip_targets(w);
   w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = 1;
   w->sand_on = 1;
   /* anything that wouldn't hold at spawn is welded in place, so levels never collapse on load */

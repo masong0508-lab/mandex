@@ -30,7 +30,7 @@ void sfx_play(int id, int pan){
   if(cool[id] > 0) return;
   cool[id] = s->cool;
   for(int i = 0; i < NV; i++) if(!vo[i].active){
-    int h = s->noise ? soundPlayNoise(s->f[0], s->vol, (u8)pan) : soundPlayPSG(DutyCycle_50, s->f[0], s->vol, (u8)pan);
+    int h = s->noise ? soundPlayNoise(s->f[0], s->vol * 4 / 5, (u8)pan) : soundPlayPSG(DutyCycle_50, s->f[0], s->vol * 13 / 20, (u8)pan);
     if(h < 0) return;                                 /* no free hardware channel */
     vo[i].id = h; vo[i].seg = 0; vo[i].left = s->len[0]; vo[i].freq = s->f[0]; vo[i].s = s; vo[i].active = 1;
     return;

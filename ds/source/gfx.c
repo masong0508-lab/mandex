@@ -195,7 +195,7 @@ static void make_palette(void){
   for(int i = 0; i < 16; i++) setc(C_SKY0 + i, 60 + i * 9, 128 + i * 6, 228 + i * 1);   /* deep blue -> pale horizon */
   setc(C_CLOUD, 255, 255, 255);  setc(C_CLOUD2, 205, 222, 245);
   setc(C_SUN, 255, 240, 140);    setc(C_SUNHALO, 235, 240, 235);
-  setc(C_HILL1, 120, 170, 190);  setc(C_HILL2, 80, 150, 90);  setc(C_HILL3, 150, 200, 215);
+  setc(C_HILL1, 108, 150, 192);  setc(C_HILL2, 80, 150, 90);  setc(C_HILL3, 150, 200, 215);
   setc(C_GRASS, 90, 190, 60);    setc(C_GRASS2, 55, 140, 45);
   setc(C_SNOW, 244, 249, 255);   setc(C_CITY, 143, 176, 212);  setc(C_CITY2, 205, 228, 246); setc(C_TREE, 63, 158, 74);   setc(C_TREE2, 88, 182, 88);
   setc(C_TREE3, 40, 120, 56);    setc(C_TRUNK, 107, 74, 43);    setc(C_FENCE, 232, 220, 196); setc(C_FENCE2, 150, 130, 98);
@@ -310,6 +310,11 @@ static void make_bg(void){
     int h1 = 126 - (tri(x, 150) * 3 / 5 + tri(x + 40, 53) / 3);
     for(int y = h1; y < BGH; y++) bg[y * BGW + x] = (u8)(y == h1 ? C_HILL3 : C_HILL1);
     if(h1 < 92){ int cap = 3 + tri(x, 12) / 2 + (92 - h1) / 3; for(int y = h1; y < h1 + cap; y++) bg[y * BGW + x] = C_SNOW; }   /* snow: a jagged cap on the high peaks */
+  }
+  /* aerial haze: the foot of the mountains fades toward the sky (ordered dither, denser lower down) */
+  for(int x = 0; x < BGW; x++) for(int y = 96; y < 134 && y < BGH; y++){
+    static const u8 bay[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+    if((bg[y * BGW + x] == C_HILL1 || bg[y * BGW + x] == C_HILL3) && (y - 96) * 16 / 38 > bay[(y & 3) * 4 + (x & 3)]) bg[y * BGW + x] = C_CITY2;
   }
   /* a distant city between the mountains and the hills */
   for(int x = 0; x < BGW; x += 13){

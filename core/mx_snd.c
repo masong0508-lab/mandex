@@ -14,25 +14,28 @@ int mx_snd_render(int id, short *out, int max){
   for(int i = 0; i < s->n; i++){ segn[i] = s->len[i] * MX_SND_RATE / 60; if(segn[i] < 1) segn[i] = 1; total += segn[i]; }
   total += MX_SND_RATE / 40;                                  /* a short release after the last segment */
   if(total > max) total = max;
-  int amp = s->vol * 200;                                     /* vol 127 -> 25400 */
-  unsigned lfsr = 0x4001; int lp = 0, noise_v = 0; long phase = 0; int pos = 0;
+  int amp = s->vol * 150;                                     /* vol 127 -> 19050: well under full scale, so layered effects never clip into a buzz */
+  unsigned lfsr = 0x4001; int lp = 0, lp2 = 0, noise_v = 0; long phase = 0; int pos = 0;
   for(int i = 0; i < s->n && pos < total; i++){
     int f0 = s->f[i], f1 = (s->glide && i + 1 < s->n) ? s->f[i + 1] : f0;
     for(int k = 0; k < segn[i] && pos < total; k++, pos++){
       int f = f0 + (int)((long)(f1 - f0) * k / segn[i]);
-      int v;
+      int v;                                                       /* v is -256..256 */
       if(s->noise){
         phase += f;
-        while(phase >= MX_SND_RATE){ phase -= MX_SND_RATE; unsigned b = (lfsr ^ (lfsr >> 1)) & 1; lfsr = (lfsr >> 1) | (b << 14); noise_v = (lfsr & 1) ? 1 : -1; }
+        while(phase >= MX_SND_RATE){ phase -= MX_SND_RATE; unsigned b = (lfsr ^ (lfsr >> 1)) & 1; lfsr = (lfsr >> 1) | (b << 14); noise_v = (lfsr & 1) ? 256 : -256; }
         v = noise_v;
-      } else { phase += f; if(phase >= MX_SND_RATE) phase -= MX_SND_RATE; v = phase * 2 < MX_SND_RATE ? 1 : -1; }
+      } else { phase += f; if(phase >= MX_SND_RATE) phase -= MX_SND_RATE;   /* a soft tone: mostly triangle, a quarter square for body (a bare square is the shrill part) */
+        int tri = (int)((phase * 2 < MX_SND_RATE ? phase * 4 - MX_SND_RATE : 3L * MX_SND_RATE - phase * 4) * 256 / MX_SND_RATE), sq = phase * 2 < MX_SND_RATE ? 256 : -256;
+        v = (tri * 3 + sq) / 4; }
       int env = (int)(256L * (total - pos) / total);              /* 256 -> 0 */
-      int att = pos < 44 ? pos * 256 / 44 : 256;
-      int x = (int)((long)v * amp * env / 256 * att / 256);   /* the 1-pole filter never overshoots a square, so full scale is safe */
-      lp += (x - lp) * 5 / 8; out[pos] = (short)lp;
+      if(s->noise) env = env * env / 256;                         /* noise bursts die away fast, like a real thump or crunch, instead of hissing out */
+      int att = pos < 110 ? pos * 256 / 110 : 256;                /* 5 ms attack: no click */
+      int x = (int)((long)v * amp / 256 * env / 256 * att / 256);
+      lp += (x - lp) * (s->noise ? 2 : 3) / 8; lp2 += (lp - lp2) * 5 / 8; out[pos] = (short)lp2;   /* two poles: the top end that stung is gone */
     }
   }
-  for(; pos < total; pos++){ lp = lp * 3 / 4; out[pos] = (short)lp; }   /* release tail */
+  for(; pos < total; pos++){ lp = lp * 3 / 4; lp2 += (lp - lp2) * 5 / 8; out[pos] = (short)lp2; }   /* release tail */
   return total;
 }
 
