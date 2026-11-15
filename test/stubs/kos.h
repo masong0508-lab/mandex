@@ -19,4 +19,8 @@ int pvr_prim(void*,int); void pvr_wait_ready(void); void pvr_scene_begin(void); 
 typedef struct { int d; } maple_device_t; typedef struct { uint32 buttons; int joyx, joyy, ltrig, rtrig; } cont_state_t;
 enum { MAPLE_FUNC_CONTROLLER = 1, CONT_A = 4, CONT_B = 2, CONT_START = 8, CONT_Y = 512, CONT_X = 1024, CONT_DPAD_LEFT = 128, CONT_DPAD_RIGHT = 64, CONT_DPAD_DOWN = 32, CONT_DPAD_UP = 16 };
 maple_device_t *maple_enum_type(int,int); void *maple_dev_status(maple_device_t*);
+typedef int sfxhnd_t; enum { SFXHND_INVALID = 0 };
+extern int stub_snd_plays;
+static inline int snd_stream_init(void){ return 0; } static inline sfxhnd_t snd_sfx_load_buf(char *b){ static int n; (void)b; return ++n; }
+static inline int snd_sfx_play(sfxhnd_t h, int v, int p){ (void)h; (void)v; (void)p; stub_snd_plays++; return 0; }
 #endif

@@ -78,27 +78,31 @@ echo "--- idle gags: every step valid, every gag ends and plays, he falls asleep
 gcc -std=c99 -O2 -Wall -Wno-unused-function -I../art idle_test.c -o idle_test && ./idle_test
 echo "--- Dreamcast front-end drawing on the host (software rasteriser instead of the PVR): jiggle, gags, win/lose ---"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o dc_$f.o; done   # the shared cutscene code, built exactly as dreamcast/Makefile does
-gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c dc_render.c -lm -o dc_render && ./dc_render
+gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c dc_render.c -lm -o dc_render && ./dc_render
 echo "--- 3DS front-end drawing on the host (real 3ds/main.c loop, stub libctru): win-panel stars, NEW BEST!, best score on the title; slider flat and full 3D ---"
 N3D_UNITS="n3d_gfx.o n3d_intro.o"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o n3d_$f.o; done   # the shared DS cutscene code, as its own fixed-point unit, exactly as 3ds/Makefile builds it
-gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o n3ds_render
+gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_render
 ./n3ds_render /tmp/n3r0 0 | grep -v "^ok:"
 ./n3ds_render /tmp/n3r1 1.0 | grep -v "^ok:"
 echo "--- pneumatic tubes and the hourglass (core, both math modes): a man flying into a mouth is posted out of the nozzle; the sand stands until the plug goes ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c tube_test.c -lm -o tube_float && ./tube_float | grep -v "^ok:"
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c tube_test.c -lm -o tube_fixed && ./tube_fixed | grep -v "^ok:"
 echo "--- 3DS man: pixel-art sprites, idle gags, hearts and sparkles, tubes (real 3ds/main.c against the stub libctru) ---"
-gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_gags.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o n3ds_gags && ./n3ds_gags | grep -v "^ok:"
+gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_gags.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_gags && ./n3ds_gags | grep -v "^ok:"
 echo "--- chapter 2 (walk mode, bounce pads, walker / thrower / bat landlords, the fight-back switch): core in both math modes, DS and 3DS front-ends ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c ch2_test.c -lm -o ch2_float && ./ch2_float | grep -v "^ok:"
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c ch2_test.c -lm -o ch2_fixed && ./ch2_fixed | grep -v "^ok:"
 WALK_TEST=1 ./ds_render /tmp/dswalk 1400 22 | grep -v "^ok:"
 WALK_TEST=3 ./ds_render /tmp/dswalk3 1400 25 | grep -v "^ok:"
 WALK_TEST=2 ./ds_render /tmp/dswalk2 1400 26 | grep -v "^ok:"
-gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_walk.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o n3ds_walk && ./n3ds_walk | grep -v "^ok:"
+gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_walk.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_walk && ./n3ds_walk | grep -v "^ok:"
 echo "--- 3DS cutscenes (shared with the DS) ---"
-gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_intro.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o n3ds_intro && ./n3ds_intro | grep -v "^ok:"
+gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_intro.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_intro && ./n3ds_intro | grep -v "^ok:"
+echo "--- sound effect synth (3DS + Dreamcast) ---"
+gcc -std=c99 -O2 -Wall -I../core -I../ds/source snd_test.c ../core/mx_snd.c ../core/mx.c -lm -o snd_test && ./snd_test | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core -I../ds/source snd_test.c ../core/mx_snd.c ../core/mx.c -lm -o snd_test_fx && ./snd_test_fx | tail -1
+gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_fur.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_fur && ./n3ds_fur | grep -v "^ok:"
 echo "--- Dreamcast chapter 2 drawing (walking man, pads, briefcases, landlord kinds) ---"
 DC_WALK=1 ./dc_render | grep "walk mode"
 DC_INTRO=1 ./dc_render | { grep -v " finished after " || true; } ; DC_INTRO=1 ./dc_render | grep -c " finished after " | grep -qx 2 && echo "dc cutscenes: both finish"

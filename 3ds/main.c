@@ -18,6 +18,8 @@
 #include <math.h>
 #include "mx.h"
 #include "intro.h"
+#include "sfx.h"
+#include "mx_snd.h"
 extern u16 gfx_pal[256]; void gfx_init(void);      /* ds/source/gfx.c (built with -DMX_FIXED as its own unit; only the palette is used here) */
 #include "mx_meta.h"
 #include "manspr.h"                                /* the same pixel-art man as the DS and Dreamcast ports (generated from the web game) */
@@ -32,12 +34,48 @@ static int intro_seen = 1, wolf_seen = 1, intro_level;   /* host scripts that pr
 static int intro_seen, wolf_seen, intro_level;
 #endif       /* the cutscenes (shared with the DS: ds/source/intro.c) play once per power-on */
 static u8 ic_top[256 * 192], ic_bot[256 * 192];       /* the cutscene is drawn into two 256x192 palette buffers, then scaled up to the 3DS screens */
-void sfx_play(int id, int pan){ (void)id; (void)pan; }   /* the 3DS build has no sound; the shared cutscene code calls this */
+/* Sound: every effect is synthesised once at start (core/mx_snd.c, the DS's own effect table) into linear memory and played on the DSP's
+   8 channels round-robin.  Without the DSP firmware (dspfirm.cdc) ndspInit fails and the game is simply silent. */
+static short *snd_buf[SFX_COUNT]; static int snd_len[SFX_COUNT], snd_ok, snd_cool[SFX_COUNT], snd_next;
+static ndspWaveBuf snd_wb[8];
+static void sound_init(void){
+  if(ndspInit() != 0) return;
+  ndspSetOutputMode(NDSP_OUTPUT_STEREO);
+  static short tmp[MX_SND_MAX];
+  for(int i = 0; i < SFX_COUNT; i++){
+    int n = mx_snd_render(i, tmp, MX_SND_MAX);
+    snd_buf[i] = (short *)linearAlloc(n * 2); if(!snd_buf[i]) return;
+    memcpy(snd_buf[i], tmp, n * 2); snd_len[i] = n; DSP_FlushDataCache(snd_buf[i], n * 2);
+  }
+  for(int c = 0; c < 8; c++){
+    float mix[12] = { 0 }; mix[0] = mix[1] = 0.45f;
+    ndspChnReset(c); ndspChnSetInterp(c, NDSP_INTERP_LINEAR); ndspChnSetRate(c, (float)MX_SND_RATE); ndspChnSetFormat(c, NDSP_FORMAT_MONO_PCM16); ndspChnSetMix(c, mix);
+  }
+  snd_ok = 1;
+}
+static void sound_tick(void){ for(int i = 0; i < SFX_COUNT; i++) if(snd_cool[i] > 0) snd_cool[i]--; }
+void sfx_play(int id, int pan){
+  if(!snd_ok || id < 0 || id >= SFX_COUNT || snd_cool[id] > 0) return;
+  snd_cool[id] = mx_snd_cooldown(id);
+  int c = snd_next++ & 7;
+  float mix[12] = { 0 }; mix[0] = 0.45f * (127 - pan) / 64.0f; mix[1] = 0.45f * pan / 64.0f; if(mix[0] > 0.6f) mix[0] = 0.6f; if(mix[1] > 0.6f) mix[1] = 0.6f;
+  ndspChnWaveBufClear(c); ndspChnSetMix(c, mix);
+  memset(&snd_wb[c], 0, sizeof snd_wb[c]); snd_wb[c].data_vaddr = snd_buf[id]; snd_wb[c].nsamples = snd_len[id];
+  ndspChnWaveBufAdd(c, &snd_wb[c]);
+}
 static int app = ST_TITLE, sel = 0, frame, dragging, pad_used, cells0 = 1;
 static float pad_dx, pad_dy;
 static int new_best;                                     /* this win beat the level's old best score */
 static uint32_t prev_best;                              /* best[level] just before the win was recorded */
 static MxStats stats;                                   /* session achievements / outfits (no save on the 3DS yet) */
+static unsigned char man_pal[MS_NPAL][3];              /* the man's palette, re-tinted for the worn outfit (boxers, towel, skin or the Wolfman's fur) */
+static void apply_outfit(int o){
+  static const int idx[6] = { 5, 6, 7, 13, 14, 15 };
+  uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); mx_outfit_skin(o, sk);
+  memcpy(man_pal, MS_PAL, sizeof man_pal);
+  for(int k = 0; k < 6; k++) for(int c = 0; c < 3; c++) man_pal[idx[k]][c] = sh[k][c];
+  for(int k = 0; k < 4; k++) for(int c = 0; c < 3; c++) man_pal[1 + k][c] = sk[k][c];
+}
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
 static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
 
@@ -114,6 +152,7 @@ static void on_events(void){
   for(int i = 0; i < world.nev; i++){
     const MxEvent *e = &world.ev[i];
     float x = RTOF(e->x), y = RTOF(e->y);
+    { int sn[2], nn = mx_event_sfx(e, sn); for(int k = 0; k < nn; k++) sfx_play(sn[k], 64); }
     switch(e->type){
     case EV_CELL: { const uint8_t *c = mx_material_rgb(e->m);
       spawn(x, y, RTOF(e->a) * .3f + (rand() % 9 - 4) * .2f, RTOF(e->b) * .3f - (rand() % 7) * .2f, 30 + rand() % 20, RGB(c[0], c[1], c[2])); } break;
@@ -159,12 +198,16 @@ static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
       if(!c) continue;
       int dx = face >= 0 ? sx - f->ax : f->ax - sx - 1, x0 = cx + fdiv4(dx * ppc), x1 = cx + fdiv4((dx + 1) * ppc);
       if(x1 <= x0) x1 = x0 + 1;
-      rect(s, x0, y0, x1 - x0, y1 - y0, RGB(MS_PAL[c - 1][0], MS_PAL[c - 1][1], MS_PAL[c - 1][2]));
+      rect(s, x0, y0, x1 - x0, y1 - y0, RGB(man_pal[c - 1][0], man_pal[c - 1][1], man_pal[c - 1][2]));
     }
   }
 }
 static MiState mi;                                             /* idle gag state, see art/manidle.h */
-static void idle_fx(int fx, float wx, float wy){               /* particles and words for a gag step (no sound on the 3DS port yet) */
+static void idle_fx(int fx, float wx, float wy){
+  switch(fx){ case FX_SLAP: sfx_play(SFX_SLAP, 64); break; case FX_GRUNT: sfx_play(SFX_GRUNT, 64); break; case FX_BURP: sfx_play(SFX_BURP, 64); break; case FX_FART: sfx_play(SFX_FART, 64); break;
+    case FX_FLICK: sfx_play(SFX_FLICK, 64); break; case FX_TAUNT: sfx_play(SFX_TAUNT, 64); break; case FX_EEK: sfx_play(SFX_EEK, 64); break; case FX_SNAP: sfx_play(SFX_SLAP, 64); sfx_play(SFX_BOING, 64); break;
+    case FX_SNORE: sfx_play(SFX_SNORE, 64); break; case FX_KISS: case FX_POP: sfx_play(SFX_POP, 64); break; case FX_SPARKLE: sfx_play(SFX_STRETCH, 64); break; case FX_DISCO: sfx_play(SFX_BOING, 64); break;
+    case FX_YAWN: sfx_play(SFX_YAWN, 64); break; case FX_WHEW: sfx_play(SFX_WHEW, 64); break; case FX_BOING: sfx_play(SFX_BOING, 64); break; case FX_WHOOSH: sfx_play(SFX_WHOOSH, 64); break; default: break; }               /* particles and words for a gag step  */
   float mxp = wx + 1.3f, myp = wy - 3.6f;
   switch(fx){
   case FX_SLAP: spawn(wx - 2, wy - 4, -.6f, -1.f, 30, RGB(150, 200, 255)); spawn(wx + 2, wy - 4, .6f, -1.f, 30, RGB(150, 200, 255)); break;
@@ -466,11 +509,14 @@ int main(void){
   gfxInitDefault();
   gfxSetDoubleBuffering(GFX_TOP, true); gfxSetDoubleBuffering(GFX_BOTTOM, true);
   srand(1234);
+  sound_init();
+  apply_outfit(0);
   gfx_init();                                         /* the shared DS drawing library builds its palette in RAM (used by the cutscenes) */
   load_level(0);
   View vt = {&top, 3, 20, 28, 0, 0};                 /* whole level: 360x180 centred on the top screen */
   View vb = {&bot, 4, 0, 0, -24, 0};                 /* the sling at 4 px per voxel; touch maps straight back to cells */
   while(aptMainLoop()){
+    sound_tick();
     hidScanInput();
     u32 down = hidKeysDown(), held = hidKeysHeld(), up = hidKeysUp();
     touchPosition t; hidTouchRead(&t);
@@ -489,7 +535,7 @@ int main(void){
     if(app == ST_TITLE){
       if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
-      if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } }
+      if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } apply_outfit(outfit_sel); }
       if(down & KEY_Y){ nofight = !nofight; mx_set_fight(&world, !nofight); }
       if(down & (KEY_A | KEY_START | KEY_TOUCH)){
         if(sel == 0 && !intro_seen){ intro_seen = 1; intro_level = 0; app = ST_INTRO; intro_start(); }
@@ -597,6 +643,7 @@ int main(void){
     } else textc(&bot, 160, 12, "TOUCH TO START", 2, RGB(255, 255, 255));
     gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();
   }
+  if(snd_ok) ndspExit();
   gfxExit();
   return 0;
 }

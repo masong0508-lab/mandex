@@ -24,6 +24,7 @@ u32 hidKeysDown(void){ return g_dn; } u32 hidKeysHeld(void){ return g_keys; } u3
 void hidTouchRead(touchPosition *t){ *t = g_touch; }
 
 #define MX_TEST_NO_CUTSCENES 1
+int stub_snd_plays;
 #define main n3ds_main
 #include "../3ds/main.c"
 #undef main

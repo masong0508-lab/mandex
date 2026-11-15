@@ -24,6 +24,7 @@ u32 hidKeysDown(void){ return g_dn; } u32 hidKeysHeld(void){ return g_keys; } u3
 void hidTouchRead(touchPosition *t){ *t = g_touch; }
 bool aptMainLoop(void){ return g_left-- > 0; }
 #define MX_TEST_NO_CUTSCENES 1
+int stub_snd_plays;
 #define main n3ds_main
 #include "../3ds/main.c"
 #undef main
@@ -77,6 +78,7 @@ int main(int argc, char **argv){
   /* Y on the title switches fighting back off and on */
   level = 99; nofight = 0; vf = 0; g_left = 5; g_keys = g_prev = 0; app = ST_TITLE; n3ds_main();
   CHECK(nofight == 1 && world.nofight == 1, "Y on the title switches landlords fighting back off");
+  CHECK(stub_snd_plays > 0, "the 3DS asked the DSP to play sound effects during the walk");
   printf(fails ? "3DS walk test: %d FAILED\n" : "3DS walk test: all passed\n", fails);
   return fails != 0;
 }

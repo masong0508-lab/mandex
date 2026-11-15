@@ -60,8 +60,32 @@ static uint32 argb(int r, int g, int b, int a){ return ((uint32)a << 24) | ((uin
 
 /* ---- the cutscenes (ds/source/intro.c, shared with the DS and 3DS): drawn into two 256x192 palette buffers, expanded to RGB565 and shown as two textured quads ---- */
 #include "intro.h"
+#include "sfx.h"
+#include "mx_snd.h"
 extern unsigned short gfx_pal[256]; void ds_gfx_init(void);       /* ds/source/gfx.c (built with -DMX_FIXED -Dgfx_init=ds_gfx_init as its own unit: only its palette is used here) */
-void sfx_play(int id, int pan){ (void)id; (void)pan; }           /* the Dreamcast build has no sound */
+/* Sound: each effect is synthesised once at start (core/mx_snd.c, the DS's own effect table), wrapped in a WAV header in memory and handed to KOS's
+   sound-effect player, which copies it into the AICA's RAM.  If the sound system will not start the game is simply silent. */
+static sfxhnd_t snd_h[SFX_COUNT]; static int snd_ok, snd_cool[SFX_COUNT];
+static void le32(unsigned char *p, unsigned v){ p[0] = v; p[1] = v >> 8; p[2] = v >> 16; p[3] = v >> 24; }
+static void sound_init(void){
+  if(snd_stream_init() < 0) return;
+  static short pcm[MX_SND_MAX]; static unsigned char wav[44 + MX_SND_MAX * 2];
+  for(int i = 0; i < SFX_COUNT; i++){
+    int n = mx_snd_render(i, pcm, MX_SND_MAX);
+    memcpy(wav, "RIFF\0\0\0\0WAVEfmt \x10\0\0\0\1\0\1\0\0\0\0\0\0\0\0\0\2\0\x10\0data\0\0\0\0", 44);
+    le32(wav + 4, 36 + n * 2); le32(wav + 24, MX_SND_RATE); le32(wav + 28, MX_SND_RATE * 2); le32(wav + 40, n * 2);
+    for(int k = 0; k < n; k++){ wav[44 + k * 2] = (unsigned char)pcm[k]; wav[45 + k * 2] = (unsigned char)((unsigned short)pcm[k] >> 8); }
+    snd_h[i] = snd_sfx_load_buf((char *)wav);
+    if(snd_h[i] == SFXHND_INVALID){ snd_ok = 0; return; }
+  }
+  snd_ok = 1;
+}
+static void sound_tick(void){ for(int i = 0; i < SFX_COUNT; i++) if(snd_cool[i] > 0) snd_cool[i]--; }
+void sfx_play(int id, int pan){
+  if(!snd_ok || id < 0 || id >= SFX_COUNT || snd_cool[id] > 0) return;
+  snd_cool[id] = mx_snd_cooldown(id);
+  snd_sfx_play(snd_h[id], 200, pan * 2);                  /* volume 0..255, pan 0..255 (128 = centre) */
+}
 static unsigned char ic_top[256 * 192], ic_bot[256 * 192];
 static unsigned short ic_rgb[256 * 256];
 static pvr_ptr_t tx_ic_top, tx_ic_bot;
@@ -177,14 +201,18 @@ static void toast_tick(void){
 static unsigned short *man_px;
 static void recolor_man(int o){
   if(!man_px || !tx_man) return;
-  uint8_t sh[6][3]; mx_outfit_shades(o, sh);
+  uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); int fur = mx_outfit_skin(o, sk);
   size_t tot = (size_t)DCT_MAN_W * DCT_MAN_H;
   unsigned short *tmp = (unsigned short *)malloc(tot * 2);
   if(!tmp) return;
   for(size_t i = 0; i < tot; i++){
     unsigned short v = man_px[i]; unsigned a = (v >> 12) & 15, r = ((v >> 8) & 15) * 17, g = ((v >> 4) & 15) * 17, b = (v & 15) * 17;
     int mx_ = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b), d = mx_ - mn;
-    if(a && d * 100 > 40 * mx_ && r == (unsigned)mx_ && r > 120 && b > g){      /* saturated, red-dominant and leaning to blue (not skin or hair) */
+    if(fur && a && r >= 190 && g * 100 >= 62 * (int)r && g * 100 <= 88 * (int)r && b * 100 >= 45 * (int)r && b * 100 <= 74 * (int)r && (int)(g - b) * 100 >= 11 * (int)r){   /* skin: his pink becomes grey fur, same brightness steps */
+      int nr = sk[0][0] * (int)r / 244, ng = sk[0][1] * (int)r / 244, nb = sk[0][2] * (int)r / 244;
+      nr = nr > 255 ? 255 : nr; ng = ng > 255 ? 255 : ng; nb = nb > 255 ? 255 : nb;
+      v = (unsigned short)((a << 12) | ((nr >> 4) << 8) | ((ng >> 4) << 4) | (nb >> 4));
+    } else if(a && d * 100 > 40 * mx_ && r == (unsigned)mx_ && r > 120 && b > g){      /* saturated, red-dominant and leaning to blue (not skin or hair) */
       int pink = b * 100 > 45 * (int)r;                                         /* the towel is the pinker one */
       const uint8_t *tc = pink ? sh[3] : sh[0];
       int lum = (int)r * 100 / (pink ? 255 : 224);
@@ -200,6 +228,7 @@ static void recolor_man(int o){
 static void handle_events(void){
   for(int i = 0; i < world.nev; i++){
     const MxEvent *e = &world.ev[i];
+    { int sn[2], nn = mx_event_sfx(e, sn); for(int k = 0; k < nn; k++) sfx_play(sn[k], 64); }
     switch(e->type){
     case EV_CELL: { const uint8_t *m = mx_material_rgb(e->m);
       spawn(e->x, e->y, argb(m[0], m[1], m[2], 255), 260); spawn(e->x, e->y, argb(m[0] / 2, m[1] / 2, m[2] / 2, 255), 220); break; }
@@ -310,6 +339,10 @@ static void man_with_towel(ClothActor *ta, int fr, float x, float y, int face, f
   if(ta->live) draw_cloth(&ta->c, x, y, face, z + 0.5f, 1);
 }
 static void idle_fx(int fx, float wx, float wy, int face){
+  switch(fx){ case FX_SLAP: sfx_play(SFX_SLAP, 64); break; case FX_GRUNT: sfx_play(SFX_GRUNT, 64); break; case FX_BURP: sfx_play(SFX_BURP, 64); break; case FX_FART: sfx_play(SFX_FART, 64); break;
+    case FX_FLICK: sfx_play(SFX_FLICK, 64); break; case FX_TAUNT: sfx_play(SFX_TAUNT, 64); break; case FX_EEK: sfx_play(SFX_EEK, 64); break; case FX_SNAP: sfx_play(SFX_SLAP, 64); sfx_play(SFX_BOING, 64); break;
+    case FX_SNORE: sfx_play(SFX_SNORE, 64); break; case FX_KISS: case FX_POP: sfx_play(SFX_POP, 64); break; case FX_SPARKLE: sfx_play(SFX_STRETCH, 64); break; case FX_DISCO: case FX_BOING: sfx_play(SFX_BOING, 64); break;
+    case FX_YAWN: sfx_play(SFX_YAWN, 64); break; case FX_WHEW: sfx_play(SFX_WHEW, 64); break; case FX_WHOOSH: sfx_play(SFX_WHOOSH, 64); break; default: break; }
   float mxp = wx + face * 1.3f, myp = wy - 3.6f;
   switch(fx){
   case FX_SLAP:  spawn_k(PK_SWEAT, wx - 2, wy - 4, -40, -80, 0.5f, argb(190, 230, 255, 255)); spawn_k(PK_SWEAT, wx + 2, wy - 4, 40, -80, 0.5f, argb(190, 230, 255, 255)); break;
@@ -698,11 +731,13 @@ static void gfx_init(void){
 int main(int argc, char **argv){
   (void)argc; (void)argv;
   gfx_init();
+  sound_init();
 
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
   load_level(0);
   uint32 prev = 0; int prev_trig = 0;
   while(1){
+    sound_tick();
     maple_device_t *dev = maple_enum_type(0, MAPLE_FUNC_CONTROLLER);
     cont_state_t *st = dev ? (cont_state_t *)maple_dev_status(dev) : NULL;
     if(st){

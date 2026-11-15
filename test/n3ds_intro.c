@@ -15,6 +15,7 @@ float osGet3DSliderState(void){ return 0; }
 void hidScanInput(void){ g_dn = g_keys & ~g_prev; g_up = g_prev & ~g_keys; g_prev = g_keys; }
 u32 hidKeysDown(void){ return g_dn; } u32 hidKeysHeld(void){ return g_keys; } u32 hidKeysUp(void){ return g_up; }
 void hidTouchRead(touchPosition *t){ *t = g_touch; }
+int stub_snd_plays;
 #define main n3ds_main
 #include "../3ds/main.c"
 #undef main
@@ -34,7 +35,7 @@ bool aptMainLoop(void){
     if(app == ST_INTRO && intro_scene() != sc_seen){ sc_seen = intro_scene(); char p[200]; snprintf(p, sizeof p, "%s_p%d_s%d_top.ppm", OUT, ph, sc_seen); dump(fb_top[0], 400, 240, p); snprintf(p, sizeof p, "%s_p%d_s%d_bot.ppm", OUT, ph, sc_seen); dump(fb_bot, 320, 240, p);
       if(t > 40){ char q[200]; snprintf(q, sizeof q, "%s_p%d_s%d_mid_top.ppm", OUT, ph, sc_seen); } }
     if(app == ST_INTRO && t == 200){ char p[200]; snprintf(p, sizeof p, "%s_p%d_t200_top.ppm", OUT, ph); dump(fb_top[0], 400, 240, p); snprintf(p, sizeof p, "%s_p%d_t200_bot.ppm", OUT, ph); dump(fb_bot, 320, 240, p); CHECK(nonblack(fb_top[0], 400 * 240) > 20000 && nonblack(fb_bot, 320 * 240) > 3000, "both screens carry the cutscene picture and narration"); }
-    if(app == ST_PLAY){ CHECK(world.level == (ph == 1 ? 0 : MX_CH3_START), ph == 1 ? "the origin story ends in level 1" : "the wolfman scene ends in level 41"); if(ph == 1){ ph = 2; t = 0; sc_seen = -1; app = ST_TITLE; sel = MX_CH3_START; load_level(sel); } else { printf(fails ? "3ds intro: %d FAILED\n" : "3ds intro: all passed\n", fails); exit(fails != 0); } }
+    if(app == ST_PLAY){ CHECK(world.level == (ph == 1 ? 0 : MX_CH3_START), ph == 1 ? "the origin story ends in level 1" : "the wolfman scene ends in level 41"); if(ph == 1){ ph = 2; t = 0; sc_seen = -1; app = ST_TITLE; sel = MX_CH3_START; load_level(sel); } else { CHECK(stub_snd_plays > 8, "the cutscenes play their sound effects on the DSP"); printf(fails ? "3ds intro: %d FAILED\n" : "3ds intro: all passed\n", fails); exit(fails != 0); } }
   }
   else if(ph == 2){ if(t == 3){ CHECK(!wolf_seen, "the wolfman scene is not seen yet"); g_keys = KEY_A; } if(t == 4){ CHECK(app == ST_INTRO, "A on level 41 starts the wolfman cutscene"); ph = 3; t = 0; } }
   if(t > 60000){ printf("FAIL: timeout\n"); exit(1); }

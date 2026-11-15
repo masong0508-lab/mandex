@@ -211,12 +211,27 @@ static void couch_front(u8 *b, int x, int gy){ gfx_rect(b, x - 8, gy - 20, 126, 
 static void pizza(u8 *b, int x, int gy, int n){ for(int i = 0; i < n; i++){ gfx_rect(b, x + (i & 1) * 2, gy - 4 - i * 5, 26, 5, C_WHITE); gfx_rect(b, x + (i & 1) * 2, gy - 4 - i * 5, 26, 1, C_FIRE); gfx_rect(b, x + 9 + (i & 1) * 2, gy - 3 - i * 5, 8, 3, C_RED); } }
 static void can(u8 *b, int x, int gy){ gfx_rect(b, x, gy - 7, 4, 7, C_GRAY); gfx_rect(b, x, gy - 7, 4, 1, C_WHITE); }
 static void landlord(u8 *b, int x, int y, int ppc, int tt, int scared){ spr_landlord(b, x, y, ppc, tt, scared); }
-static void dennis(u8 *b, int x, int by, int s, int tt){         /* behind a desk: x centre, by = desk top */
-  gfx_ell(b, x, by - 6 * s, 9 * s, 7 * s, C_SUIT2); gfx_ell(b, x, by - 7 * s, 8 * s, 6 * s, C_SUIT);
-  gfx_tri(b, x - s, by - 11 * s, x + s, by - 11 * s, x, by - 4 * s, C_GOLD);
-  gfx_ell(b, x, by - 15 * s, 4 * s, 4 * s, C_SKIN); gfx_ell(b, x, by - 18 * s, 4 * s, 2 * s, C_BLACK);
-  gfx_rect(b, x - 2 * s, by - 16 * s, s, s, C_BLACK); gfx_rect(b, x + s, by - 16 * s, s, s, C_BLACK);
-  int m = 1 + (wv(tt, 30, 1) > 0); gfx_rect(b, x - 2 * s, by - 12 * s, 4 * s, m * s, C_WHITE); gfx_rect(b, x - 2 * s, by - 12 * s, 4 * s, 1, C_BLACK);
+static void dennis(u8 *b, int x, int by, int s, int tt){         /* behind a desk: x centre, by = desk top.  The landlord: slicked hair, jowls, a cigar, a tie like a bar chart */
+  int bob = wv(tt, 50, 1) > 0, talk = wv(tt, 30, 1) > 0;
+  gfx_ell(b, x, by - 5 * s, 10 * s, 7 * s, C_SUIT2); gfx_ell(b, x, by - 6 * s, 9 * s, 6 * s, C_SUIT);                       /* shoulders, lit from above */
+  gfx_tri(b, x - 3 * s, by - 11 * s, x + 3 * s, by - 11 * s, x, by - 3 * s, C_WHITE);                                      /* shirt V */
+  gfx_tri(b, x - 4 * s, by - 11 * s, x - s, by - 11 * s, x - 3 * s, by - 3 * s, C_SUIT2); gfx_tri(b, x + 4 * s, by - 11 * s, x + s, by - 11 * s, x + 3 * s, by - 3 * s, C_SUIT2);   /* lapels */
+  gfx_tri(b, x - s, by - 11 * s, x + s, by - 11 * s, x, by - 4 * s, C_GOLD); gfx_rect(b, x - s / 2, by - 8 * s, s, s, C_GOLD2); gfx_rect(b, x - s / 2, by - 6 * s, s, s, C_GOLD2);   /* tie, striped */
+  gfx_rect(b, x - 6 * s, by - 7 * s, s, s, C_GOLD);                                                                         /* pocket square */
+  int hy = by - 15 * s - bob;
+  gfx_ell(b, x, hy + 2 * s, 5 * s, 4 * s, C_SKIN2);                                                                        /* jowls and a second chin, in shade */
+  gfx_ell(b, x, hy, 4 * s + s / 2, 4 * s, C_SKIN);                                                                          /* head */
+  gfx_ell(b, x - 4 * s, hy + s, s, s, C_SKIN); gfx_ell(b, x + 4 * s, hy + s, s, s, C_SKIN);                                  /* ears */
+  gfx_ell(b, x, hy - 3 * s, 4 * s + s / 2, 2 * s, C_BLACK); gfx_rect(b, x - 3 * s, hy - 4 * s, 3 * s, s / 2 + 1, C_DARK);      /* slicked hair with a shine */
+  gfx_rect(b, x - 3 * s, hy - 2 * s, 2 * s + 1, s / 2 + 1, C_BLACK); gfx_rect(b, x + s, hy - 2 * s, 2 * s + 1, s / 2 + 1, C_BLACK);   /* heavy brows */
+  gfx_line(b, x - 3 * s, hy - 2 * s, x - s, hy - s, C_BLACK); gfx_line(b, x + 3 * s, hy - 2 * s, x + s, hy - s, C_BLACK);    /* angry slant */
+  gfx_rect(b, x - 3 * s, hy - s / 2, 2 * s, s, C_WHITE); gfx_rect(b, x + s, hy - s / 2, 2 * s, s, C_WHITE);
+  gfx_rect(b, x - 2 * s, hy - s / 2, s, s, C_BLACK); gfx_rect(b, x + s, hy - s / 2, s, s, C_BLACK);                           /* beady eyes */
+  gfx_rect(b, x - s / 2, hy + s / 2, s, 2 * s, C_SKIN2);                                                                     /* nose */
+  gfx_rect(b, x - 3 * s, hy + s, 6 * s, s, C_HAIR);                                                                           /* moustache */
+  int m = talk ? 2 : 1; gfx_rect(b, x - 2 * s, hy + 2 * s, 4 * s, m * s, C_RED2); gfx_rect(b, x - 2 * s, hy + 2 * s, 4 * s, 1, C_WHITE);   /* mouth, flapping */
+  gfx_rect(b, x + 2 * s, hy + 2 * s, 4 * s, s, C_DIRT2); gfx_rect(b, x + 6 * s, hy + 2 * s, s, s, C_FIRE);                 /* cigar and its glow */
+  { int u = tt % 60; gfx_ell(b, x + 7 * s + u / 6, hy - u / 5, 1 + u / 14, 1 + u / 14, C_SMOKE); }                          /* a curl of smoke */
 }
 static void bpt(int p, int *x, int *y){                 /* a point on the rectangle (-40,-40)-(296,232) */
   const int w = 336, h = 272; p %= 2 * (w + h);
@@ -437,13 +452,31 @@ static void w_howl(u8 *b, int k, int tt){
   else if(k == 1){ moon(b, 128, 80, 30); gfx_rect(b, 0, 130, 256, 62, C_DARK); face(b, 128, 120, 16, GF_EARS | GF_FUR | GF_SNOUT | GF_HOWL); bubble(b, 128, 12, "A LOT. HE SAID A LOT.", 0); }
   else { gfx_rect(b, 0, 0, 256, 192, C_WALL1); gfx_rect(b, 0, 150, 256, 42, C_DIRT2); landlord(b, 128, 130, 10, tt, 1); int cr = tt > 20; gfx_rect(b, 150, 70, 10, 14, cr ? C_CLOUD2 : C_RED); gfx_rect(b, 154, 84, 2, 10, C_WHITE); if(cr) gfx_text_c(b, 160, 56, "CRACK!", C_GOLD, C_BLACK, 2); }
 }
-static void brenda(u8 *b, int x, int fy, int s, int t){      /* Brenda: yellow hair, a pink dress, a handbag, a smile that means business */
-  int bob = wv(t, 40, 1);
-  gfx_rect(b, x - 4 * s, fy - 10 * s, 3 * s, 10 * s, C_SKIN); gfx_rect(b, x + s, fy - 10 * s, 3 * s, 10 * s, C_SKIN);
-  gfx_tri(b, x - 7 * s, fy - 8 * s + bob, x + 7 * s, fy - 8 * s + bob, x, fy - 22 * s + bob, C_PINK); gfx_rect(b, x - 6 * s, fy - 10 * s + bob, 12 * s, 3 * s, C_PINK);
-  gfx_ell(b, x, fy - 28 * s + bob, 7 * s, 8 * s, C_GOLD); gfx_ell(b, x, fy - 26 * s + bob, 5 * s, 5 * s, C_SKIN);
-  gfx_rect(b, x - 2 * s, fy - 27 * s + bob, s, s, C_BLACK); gfx_rect(b, x + s, fy - 27 * s + bob, s, s, C_BLACK); gfx_rect(b, x - s, fy - 24 * s + bob, 2 * s, s, C_RED);
-  gfx_rect(b, x + 8 * s, fy - 14 * s, 4 * s, 4 * s, C_DIRT);
+static void brenda(u8 *b, int x, int fy, int s, int t){      /* Brenda: big yellow hair, a pink dress, a handbag, a smile that means business */
+  int bob = wv(t, 40, 1), hy = fy - 27 * s + bob;
+  gfx_ell(b, x, hy + s, 8 * s, 9 * s, C_GOLD2);                                                                              /* the hair behind, in shade */
+  gfx_ell(b, x - 7 * s, hy + 7 * s, 3 * s, 4 * s, C_GOLD2); gfx_ell(b, x + 7 * s, hy + 7 * s, 3 * s, 4 * s, C_GOLD2);        /* curls on the shoulders */
+  gfx_rect(b, x - 4 * s, fy - 10 * s, 2 * s, 10 * s, C_SKIN); gfx_rect(b, x + 2 * s, fy - 10 * s, 2 * s, 10 * s, C_SKIN);     /* legs */
+  gfx_rect(b, x - 4 * s, fy - s, 3 * s, s, C_RED); gfx_rect(b, x + s, fy - s, 3 * s, s, C_RED);                              /* heels */
+  gfx_rect(b, x - s, fy - 28 * s + bob + 8 * s, 2 * s, 3 * s, C_SKIN2);                                                       /* neck */
+  gfx_tri(b, x - 8 * s, fy - 8 * s + bob, x + 8 * s, fy - 8 * s + bob, x, fy - 22 * s + bob, C_PINK);                         /* skirt */
+  gfx_rect(b, x - 6 * s, fy - 12 * s + bob, 12 * s, 3 * s, C_PINK); gfx_rect(b, x - 6 * s, fy - 13 * s + bob, 12 * s, s, C_RED);   /* hem, belt */
+  gfx_rect(b, x - 5 * s, fy - 21 * s + bob, 10 * s, 8 * s, C_PINK); gfx_tri(b, x - 2 * s, fy - 21 * s + bob, x + 2 * s, fy - 21 * s + bob, x, fy - 18 * s + bob, C_SKIN);   /* bodice, neckline */
+  for(int i = 0; i < 4; i++) gfx_rect(b, x - 7 * s + i * 4 * s + (i & 1) * s, fy - 11 * s + bob + (i & 1) * s, s, s, C_WHITE);        /* polka dots on the hem */
+  int wave = wv(t, 24, 1);
+  gfx_rect(b, x - 7 * s, fy - 20 * s + bob, 2 * s, 7 * s, C_SKIN); gfx_rect(b, x + 5 * s, fy - 20 * s + bob - (wave > 0 ? s : 0), 2 * s, 7 * s, C_SKIN);   /* arms, one waving */
+  gfx_rect(b, x + 8 * s, fy - 14 * s + bob, 5 * s, 4 * s, C_DIRT); gfx_rect(b, x + 8 * s, fy - 14 * s + bob, 5 * s, s, C_DIRT2); gfx_rect(b, x + 10 * s, fy - 16 * s + bob, s, 2 * s, C_DIRT2);   /* the handbag, its strap */
+  gfx_ell(b, x, hy + s, 5 * s + s / 2, 6 * s, C_SKIN); gfx_ell(b, x, hy + 5 * s, 4 * s, s, C_SKIN2);                           /* face, a hint of chin shadow */
+  gfx_ell(b, x, hy - 4 * s, 7 * s, 3 * s, C_GOLD); gfx_tri(b, x - 6 * s, hy - 3 * s, x, hy - 3 * s, x - 5 * s, hy + 2 * s, C_GOLD); gfx_tri(b, x + 6 * s, hy - 3 * s, x, hy - 3 * s, x + 5 * s, hy + 2 * s, C_GOLD);   /* fringe */
+  gfx_rect(b, x - 3 * s, hy - 5 * s, s, s, C_WHITE);                                                                         /* a shine on the hair */
+  int blink = (t % 90) > 86;
+  gfx_rect(b, x - 3 * s, hy - s, 2 * s, blink ? 1 : s + 1, blink ? C_BLACK : C_WHITE); gfx_rect(b, x + s, hy - s, 2 * s, blink ? 1 : s + 1, blink ? C_BLACK : C_WHITE);
+  if(!blink){ gfx_rect(b, x - 2 * s, hy - s, s, s, C_BLACK); gfx_rect(b, x + s, hy - s, s, s, C_BLACK); }
+  gfx_line(b, x - 3 * s, hy - s, x - 4 * s, hy - 2 * s, C_BLACK); gfx_line(b, x + 3 * s, hy - s, x + 4 * s, hy - 2 * s, C_BLACK);    /* lashes */
+  gfx_rect(b, x - 3 * s, hy - 2 * s, 2 * s, 1, C_HAIR); gfx_rect(b, x + s, hy - 2 * s, 2 * s, 1, C_HAIR);                      /* brows */
+  gfx_ell(b, x - 4 * s, hy + 2 * s, s, s / 2 + 1, C_PINK); gfx_ell(b, x + 4 * s, hy + 2 * s, s, s / 2 + 1, C_PINK);            /* blush */
+  gfx_rect(b, x - 2 * s, hy + 3 * s, 4 * s, s, C_RED); gfx_rect(b, x - s, hy + 3 * s, s, 1, C_WHITE);                         /* lipstick, with a highlight */
+  gfx_rect(b, x - 3 * s, hy + 3 * s - 1, s, 1, C_RED); gfx_rect(b, x + 2 * s, hy + 3 * s - 1, s, 1, C_RED);                  /* the corners of the smile */
 }
 static void w_visit(u8 *b, int k, int tt){
   if(k == 0){ stars_night(b); night_hills(b, 150); gfx_rect(b, 150, 70, 60, 82, C_WALL3); gfx_rect(b, 164, 100, 32, 52, C_DIRT); gfx_ell(b, 192, 126, 2, 2, C_GOLD);

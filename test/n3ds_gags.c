@@ -20,6 +20,7 @@ void hidScanInput(void){} u32 hidKeysDown(void){ return 0; } u32 hidKeysHeld(voi
 void hidTouchRead(touchPosition *t){ (void)t; }
 bool aptMainLoop(void){ return false; }
 #define MX_TEST_NO_CUTSCENES 1
+int stub_snd_plays;
 #define main n3ds_main
 #include "../3ds/main.c"
 #undef main

@@ -44,6 +44,7 @@ int pvr_prim(void*p,int n){
       for(int y=y0;y<y1;y++)for(int x=x0;x<x1;x++){ if(x<0||y<0||x>=640||y>=480)continue; blend(x,y,(c>>16)&255,(c>>8)&255,c&255,a); }
     } else { tri(&q[0],&q[1],&q[2]); tri(&q[1],&q[3],&q[2]); } }
   return 0; }
+int stub_snd_plays;
 #define main dc_main_unused
 #include "../dreamcast/main.c"
 #undef main
@@ -51,7 +52,7 @@ static void dump(const char*fn){ FILE*f=fopen(fn,"wb"); fprintf(f,"P6\n640 480\n
 static void frame(const char*fn){ memset(fb,0,sizeof fb); cur_hdr=0; draw_all(); dump(fn); }
 static void tick(int calm){ mx_update(&world,DT); handle_events(); fx_step(calm,0); }
 int main(void){
-  gfx_init();
+  gfx_init(); sound_init(); if(!snd_ok){ puts("FAIL: dc sound did not initialise"); return 1; }
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
   memset(fb,0,sizeof fb); title_t=0; cur_hdr=0; draw_title(); dump("/tmp/dc_title.ppm"); title_t=40; cur_hdr=0; draw_title(); dump("/tmp/dc_title_blink.ppm");   /* the title, and the half of the blink with no PRESS START */
   { const int T[3] = { 30, 170, 330 }; for(int k = 0; k < 3; k++){ char fn[48]; snprintf(fn, sizeof fn, "/tmp/dc_tpan%d.ppm", k); memset(fb,0,sizeof fb); title_t = T[k]; cur_hdr=0; draw_title(); dump(fn); } }   /* the pan: logo end, mid glide, the man */
@@ -60,6 +61,7 @@ int main(void){
     for(int w = 0; w < 2; w++){ if(w) intro_start_wolf(); else intro_start(); int lastsc = -1, done = 0, f;
       for(f = 0; f < 6000 && !done; f++){ int dn = (f % 400 == 399) ? 1 : 0; done = intro_tick(dn, 0, 0);
         if(!done && (intro_scene() != lastsc || f % 150 == 149)){ lastsc = intro_scene(); char fn[64]; snprintf(fn, sizeof fn, "/tmp/dc_intro%d_%d_%d.ppm", w, lastsc, f); memset(fb, 0, sizeof fb); cur_hdr = 0; draw_intro(); dump(fn); } }
+      if(!stub_snd_plays){ puts("FAIL: dc cutscene played no sound"); return 1; }
       printf("dc intro %s: %s after %d frames, %d scenes\n", w ? "wolf" : "origin", done ? "finished" : "NOT finished", f, intro_count()); }
     return 0; }
   load_level(4);
@@ -96,4 +98,4 @@ int main(void){
     for(int i=0;i<400;i++){ tick(0); if(world.cases[0].active || world.cases[1].active){ frame("/tmp/dc_l26b.ppm"); break; } }
   }
   world.state = MX_WIN; frame("/tmp/dc_win.ppm"); world.state = MX_LOSE; frame("/tmp/dc_lose.ppm");
-  return 0; }
+  printf("%s dc sound effects played during the run: %d\n", stub_snd_plays > 3 ? "ok:" : "FAIL:", stub_snd_plays); return stub_snd_plays > 3 ? 0 : 1; }

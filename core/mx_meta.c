@@ -144,6 +144,14 @@ void mx_outfit_shades(int i, uint8_t out[6][3]){
   }
 }
 
+int mx_outfit_skin(int i, uint8_t out[4][3]){
+  static const uint8_t SKIN[4][3] = { {244,183,142}, {205,135,100}, {255,215,180}, {226,160,118} };
+  static const uint8_t FUR[4][3]  = { {140,144,158}, {101,105,121}, {185,189,201}, {120,124,139} };    /* the browser's setFur() greys */
+  int fur = (unsigned)i % MX_NUM_OUTFITS == 12;
+  for(int k = 0; k < 4; k++) for(int c = 0; c < 3; c++) out[k][c] = fur ? FUR[k][c] : SKIN[k][c];
+  return fur;
+}
+
 /* ------------------------------------------------------------------ save blob (layout: see mx_meta.h) */
 uint32_t mx_crc32(const uint8_t *p, int n){
   uint32_t c = 0xFFFFFFFFu;

@@ -44,6 +44,8 @@ static inline int mx_ach_unlocked(const MxStats *s, int i){ return (int)((s->ach
 int mx_valve_unlocked(const MxStats *s);
 /* the six palette colours an outfit changes: boxers, boxers dark, boxers highlight, towel, towel stripes, towel shade */
 void mx_outfit_shades(int i, uint8_t out[6][3]);
+/* the four skin shades of the man sprites (palette entries 1..4 of art/manspr.h: base, shadow, highlight, mid): his pink skin, or the Wolfman's grey fur */
+int mx_outfit_skin(int i, uint8_t out[4][3]);      /* returns 1 when the outfit is furry */
 
 /* ---- options (port 13): kept by each front-end, saved in the blob (version 2).  Default = off / air valve, the browser's defaults. ---- */
 enum { MX_TOOL_NONE, MX_TOOL_VALVE, MX_TOOL_BEANS, MX_TOOL_TOWEL, MX_TOOL_SPLAT, MX_NUM_TOOLS };   /* appended, never inserted (stored as an index); Burpbuster is slot 5 when port 14 lands */

@@ -17,4 +17,14 @@ void gfxInitDefault(void); void gfxSetDoubleBuffering(gfxScreen_t, bool); u8 *gf
 void gfxSet3D(bool); void gfxFlushBuffers(void); void gfxSwapBuffers(void); void gspWaitForVBlank(void); void gfxExit(void);
 bool aptMainLoop(void); void hidScanInput(void); u32 hidKeysDown(void); u32 hidKeysHeld(void); u32 hidKeysUp(void);
 void hidTouchRead(touchPosition *); float osGet3DSliderState(void);
+/* DSP audio: record what the game asks for so the tests can see sound being played */
+typedef struct { const void *data_vaddr; uint32_t nsamples; } ndspWaveBuf;
+enum { NDSP_OUTPUT_STEREO, NDSP_INTERP_LINEAR, NDSP_FORMAT_MONO_PCM16 };
+extern int stub_snd_plays;
+static inline int ndspInit(void){ return 0; } static inline void ndspExit(void){} static inline void ndspSetOutputMode(int m){ (void)m; }
+static inline void ndspChnReset(int c){ (void)c; } static inline void ndspChnSetInterp(int c, int i){ (void)c; (void)i; } static inline void ndspChnSetRate(int c, float r){ (void)c; (void)r; }
+static inline void ndspChnSetFormat(int c, int f){ (void)c; (void)f; } static inline void ndspChnSetMix(int c, float *m){ (void)c; (void)m; } static inline void ndspChnWaveBufClear(int c){ (void)c; }
+static inline void ndspChnWaveBufAdd(int c, ndspWaveBuf *w){ (void)c; (void)w; stub_snd_plays++; }
+#include <stdlib.h>
+static inline void *linearAlloc(size_t n){ return malloc(n); } static inline void DSP_FlushDataCache(const void *p, uint32_t n){ (void)p; (void)n; }
 #endif
