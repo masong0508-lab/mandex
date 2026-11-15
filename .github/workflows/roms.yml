@@ -57,12 +57,9 @@ jobs:
           source "$ENV_SH"
           make -C dreamcast
           cd dreamcast
-          echo "--- mkdcdisc help (the plain .cdi it makes is ~740 MB of padding, so look for a way to avoid that)"
-          mkdcdisc --help 2>&1 | sed -n "40,200p" || true
-          mkdcdisc -e mandex.elf -o mandex.cdi -n MANDEX 2>&1 | tail -20
+          # -N: no data track padding (the default pads the .cdi out to ~740 MB just to optimise loading speed; the game is ~5 MB)
+          mkdcdisc -N -e mandex.elf -o mandex.cdi -n MANDEX 2>&1 | tail -20
           ls -la mandex.elf mandex.cdi
-          # a compact image: strip the ELF to a raw binary, then make a small selfboot disc (ISO data track only, a few MB) when the tools exist
-          for t in mkisofs genisoimage xorriso makeip scramble sh-elf-objcopy mksdiso mkgdi; do echo "$t: $(command -v $t || echo -)"; done
       - uses: actions/upload-artifact@v4
         with:
           name: rom-dreamcast
