@@ -2909,7 +2909,7 @@ function drawTitle(){
 // =====================================================================
 function pt(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
 function retry(){load(level,CL&&CL.custom?CL:undefined)}
-function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else{state='ending';endScroll=0;hits=[]}}
+function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else if(level+1===CH1)startCutEnd(1);else if(level+1===CH2)startCutEnd(2);else{state='ending';endScroll=0;hits=[]}}
 let endScroll=0;
 const CREDITS=['MANDEX','THE LANDLORD SMASHER','','Every landlord has been evicted.','The neighbourhood is free.','Rent is cancelled.','','STARRING','The Man  -  as himself','His Towel  -  as the cape','The Belly  -  stunts and special effects','','LANDLORDS HARMED','all of them','','Thank you for playing!'];
 function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);endScroll+=frameDt*26;const PT=W<700,cx=PT?W/2:W/2+190;
@@ -3581,6 +3581,79 @@ const CUT3=[
    const z=Math.min(1,t*2.2);ctx.save();ctx.translate(480,100);ctx.scale(.6+.4*z,.6+.4*z);ctx.rotate(-.04);txt('THE WOLFMAN',0,10,72,'#fff','center','#1a1030');ctx.restore();
    cutGerald(480,420,2.5,{wolf:true,face:'cool',pose:'flex',armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]})}}
 ];
+// ---------- CLOSING CUTSCENES: they play after the last level of chapter 1 (Mandex Manor) and of chapter 2 (Landlord HQ), before the credits ----------
+function cgRubble(x,gy,s,seed){ctx.save();ctx.translate(x,gy);ctx.scale(s,s);cgShadow(0,2,150,10,.3);
+  for(let i=0;i<14;i++){const a=cgRnd(seed+i),b=cgRnd(seed+i+30),bx=(a-.5)*250,bw=26+b*44,bh=14+cgRnd(seed+i+60)*34,by=-bh*(1-Math.abs(a-.5)*1.2)-i%3*10;
+    cgP([bx,by,bx+bw*.5,by-bh*.4,bx+bw,by+2,bx+bw*.9,by+bh,bx+bw*.1,by+bh],i%3?'#8a6a58':'#a4553a',2);cgLine(bx+bw*.15,by+bh*.4,bx+bw*.8,by+bh*.35,'rgba(60,20,10,.35)',1.4)}
+  ctx.restore()}
+function cgSmoke(x,gy,t,n){ctx.save();for(let i=0;i<n;i++){const ph=(t*.25+i/n)%1,px=x+Math.sin(ph*5+i)*26*ph+(i-n/2)*8,py=gy-ph*230;ctx.globalAlpha=(1-ph)*.42;cgE(px,py,16+ph*40,14+ph*30,'#bdb6aa')}ctx.restore()}
+function cgFolk(x,gy,t,col,sign){const b=Math.abs(Math.sin(t*7+x))*5;ctx.save();ctx.translate(x,gy-b);cgShadow(0,b+2,16,4,.3);cgR(-9,-30,18,30,col,2,5);cgE(0,-40,10,10,'#f4b78e',2);cgE(-3.5,-42,1.6,1.8,'#2b1810');cgE(3.5,-42,1.6,1.8,'#2b1810');ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(0,-37,4,.2,2.9);ctx.stroke();
+  cgLine(-8,-26,-16,-48-Math.sin(t*9+x)*6,'#f4b78e',5);cgLine(8,-26,16,-48+Math.sin(t*9+x)*6,'#f4b78e',5);
+  if(sign){ctx.save();ctx.translate(18,-66);ctx.rotate(.12*Math.sin(t*5+x));cgR(-30,-18,60,32,'#fbf8ee',2,3);txt(sign,0,2,12,'#c43a3a','center');cgLine(0,14,0,34,'#8a6a42',3);ctx.restore()}ctx.restore()}
+function cgConfetti(t,n){ctx.save();for(let i=0;i<n;i++){const ph=(t*.55+cgRnd(i)*3)%1,x=cgRnd(i+9)*W+Math.sin(t*3+i)*24,y=-20+ph*(H+40);ctx.save();ctx.translate(x,y);ctx.rotate(t*5+i);ctx.fillStyle=['#ffd23f','#ff7eb0','#7dff5a','#6ab8ff','#fff'][i%5];ctx.fillRect(-4,-2,8,4);ctx.restore()}ctx.restore()}
+function cgStars(t,n,ymax){for(let i=0;i<n;i++)cgE(cgRnd(i)*W,cgRnd(i+50)*ymax,1+cgRnd(i+9)*1.2*(.6+.4*Math.sin(t*3+i)),1.2,'#fff')}
+function cgTower(x,gy,lean,fall,t){ctx.save();ctx.translate(x,gy);ctx.rotate(lean);const tw=150,th=285*(1-fall*.55);
+  cgR(-tw/2,-th,tw,th,cgLG(-tw/2,0,tw/2,0,[0,'#6a6a7e',.5,'#8a8aa0',1,'#55556a']),3);
+  for(let r=0;r<7;r++)for(let c=0;c<4;c++){const lit=cgRnd(r*4+c)>.35;cgR(-tw/2+14+c*34,-th+22+r*44,22,28,lit?'#ffe9a8':'#2a2a3a',1.6)}
+  cgR(-tw/2-10,-th-18,tw+20,20,'#3a3a4c',3);txt('LANDLORD HQ',0,-th-30,18,'#ffd23f','center','#000');ctx.restore()}
+const CUT_E1=[
+ // 1. the manor is gone
+ {shirt:0,lines:["The manor came down in eleven seconds.","Gerald stood on top of it for the other four hours. For the view.","Somewhere under the bricks, a top hat gave up."],hl:1,cuts:[0,2.6],tr:'fade',hold:3.4,shake:[0,4],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
+   cgSky('#ff8a4a','#ffe0a8',395);cgSun(780,150,50,t);cgHills(395,'#b86a5a','#9a5a50','#7a4a44');cutCloud(180+t*5,90,1.1,'#ffd9b0');cutCloud(560+t*3,60,.8,'#ffd9b0');cgGrass(395,145,'#6a9a56','#365a30');
+   cgSmoke(300,395,t,6);cgSmoke(640,395,t+.5,5);
+   if(k===0){cgRubble(480,420,2.2,3);cutGerald(470,300,1.9,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]});if(t>1.4)cutBubble(690,170,"...is that all of it?",0)}
+   else{cgRubble(300,430,2.5,9);ctx.save();ctx.translate(700,396);ctx.scale(1,1);cgLord(0,0,3.2,t,0);ctx.restore();cutGerald(260,330,1.9,{face:'cool',pose:'up',shirt:0});
+     const w=Math.min(1,u*2);ctx.save();ctx.translate(700,170);ctx.rotate(Math.sin(t*6)*.12);cgLine(0,0,0,100,'#8a6a42',4);cgP([0,0,56*w,-6,52*w,26,0,22],'#fff',2);ctx.restore();
+     if(u>.8)cutBubble(560,130,"I surrender. Also: I'm just a man in a hat.",1,18)}}},
+ // 2. the street cheers
+ {shirt:0,lines:["Word got round the street faster than a rent increase.","Brenda brought the neighbours. The neighbours brought signs.","Gerald brought the belly, as requested."],hl:2,cuts:[0,2.2,4.2],tr:'wipe',hold:3.4,shake:[0,3,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
+   cgSky('#ff9a5a','#fff0c0',395);cgSun(160,130,44,t);cgHills(395,'#c47a6a','#a86a5c','#8a5a50');cgGrass(395,145,'#79c26a','#3f8a3c');cgRoad(395);cgConfetti(t,40);
+   const cols=['#2a4d9c','#c43a3a','#2a9c6a','#9c6a2a','#6a3a9c'],signs=['EVICT!','NO RENT','THANKS','GO MANDEX','FREE!'];
+   for(let i=0;i<7;i++)cgFolk(90+i*130+(k===0?0:-30),414+(i%2)*14,t+i*.3,cols[i%5],i%2?signs[i%5]:null);
+   if(k===0){ctx.save();ctx.translate(480,300);ctx.scale(1.5,1.5);cgBrenda(0,0,t);ctx.restore();cutGerald(700,420,2.2,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]});cutBubble(350,150,"You did it, Gerald!",1)}
+   else if(k===1){cutGerald(480,470,3.4,{face:'kiss',pose:'up',shirt:0});ctx.save();ctx.translate(250,330);ctx.scale(2.2,2.2);cgBrenda(0,0,t);ctx.restore();for(let i=0;i<5;i++){const ph=(t*.6+i*.2)%1;cgSpark(340+i*40,260-ph*140,7,'#ff6fa8')}cutBubble(700,150,"For the neighbourhood.",0);if(u>1.2)cutBubble(250,130,"For the BELLY.",1)}
+   else{cutGerald(480,470,3.2,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]});cutBubble(720,150,"RENT IS CANCELLED!",0,22)}}},
+ // 3. the letter
+ {shirt:0,lines:["Thump. The mailbox coughed up a metal tube.","Inside: one letter, on very expensive paper.","\"We noticed. Come to the office. Bring the belly.\""],hl:2,cuts:[0,1.6,3.4],tr:'iris',hold:3.8,shake:[0,6,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
+   cgSky('#2a2f55','#9a7a9a',395);cgStars(t,30,260);cgHills(395,'#2a2f50','#222644','#1a1e38');cgGrass(395,145,'#2f4a3a','#16261c');cgMailbox(300,420);
+   if(k===0){cutGerald(660,420,2.2,{face:'cool',pose:'up',shirt:0});const pop=Math.min(1,u*3);if(u>.1)cutFlag(1,()=>SFX.thud(.6));ctx.save();ctx.translate(318,340-pop*40+pop*pop*40);ctx.rotate(-.5+pop*.4);cgR(-30,-9,60,18,'#9aa0b0',2,9);cgR(-26,-4,52,4,'rgba(255,255,255,.5)',0);ctx.restore();cutBubble(560,170,"...that's not mail.",1)}
+   else if(k===1){cgR(230,48,500,310,'rgba(0,0,0,.55)',2,12);cgR(250,64,460,280,'#fbf8ee',2.6,6);txt('LANDLORD HQ',480,108,32,'#7a1a1a','center');cgLine(280,124,680,124,'#c43a3a',3);txt('Dear Mr. Fitzgerald,',480,160,19,'#333','center');txt('Your work has been noticed.',480,192,19,'#333','center');txt('Your paperwork has not been filed.',480,224,19,'#333','center');txt('Please report to HQ.',480,256,19,'#333','center');
+     if(u>.9){ctx.save();ctx.translate(600,310);ctx.rotate(-.2);cgR(-60,-20,120,40,'rgba(196,58,58,.12)',3,6,'#c43a3a');txt('URGENT',0,8,24,'#c43a3a','center');ctx.restore()}}
+   else{cutGerald(480,470,3.4,{face:'sad',pose:'up',shirt:0});cutBubble(740,150,"Do they validate parking?",0)}}},
+ // 4. title card
+ {shirt:0,lines:["CHAPTER 1 COMPLETE","Every landlord on Maple Street has been evicted.","Next: the paperwork. So much paperwork."],hl:0,cuts:[0],tr:'white',hold:4,shake:[6],draw(t){
+   cgSky('#2a2f55','#ff9a5a',395);cgSun(480,300,70,t);for(let i=0;i<12;i++){ctx.save();ctx.translate(480,300);ctx.rotate(i*.52+t*.08);ctx.fillStyle='rgba(255,230,140,.12)';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(900,-34);ctx.lineTo(900,34);ctx.closePath();ctx.fill();ctx.restore()}
+   cgConfetti(t,36);const z=Math.min(1,t*2.2);ctx.save();ctx.translate(480,100);ctx.scale(.6+.4*z,.6+.4*z);ctx.rotate(-.03);txt('CHAPTER 1',0,10,64,'#ffd23f','center','#7a1a1a');txt('COMPLETE',0,70,40,'#fff','center','#7a1a1a');ctx.restore();
+   cutGerald(480,470,2.6,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]})}}
+];
+const CUT_E2=[
+ // 1. the tower comes down
+ {shirt:0,lines:["Landlord HQ had forty floors, three districts and a plant called Kevin.","It had a lobby fountain, a gift shop, and no insurance.","It leaned. It thought about it. It came down."],hl:2,cuts:[0,2.4,4.2],tr:'fade',hold:3.6,shake:[0,10,18],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
+   cgSky('#3a2a5a','#ff8a5a',395);cgSun(200,300,60,t);cgHills(395,'#4a3a5a','#3a2e4a','#2a2238');ctx.fillStyle='#1c1830';ctx.fillRect(0,395,W,H-395);cgRoad(395);
+   const lean=k===0?0:k===1?.02+u*.05:.12+(t-4.2)*.4,fall=k<2?0:Math.min(1,(t-4.2)*.9);
+   cgTower(620,396,Math.min(lean,.9),fall,t);if(k===2){cgDebris(t,396,22);cgSmoke(620,396,t,8)}
+   if(k===0)cutGerald(220,400,1.7,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46],armL:[-40,-22,-46,-46]});
+   else if(k===1){cutGerald(220,400,1.7,{face:'cool',pose:'up',shirt:0});cutFlag(1,()=>SFX.thud(.7));cutBubble(420,150,"Timber?",0)}
+   else{cutGerald(220,400,1.7,{face:'cool',pose:'flex',shirt:0});cutFlag(2,()=>{SFX.whoosh();SFX.thud(1)});cutBubble(420,130,"...Timber.",0)}}},
+ // 2. the boss in the dust
+ {shirt:0,lines:["The Head Landlord crawled out of the lobby, carrying his mug.","\"WORLD'S OKAYEST LANDLORD\", it said. It was still full.","He took a sip. It was cold. It had always been cold."],hl:2,cuts:[0,2.4],tr:'wipe',hold:3.6,shake:[0,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
+   cgSky('#4a3a5a','#c86a5a',395);cgSmoke(300,395,t,7);cgSmoke(720,395,t+.4,7);cgGrass(395,145,'#4a5a4a','#222c22');cgRubble(240,420,2.4,21);cgRubble(780,430,2.2,5);
+   if(k===0){cgLord(560,400,3.6,t,0);ctx.save();ctx.translate(640,300);ctx.rotate(-.1);cgR(-24,-30,48,44,'#fbf8ee',2.4,6);cgR(24,-20,14,24,'none',2.4,7);txt('OKAYEST',0,-8,9,'#333','center');txt('LANDLORD',0,3,9,'#333','center');ctx.restore();cutBubble(380,160,"My... paperwork.",1)}
+   else{ctx.save();ctx.translate(480,430);ctx.scale(4.6,4.6);drawLandlordScared(t);ctx.restore();if(u>.6)cutBubble(300,130,"Is Gerald still out there?",1);if(u>1.7)cutBubble(700,160,"I can hear the belly.",0)}}},
+ // 3. the street at dusk, and the moon
+ {shirt:0,lines:["The neighbourhood threw a party. Dennis from accounts cried quietly.","Gerald ate one slice of pizza. Then another. Then Dennis's.","Above the rubble, something large and pale was rising."],hl:2,cuts:[0,2.4,4.6],tr:'iris',hold:3.8,shake:[0,0,5],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
+   cgSky('#2a2250','#c86a6a',395);cgStars(t,34,220);const mr=k<2?46:46+(t-4.6)*50;cgMoon(k<2?820:560,k<2?300:260,Math.min(mr,150),t);cgHills(395,'#3a2e5a','#2a2248','#1c1634');cgGrass(395,145,'#3a4a3a','#18221a');cgConfetti(t,20);
+   for(let i=0;i<6;i++)cgFolk(70+i*140,420+(i%2)*12,t+i*.4,['#2a4d9c','#c43a3a','#2a9c6a','#9c6a2a','#6a3a9c','#9c3a6a'][i],i%3===0?'PARTY':null);
+   if(k===0){cutGerald(480,430,2.3,{face:'cool',pose:'up',shirt:0});cgPizza(580,418,3);cutBubble(700,160,"Best pizza of my life.",0)}
+   else if(k===1){cutGerald(480,430,2.5,{face:'cool',pose:'flex',shirt:0});cutBubble(700,150,"Eviction complete.",0)}
+   else{cutGerald(380,440,2.6,{face:'sad',pose:'up',shirt:0});cutBubble(260,130,"...Huh. Weird moon.",1);if(u>1.4)cgHowl(u,720,310)}}},
+ // 4. title card
+ {shirt:0,lines:["CHAPTER 2 COMPLETE","Landlord HQ is now a very large rubble pile with a gift shop.","Next: the moon. It has opinions."],hl:0,cuts:[0],tr:'white',hold:4,shake:[6],draw(t){
+   cgSky('#1c1840','#6a3a8a',395);cgStars(t,40,300);cgMoon(480,300,120,t);for(let i=0;i<12;i++){ctx.save();ctx.translate(480,300);ctx.rotate(i*.52+t*.08);ctx.fillStyle='rgba(255,240,170,.1)';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(900,-34);ctx.lineTo(900,34);ctx.closePath();ctx.fill();ctx.restore()}
+   const z=Math.min(1,t*2.2);ctx.save();ctx.translate(480,100);ctx.scale(.6+.4*z,.6+.4*z);ctx.rotate(-.03);txt('CHAPTER 2',0,10,64,'#ffd23f','center','#2a1048');txt('COMPLETE',0,70,40,'#fff','center','#2a1048');ctx.restore();
+   cutGerald(480,470,2.6,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]})}}
+];
+function startCutEnd(c){CUTS=c===1?CUT_E1:CUT_E2;cutDone=()=>{state='ending';endScroll=0;hits=[]};state='cutscene';cutI=0;cutT=0;cutFx=0;hits=[]}
 function startCut3(){CUTS=CUT3;cutDone=()=>{PD.seenWolf=true;pdTouch();pdSave();load(CH2)};state='cutscene';cutI=0;cutT=0;cutFx=0;hits=[]}
 function drawCutscene(){
   const sc=CUTS[cutI],cs=cutCam(cutI,cutT);ctx.save();ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);ctx.translate(-cs.x,-cs.y);sc.draw(cutT);ctx.restore();cutDust(cutT);cutVig();
