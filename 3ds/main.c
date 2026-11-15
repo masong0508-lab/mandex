@@ -269,23 +269,48 @@ static float g_pan, g_sl; static int g_sgn;   /* eye sign and slider, so layers 
 #define LD(D) ((int)lroundf(g_sgn * (D) * g_sl * 0.5f))
 static float g_pan_unused;                              /* camera drift in px: follows the man, each layer scrolls by its own fraction */
 static void star(Scr *s, int cx, int cy, int r, u32 c);
-static void hills(Scr *s, int base, int ox, int step, int r, int amp, int col0, int col1, int col2){
-  for(int k = -2; k < s->w / step + 3; k++){ int x = ox + k * step, h = ((k * 37 + 11) & 7) * amp / 7;
-    disc(s, x, base - h + r / 2, r, (k & 1) ? col1 : col0);
-    disc(s, x - r / 6, base - h + r / 2 + 3, r - 4, (k & 1) ? col0 : col1); }                              /* a softer inner lobe gives the crest a lit rim */
-  rect(s, 0, base + r / 2, s->w, s->h, col2);
+static unsigned hsh_(int a, int b){ unsigned h = (unsigned)a * 374761393u + (unsigned)b * 668265263u; h = (h ^ (h >> 13)) * 1274126177u; return h ^ (h >> 16); }
+/* world px (web: 8 per cell) -> screen */
+#define WXS(v, wx) ((v)->ox + (int)floorf(((wx) / 8.0f - (v)->cx) * (v)->ppc))
+static void ridge(const View *v, int gy, int dx, int kind, u32 top, u32 bot){      /* a hill line from the web's sine sums, two-tone */
+  Scr *s = v->s; float k = v->ppc / 8.0f;
+  for(int x = 0; x < s->w; x += 2){
+    float wx = ((x - dx - v->ox) / k) + v->cx * 8, h;
+    if(kind == 0) h = 120 + sinf(wx * .007f + 1) * 55 + sinf(wx * .021f) * 18;
+    else if(kind == 1) h = 70 + sinf(wx * .011f + 3) * 38 + sinf(wx * .04f) * 8;
+    else h = 30 + sinf(wx * .013f) * 18;
+    int y0 = gy - (int)(h * k); if(y0 < 0) y0 = 0;
+    int mid = y0 + (gy - y0) * 2 / 5;
+    rect(s, x, y0, 2, mid - y0, top); rect(s, x, mid, 2, gy - mid, bot);
+  }
 }
 static void draw_sky(const View *v){
-  Scr *s = v->s; int gy = VY(v, MX_ROWS);
-  for(int y = 0; y < s->h; y += 2){ int t = y * 90 / s->h; rect(s, 0, y, s->w, 2, RGB(86 + t * 5 / 8, 164 + t * 5 / 8, 242 - t / 4)); }
-  { int sx = 330 + LD(10) - (int)(g_pan * .02f); disc(s, sx, 44, 46, RGB(170, 215, 250)); disc(s, sx, 44, 36, RGB(205, 232, 250)); disc(s, sx, 44, 28, RGB(240, 244, 225)); disc(s, sx, 44, 22, RGB(255, 245, 190)); }   /* sun with a glow */                              /* sun: almost at infinity */
-  for(int k = 0; k < 5; k++){ int cx = LD(-2 * (k & 1)) + ((k * 97 + (int)(frame * (.12f + .05f * (k & 1))) - (int)(g_pan * .06f)) % 480) - 40;   /* drifting clouds */
-    int cy = 30 + (k * 23) % 60; disc(s, cx, cy + 3, 13, RGB(214, 226, 244)); disc(s, cx + 12, cy + 6, 9, RGB(214, 226, 244)); disc(s, cx, cy, 14, RGB(250, 252, 255)); disc(s, cx + 14, cy + 3, 11, RGB(244, 248, 255)); disc(s, cx - 13, cy + 4, 10, RGB(244, 248, 255)); }
-  hills(s, gy - 30, v->ox + LD(-8) - (int)(g_pan * .10f), 120, 70, 28, RGB(146, 184, 216), RGB(156, 192, 220), RGB(146, 184, 216));   /* far hills, hazed toward the sky */
-  hills(s, gy - 14, v->ox + LD(-4) - (int)(g_pan * .22f), 90, 52, 18, RGB(95, 150, 150), RGB(105, 160, 150), RGB(95, 150, 150));     /* near hills */
-  for(int y = gy, k = 0; y < s->h; y += 10, k++){ int d = k > 8 ? 8 : k; rect(s, 0, y, s->w, 10, RGB(100 - d * 3, 68 - d * 3, 40 - d * 2)); }   /* soil darkens with depth */
-  for(int x = -((int)g_pan % 23); x < s->w; x += 23) for(int k = 0; k < 4; k++){ int yy = gy + 6 + k * 13 + ((x * 5 + k * 3) & 7), xx = x + k * 9 + ((k * 11) & 7); rect(s, xx, yy, 3, 2, RGB(78, 52, 30)); px(s, xx + 1, yy - 1, RGB(128, 96, 62)); }   /* pebbles and roots */
-  rect(s, 0, gy - 2, s->w, 4, RGB(70, 170, 70)); rect(s, 0, gy - 3, s->w, 1, RGB(150, 224, 110)); rect(s, 0, gy + 2, s->w, 2, RGB(44, 110, 48));
+  Scr *s = v->s; int gy = VY(v, MX_ROWS); float k = v->ppc / 8.0f;
+  for(int y = 0; y < gy; y += 2){ float t = (float)y / (gy > 1 ? gy : 1), r, g, b;           /* #3d8fe8 -> #8ccaf7 -> #ffeccb: the web's warm horizon */
+    if(t < .55f){ float u = t / .55f; r = 61 + (140 - 61) * u; g = 143 + (202 - 143) * u; b = 232 + (247 - 232) * u; } else { float u = (t - .55f) / .45f; r = 140 + (255 - 140) * u; g = 202 + (236 - 202) * u; b = 247 + (203 - 247) * u; }
+    rect(s, 0, y, s->w, 2, RGB((int)r, (int)g, (int)b)); }
+  if(gy < s->h) rect(s, 0, gy, s->w, s->h - gy, RGB(100, 68, 40));
+  { int sx = 330 + LD(10) - (int)(g_pan * .02f); disc(s, sx, 44, 46, RGB(190, 226, 250)); disc(s, sx, 44, 36, RGB(222, 238, 244)); disc(s, sx, 44, 28, RGB(252, 246, 214)); disc(s, sx, 44, 22, RGB(255, 245, 190)); }   /* sun with a glow */
+  for(int c = 0; c < 5; c++){ int cx = LD(-2 * (c & 1)) + ((c * 97 + (int)(frame * (.12f + .05f * (c & 1))) - (int)(g_pan * .06f)) % 480) - 40;   /* drifting clouds */
+    int cy = 30 + (c * 23) % 60; disc(s, cx, cy + 3, 13, RGB(214, 226, 244)); disc(s, cx + 12, cy + 6, 9, RGB(214, 226, 244)); disc(s, cx, cy, 14, RGB(250, 252, 255)); disc(s, cx + 14, cy + 3, 11, RGB(244, 248, 255)); disc(s, cx - 13, cy + 4, 10, RGB(244, 248, 255)); }
+  ridge(v, gy, LD(-8), 0, RGB(156, 180, 220), RGB(176, 201, 232));        /* far mountains, hazed */
+  for(int wx = 0; wx <= 960; wx += 24){ float h = 120 + sinf(wx * .007f + 1) * 55 + sinf(wx * .021f) * 18; if(h > 150){ int x = WXS(v, wx) + LD(-8), y = gy - (int)(h * k); rect(s, x - 2, y + (int)(10 * k) - 1, 5, 2, RGB(230, 238, 250)); rect(s, x - 1, y + (int)(2 * k), 3, 2, RGB(244, 248, 255)); } }   /* snow caps */
+  ridge(v, gy, LD(-4), 1, RGB(150, 178, 214), RGB(170, 198, 230));
+  for(int wx = 0; wx < 960; wx += 26){ int h = 22 + (int)(hsh_(wx, 7) % 46); int x = WXS(v, wx) + LD(-4), y = gy - (int)((48 + h * .6f) * k); rect(s, x, y, (int)(18 * k) + 1, gy - y, RGB(162, 190, 222));
+    for(int wy = y + 3; wy < gy - 6; wy += 4) if(hsh_(wx, wy) & 1) rect(s, x + 2, wy, 2, 2, RGB(190, 214, 236)); }   /* distant city, with lit windows */
+  ridge(v, gy, 0, 2, RGB(142, 208, 112), RGB(90, 168, 84));                                                       /* rolling green hills */
+  for(int wx = 14; wx < 960; wx += 58 + (int)(hsh_(wx, 3) % 40)){ if(wx > 520 && wx < 880) continue;           /* round trees */
+    float hh = 22 + sinf(wx * .013f) * 18, sc = .8f + (hsh_(wx, 1) % 5) * .12f; int x = WXS(v, wx), y = gy - (int)(hh * k); u32 lc = (hsh_(wx, 2) & 1) ? RGB(63, 158, 74) : RGB(76, 174, 80);
+    rect(s, x - (int)(3 * k), y - (int)(8 * sc * k), (int)(6 * k) + 1, (int)(12 * sc * k), RGB(107, 74, 43));
+    disc(s, x, y - (int)(20 * sc * k), (int)(16 * sc * k), lc); disc(s, x - (int)(10 * sc * k), y - (int)(12 * sc * k), (int)(11 * sc * k), lc); disc(s, x + (int)(10 * sc * k), y - (int)(12 * sc * k), (int)(11 * sc * k), lc);
+    disc(s, x - (int)(4 * sc * k), y - (int)(24 * sc * k), (int)(7 * sc * k), RGB(96, 196, 98)); }
+  for(int y = gy, c = 0; y < s->h; y += 10, c++){ int d = c > 12 ? 12 : c; rect(s, 0, y, s->w, 10, RGB(123 - d * 4, 84 - d * 3, 52 - d * 2)); }   /* soil #7b5434 -> #4d311d */
+  for(int x = -((int)g_pan % 23); x < s->w; x += 23) for(int c = 0; c < 4; c++){ int yy = gy + 6 + c * 13 + ((x * 5 + c * 3) & 7), xx = x + c * 9 + ((c * 11) & 7); rect(s, xx, yy, 3, 2, RGB(78, 52, 30)); px(s, xx + 1, yy - 1, RGB(138, 132, 120)); }   /* pebbles */
+  rect(s, 0, gy - 2, s->w, 4, RGB(79, 156, 59)); rect(s, 0, gy - 3, s->w, 1, RGB(105, 187, 79)); rect(s, 0, gy + 2, s->w, 2, RGB(44, 110, 48));
+  for(int wx = 0; wx < 960; wx += 5){ if(wx % 3 == 0) continue; int x = WXS(v, wx), h = 3 + (int)(hsh_(wx, 6) % 5); if(x >= 0 && x < s->w) rect(s, x, gy - h + 2, 2, h, (hsh_(wx, 5) & 1) ? RGB(63, 138, 49) : RGB(95, 177, 74)); }   /* grass blades */
+  for(int c = 0; c < 30; c++){ int wx = (int)(hsh_(c, 31) % 960); if(wx > 40 && wx < 200) continue; static const u32 fl[3] = {RGB(255, 107, 138), RGB(255, 210, 63), RGB(255, 255, 255)}; rect(s, WXS(v, wx), gy - 2, 2, 2, fl[c % 3]); }   /* flowers */
+  for(int wx = 300; wx < 560; wx += 18){ int x = WXS(v, wx), w = (int)(8 * k), top = gy - (int)(20 * k); rect(s, x, top, w + 1, (int)(22 * k), RGB(138, 122, 90)); rect(s, x + 1, top + 1, w - 1, (int)(22 * k) - 2, RGB(232, 220, 196)); }   /* the picket fence */
+  rect(s, WXS(v, 300), gy - (int)(14 * k), (int)(260 * k), (int)(4 * k) + 1, RGB(232, 220, 196)); rect(s, WXS(v, 300), gy - (int)(6 * k), (int)(260 * k), (int)(4 * k) + 1, RGB(232, 220, 196));
 }
 static void draw_fore(const View *v){               /* grass blades and a fence post in front of everything: the nearest layer */
   Scr *s = v->s; int gy = VY(v, MX_ROWS);
@@ -293,12 +318,65 @@ static void draw_fore(const View *v){               /* grass blades and a fence 
     rect(s, x + sw, gy - h + 6, 2, h, RGB(48, 140, 52)); rect(s, x + 4 + sw, gy - h / 2 + 6, 2, h / 2, RGB(70, 170, 70)); }
 }
 static void draw_shadow(const View *v, int cx, int cy_ground, int w){ rect(v->s, cx - w / 2, cy_ground, w, 3, RGB(60, 90, 40)); }
-static inline int min255(int v){ return v > 255 ? 255 : v; }
+
+/* ---- the web's 8x8 voxel sprites (paintCell), ported: built once per zoom level, box-filtered down to ppc x ppc, drawn per voxel */
+static u32 tcol[MX_NMAT][4][3][64]; static u8 talp[MX_NMAT][4][3][64]; static int tile_p;
+static void tile_build(int p){
+  static const int VO[4] = {0, -9, 7, -4};
+  for(int m = 1; m < MX_NMAT; m++) for(int v = 0; v < 4; v++) for(int d = 0; d < 3; d++){
+    float T[64][4]; memset(T, 0, sizeof T);
+    const uint8_t *bc = mx_material_rgb(m); int o = VO[v];
+#define CL(x) ((x) < 0 ? 0 : (x) > 255 ? 255 : (x))
+#define SH(a) {(float)CL(bc[0] + o + (a)), (float)CL(bc[1] + o + (a)), (float)CL(bc[2] + o + (a)), 1.0f}
+    float base[4] = SH(0), dark[4] = SH(-38), lite[4] = SH(32);
+#define HEX(h) {(float)((h) >> 16), (float)(((h) >> 8) & 255), (float)((h) & 255), 1.0f}
+#define FILL(c, X, Y, W, H, A) { float cc_[4] = {(c)[0], (c)[1], (c)[2], (A)}; for(int yy = (Y); yy < (Y) + (H); yy++) for(int xx = (X); xx < (X) + (W); xx++) if(xx >= 0 && xx < 8 && yy >= 0 && yy < 8){ float *q = T[yy * 8 + xx], a = cc_[3]; for(int k = 0; k < 3; k++) q[k] = q[k] * q[3] * (1 - a) + cc_[k] * a, q[k] = q[3] * (1 - a) + a > 0 ? q[k] / (q[3] * (1 - a) + a) : 0; q[3] = q[3] * (1 - a) + a; } }
+    float white[4] = {255, 255, 255, 1}, black[4] = {17, 17, 17, 1}, mort[4] = HEX(0xbcab9b), red[4] = HEX(0x7a1010), pink[4] = HEX(0xff9a9a), gry[4] = HEX(0x555555), pale[4] = HEX(0xd7e1ec), tint[4] = {60, 120, 150, 1}, crk[4] = {20, 10, 5, 1}, blk[4] = {0, 0, 0, 1};
+    float mid[4] = SH(-12);
+    if(m == 1){ FILL(base, 0, 0, 8, 8, 1); FILL(dark, 2, 0, 1, 8, 1); FILL(dark, 5, 0, 1, 8, 1); FILL(lite, 0, 0, 8, 1, 1); FILL(dark, 0, 7, 8, 1, 1); if(v == 2) FILL(dark, 3, 3, 2, 2, 1); }
+    else if(m == 2){ FILL(mort, 0, 0, 8, 8, 1); FILL(base, 0, 0, 7, 3, 1); FILL(base, 0, 4, 3, 3, 1); FILL(base, 4, 4, 4, 3, 1); FILL(lite, 0, 0, 7, 1, 1); FILL(lite, 0, 4, 3, 1, 1); FILL(lite, 4, 4, 4, 1, 1); FILL(dark, 0, 2, 7, 1, 1); FILL(dark, 0, 6, 3, 1, 1); FILL(dark, 4, 6, 4, 1, 1); }
+    else if(m == 3){ FILL(base, 0, 0, 8, 8, 1); FILL(lite, 0, 0, 8, 1, 1); FILL(lite, 0, 0, 1, 8, 1); FILL(dark, 0, 7, 8, 1, 1); FILL(dark, 7, 0, 1, 8, 1); FILL(dark, 2 + v, 3, 1, 1, 1); FILL(lite, 5 - v % 2, 5, 1, 1, 1); FILL(dark, 4, 2 + v % 2, 1, 1, 1); }
+    else if(m == 4){ FILL(base, 0, 0, 8, 8, .5f); FILL(white, 1, 1, 1, 4, .85f); FILL(white, 2, 1, 1, 1, .7f); FILL(white, 5, 5, 1, 2, .5f); FILL(tint, 0, 7, 8, 1, .5f); FILL(tint, 7, 0, 1, 8, .5f); }
+    else if(m == 5){ FILL(base, 0, 0, 8, 8, 1); FILL(white, 0, 3, 8, 2, 1); FILL(black, 1, 3, 1, 2, 1); FILL(black, 3, 3, 1, 2, 1); FILL(black, 5, 3, 1, 2, 1); FILL(red, 0, 7, 8, 1, 1); FILL(pink, 0, 0, 8, 1, 1); FILL(gry, 3, 0, 2, 1, 1); }
+    else if(m == 7){ FILL(dark, 0, 0, 8, 8, 1); FILL(base, 1, 1, 6, 6, 1); FILL(lite, 1, 1, 6, 1, 1); FILL(lite, 1, 1, 1, 3, 1); FILL(white, 2, 2, 2, 1, .85f); FILL(white, 2, 3, 1, 1, .85f); FILL(dark, 5, 6, 2, 1, 1); FILL(dark, 0, 0, 1, 1, 1); FILL(dark, 7, 0, 1, 1, 1); FILL(dark, 0, 7, 1, 1, 1); FILL(dark, 7, 7, 1, 1, 1); }
+    else if(m == 8){ FILL(base, 0, 0, 8, 8, 1); for(int k = 0; k < 11; k++){ int pxx = (k * 5 + v * 3) % 8, pyy = (k * 3 + v * 7 + (k >> 2)) % 8; if(k & 1) FILL(lite, pxx, pyy, 1, 1, 1) else FILL(dark, pxx, pyy, 1, 1, 1) } FILL(lite, 0, 0, 8, 1, 1); FILL(dark, 0, 7, 8, 1, 1); }
+    else { FILL(base, 0, 0, 8, 8, 1); FILL(lite, 0, 0, 8, 1, 1); FILL(dark, 0, 7, 8, 1, 1); FILL(dark, 7, 0, 1, 8, 1); FILL(pale, 1, 1, 1, 1, 1); FILL(pale, 6, 1, 1, 1, 1); FILL(dark, 1, 6, 1, 1, 1); FILL(dark, 6, 6, 1, 1, 1); FILL(mid, 3, 3, 2, 2, 1); }
+    if(d >= 1){ float *cr = m == 4 ? white : crk; float a = m == 4 ? .9f : .75f; FILL(cr, 2, 1, 1, 3, a); FILL(cr, 3, 4, 2, 1, a); FILL(cr, 5, 5, 1, 3, a); }
+    if(d >= 2){ float *cr = m == 4 ? white : crk; float a = m == 4 ? .9f : .85f; if(m != 4) FILL(blk, 0, 0, 8, 8, .22f); FILL(cr, 0, 2, 3, 1, a); FILL(cr, 4, 0, 1, 3, a); FILL(cr, 1, 5, 4, 1, a); FILL(cr, 6, 3, 1, 4, a); }
+    if(m != 4) for(int y = 0; y < 8; y++) for(int x = 0; x < 8; x++){            /* the web's diagonal light: warm top-left, cool shadow bottom-right */
+      float g = (x * .35f + y) / (8 * 1.35f), *q = T[y * 8 + x]; float a, c0, c1, c2;
+      if(g < .5f){ a = .22f * (1 - g / .5f); c0 = 255; c1 = 248; c2 = 225; } else { a = .26f * ((g - .5f) / .5f); c0 = 20; c1 = 15; c2 = 60; }
+      q[0] += (c0 - q[0]) * a; q[1] += (c1 - q[1]) * a; q[2] += (c2 - q[2]) * a; }
+    for(int j = 0; j < p; j++) for(int i = 0; i < p; i++){                        /* box filter 8x8 -> p x p */
+      float x0 = i * 8.0f / p, x1 = (i + 1) * 8.0f / p, y0 = j * 8.0f / p, y1 = (j + 1) * 8.0f / p, sr = 0, sg = 0, sb = 0, sa = 0, sw = 0;
+      for(int yy = (int)y0; yy < (int)ceilf(y1) && yy < 8; yy++) for(int xx = (int)x0; xx < (int)ceilf(x1) && xx < 8; xx++){
+        float wx = (xx + 1 < x1 ? xx + 1 : x1) - (xx > x0 ? xx : x0), wy = (yy + 1 < y1 ? yy + 1 : y1) - (yy > y0 ? yy : y0), w = wx * wy, *q = T[yy * 8 + xx];
+        sr += q[0] * q[3] * w; sg += q[1] * q[3] * w; sb += q[2] * q[3] * w; sa += q[3] * w; sw += w; }
+      float al = sa / sw, r = sa > 0 ? sr / sa : 0, g2 = sa > 0 ? sg / sa : 0, b2 = sa > 0 ? sb / sa : 0;
+      tcol[m][v][d][j * 8 + i] = RGB((int)r, (int)g2, (int)b2); talp[m][v][d][j * 8 + i] = (u8)(al * 255 + .5f); }
+  }
+  tile_p = p;
+}
+/* one voxel: dm = brightness in 1/256ths (damage tint, dim), per-pixel alpha for glass */
+static void draw_tile(Scr *s, int sx, int sy, int p, int m, int v, int d, int dm){
+  const u32 *tc = tcol[m][v][d]; const u8 *ta = talp[m][v][d];
+  for(int i = 0; i < p; i++){
+    int X = sx + i; if((unsigned)X >= (unsigned)s->w) continue;
+    for(int j = 0; j < p; j++){
+      int Y = sy + j; if((unsigned)Y >= (unsigned)s->h) continue;
+      int a = ta[j * 8 + i]; if(!a) continue;
+      u32 c = tc[j * 8 + i]; int r = ((c >> 16) & 255) * dm >> 8, g = ((c >> 8) & 255) * dm >> 8, b = (c & 255) * dm >> 8;
+      u8 *q = s->fb + ((X * s->h) + (s->h - 1 - Y)) * 3;
+      if(a >= 250){ q[0] = (u8)(b > 255 ? 255 : b); q[1] = (u8)(g > 255 ? 255 : g); q[2] = (u8)(r > 255 ? 255 : r); }
+      else { q[0] = (u8)((q[0] * (255 - a) + b * a) / 255); q[1] = (u8)((q[1] * (255 - a) + g * a) / 255); q[2] = (u8)((q[2] * (255 - a) + r * a) / 255); }
+    }
+  }
+}
 static void draw_cells(const View *v){
   int p = v->ppc;
-  /* per-material colour and 1/maxhp once per frame, not once per voxel (the core's lookups were ~600 000 calls in a short run) */
-  static float mrgb[MX_NMAT][3], minv[MX_NMAT]; static int mready;
-  if(!mready){ for(int m = 1; m < MX_NMAT; m++){ const uint8_t *c = mx_material_rgb(m); for(int k = 0; k < 3; k++) mrgb[m][k] = c[k]; minv[m] = .45f / (float)mx_material_hp(m); } mready = 1; }
+  if(tile_p != p) tile_build(p);
+  static float minv[MX_NMAT]; static int mready;
+  if(!mready){ for(int m = 1; m < MX_NMAT; m++) minv[m] = 1.0f / (float)mx_material_hp(m); mready = 1; }
   const int sw = v->s->w, sh = v->s->h;
   for(int y = 0; y < MX_ROWS; y++) for(int x = 0; x < MX_COLS; x++){
     int i = y * MX_COLS + x, m = world.grid[i];
@@ -307,18 +385,9 @@ static void draw_cells(const View *v){
     if(world.wob_on){ fx += RTOF(world.ox[i]); fy += RTOF(world.oy[i]); }
     int sx = VX(v, fx), sy = VY(v, fy);
     if(sx + p < 0 || sx >= sw || sy + p < 0 || sy >= sh) continue;
-    float f = .55f + RTOF(world.hp[i]) * minv[m];                          /* darker as it takes damage */
-    if(f > 1) f = 1;
-    f *= g_dim; if(world.brk[i]) f *= .8f;
-    f *= 1.0f + (float)(((x * 7 + y * 13 + (x ^ y)) & 3) - 1) * .035f;                  /* grain: no two voxels quite alike */
-    int r0 = (int)(mrgb[m][0] * f), g0 = (int)(mrgb[m][1] * f), b0 = (int)(mrgb[m][2] * f);
-    rect(v->s, sx, sy, p, p, RGB(r0, g0, b0));
-    if(p >= 3){
-      int up = y > 0 ? world.grid[i - MX_COLS] : 1, dn = y < MX_ROWS - 1 ? world.grid[i + MX_COLS] : 1, lf = x > 0 ? world.grid[i - 1] : 1;
-      if(!up) rect(v->s, sx, sy, p, 1, RGB(min255(r0 + 46), min255(g0 + 46), min255(b0 + 40)));             /* sunlit top edge */
-      else if(!lf) rect(v->s, sx, sy, 1, p, RGB(min255(r0 + 22), min255(g0 + 22), min255(b0 + 20)));        /* lit left face */
-      if(!dn) rect(v->s, sx, sy + p - 1, p, 1, RGB(r0 * 6 / 10, g0 * 6 / 10, b0 * 6 / 10));                  /* shaded underside */
-    }
+    float r = RTOF(world.hp[i]) * minv[m];
+    int dd = r > .66f ? 0 : r > .33f ? 1 : 2, dm = (int)(256 * g_dim * (world.brk[i] ? .8f : 1.0f));
+    draw_tile(v->s, sx, sy, p, m, ((x * 374761393u + y * 668265263u) >> 13) & 3, dd, dm);
   }
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
     const MxChunk *ch = &world.chunks[c];
@@ -326,8 +395,7 @@ static void draw_cells(const View *v){
     for(int k = 0; k < ch->count; k++){
       const MxCell *a = &ch->cells[k];
       if(a->dead) continue;
-      const uint8_t *col = mx_material_rgb(a->m);
-      rect(v->s, VX(v, RTOF(a->wx)) - p / 2, VY(v, RTOF(a->wy)) - p / 2, p, p, RGB((int)(col[0] * g_dim), (int)(col[1] * g_dim), (int)(col[2] * g_dim)));
+      draw_tile(v->s, VX(v, RTOF(a->wx)) - p / 2, VY(v, RTOF(a->wy)) - p / 2, p, a->m, (k * 7 + 3) & 3, 0, (int)(256 * g_dim));
     }
   }
 }
@@ -429,6 +497,12 @@ static void draw_tubes(const View *v){
 static void draw_sling(const View *v){
   int sx = VX(v, RTOF(MX_ANCHOR_X)), sy = VY(v, RTOF(MX_ANCHOR_Y)), p = v->ppc;
   rect(v->s, sx - p / 2, sy + p, p, VY(v, MX_ROWS) - sy - p, RGB(122, 82, 48));
+  { int gy2 = VY(v, MX_ROWS), cx = sx - p * 9, cw = p * 4, ch = p * 5;                                   /* the can of beans on its plank */
+    rect(v->s, cx - p * 2, gy2 - p, p * 8, p, RGB(138, 98, 58)); rect(v->s, cx - p * 2, gy2 - p, p * 8, 1, RGB(178, 138, 90));
+    rect(v->s, cx, gy2 - p - ch, cw, ch, RGB(176, 32, 32)); rect(v->s, cx, gy2 - p - ch, 1, ch, RGB(226, 84, 70)); rect(v->s, cx + cw - 1, gy2 - p - ch, 1, ch, RGB(110, 18, 18));
+    rect(v->s, cx, gy2 - p - ch + p, cw, ch - p * 2, RGB(240, 236, 224)); rect(v->s, cx + 1, gy2 - p - ch + p + ch / 4, cw - 2, 1, RGB(176, 32, 32));
+    rect(v->s, cx, gy2 - p - ch, cw, 1, RGB(200, 200, 208)); rect(v->s, cx, gy2 - p - 1, cw, 1, RGB(200, 200, 208));
+    for(int k = 0; k < 2; k++) disc(v->s, cx + cw / 2 + k * 3, gy2 - p - ch - 3 - ((frame >> 3) + k * 3) % 8, 2, RGB(170, 214, 90)); }
   if(world.man.mode == MAN_AIM){
     int mx_ = VX(v, RTOF(world.man.x)), my = VY(v, RTOF(world.man.y));
     line(v->s, sx - p, sy, mx_, my, RGB(42, 22, 10)); line(v->s, sx + p, sy, mx_, my, RGB(42, 22, 10));

@@ -61,6 +61,7 @@ bool aptMainLoop(void){
     break;
   case 1:                                                        /* wait for the sling, or for the end */
     if(world.state != MX_PLAY){ ph = 3; t = 0; break; }
+    if(world.man.mode == MAN_AIM && t > 10 && t < 13 && (shot == 0 || shot == 2)){ shots(shot ? "aim2" : "aim0"); }
     if(world.man.mode == MAN_AIM && t > 10){ hold = HOLD[shot % 8]; ph = 2; t = 0; }
     if(shot > 24){ CHECK(0, "level 1 reached an end panel within 24 shots"); return false; }
     break;
