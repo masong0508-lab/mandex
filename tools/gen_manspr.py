@@ -31,7 +31,7 @@ POSES = [
     ("FLEX_B",  "drawFront('flex','cool',1.1781)",  0.36),
     ("FLY_A",   "drawSide(0.0982,'scream')",  0.40),
     ("FLY_B",   "drawSide(0.2945,'scream')",  0.40),
-    ("DIVE",    "drawBall(0.1,'scream')",  0.40),
+    ("DIVE",    "drawSide(0.2,'scream')",  0.40),
     ("STUCK_A", "drawFront('star','dizzy',0.3927)", 0.27),
     ("STUCK_B", "drawFront('star','dizzy',1.1781)", 0.27),
 ]
@@ -231,9 +231,9 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
                     if ch != '.': put(idx, l + w_ - 3 + i, t + h_ // 2 - 1 + j, hk[ch])
         return
     if name in ("FLY_A", "FLY_B", "DIVE"):                         # side-view big head, facing right, pixelled over the head only (the web head sits at (31,-17) / (18,-14))
-        rows = manhead.side_head("fly" if name != "DIVE" else "dive")
+        rows = manhead.side_head("fly")                              # the dive is the same pose, tumbling
         hk = {k: PI[v] for k, v in manhead.KEY.items()}
-        cx, cy = (31, -17) if name != "DIVE" else (18, -14)
+        cx, cy = 31, -17
         hx, hy = ax + int(round(cx * ppu)), ay + int(round(cy * ppu))
         stamp(idx, rows, hx - 8, hy - 7, hk)
         return
