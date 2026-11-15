@@ -2915,7 +2915,7 @@ function drawHUD(){
   const mstp=Math.min(P?16:20,(P?190:230)/Math.max(1,men));   // a long row of men squeezes together (the wide finale can have 17)
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
-  if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60);txt('DRAG BACK  &  RELEASE!',hp[0],hp[1],22,'#fff','center')};ctx.globalAlpha=1}
+  if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
   if(state==='play'){const tid=OPT().tool||'valve',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+pw.left[tid]:'';
     if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
       btn(W-212,H-44,96,32,'< SLING',()=>goSling(slingK-1),{size:13,disabled:slingK<=0});btn(W-108,H-44,96,32,'SLING >',()=>goSling(slingK+1),{size:13,disabled:slingK>=CL.slings.length-1});void ny}
