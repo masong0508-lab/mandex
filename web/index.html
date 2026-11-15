@@ -1352,6 +1352,20 @@ function wolfHeadF(lv){lv=lv||3;ctx.save();ctx.lineJoin='round';ctx.lineCap='rou
   ctx.strokeStyle='rgba(30,30,40,.55)';ctx.lineWidth=.8;for(const q of[-1,1])for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(q*10,-37+i*1.6);ctx.lineTo(q*20,-40+i*3.4);ctx.stroke()}   // whiskers
   ctx.restore()}
 function wolfEarS(cx,cy){if(!WOLF&&!WOLFH)return;ctx.save();ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(cx-6,cy-9);ctx.lineTo(cx-4,cy-25);ctx.lineTo(cx+5,cy-10);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.5;ctx.stroke();ctx.beginPath();ctx.moveTo(cx-4,cy-12);ctx.lineTo(cx-3,cy-20);ctx.lineTo(cx+2,cy-12);ctx.closePath();ctx.fillStyle='#e8a0a8';ctx.fill();ctx.restore()}
+// wolf muzzle in profile, same face as the front view: long pale snout, big black nose, a jaw that works (howl/shout/pant), a fang, yellow lazy eye
+function wolfSnoutS(cx,cy){if(!WOLF&&!WOLFH)return;const a=.5+.5*Math.sin(time*9+1),op=2+a*4.5;ctx.save();ctx.translate(cx-31,cy+17);ctx.lineJoin='round';ctx.lineCap='round';
+  // cover the human nose + mouth with fur, then the lower jaw (hinged under the cheek) and upper snout
+  ctx.beginPath();ctx.moveTo(34,-9.5);ctx.quadraticCurveTo(44,-9+op*.4,52.5,-10.2+op*.7);ctx.quadraticCurveTo(53.5,-6.5+op,48,-5.2+op);ctx.quadraticCurveTo(41,-3.4+op,35,-4.2+op*.6);ctx.closePath();ctx.fillStyle='#5a1020';ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.4;ctx.stroke();
+  ctx.beginPath();ctx.ellipse(42,-3.2+op*.8,5.2,2,.15,0,6.3);ctx.fillStyle='#ff6b8a';ctx.fill();   // tongue
+  ctx.beginPath();ctx.moveTo(33,-6);ctx.quadraticCurveTo(43,-3.6+op*.8,52,-7.8+op*.9);ctx.quadraticCurveTo(52,-4+op*1.05,46,-2.2+op);ctx.quadraticCurveTo(38,-.6+op*.7,33,-3);ctx.closePath();ctx.fillStyle=WFL;ctx.fill();ctx.stroke();  // lower jaw
+  ctx.beginPath();ctx.moveTo(31,-21);ctx.quadraticCurveTo(40,-21.5,50,-19.4);ctx.quadraticCurveTo(54.4,-17,52.6,-12.4);ctx.quadraticCurveTo(46,-9.4,34,-9.6);ctx.closePath();ctx.fillStyle=WFL;ctx.fill();ctx.stroke();   // upper snout
+  ctx.beginPath();ctx.moveTo(40,-9.6);ctx.lineTo(41.4,-5.4+op*.4);ctx.lineTo(43.4,-9.8);ctx.closePath();ctx.fillStyle='#fff';ctx.lineWidth=.8;ctx.fill();ctx.stroke();   // fang
+  ell(52.6,-16.6,3.1,3.2,'#15151c',1.2);ctx.fillStyle='rgba(255,255,255,.7)';ctx.beginPath();ctx.ellipse(51.8,-17.6,1.1,.7,-.4,0,6.3);ctx.fill();   // nose
+  ctx.strokeStyle='rgba(30,30,40,.6)';ctx.lineWidth=.8;for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(47,-13.6+i*1.2);ctx.lineTo(55+i,-15.5+i*2.6+Math.sin(time*7+i)*.8);ctx.stroke()}   // whiskers
+  // lazy yellow eye with a heavy lid
+  ctx.save();ctx.beginPath();ctx.ellipse(36.4,-20.2,4.6,4.4,0,0,6.3);ctx.clip();ctx.fillStyle='#e9e48c';ctx.fillRect(30,-26,14,12);ctx.fillStyle='#17110e';ctx.beginPath();ctx.ellipse(38.2,-19.4,1.5,2.8,0,0,6.3);ctx.fill();ctx.fillStyle=WF;ctx.beginPath();ctx.moveTo(30,-26);ctx.lineTo(44,-26);ctx.lineTo(44,-21.6+Math.max(0,Math.sin(time*.9)>.97?3:0));ctx.lineTo(30,-19.6);ctx.closePath();ctx.fill();ctx.restore();
+  ctx.beginPath();ctx.ellipse(36.4,-20.2,4.6,4.4,0,0,6.3);ctx.strokeStyle='#17110e';ctx.lineWidth=1.2;ctx.stroke();
+  ctx.restore()}
 function wolfHeadB(){ctx.save();ctx.lineJoin='round';for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5,-54);ctx.lineTo(q*13,-68);ctx.lineTo(q*17,-52);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke()}
   furTufts([[-9,-30,1],[0,-28,1],[9,-30,1],[-15,-40,1],[15,-40,1]],WFD);ctx.restore()}
 function thongFront(){if(WOLF)return wolfFront();ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
@@ -1615,6 +1629,7 @@ function drawSide(t,fk){
   ell(42,-16,3.4,3,SKD,1.3);
   ell(38.5,-7,5,5.4,'#5a1010',1.3);ell(37,-4.8,3,2,'#ff6b8a');
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(33,-12.5);ctx.quadraticCurveTo(40,-14.5,46,-10.5);ctx.quadraticCurveTo(48,-12.5,47,-15);ctx.quadraticCurveTo(50,-8,41,-9);ctx.quadraticCurveTo(36,-9,33,-10);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1;ctx.stroke();
+  wolfSnoutS(31,-17);
   }
   if(WORK)workHatSide();
   }
@@ -1692,7 +1707,7 @@ function drawSlam(t){
    ell(42,-16,3.4,3,SKD,1.3);
    ell(38.5,-7,5.4,5.8,'#5a1010',1.3);ell(37.4,-4.4,3.3,2.2,'#ff6b8a');ctx.fillStyle='#fff';ctx.fillRect(34,-11.5,8.6,2.2);ctx.strokeStyle=OUT;ctx.lineWidth=.7;ctx.strokeRect(34,-11.5,8.6,2.2);
    ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(33,-12.5);ctx.quadraticCurveTo(40,-14.5,46,-10.5);ctx.quadraticCurveTo(48,-12.5,47,-15);ctx.quadraticCurveTo(50,-8,41,-9);ctx.quadraticCurveTo(36,-9,33,-10);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1;ctx.stroke();
-   ctx.restore()}
+   wolfSnoutS(31,-17);ctx.restore()}
   // near arm last, a hand locked on his own shin
   blob(AN.parts);
   {const hp=AN.hd;ctx.strokeStyle='rgba(120,60,30,.75)';ctx.lineWidth=1.2;ctx.lineCap='round';for(const a of[-.9,-.1,.7]){ctx.beginPath();ctx.arc(hp[0],hp[1],5.6*hp[3],a+.3,a+1.1);ctx.stroke()}}
