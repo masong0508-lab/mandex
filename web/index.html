@@ -3125,7 +3125,7 @@ function cutShirtBack(mode){const OU='#5a2f1b';ctx.save();ctx.lineJoin='round';c
   for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(q*22.5,-19,6.4,7.2,q*.5,0,6.3);ctx.fillStyle=mode===2?'#e6ecf4':'#f6f9ff';ctx.fill();ctx.strokeStyle=OU;ctx.stroke()}
   ctx.restore()}
 // Gerald: the same body, no cape, khaki shorts (or boxers), optional tie.  feetY = where his feet land
-function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;setFur(WOLF);if(o.wolf>=3){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
+function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;setFur(WOLF);if(o.wolf>=3){BR='#8c909e';BRD='#656979'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
   const op={nocape:true},T=cutT;if(o.belly)op.belly=o.belly;op.head=o.head||[Math.sin(T*1.3)*.5,Math.sin(T*2.6)*.5,Math.sin(T*1.1)*.035];
   if(o.armL){op.armL=o.armL;op.armR=o.armR}
   else if((o.pose||'up')==='up'){const a=Math.sin(T*2.1),b=Math.sin(T*2.1+1.2);op.armL=[-35-a*1.2,-12+b*1.5,-33-a*2.2,-34+b*3];op.armR=[35+a*1.2,-12+b*1.5,33+a*2.2,-34+b*3]}   // arms drift with the breathing
@@ -3370,7 +3370,7 @@ function cutCam(i,t){const S=CUTS[i],c=S.cuts,k=cgK(c,t),dt=t-c[k],sk=((S.shake|
   const pu=S.push!=null?S.push:.016,pn=(S.pan||[])[k]||[0,0];
   return{z:1.04+Math.abs(r)*2.4+Math.min(.12,pu*dt),x:480+pn[0]*dt,y:270+pn[1]*dt,r:r,sx:Math.sin(t*93)*sk,sy:Math.cos(t*71)*sk,fl:k>0?Math.max(0,.45*(1-dt/.12)):0}}
 // Gerald seen from behind (over-the-shoulder shots)
-function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;setFur(WOLF);if(o.wolf>=3){BR='#f4b78e';BRD='#e2a077'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
+function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;setFur(WOLF);if(o.wolf>=3){BR='#8c909e';BRD='#656979'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
   ctx.save();ctx.translate(x,feetY-48*s);ctx.scale(s,s);drawBack(null,cutT*.8+.3,{noflag:true});WOLFH=o.wolf&&o.wolf<3?o.wolf:0;if(!(o.wolf>=3)&&!o.noshirt){const sm=o.shirt!=null?o.shirt:(CUTS&&CUTS[cutI]&&CUTS[cutI].shirt!=null?CUTS[cutI].shirt:1);if(sm){ctx.save();ctx.translate(0,3);ctx.beginPath();ctx.rect(-40,-25,80,60);ctx.clip();cutShirtBack(sm);ctx.restore()}}ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
 function cgBill(t,x,y,sz){txt('$'+Math.floor(t*t*600).toLocaleString(),x,y,sz,'#7dff5a','center','#0a3a0a');txt('BILLED SO FAR',x,y+sz*.45,Math.max(12,sz*.26),'#cfd','center')}
 function cgBokeh(t,cols,n){ctx.save();for(let i=0;i<n;i++){const x=(cgRnd(i)*W+t*6*(i%3+1))%W,y=cgRnd(i+20)*H*.75,r=16+cgRnd(i+40)*36;ctx.globalAlpha=.1+.14*cgRnd(i+60);cgE(x,y,r,r,cols[i%cols.length])}ctx.restore()}
@@ -3560,7 +3560,7 @@ const CUT3=[
    else if(k===1){const sp=Math.min(1,u/.5),sx=Math.cos(sp*Math.PI);ctx.save();ctx.translate(480,0);ctx.scale(Math.abs(sx)||.01,1);ctx.translate(-480,0);if(sx>0)cutGerald(480,392,2.5,{wolf:true,pose:'up'});else cutGeraldBack(480,392,2.5,{wolf:true});ctx.restore();
      cutFlag(5,()=>SFX.whoosh());ctx.fillStyle='#8a5a2b';for(let i=0;i<6;i++){const a=u*3+i*1.4;ctx.save();ctx.translate(480+Math.sin(a*2+i)*(60+u*90)*(i%2?1:-1),360-u*40+u*u*160);ctx.rotate(a);ctx.fillRect(-9,-4,18,8);ctx.restore()}
      if(u>.7)cutBubble(760,150,"*riiip*",0)}
-   else{cutGeraldBack(480,420,3.5,{wolf:true,dy:Math.sin(u*5)*3});cutBubble(760,130,"Looking good, Gerald.",0)}}},
+   else{cutGeraldBack(480,440,2.55,{wolf:true,dy:Math.sin(u*5)*3});cutBubble(760,130,"Looking good, Gerald.",0)}}},
  // 6. the howl
  {lines:["Naturally, he howled.","At a moon he had called \"a lot\" two minutes earlier.","Three blocks away, a landlord's wine glass cracked."],hl:2,cuts:[0,1.8,3.5],tr:'wipe',hold:3.6,shake:[6,10,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
    if(k<2){cgSky('#0a0d24','#3a2a60',395);cgMoon(480,k===0?210:150,k===0?200:130,t);if(k===0){cgHowl(t,300,300);cgHowl(t+.5,660,300)}
