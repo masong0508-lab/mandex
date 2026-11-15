@@ -1448,6 +1448,12 @@ function frontHair(){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
   ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(-2.5,-55,3.4,1.7,-.3,0,6.3);ctx.fill();   // shine on the bare top, like the back view
   ctx.strokeStyle=HAIR;ctx.lineWidth=1.25;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(-10.4,-47-k*2.2);ctx.quadraticCurveTo(-1+k,-62.5+k*.5,10.6,-51.5+k*1.6);ctx.stroke()}   // the comb-over
   ctx.restore()}
+function sideHair(cx,cy,r,o){o=o||{};   // profile hair, the same thinning as frontHair: a tuft behind the ear, a bare shiny crown, a few combed-over strands
+  ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(cx,cy,r*1.02,2.75,4.55);ctx.arc(cx,cy,r*.74,4.55,2.75,true);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.2;ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(cx+r*.12,cy-r*.8,r*.3,r*.13,-.15,0,6.3);ctx.fill();
+  ctx.strokeStyle=HAIR;ctx.lineWidth=1.15;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(cx-r*.74,cy-r*(.5+k*.04));ctx.quadraticCurveTo(cx-r*.1+k*r*.07,cy-r*(1.12-k*.03),cx+r*.62,cy-r*(.62-k*.02));ctx.stroke()}
+  ctx.restore()}
 function drawFront(pose,fk,t,o){
   o=jigMerge(o);
   const sw=Math.sin(t*4);
@@ -1591,7 +1597,7 @@ function drawSide(t,fk){
   blob([pEll(49,-41+fl*3,5.8,5.4),pEll(52.5,-45+fl*3,2.2,3)],{ow:1.6});                                                // open hand + thumb
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(24,-24);ctx.quadraticCurveTo(15,-26+fl*2,6,-29+fl*3);ctx.quadraticCurveTo(15,-22,20,-21);ctx.quadraticCurveTo(14,-17,8,-15+fl*2);ctx.quadraticCurveTo(22,-16,26,-19);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.3;ctx.stroke();
   blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});blob([pEll(25.5,-16,3,4)],{ow:1.3,sd:1,hl:0});
-  ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(30,-21,11,3.45,5.75);ctx.fill();
+  sideHair(31,-17,11.2);
   ell(36.2,-20.5,4.3,4.9,'#fff',1.2);ell(37.8,-20.2,2.3,2.7,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(37,-21.4,.95,0,6.3);ctx.fill();ctx.fillStyle='rgba(255,105,110,.3)';ctx.beginPath();ctx.ellipse(35,-12,3.2,2,0,0,6.3);ctx.fill();ctx.strokeStyle=HAIR;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(32,-27);ctx.lineTo(40,-25.5);ctx.stroke();
   ell(42,-16,3.4,3,SKD,1.3);
   ell(38.5,-7,5,5.4,'#5a1010',1.3);ell(37,-4.8,3,2,'#ff6b8a');
@@ -1665,8 +1671,7 @@ function drawSlam(t){
    ctx.save();ctx.translate(ph[0],ph[1]);ctx.scale(ph[3]*.97,ph[3]*.97);ctx.rotate(.3);ctx.translate(-31,17);
    blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});
    blob([pEll(24.4,-14,2.4,3.3,SKD)],{ow:0,sd:1,hl:0});ctx.strokeStyle=OUT;ctx.lineWidth=1.1;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(24.4,-14,2.4,3.3,0,1.9,4.4);ctx.stroke();
-   ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(30,-21,11,3.3,5.8);ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.2;ctx.stroke();
-   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(22,-27);ctx.quadraticCurveTo(21+f1*.6,-34,29,-33);ctx.quadraticCurveTo(25,-30,26,-26);ctx.closePath();ctx.fill();   // a little top knot
+   sideHair(31,-17,11.2);
    ell(36.2,-20,4.4,5,'#fff',1.2);ell(37.6,-19,2.4,2.8,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(37,-20,.95,0,6.3);ctx.fill();
    ctx.fillStyle='rgba(255,105,110,.34)';ctx.beginPath();ctx.ellipse(35,-12,3.4,2.1,0,0,6.3);ctx.fill();
    ctx.strokeStyle=HAIR;ctx.lineWidth=2.6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(31.5,-27.8);ctx.lineTo(40.5,-24.4);ctx.stroke();                 // brow, slanted: this is going to hurt, and he knows it
@@ -1727,7 +1732,7 @@ function drawBall(t,fk){
   blob([pTap(8,4,6.2,18,14,5),pTap(18,14,4.8,8,22,4),pEll(18,14,5.2,5.2)]);blob([pEll(7,24,6.5,3.2,'#8a5a2b')],{ow:1.4,hl:0});
   blob([pTap(14,-8,4.8,26,4,4,SKD),pEll(24,6,6,6,SKD)],{ow:1.6});
   blob([pEll(18,-14,11,10.5)],{ow:1.9});
-  ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(18,-18,10.5,3.4,5.9);ctx.fill();
+  sideHair(18,-14,10.8);
   ell(22.4,-15,4.1,4.6,'#fff',1.2);ell(23.8,-14.8,2.1,2.5,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(23,-15.8,.9,0,6.3);ctx.fill();ctx.strokeStyle=HAIR;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(18,-21);ctx.lineTo(26,-19.5);ctx.stroke();
   ell(27,-9,4.5,5,'#5a1010',1.3);ctx.fillStyle=HAIR;ctx.fillRect(20,-11.5,11,3);
   ctx.globalAlpha=.32;ell(0,-8,14,5,'#7dff5a');ctx.globalAlpha=1}
@@ -2247,21 +2252,20 @@ function drawSpin(th,o){
     const fac=(f,v)=>{const rr=Math.sqrt(Math.max(0,1-v*v)),nx=rr*Math.sin(f)/A,ny=v/B,nzz=rr*Math.cos(f)/Cc,nz2=nzz*cpt-ny*spt;return(-nx*S+nz2*C)/Math.hypot(nx,ny,nzz)};
     const hp=(f,v)=>{const rr=Math.sqrt(Math.max(0,1-v*v)),X=A*rr*Math.sin(f),Y=B*v,Z=Cc*rr*Math.cos(f),Y2=Y*cpt+Z*spt,Z2=Z*cpt-Y*spt;return[X*C+Z2*S+oU,hcy+Y2]};
     add(10,()=>{                                                                                                       // hair
-      const NU=32,NV=7;ctx.fillStyle=HAIR;ctx.strokeStyle=HAIR;ctx.lineWidth=.8;ctx.lineJoin='round';ctx.beginPath();
+      const NU=48,NV=16;ctx.fillStyle=HAIR;ctx.strokeStyle=HAIR;ctx.lineWidth=.8;ctx.lineJoin='round';ctx.beginPath();
       for(let i=0;i<NU;i++){const f0=i/NU*6.2832,f1=(i+1)/NU*6.2832,fm=(f0+f1)/2;
-        for(let j=0;j<NV;j++){const vm=-1+(vh(fm)+1)*(j+.5)/NV;if(fac(fm,vm)<-.05)continue;
+        for(let j=0;j<NV;j++){const vm=-1+(vh(fm)+1)*(j+.5)/NV;if(fac(fm,vm)<-.05||vm<-.34)continue;
           const p0=hp(f0,-1+(vh(f0)+1)*j/NV),p1=hp(f1,-1+(vh(f1)+1)*j/NV),p2=hp(f1,-1+(vh(f1)+1)*(j+1)/NV),p3=hp(f0,-1+(vh(f0)+1)*(j+1)/NV);
           ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.lineTo(p2[0],p2[1]);ctx.lineTo(p3[0],p3[1]);ctx.closePath()}}
       ctx.fill();ctx.stroke();
       const N=Math.hypot(A*C,Cc*S),fs=Math.atan2(A*C,Cc*S);ctx.strokeStyle=OUT;ctx.lineWidth=1.8;ctx.lineCap='round';
       for(const br of[0,1]){const f=fs+br*Math.PI,vt=vh(f);ctx.beginPath();                                          // the hair's two edges against the sky
-        for(let j=0;j<=10;j++){const v=-1+(vt+1)*j/10,rr=Math.sqrt(Math.max(0,1-v*v)),px=oU+(br?-1:1)*rr*N,py=hcy+B*v;j?ctx.lineTo(px,py):ctx.moveTo(px,py)}ctx.stroke()}
-      ctx.lineWidth=1.5;let on=false;ctx.beginPath();                                                                  // hairline, only where it faces us
-      for(let k=0;k<=120;k++){const f=k/120*6.2832,v=vh(f);if(fac(f,v)>.02){const p=hp(f,v);on?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]);on=true}else on=false}ctx.stroke();
-      ctx.fillStyle='rgba(255,255,255,.16)';ctx.beginPath();ctx.ellipse(oU-5,hcy-B*.7,4.8,2.3,-.35,0,6.2832);ctx.fill();
-      dec([shell],0,-52,()=>{ctx.strokeStyle='rgba(25,12,4,.75)';ctx.lineWidth=1.3;ctx.beginPath();for(let a=0;a<9;a+=.4){const r=a*.55;a?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r*.8):ctx.moveTo(0,0)}ctx.stroke()},{back:1})});
+        for(let j=0;j<=10;j++){const v=-.34+(vt+.34)*j/10,rr=Math.sqrt(Math.max(0,1-v*v)),px=oU+(br?-1:1)*rr*N,py=hcy+B*v;j?ctx.lineTo(px,py):ctx.moveTo(px,py)}ctx.stroke()}
+            ctx.strokeStyle=HAIR;ctx.lineWidth=1.1;for(let k=0;k<4;k++){ctx.beginPath();let on=false;for(let q=0;q<=14;q++){const f=-1.9+q/14*3.0,v=-.62-.12*Math.sin(q/14*Math.PI)*1.4+k*.03,sq=Math.sqrt(Math.max(0,1-v*v));if(fac(f,v)>.0){const p=hp(f,v-.0);on?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]);on=true}else on=false}ctx.stroke()}   // the comb-over, wherever it faces us
+      ctx.fillStyle='rgba(255,255,255,.4)';ctx.beginPath();ctx.ellipse(oU-3,hcy-B*.86,4.4,1.9,-.2,0,6.2832);ctx.fill();
+      if(0)dec([shell],0,-52,()=>{ctx.strokeStyle='rgba(25,12,4,.75)';ctx.lineWidth=1.3;ctx.beginPath();for(let a=0;a<9;a+=.4){const r=a*.55;a?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r*.8):ctx.moveTo(0,0)}ctx.stroke()},{back:1})});
     const tk=G3(0,-62.6,-1,5.6,5.2,5,U);                                                                                 // top knot
-    if(o.quiff)add(31,()=>quiffDraw(oU+Sh*5,Math.max(.3,Math.abs(Ch)),pdv));else add(30,()=>{ell(tk.px,tk.py,tk.rx,5.2,HAIR,0);ctx.strokeStyle=OUT;ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(tk.px,tk.py,tk.rx,5.2,0,Math.PI,6.2832);ctx.stroke();
+    if(o.quiff)add(31,()=>quiffDraw(oU+Sh*5,Math.max(.3,Math.abs(Ch)),pdv));else if(0)add(30,()=>{ell(tk.px,tk.py,tk.rx,5.2,HAIR,0);ctx.strokeStyle=OUT;ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(tk.px,tk.py,tk.rx,5.2,0,Math.PI,6.2832);ctx.stroke();
       ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.ellipse(tk.px-1.4,tk.py-1.8,1.7,.9,-.4,0,6.2832);ctx.fill()});
     // face (only the spots that face us are drawn, squashed by how squarely they face us)
     const FH=[jaw,hd],fy=ly=>ly-43+pdv;
