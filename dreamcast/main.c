@@ -279,6 +279,7 @@ static float blob(float dx, float dy, float rad){ float d2 = dx * dx + dy * dy, 
 #define MG_X 8
 #define MG_Y 10
 static void draw_frame(int fr, float cx, float cy, int face, float z, const Jig *jg){
+  if(man_fur && fr >= 0 && fr < MSF_NBASE) fr += MSF_NBASE;                  /* the Wolfman's frames follow the human ones */
   const short *f = DCM_FR[fr];
   float sc = DCM_SCALE * man_zoom, s = PXC / 4.0f;
   int live = jg && (jg->bx != 0 || jg->by != 0 || jg->rx != 0 || jg->ry != 0 || jg->sx != 1 || jg->sy != 1);
@@ -586,7 +587,7 @@ static void draw_all(void){
     }
     else if(m->mode == MAN_WALK){ fr = -1; }
     else if(m->mode == MAN_STUCK){ puff(x, y + 6, 30, Z_MAN - 0.2f, argb(111, 227, 74, 200)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
-    else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? (man_fur ? MSF_DIVE_W : MSF_DIVE) : ((ph >> 2) & 1 ? (man_fur ? MSF_FLY_A_W : MSF_FLY_A) : (man_fur ? MSF_FLY_B_W : MSF_FLY_B)); }
+    else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
     if(m->mode == MAN_AIM || m->mode == MAN_FLY){                         /* his shadow on the ground: smaller and fainter the higher he is */
       float hgt = (MX_ROWS - m->y) / 40.0f; if(hgt < 0) hgt = 0; if(hgt > 1) hgt = 1;
       float rw = 30.0f * (1.0f - 0.55f * hgt); quad(XB(m->x) - rw, YB(MX_ROWS) + 1, rw * 2, 4, Z_SLING + 0.05f, argb(0, 0, 0, (int)(90 - 60 * hgt)));
@@ -594,7 +595,7 @@ static void draw_all(void){
     if(m->mode == MAN_WALK){                                              /* on his own feet: the turning frame steps him along, three quarters of the sling size */
       if(!(m->hurtCd > 0 && (fcount & 2))){
         int mv = m->gr && (m->vx > 3 || m->vx < -3), wf = MSF_SPIN_6 + (mv ? ((fcount >> 2) & 1 ? 1 : -1) : 0), fc = m->face < 0 ? -1 : 1;
-        const short *f = DCM_FR[wf]; float zm = man_zoom; man_zoom = zm * 0.75f;
+        const short *f = DCM_FR[wf + (man_fur ? MSF_NBASE : 0)]; float zm = man_zoom; man_zoom = zm * 0.75f;
         float foot = Y(m->y + 2.375f) - (mv && ((fcount >> 2) & 1) ? 1.0f : 0.0f);
         draw_frame(wf, x, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
         man_zoom = zm;

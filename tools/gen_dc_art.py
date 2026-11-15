@@ -98,6 +98,7 @@ def rle16(arr):
     return out
 
 
+class AtlasFull(Exception): pass
 class Shelf:
     """tiny shelf packer: put(image) -> (x, y), 1 px gutter"""
     def __init__(self, w, h):
@@ -108,7 +109,7 @@ class Shelf:
         if self.x + w + 1 > self.w:
             self.x, self.y, self.rowh = 1, self.y + self.rowh + 1, 0
         if self.y + h + 1 > self.h:
-            sys.exit("atlas full")
+            raise AtlasFull()
         self.img.paste(im, (self.x, self.y))
         pos = (self.x, self.y)
         self.x += w + 1; self.rowh = max(self.rowh, h)
@@ -190,16 +191,17 @@ def main():
             cells.append(atl.put(im))
         # ---------------- the man (HD)
         man = Shelf(1024, 512)
-        frames = []
+        frames = []; aliased = []
         has_towel = True
         legacy = {n: (c, pp) for n, c, pp in G.POSES}
-        names = []
-        for n in [pp[0] for pp in G.POSES] + G.NEW_FRAMES:
-            names.append(n)
-            if n in G.WOLF_FRAMES: names.append(n + "_W")            # the Wolfman's own head, right after the frame it replaces (same order as art/manspr.h)
+        names = [pp[0] for pp in G.POSES] + G.NEW_FRAMES
+        base_names = list(names)
+        PRIO = ("FLY_A FLY_B DIVE IDLE_A IDLE_B DRAG FLEX_A FLEX_B STUCK_A STUCK_B SAD BACK_C BACK_L BACK_R SPIN_6 SPIN_5 SPIN_7 BELLY_A BELLY_B YAWN CAPE_A SLEEP_A SLEEP_B").split()
+        wnames = [n for n in PRIO if n in base_names] + [n for n in base_names if n not in PRIO]
+        names = base_names + [n + "_W" for n in wnames]               # then the Wolfman's own heads, most-seen frames first (same frame set as art/manspr.h; the runtime adds MSF_NBASE).  What no longer fits in the 1024x512 atlas shares the human frame's rectangle.
         for name in names:
             wolf = name.endswith("_W"); name0 = name[:-2] if wolf else name
-            pg.evaluate("([w, t]) => { WOLF = w; setFur(w); time = t; }", [wolf, (-0.2856 if name == 'FLY_A_W' else 0.0634) if wolf else 0])
+            pg.evaluate("([w, t]) => { WOLFH = w ? 3 : 0; setFur(w); time = t; }", [wolf, (-0.2856 if name == 'FLY_A_W' else 0.0634) if wolf else 0])
             if name0 in meta:
                 call, ppu, head = f"drawManFrame('{name0}')", meta[name0]["ppu"], meta[name0].get("head")
             elif name0 in legacy:
@@ -220,7 +222,10 @@ def main():
             out = np.dstack([np.clip(rgb, 0, 255), alpha * 255]).astype(np.uint8)
             pad = np.zeros((h + 2, w + 2, 4), np.uint8); pad[1:-1, 1:-1] = out
             im = Image.fromarray(pad, "RGBA")
-            pos = man.put(im)
+            try: pos = man.put(im)
+            except AtlasFull:
+                if not wolf: sys.exit("atlas full")
+                aliased.append(name); frames.append((name, None)); continue
             ax, ay = (CX - x0) // SS + 1, (CY - y0) // SS + 1
             (bx, by, br), (rx, ry, rr) = G.BLOBS[G.family(name)]
             f = [pos[0], pos[1], w + 2, h + 2, ax, ay] + [int(round(v * ppu * K)) for v in (bx + 0, by + 0, br)] + [int(round(v * ppu * K)) for v in (rx, ry, rr)]
@@ -228,6 +233,11 @@ def main():
             f[6] = ax + f[6]; f[7] = ay + f[7]; f[9] = ax + f[9]; f[10] = ay + f[10]
             f.append(int(round(ppu * K * 1000)))              # baked pixels per design unit * 1000
             frames.append((name, f))
+        fd = dict(frames)
+        for i, (nm, f) in enumerate(frames):
+            if f is None: fd[nm] = fd[nm[:-2]]
+        frames = [(nm, fd[nm]) for nm in base_names + [n + "_W" for n in base_names]]       # back to the art/manspr.h order
+        print("wolf frames sharing the human rectangle (atlas full):", len(aliased))
         b.close()
         if errs: sys.exit("page errors: %s" % errs)
 

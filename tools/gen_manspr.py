@@ -66,6 +66,7 @@ BLOBS = {"front": ((0, -2, 21), (0, 10, 21)), "back": ((0, -6, 20), (0, 10, 21))
          "fly": ((2, -2, 19), (-13, 6, 14)), "dive": ((3, -2, 17), (-13, 6, 14)), "star": ((0, -2, 21), (0, 12, 20))}
 WOLF_FRAMES = ('FLY_A', 'FLY_B', 'DIVE')
 def family(name):
+    if name.endswith("_W"): name = name[:-2]
     if name.startswith("BACK") or name.startswith("FART") or (name.startswith("SPIN_") and spin_th(name)[0] >= 120) or name.startswith("OOPS_"): return "back"
     if name.startswith("FLY"): return "fly"
     if name.startswith("DIVE"): return "dive"
@@ -131,10 +132,13 @@ def wipe_head(idx, hx, hy, ppu):
     knot = ((xx - hx) / (6.5 * ppu + 1.6)) ** 2 + ((yy - (hy - 18.5 * ppu)) / (5.6 * ppu + 1.6)) ** 2 <= 1
     idx[skull | knot] = 0
 
+WOLFMODE = False; WSIDE = False      # set per frame by paint_face: paint the Wolfman's head instead of the human one (WSIDE: the head is already a wolf profile)
 HK = 0.82                   # his head is drawn this much smaller than the first hand-pixelled version (the user found it too big)
 def stamp(idx, rows, left, top, hk, k=None):
     """paint a hand-pixelled head; it is shrunk by HK about the middle of its bottom edge so the chin stays on the shoulders"""
     k = HK if k is None else k
+    if WOLFMODE and not WSIDE:
+        rows = manhead.wolfify(rows); top -= manhead.EAR_ROWS
     h, w = len(rows), len(rows[0])
     if k != 1:
         nw, nh = max(4, int(round(w * k))), max(4, int(round(h * k)))
@@ -198,6 +202,9 @@ def shade_butt(idx, PI, ay):
 
 def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
     """the generated heads are only ~10 px wide, so the face is pixelled by hand on top of the HTML shapes"""
+    global WOLFMODE, WSIDE
+    WOLFMODE = name.endswith("_W"); WSIDE = False
+    if WOLFMODE: name = name[:-2]
     key = {'B': 'BLK', 'G': 'GOLD', 'g': 'GOLD2', 'w': 'WH', 'h': 'HAIR', 'H': 'HAIR2', 'o': 'RIM', 'm': 'MOUTH', 't': 'TONG', 's': 'SKD', 'k': 'SKM', 'S': 'SK'}
     hx, hy = (int(round(ax + head[0] * ppu)), int(round(ay + head[1] * ppu))) if head else (ax, ay - 16)   # head centre
     if spiny(name) and name not in ("SPIN_BL", "SPIN_BR"):   # the turn: the head has its own angle (th + lead); front, narrowing, profile, then the back
@@ -210,7 +217,9 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
             else: rows = manhead.side_head("dive"); ox = 8
             top = 11 if a < 56 else 7
             wipe_head(idx, hx, hy, ppu)
-            stamp(idx, rows, hx - ox, hy - top, hk)
+            if WOLFMODE and a >= 56:                                  # a wolf profile in the middle of the turn
+                WSIDE = True; stamp(idx, manhead.wolf_side_head("snarl"), hx - ox, hy - top - 2, hk); WSIDE = False
+            else: stamp(idx, rows, hx - ox, hy - top, hk)
             return
     if name.startswith("BACK") or name.startswith("FART") or spiny(name):          # the back of a proper head, replacing the muddy generated one
         if spiny(name) and head:
@@ -236,13 +245,10 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
         hk = {k: PI[v] for k, v in manhead.KEY.items()}
         cx, cy = 31, -17
         hx, hy = ax + int(round(cx * ppu)), ay + int(round(cy * ppu))
+        if WOLFMODE:                                                 # the Wolfman's profile: FLY_B / DIVE howl, FLY_A snarls
+            WSIDE = True; stamp(idx, manhead.wolf_side_head("snarl" if name == "FLY_A" else "howl"), hx - 8, hy - 9, hk, 0.8); WSIDE = False
+            return
         stamp(idx, rows, hx - 8, hy - 7, hk)
-        return
-    if name in ("FLY_A_W", "FLY_B_W", "DIVE_W"):                   # the Wolfman's profile: ears, long muzzle, yellow eye, a fang; FLY_B / DIVE howl, FLY_A snarls
-        rows = manhead.wolf_side_head("snarl" if name == "FLY_A_W" else "howl")
-        hk = {k: PI[v] for k, v in manhead.KEY.items()}
-        hx, hy = ax + int(round(31 * ppu)), ay + int(round(-17 * ppu))
-        stamp(idx, rows, hx - 8, hy - 9, hk, 0.8)
         return
     if name in ("STUCK_A", "STUCK_B"):                             # small dizzy head
         hy = ay - 12
@@ -326,6 +332,7 @@ def main():
         else:
             print("  (this HTML has no TOWEL_HAND / NOTOWEL: the old baked flag stays in the sprites and no cloth is drawn)")
         legacy = {n: (c, p) for n, c, p in POSES}
+        wolf_copies = []
         for name in [p[0] for p in POSES] + NEW_FRAMES:
             src = name
             if has_api and name in meta:
@@ -341,9 +348,9 @@ def main():
             if has_api: pg.evaluate('(v) => { NOHEAD = v }', name in ('FLY_A', 'FLY_B', 'DIVE'))
             rgb, alpha, ax, ay = downsample(render(pg, call, ppu))
             frames.append((name, src, ppu, head) + outline(rgb, alpha, ax, ay))
-            if name in WOLF_FRAMES:                                   # the same body again, for the Wolfman (the runtime swaps this one in when the outfit is furry)
-                frames.append((name + "_W", name + "_W", ppu, head) + outline(rgb, alpha, ax, ay))
+            wolf_copies.append((name + "_W", name + "_W", ppu, head) + outline(rgb, alpha, ax, ay))   # every frame again for the Wolfman: the runtime adds MSF_NBASE when the outfit is furry
         b.close()
+        NBASE_FR = len(frames); frames += wolf_copies
         if errs: print("page errors:", errs)
 
     # hand-picked palette (nearest-colour mapping keeps the skin shading clean instead of 30 near-duplicates)
@@ -387,6 +394,7 @@ def main():
          "   Chunky pixel art at 4 pixels per cell; index 0 = transparent, index k = MS_PAL[k-1]. */",
          "/* #define MS_ENUM_ONLY before including to get just the frame names (MSF_*) without the pixel data. */",
          "#ifndef MX_MANSPR_H", "#define MX_MANSPR_H", f"#define MS_NPAL {len(pal_list)}"]
+    L += [f"#define MSF_NBASE {sum(1 for o in out if not o[0].endswith('_W'))}   /* the Wolfman's copy of frame f is f + MSF_NBASE (same order); the front-ends add it while the fur outfit is worn */"]
     L += ["enum {" + ", ".join(f"MSF_{o[0]}" for o in out) + ", MSF_COUNT };", "#ifndef MS_ENUM_ONLY",
           "static const unsigned char MS_PAL[MS_NPAL][3] = {"]
     L += ["  {%d,%d,%d}," % c for c in pal_list]
@@ -411,7 +419,7 @@ def main():
     L.append("/* where the raised hand is in each frame, in quarter design units {x, y, z} (centre of the man = 0,0,0; z toward the viewer); 32767 = no towel in this frame */")
     L.append("static const short MS_HAND[MSF_COUNT][3] = {")
     for name, w, h, ax, ay, idx, bl in out:
-        hd = hands.get(name)
+        hd = hands.get(name[:-2] if name.endswith('_W') else name)
         L.append("  { %d, %d, %d }," % tuple(int(round(v * 4)) for v in hd) if hd else "  { 32767, 0, 0 },")
     L += ["};", "#endif /* MS_ENUM_ONLY */", "#endif", ""]
     os.makedirs(os.path.dirname(OUT_H), exist_ok=True)

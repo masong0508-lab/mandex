@@ -193,6 +193,7 @@ static void tick_parts(void){
 /* ---------------------------------------------------------------- the man: indexed sprite frames (art/manspr.h, 4 art pixels per cell), scaled to ppc px per cell */
 static inline int fdiv4(int a){ return a >= 0 ? a / 4 : -((-a + 3) / 4); }
 static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
+  if(man_fur && fr < MSF_NBASE) fr += MSF_NBASE;                             /* the Wolfman's frames follow the human ones */
   const MsFrame *f = &MS_FRAMES[fr];
   for(int sy = 0; sy < f->h; sy++){
     int dy = sy - f->ay, y0 = cy + fdiv4(dy * ppc), y1 = cy + fdiv4((dy + 1) * ppc);
@@ -347,13 +348,13 @@ static void draw_man(const View *v){
   if(m->mode == MAN_WALK){                                                   /* on his own feet: the turning frames step him along, three quarters of the sling size */
     if(m->hurtCd > 0 && (frame & 2)) return;
     int q = (p * 3 + 2) / 4, mv = m->gr && (m->vx > R(3) || m->vx < -R(3)), wf = MSF_SPIN_6 + (mv ? ((frame >> 2) & 1 ? 1 : -1) : 0), fc = m->face < 0 ? -1 : 1;
-    const MsFrame *f = &MS_FRAMES[wf];
+    const MsFrame *f = &MS_FRAMES[wf + (man_fur ? MSF_NBASE : 0)];
     int fy = VY(v, RTOF(m->y) + 2.375f) - (mv && ((frame >> 2) & 1) ? 1 : 0);
     blit_frame(v->s, wf, x, fy - fdiv4((f->h - f->ay) * q), q, fc);
     if(m->pT > 0){ for(int k = -3; k <= 3; k++) px(v->s, x + fc * (p * 5 - k * k * p * 5 / 18) + fc * p * 4, y + k * p * 3 / 4, RGB(255, 255, 255)); }
     return;
   }
-  if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? (man_fur ? MSF_DIVE_W : MSF_DIVE) : (((frame >> 2) & 1) ? (man_fur ? MSF_FLY_A_W : MSF_FLY_A) : (man_fur ? MSF_FLY_B_W : MSF_FLY_B)); }
+  if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : (((frame >> 2) & 1) ? MSF_FLY_A : MSF_FLY_B); }
   else if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); fr = ((frame >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
   else if(dragging) fr = MSF_DRAG;
   else fr = mi_frame(&mi, frame);                                            /* idle gags */

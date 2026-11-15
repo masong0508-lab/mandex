@@ -528,6 +528,9 @@ static void blit_frame_rot(u8 *b, const MsFrame *fr, int x, int y, int ppc, int 
 }
 
 /* design units (20.12) -> pixels at this zoom: the sprites are drawn at 0.36 px per unit at 4 px per cell, so 0.09 px per unit per ppc */
+extern int gfx_man_fur;
+#define MFR(fr) (&MS_FRAMES[(gfx_man_fur && (fr) < MSF_NBASE) ? (fr) + MSF_NBASE : (fr)])   /* the Wolfman's head frames follow the human ones */
+
 static int cpx(real v, int ppc){ return (int)((((int64_t)v * (ppc * 369)) + (1LL << 23)) >> 24); }
 
 const short *spr_man_hand(int frame){ return MS_HAND[frame]; }
@@ -552,7 +555,7 @@ void gfx_cloth(u8 *b, const Cloth *c, int x, int y, int ppc, int f, int pass){
 }
 
 void spr_man_frame(u8 *b, int x, int y, int ppc, int f, int frame, const ManJig *jg){
-  blit_frame(b, &MS_FRAMES[frame], x, y, ppc, f, 0, jg);
+  blit_frame(b, MFR(frame), x, y, ppc, f, 0, jg);
 }
 
 void spr_man(u8 *b, int x, int y, int ppc, int f, int pose, int ph){ spr_man_j(b, x, y, ppc, f, pose, ph, 0); }
@@ -565,8 +568,8 @@ int gfx_man_fur;                                                  /* 1 while the
 void spr_man_jr(u8 *b, int x, int y, int ppc, int f, int pose, int ph, const ManJig *jg, int sn, int cs){
   int sw = (ph >> 2) & 1, slow = (ph >> 4) & 1, fr;
   switch(pose){
-  case POSE_FLY:   fr = gfx_man_fur ? (sw ? MSF_FLY_A_W : MSF_FLY_B_W) : (sw ? MSF_FLY_A : MSF_FLY_B); break;
-  case POSE_DIVE:  fr = gfx_man_fur ? MSF_DIVE_W : MSF_DIVE; break;
+  case POSE_FLY:   fr = sw ? MSF_FLY_A : MSF_FLY_B; break;
+  case POSE_DIVE:  fr = MSF_DIVE; break;
   case POSE_STUCK: fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; break;
   case POSE_DRAG:  fr = MSF_DRAG; break;
   case POSE_FLEX:  fr = slow ? MSF_FLEX_A : MSF_FLEX_B; break;
@@ -582,8 +585,8 @@ void spr_man_jr(u8 *b, int x, int y, int ppc, int f, int pose, int ph, const Man
       gfx_px(b, x + S(-18 + k * 9) + (SM(3) > 1 ? 1 : 0), y + S(16 + len), C_GOO2);
     }
   }
-  if(sn > 40 || sn < -40 || cs < 0) blit_frame_rot(b, &MS_FRAMES[fr], x, y, ppc, f, jg, sn, cs);   /* turned more than ~0.6 degrees */
-  else blit_frame(b, &MS_FRAMES[fr], x, y, ppc, f, 0, jg);
+  if(sn > 40 || sn < -40 || cs < 0) blit_frame_rot(b, MFR(fr), x, y, ppc, f, jg, sn, cs);   /* turned more than ~0.6 degrees */
+  else blit_frame(b, MFR(fr), x, y, ppc, f, 0, jg);
 }
 
 void spr_man_bust(u8 *b, int x, int y, int ppc){         /* head + shoulders only, for the HUD strip */

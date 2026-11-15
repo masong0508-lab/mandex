@@ -236,3 +236,41 @@ def wolf_side_head(kind="snarl"):
     rows = _WOLF_TOP + _WOLF_MOUTH[kind]
     w = max(len(r) for r in rows)
     return [r.ljust(w, '.') for r in rows]
+
+
+# ---- wolfify: turn any hand-pixelled human head (front, back or turning, any width) into the Wolfman's: fur for hair, two ears, a muzzle with a nose and fangs.
+EAR_ROWS = 7
+_EAR = ["...o...", "..oSo..", ".oStSo.", ".oStSo.", "oStttSo", "oSSStSo", "oSSSSSo"]
+def wolfify(rows):
+    H, W = len(rows), len(rows[0]); g = [list(r) for r in rows]
+    front = any(ch in 'Bi' for r in rows[int(H * .35):int(H * .65)] for ch in r)       # eyes present: a face (else the back of the head)
+    for r in g:
+        for i, ch in enumerate(r):
+            if ch == 'h': r[i] = 'S'
+            elif ch == 'l': r[i] = 'K'
+            elif ch == 'k' and not front: r[i] = 'S'
+    if front:
+        cx = W // 2; mw = max(2, int(W * .2)); top = int(H * .58); bot = H - 2
+        tongue = any('t' in r for r in rows[int(H * .7):])
+        for y in range(top, bot + 1):
+            for x in range(cx - mw - 1, cx + mw + 2):
+                edge = x in (cx - mw - 1, cx + mw + 1)
+                if y > top or not edge: g[y][x] = 'o' if edge and y > top else 'K'
+        for x in range(cx - 1, cx + 2):
+            g[top + 1][x] = 'B'
+        g[top + 2][cx] = 'B'
+        my = bot - 2
+        for x in range(cx - mw, cx + mw + 1): g[my][x] = 'm'
+        g[my][cx - mw] = 'w'; g[my][cx + mw] = 'w'
+        if tongue:
+            for x in range(cx - 1, cx + 2): g[my + 1][x] = 't'
+        for x in range(cx - mw - 1, cx + mw + 2):
+            g[bot][x] = 'o'
+    out = ["".join(r) for r in g]
+    a = max(0, int(W * .04)); ear = []
+    for e in _EAR:
+        row = ['.'] * W
+        for i, ch in enumerate(e):
+            row[a + i] = ch; row[W - 7 - a + i] = ch
+        ear.append("".join(row))
+    return ear + out
