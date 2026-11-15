@@ -48,3 +48,27 @@ test/tube_fixed
 test/bench_float
 test/bench_fixed
 test/bench_prof
+
+# host test binaries (rebuilt by test/run_tests.sh)
+/test/collapse_48
+/test/collapse_fixed
+/test/collapse_float
+/test/crumble_fixed
+/test/crumble_float
+/test/hq_shot
+/test/hq_test
+/test/intro_shot
+/test/n3ds_fur
+/test/n3ds_intro
+/test/n3ds_render
+/test/outfit_fixed
+/test/outfit_float
+/test/pose_fixed
+/test/pose_float
+/test/save_fixed
+/test/save_float
+/test/snd_test
+/test/snd_test_fx
+/test/text_hash
+/test/valve_fixed
+/test/valve_float
