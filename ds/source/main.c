@@ -468,11 +468,66 @@ static void draw_aim_dots(const View *v){
 #ifndef MX_DS_WALL_RUNS
 #define MX_DS_WALL_RUNS 0 /* older gfx_rect-based run prototype was slower */
 #endif
+#ifndef MX_DS_ROOM_VISIBLE_SCAN
+#define MX_DS_ROOM_VISIBLE_SCAN 1
+/* Wallpaper only exists inside exported MxRoom rectangles. Limit the scan
+   to their intersection with the camera, reading live paper/grid cells so
+   explosions and HQ district transitions cannot leave stale scenery. */
+#endif
 static void draw_rooms(const View *v){
   int ppc = v->ppc;
   int x0 = v->cx > 0 ? v->cx / ppc : 0, x1 = (v->cx + 256) / ppc + 1; if(x1 > MX_COLS) x1 = MX_COLS;
   int y0 = v->cy > 0 ? v->cy / ppc : 0, y1 = (v->cy + 192) / ppc + 1; if(y1 > MX_ROWS) y1 = MX_ROWS;
-#if MX_DS_WALL_DIRECT_RUNS
+#if MX_DS_ROOM_VISIBLE_SCAN && MX_DS_WALL_INLINED && !MX_DS_WALL_DIRECT_RUNS && !MX_DS_WALL_RUNS
+  /* Skip every off-room tile rather than probing paper/grid for the entire
+     camera rectangle. Tile colors always come from the CURRENT world arrays;
+     room lists and paper are rebuilt together on district transitions.
+     Overlapping rooms are safe: repeated paint has the same final pixels. */
+  for(int r=0;r<world.nrooms;r++){
+    const MxRoom *rm=&world.rooms[r];
+    int xa=rm->x>x0?rm->x:x0, xb=rm->x+rm->w<x1?rm->x+rm->w:x1;
+    int ya=rm->y>y0?rm->y:y0, yb=rm->y+rm->h<y1?rm->y+rm->h:y1;
+    if(xa>=xb||ya>=yb)continue;
+    if(ppc==4){
+      for(int y=ya;y<yb;y++){
+        int i=y*MX_COLS+xa,sy=y*4-v->cy,sx=xa*4-v->cx;
+        for(int x=xa;x<xb;x++,i++,sx+=4){
+          int p=world.paper[i];
+          if(!p||world.grid[i])continue;
+          if((unsigned)sx<=252u&&(unsigned)sy<=188u){
+            int pal=(p-1)&3;
+            u8 base=(u8)(C_WALL0+pal),accent=(u8)(C_WALLD0+pal);
+            u8 *d=v->buf+(size_t)sy*256+sx;
+            d[0]=base;d[1]=base;d[2]=base;d[3]=base;
+            d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=base;
+            d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=base;
+            d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=accent;
+          }else gfx_wall(v,p-1,sx,sy);
+        }
+      }
+    }else if(ppc==2){
+      for(int y=ya;y<yb;y++){
+        int i=y*MX_COLS+xa,sy=y*2-v->cy,sx=xa*2-v->cx;
+        for(int x=xa;x<xb;x++,i++,sx+=2){
+          int p=world.paper[i];
+          if(!p||world.grid[i])continue;
+          if((unsigned)sx<=254u&&(unsigned)sy<=190u){
+            int pal=(p-1)&3;
+            u8 base=(u8)(C_WALL0+pal);
+            u8 *d=v->buf+(size_t)sy*256+sx;
+            d[0]=(u8)(C_WALLD0+pal);d[1]=base;
+            d+=256;d[0]=base;d[1]=base;
+          }else gfx_wall(v,p-1,sx,sy);
+        }
+      }
+    }else{
+      for(int y=ya;y<yb;y++)for(int x=xa;x<xb;x++){
+        int i=y*MX_COLS+x;
+        if(world.paper[i]&&!world.grid[i])gfx_wall(v,world.paper[i]-1,x*ppc-v->cx,y*ppc-v->cy);
+      }
+    }
+  }
+#elif MX_DS_WALL_DIRECT_RUNS
   /* Built from the CURRENT destructible cell arrays each draw: no stale
      cached scenery after an explosion, district swap or collapsed room.
      Only long fully visible spans take this path, so clipping and edge

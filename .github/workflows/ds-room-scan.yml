@@ -1,0 +1,65 @@
+name: DS room-bounded wallpaper scan A-B
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ds/source/main.c"
+      - "test/ds_render.c"
+      - ".github/workflows/ds-room-scan.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build identical DS renderers with camera-wide and room-bounded wallpaper scans
+        run: |
+          for MODE in 0 1; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST \
+              -DMX_DS_ROOM_VISIBLE_SCAN=$MODE -Itest/stubs -Icore -Iart -Ids/source \
+              test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+              core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex-room-$MODE
+          done
+      - name: Wallpaper frame parity under camera shifts and damage
+        run: |
+          for MODE in 0 1; do
+            DS_ROOM_SCAN_PROBE=1 /tmp/mandex-room-$MODE > /tmp/room-$MODE.txt
+            DS_FACADE_DISTRICT_PROBE=1 /tmp/mandex-room-$MODE > /tmp/district-$MODE.txt
+          done
+          diff -u /tmp/room-0.txt /tmp/room-1.txt
+          diff -u /tmp/district-0.txt /tmp/district-1.txt
+          tail -n 1 /tmp/room-1.txt
+      - name: Verify complete gameplay frame hashes and matched host costs in all 60 levels
+        run: |
+          mkdir -p /tmp/mandex-room-results
+          for LEVEL in $(seq 0 59); do
+            for MODE in 0 1; do
+              DS_PERF_BENCH=1 /tmp/mandex-room-$MODE /tmp/mandex-room-$LEVEL-$MODE 300 "$LEVEL" > "/tmp/mandex-room-results/$LEVEL-$MODE.txt"
+            done
+          done
+          python3 - <<'PY'
+          import pathlib,re,statistics
+          results=[]
+          for level in range(60):
+              a=pathlib.Path(f'/tmp/mandex-room-results/{level}-0.txt').read_text()
+              b=pathlib.Path(f'/tmp/mandex-room-results/{level}-1.txt').read_text()
+              p=r'DS_FRAME_HASH checksum=([0-9a-f]+) screen_samples=(\d+)'
+              x=re.search(p,a);y=re.search(p,b)
+              assert x and y and x.groups()==y.groups(),f'PIXEL MISMATCH level={level+1}'
+              def value(s,pat):return float(re.search(pat,s).group(1))
+              old=value(a,r'cpu_frame_mean_us=([0-9.]+)')
+              new=value(b,r'cpu_frame_mean_us=([0-9.]+)')
+              wall_old=value(a,r'DS_TOP_LAYER name=wallpaper_facades mean_us=([0-9.]+)')
+              wall_new=value(b,r'DS_TOP_LAYER name=wallpaper_facades mean_us=([0-9.]+)')
+              results.append((level+1,old,new,(old-new)*100/old,wall_old,wall_new))
+          for lvl,o,n,g,wo,wn in results:
+              if lvl in (1,10,22,30,40,41,51,60):
+                  print(f'level={lvl} pixels=EQUAL old_host_us={o:.1f} room_host_us={n:.1f} change={g:.1f}% wallpaper_old_us={wo:.2f} wallpaper_room_us={wn:.2f}')
+          print('all_level_hashes=PASS 60/60')
+          print(f'median_host_change={statistics.median(r[3] for r in results):.1f}%')
+          print(f'levels_faster={sum(r[3]>0 for r in results)}/60')
+          PY

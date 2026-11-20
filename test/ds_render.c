@@ -533,6 +533,42 @@ static int facade_district_probe(void){
 }
 /* Deterministic damage-edge camera sweep: run against original and clipped
    DS rip renderer, comparing every visible pixel and non-empty torn edges. */
+/* A/B wallpaper traversal across normal and smashed rooms, camera edges,
+   and HQ district changes. No allocations or new runtime data structures. */
+static int room_scan_probe(void){
+  static const int levels[]={0,9,21,29,39,40,50,59};
+  static const int cams[][2]={{-5,-3},{0,0},{96,24},{244,67},{400,20},{-1,55}};
+  unsigned total_lit=0;
+  gfx_init();mx_meta_init(&stats);mx_options_default(&opt);
+  for(unsigned l=0;l<sizeof levels/sizeof levels[0];l++){
+    load_level(levels[l]);
+    for(int stage=0;stage<2;stage++){
+      if(stage){
+        /* Cause holes in existing paper, mirroring damage removal; the
+           exported room bounds remain unchanged during actual gameplay. */
+        for(int y=0;y<MX_ROWS;y++)for(int x=0;x<MX_COLS;x++){
+          int i=y*MX_COLS+x;
+          if(world.paper[i]&&((3*x+7*y)%13==0))world.paper[i]=0;
+        }
+      }
+      for(unsigned k=0;k<sizeof cams/sizeof cams[0];k++){
+        View v={buf_top,4,cams[k][0],cams[k][1]};
+        memset(buf_top,0,sizeof buf_top);
+        draw_rooms(&v);
+        unsigned hash=2166136261u,lit=0;
+        for(size_t i=0;i<sizeof buf_top;i++){
+          hash=(hash^buf_top[i])*16777619u;
+          lit+=(buf_top[i]!=0);
+        }
+        total_lit+=lit;
+        printf("DS_ROOM_HASH level=%d damaged=%d camera=%u checksum=%08x pixels=%u\n",levels[l]+1,stage,k,hash,lit);
+      }
+    }
+  }
+  if(!total_lit){fputs("FAIL: room probe drew no wallpaper\n",stderr);return 1;}
+  printf("DS_ROOM_PASS pixels=%u\n",total_lit);
+  return 0;
+}
 static int rip_clip_probe(void){
   static const int levels[]={0,9,39,59};
   static const int cameras[][2]={{-3,-5},{0,0},{80,24},{160,40},{252,48},{400,52}};
@@ -563,6 +599,7 @@ static int rip_clip_probe(void){
   return 0;
 }
 int main(int argc, char **argv){
+  if(getenv("DS_ROOM_SCAN_PROBE"))return room_scan_probe();
   if(getenv("DS_RIP_CLIP_PROBE"))return rip_clip_probe();
   if(getenv("DS_FACADE_DISTRICT_PROBE"))return facade_district_probe();
   if(argc > 1) OUT = argv[1];
