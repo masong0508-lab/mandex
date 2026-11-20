@@ -23,8 +23,8 @@ jobs:
         run: |
           gcc -std=gnu99 -O2 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float
           gcc -std=gnu99 -O2 -DMX_FIXED -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed
-          gcc -std=gnu99 -O2 -DMX_WOB_HOT_PROPAGATE=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_hot_ref
-          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_HOT_PROPAGATE=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_hot_ref
+          gcc -std=gnu99 -O2 -DMX_WOB_HOT_PROPAGATE=1 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_hot_ref
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_HOT_PROPAGATE=1 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_hot_ref
           gcc -std=gnu99 -O2 -DMX_WOB_CACHE_DAMP=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_damp_ref
           gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_CACHE_DAMP=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_damp_ref
           gcc -std=gnu99 -O2 -DMX_WOB_UNROLL_NB=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_ref
@@ -72,7 +72,7 @@ jobs:
               if not hot or hot.group(2)!=new.group(2):
                 raise SystemExit(f'{mode}/{frames}: hot candidate changes diverged')
               hv=float(hot.group(1))
-              hot_line=f'{mode} {frames} hot_scan_old_ms={hv:.1f} new_ms={np:.1f} gain_pct={100*(hv-np)/hv:.1f}'
+              hot_line=f'{mode} {frames} hot_scan_experiment_ms={hv:.1f} stable_ms={np:.1f} experiment_vs_stable_pct={100*(np-hv)/np:.1f}'
               print(hot_line);report.append(hot_line)
               d=subprocess.check_output([f'/tmp/mandex_physics_{mode}_damp_ref','--quiet',str(frames)],text=True)
               damp=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',d)

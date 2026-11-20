@@ -383,7 +383,7 @@ static real KK[MX_NMAT][MX_NMAT];                       /* joint stiffness of ev
 #define MX_WOB_COLD_O R(0.004)     /* |ox| + |oy|, cells */
 #endif
 #ifndef MX_WOB_HOT_PROPAGATE
-#define MX_WOB_HOT_PROPAGATE 1
+#define MX_WOB_HOT_PROPAGATE 0 /* complete world parity passed; perf mixed, keep stable scan */
 #endif
 #if !MX_WOB_HOT_PROPAGATE
 static uint8_t wob_hot[MX_ROWS * MX_COLS];
