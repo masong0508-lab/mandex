@@ -37,6 +37,12 @@ static int wob_budget = DS_WOB_MAX;
 #define MX_DS_MAX_SUBSTEPS 3
 #endif
 #define DT R(1.0 / 60.0)
+/* Display two complete software views at 60 Hz if the stylus is active,
+   otherwise redraw the touch-screen overview at 30 Hz. Top gameplay always
+   redraws at full speed. A/B profiling can disable this with -DMX_DS_BOTTOM30=0. */
+#ifndef MX_DS_BOTTOM30
+#define MX_DS_BOTTOM30 1
+#endif
 
 static MxWorld world;                         /* ~320 KB, lives in main RAM */
 static u8 buf_top[256 * 192] __attribute__((aligned(4)));
@@ -1432,7 +1438,13 @@ int main(void){
       ds_draw_top_ticks=(int)cpuEndTiming();
       DS_PERF_MARK(4);
       cpuStartTiming(0);
-      bot_dirty=!(lite && (frame & 1) && app == ST_PLAY && !dragging);
+      /* Previously the expensive second renderer ran at 60 Hz by default.
+         Keep full-rate pointer/drag feedback, but share the CPU frame budget
+         with physics when the lower screen is only an overview. */
+      int bottom_half_rate = MX_DS_BOTTOM30 && app==ST_PLAY &&
+          !dragging && !pad_used && !(held&KEY_TOUCH) && (frame&1);
+      bot_dirty=!(bottom_half_rate ||
+                  (lite && (frame&1) && app==ST_PLAY && !dragging));
       if(bot_dirty){       /* keep stylus aiming at 60Hz; throttle only noninteractive bottom redraws */
       if(world.man.mode == MAN_AIM && world.state == MX_PLAY){
         bot = (View){ buf_bot, 4, 0, 56 };

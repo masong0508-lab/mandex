@@ -23,13 +23,34 @@ jobs:
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_bench
           gcc -std=gnu99 -O2 -Icore test/fps_meter_test.c -o /tmp/ds_fps_meter_test
           /tmp/ds_fps_meter_test
+          gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_BOTTOM30=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_before
       - name: Measure simulation, upper/lower rendering and presentation for eight levels
         run: |
           mkdir -p out/ds-fps-phases
           for L in 0 9 21 29 39 40 50 59; do
+            DS_PERF_BENCH=1 /tmp/ds_fps_before /tmp/mandex-before 520 "$L" > "out/ds-fps-phases/baseline-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_bench /tmp/mandex-fps 520 "$L" > "out/ds-fps-phases/level-$L.txt"
             grep -E '^(DS_HOST_PROFILE|DS_PHASE)' "out/ds-fps-phases/level-$L.txt"
           done
+      - name: Compare actual host CPU frame costs (same job, both variants)
+        run: |
+          python3 - <<'PY'
+          import glob,re,pathlib
+          output=[]
+          for fn in sorted(glob.glob('out/ds-fps-phases/level-*.txt')):
+            level=pathlib.Path(fn).stem.split('-')[1]
+            a=pathlib.Path('out/ds-fps-phases/baseline-level-'+level+'.txt').read_text()
+            b=pathlib.Path(fn).read_text()
+            pattern=r'cpu_frame_mean_us=([0-9.]+)'
+            x=float(re.search(pattern,a).group(1));y=float(re.search(pattern,b).group(1))
+            speedup=(x-y)/x*100 if x else 0
+            output.append((int(level)+1,x,y,speedup))
+          hdr='Level | Baseline host us/frame | 30 Hz lower-screen host us/frame | CPU reduction'
+          print(hdr)
+          for level,x,y,pct in output:print(f'{level:>5} | {x:>22.1f} | {y:>32.1f} | {pct:>12.1f}%')
+          pathlib.Path('out/ds-fps-phases/summary.txt').write_text(
+            hdr+'\n'+'\n'.join(f'{level} {x:.1f} {y:.1f} {pct:.1f}%' for level,x,y,pct in output)+'\n')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: mandex-ds-bottleneck-host-phase-times
