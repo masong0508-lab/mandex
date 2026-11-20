@@ -763,16 +763,37 @@ static void w_visit(u8 *b, int k, int tt){
     /* Brief silhouettes behind frosted glass; a playful embrace and a kiss,
        then curtains politely end the shot. Never graphic or naked. */
     if(tt<54){
-      int lean=tt<22?tt/3:7;
-      gfx_rect(b,64,140,52,38,C_DARK);
-      gfx_rect(b,146,141,45,37,C_DARK);
-      gfx_ell(b,91+lean,114,17,19,C_DARK);
-      gfx_ell(b,154-lean,111,18,20,C_DARK);
-      gfx_tri(b,77+lean,114,84+lean,89,96+lean,109,C_DARK); /* hair */
-      gfx_tri(b,145-lean,104,150-lean,86,161-lean,108,C_DARK); /* ear */
-      gfx_tline(b,101+lean,149,146-lean,148,8,C_DARK);
-      gfx_tline(b,111+lean,136,138-lean,137,4,C_DARK);
-      if(tt>18)gfx_text_c(b,128,47,"SMOOCH!",C_PINK,C_UIBG,1);
+      int lean=tt<28?tt/4:7, kiss=tt>21?3:0;
+      /* Lighting on the jaw, hair, wolf ears and hands makes these clearly
+         two *people* in profile, rather than ambiguous circular shapes. */
+      gfx_ell(b,103+lean,124,28,24,C_DARK); /* Brenda's shoulders */
+      gfx_ell(b,153-lean,124,29,25,C_DARK); /* Gerald's shoulders */
+      gfx_rect(b,75+lean,122,55,25,C_DARK);
+      gfx_rect(b,132-lean,122,57,25,C_DARK);
+      gfx_ell(b,102+lean,82,14,18,C_DARK);
+      gfx_ell(b,149-lean,81,16,19,C_DARK);
+      /* Crown of hair, fringe and bangs flowing away from the kiss */
+      gfx_ell(b,96+lean,70,17,8,C_DARK);
+      gfx_tri(b,83+lean,76,87+lean,93,95+lean,83,C_DARK);
+      gfx_tri(b,86+lean,69,84+lean,58,98+lean,68,C_DARK);
+      gfx_tri(b,144-lean,67,140-lean,48,153-lean,62,C_DARK);
+      gfx_tri(b,160-lean,68,164-lean,49,154-lean,61,C_DARK);
+      /* Two asymmetric nose-and-chin profiles approach at the center */
+      gfx_tri(b,113+lean,81,122+lean+kiss,86,113+lean,91,C_DARK);
+      gfx_tri(b,138-lean,82,129-lean-kiss,87,138-lean,92,C_DARK);
+      gfx_tline(b,114+lean,95,116+lean,99,1,C_CLOUD2);
+      gfx_tline(b,137-lean,96,135-lean,99,1,C_CLOUD2);
+      gfx_line(b,95+lean,82,95+lean,89,C_CLOUD2);
+      gfx_line(b,158-lean,81,158-lean,89,C_CLOUD2);
+      /* Hand on shoulder and the other arm around the waist */
+      gfx_tline(b,94+lean,126,142-lean,120,9,C_DARK);
+      gfx_ell(b,142-lean,120,5,5,C_DARK);
+      gfx_tline(b,160-lean,121,120+lean,133,7,C_DARK);
+      gfx_ell(b,120+lean,133,4,4,C_DARK);
+      if(tt>19){
+        gfx_text_c(b,128,45,"SMOOCH!",C_PINK,C_UIBG,1);
+        gfx_text(b,171,85+wv(tt,34,3),"<3",C_PINK,1);
+      }
     }
     int curtain=tt<40?tt:40;
     gfx_rect(b,0,0,curtain*128/40,192,C_DARK);
