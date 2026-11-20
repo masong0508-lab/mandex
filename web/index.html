@@ -587,9 +587,22 @@ function shockwave(px,py,rpx,power){
     applyImpulse(ch,ch.x-dx*.3,ch.y-dy*.3,dx/d*f,dy/d*f-f*.35)}
   for(const t of targets)if(t.alive&&Math.hypot(t.x-px,t.y-py)<rpx*1.05)killTarget(t,true);
   for(const p of parts){const dx=p.x-px,dy=p.y-py,d=Math.hypot(dx,dy)||1;if(d<rpx*1.6&&p.k!==5){p.vx+=dx/d*260;p.vy+=dy/d*260}}}
+/* Match the console core's structural-shock reactions without a per-frame
+   enemy/hazard scan.  Only real collapse events call this bounded loop.
+   Nothing allocated; existing panic and dodge fields drive the animations. */
+function lordShock(x,y,reach,seconds){
+  if(state!=='play')return;
+  for(const t of targets){
+    if(!t.alive||Math.abs(t.x-x)>reach||Math.abs(t.y-y)>56)continue;
+    t.pan=Math.max(t.pan||0,.65);
+    if(MOBILE.includes(t.kind)&&!(t.dodge>0)){
+      t.dd=t.x>=x?1:-1;t.dodge=seconds;
+    }
+  }
+}
 function processExpl(){let n=0;
   while(explQ.length&&n++<80){const[x,y]=explQ.shift(),px=x*V+V/2,py=y*V+V/2;onBoom();
-    blast(x,y,7,95);wobBlast(x,y,14,26);shockwave(px,py,7*V,5200);shake=Math.max(shake,9);slow=Math.max(slow,.35);freeze=Math.max(freeze,3);flash=.35;SFX.boom();
+    blast(x,y,7,95);wobBlast(x,y,14,26);shockwave(px,py,7*V,5200);lordShock(px,py,14*V,.8);shake=Math.max(shake,9);slow=Math.max(slow,.35);freeze=Math.max(freeze,3);flash=.35;SFX.boom();
     ring(px,py,90,'#ffcf6b');
     for(let k=0;k<30;k++)parts.push({k:2,x:px,y:py,vx:(rnd()-.5)*620,vy:-rnd()*520,l:.5+rnd()*.5,l0:1});
     for(let k=0;k<8;k++)parts.push({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}}
@@ -610,7 +623,7 @@ function wobBlast(cx,cy,r,speed){
     const k=idx(x,y);if(!grid[k])continue;const d=Math.sqrt(d2),f=1-d/(r+1),dx=d2?i/d:0,dy=d2?j/d:-1,v=speed*f;wobAdd(k,dx*v,dy*v)}
   wobOn=true;wobQuiet=0}
 const FD=new Float32Array(MAT.length),INVD=new Float32Array(MAT.length);for(let m=1;m<MAT.length;m++)INVD[m]=1/MAT[m].d;
-function crackFx(x,y,m,d){const px=(x+.5+(d===0?.5:0))*V,py=(y+.5+(d===2?.5:0))*V;SFX.crack();
+function crackFx(x,y,m,d){const px=(x+.5+(d===0?.5:0))*V,py=(y+.5+(d===2?.5:0))*V;lordShock(px,py,5*V,.45);SFX.crack();
   dust(px,py,1,6);
   if(m===GLASS)for(let k=0;k<4;k++)chip(px,py,'#ffffff',(rnd()-.5)*160,-rnd()*120);
   else for(let k=0;k<2;k++)chip(px,py,shade(MAT[m].c,-20),(rnd()-.5)*90,-rnd()*70)}
@@ -698,7 +711,7 @@ function resolveStatic(ch,a,nx,ny,pen,ci,cj){
 function impactDamage(ch,a,ci,cj,vn){
   const dmg=(vn-(a.m===GLASS?57:160))*.07;if(inb(ci,cj)&&grid[idx(ci,cj)])damageCell(ci,cj,dmg*.9);a.h-=dmg*.6*MAT[a.m].brit;
   if(a.h<=0){a.dead=true;const c=MAT[a.m].c;for(let k=0;k<3;k++)chip(a.wx,a.wy,c,(rnd()-.5)*200,-rnd()*150);dust(a.wx,a.wy,1,7)}
-  SFX.thud(vn*ch.m/3000);shake=Math.max(shake,Math.min(6,vn*ch.m/5000));if(rnd()<.3)dust(a.wx,a.wy+4,1,8)}
+  if(vn>250)lordShock(a.wx,a.wy,8*V,.45);SFX.thud(vn*ch.m/3000);shake=Math.max(shake,Math.min(6,vn*ch.m/5000));if(rnd()<.3)dust(a.wx,a.wy+4,1,8)}
 function stepChunks(dt){
   if(!chunks.length)return;
   const map=new Map();
