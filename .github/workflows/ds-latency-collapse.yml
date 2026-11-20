@@ -1,0 +1,62 @@
+name: DS audio input and collapse gate
+
+# Rapid and focused regression gate. Full rendering parity, multiport builds
+# and hardware/emulator metrics remain in their dedicated workflows.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "core/**"
+      - "ds/source/**"
+      - "test/ds_render.c"
+      - "test/music_clock_test.c"
+      - "test/room_backdrop_test.c"
+      - "test/room_backdrop_web_test.js"
+      - "web/index.html"
+      - ".github/workflows/ds-latency-collapse.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test DS music catch-up ring budget
+        run: |
+          gcc -std=gnu99 -O2 -Itest/stubs -Ids/source test/music_clock_test.c -o /tmp/mx_music_clock
+          /tmp/mx_music_clock
+      - name: Compile actual DS game front-end against host stubs
+        run: |
+          gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Itest/stubs -Icore -Iart -Ids/source \
+            test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+            core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mx_ds_controls
+      - name: Script stylus options and overload; collapse must never auto-disable
+        run: |
+          rm -f /tmp/mx_opt_test.sav
+          MX_SAVE_PATH=/tmp/mx_opt_test.sav OPTIONS_TEST=1 \
+            /tmp/mx_ds_controls /tmp/mx_option_screen 3000 0 | tee /tmp/option_test.log
+          grep -q 'options: all passed' /tmp/option_test.log
+          MX_SAVE_PATH=/tmp/mx_opt_test.sav OPTIONS_LOAD=1 \
+            /tmp/mx_ds_controls /tmp/mx_option_reload 400 0
+      - name: Check browser back walls and shared-core fixed/float physics
+        run: |
+          node test/room_backdrop_web_test.js
+          for mode in float fixed; do
+            flags=""
+            if [ "$mode" = fixed ]; then flags="-DMX_FIXED"; fi
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/room_backdrop_test.c -lm -o /tmp/room_$mode
+            /tmp/room_$mode
+          done
+      - name: Verify HTML game parses
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('web/index.html').read_text()
+          a=s.rfind('<script>');b=s.rfind('</script>')
+          assert a>=0 and b>a
+          Path('/tmp/mandex_parse.js').write_text(s[a+8:b])
+          PY
+          node --check /tmp/mandex_parse.js
