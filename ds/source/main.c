@@ -109,21 +109,45 @@ enum { PT_DEBRIS, PT_SMOKE, PT_SPARK, PT_GOO, PT_HAT, PT_DUST, PT_STAR, PT_STINK
 typedef struct { int x, y, vx, vy; short life, max; u8 type, col; short r; } Part;      /* positions in 1/64 cell; r = a ring's final radius in 1/64 cell */
 #define NPART 128
 static Part parts[NPART];
+#ifndef MX_DS_PARTICLE_HINT
+#define MX_DS_PARTICLE_HINT 1
+#endif
+#if MX_DS_PARTICLE_HINT
+/* Always the lowest available slot. Destruction bursts no longer restart a
+   128-entry scan for every chip, and the same slots draw in the same order. */
+static int part_free_hint;
+#endif
 
 static void spawn(int type, real wx, real wy, int vx, int vy, int col, int life){
+#if MX_DS_PARTICLE_HINT
+  for(int i = part_free_hint; i < NPART; i++) if(parts[i].life <= 0){
+#else
   for(int i = 0; i < NPART; i++) if(parts[i].life <= 0){
+#endif
     Part *p = &parts[i];
     p->x = wx >> 6; p->y = wy >> 6; p->vx = vx; p->vy = vy; p->life = p->max = (short)life; p->type = (u8)type; p->col = (u8)col; p->r = 0;
+#if MX_DS_PARTICLE_HINT
+    part_free_hint = i + 1;
+#endif
     return;
   }
 }
 /* the browser's ring(): an outline that swells to rcells and fades */
 static void spawn_ring(real wx, real wy, int rcells, int col){
+#if MX_DS_PARTICLE_HINT
+  /* The hint is the exact same slot the legacy first-free scan would find. */
+  int i = part_free_hint;
+  if(i < NPART){
+    spawn(PT_RING, wx, wy, 0, 0, col, 27);
+    parts[i].r = (short)(rcells * 64);
+  }
+#else
   for(int i = 0; i < NPART; i++) if(parts[i].life <= 0){
     spawn(PT_RING, wx, wy, 0, 0, col, 27);
     parts[i].r = (short)(rcells * 64);
     return;
   }
+#endif
 }
 typedef struct { int x, y, life; char txt[12]; u8 col; } Popup;
 static Popup pops[4];
@@ -198,6 +222,9 @@ static void update_parts(void){
     case PT_GLINT: break;
     case PT_DUST:  p->vx = p->vx * 7 / 8; p->vy = p->vy * 7 / 8; break;
     }
+#if MX_DS_PARTICLE_HINT
+    if(p->life <= 0 && i < part_free_hint) part_free_hint = i;
+#endif
   }
   for(int i = 0; i < 4; i++) if(pops[i].life > 0){ pops[i].life--; if(frame & 1) pops[i].y -= 1; }
 }
@@ -334,6 +361,9 @@ static void on_events(void){
       break; }
     case EV_DISTRICT:                                       /* Landlord HQ: the next district is built in the same grid, with fresh men */
       cells0 = mx_cells_left(&world); dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); ev_ft = 0;
+#if MX_DS_PARTICLE_HINT
+      part_free_hint = 0;
+#endif
       sfx_play(SFX_WIN, 64); break;
     case EV_WIN:    sfx_play(SFX_WIN, 64); music_set(0); break;
     case EV_LOSE:   sfx_play(SFX_LOSE, 64); music_set(0); break;
@@ -1020,6 +1050,9 @@ static void load_level(int l){
   mx_set_wobble_budget(&world, wob_budget);
   cells0 = mx_cells_left(&world); disp_score = 0; end_t = 0; was_state = MX_PLAY; dragging = 0; pad_used = 0;
   memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops);
+#if MX_DS_PARTICLE_HINT
+  part_free_hint = 0;
+#endif
   ev_ft = 0; fx = RI(88); fy = RI(38);
 }
 
