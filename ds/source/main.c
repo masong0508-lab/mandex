@@ -1365,7 +1365,9 @@ int main(void){
       DS_PERF_MARK(1);
       cpuStartTiming(0);
       for(unsigned step=0;step<requested_steps;step++){
-        if(world.state!=MX_PLAY)break;
+        /* Keep the original one-step post-win/lose effects every frame;
+           stop only OPTIONAL catch-ups after an outcome has been reached. */
+        if(step>0 && world.state!=MX_PLAY)break;
         mx_update(&world,DT);
         sim_steps_done++;
         on_events();
