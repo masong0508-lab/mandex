@@ -124,6 +124,26 @@ static int n3_fastpath_probe(void){
          RGB((r*29)&255,(r*7)&255,(r*13)&255));
   }
   printf("N3_FAST_CIRCLES=%08x\n",n3_hash(fb_top[0],sizeof fb_top[0]));
+  /* Spawn bursts interleaved with expiry must allocate exactly the same
+     lowest free indices with and without the cursor optimization. */
+  memset(parts,0,sizeof parts);
+  for(int wave=0;wave<7;wave++){
+    for(int k=0;k<83;k++)
+      spawn_k((float)(k+wave), (float)(k%33), 0.2f,-0.3f,
+              2+(k%5), RGB(k&255,wave&255,77), k%3);
+    for(int j=0;j<NP;j++)
+      if(parts[j].life>0 && ((j+wave)%7)==0)parts[j].life=1;
+    tick_parts();
+  }
+  { unsigned h=2166136261u;
+    for(int j=0;j<NP;j++){
+      h^=(unsigned)((parts[j].life+2)*23u+j*7u+parts[j].kind);
+      h*=16777619u;
+      h^=(unsigned)(parts[j].x*10);
+      h*=16777619u;
+    }
+    printf("N3_PARTICLE_POOL=%08x\n",h);
+  }
   load_level(0);
   mx_set_pull(&world,R(-9),R(5));
   dragging=1;
