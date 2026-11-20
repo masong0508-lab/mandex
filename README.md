@@ -22,6 +22,43 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 20 continuation: cross-port gameplay + speed
+
+This pass is integrated on **main** (no parallel feature branches):
+
+- **Smarter, event-driven landlord reactions:** structural cracks, heavy
+  rubble and explosions can make nearby enemies panic and attempt to escape.
+  The shared C core and JavaScript gameplay both react only when a hazard
+  occurs; the C path has a compile-time reference switch.
+- **Safe progress on additional hardware:** 3DS stores two CRC-checked
+  alternating files at `sdmc:/3ds/mandex/`; Dreamcast uses two VMU A1
+  sectors. Both preserve existing star, outfit, achievement and score
+  formats. A simulated interrupted-VMU-write regression test covers
+  recovery after a partial replacement. Cartridge/VMU/SD hardware
+  verification is still required.
+- **3DS renderer:** integer circle rasterization replaces repeated
+  per-column square roots, including both stereoscopic eyes. Host
+  framebuffer hashes are compared to the exact old primitive.
+- **Pixel-identical particle-pool acceleration:** DS, 3DS and Dreamcast
+  remember the lowest free particle slot, reducing repeated searches
+  during large demolition effects. Cracking and settling buildings also
+  receive small, bounded dust bursts.
+- **Browser Eco FX:** **F4** switches between full decorative particles
+  and a tighter 360-particle visual budget; F3 displays FPS, simulation
+  rate and the chosen effects setting. The switch affects effects only,
+  not AI or destruction simulation.
+- **Sound and memory:** a formerly silent heavy-rubble event is fixed
+  across console ports; 3DS and Dreamcast audio startup avoids
+  duplicate PCM storage.
+- **CI throughput:** superseded long-running builds and performance
+  audits are canceled so current `main` receives the resources. Focused
+  smoke tests cover crashed saves and four DS levels, while the longer
+  pixel/physics suites cover wider regressions.
+
+**Measurement caution:** host CPU timings and parity checks do not prove
+30 FPS on hardware. Test with the on-device frame meters and confirm
+sound, SD/VMU saving and controller behavior on the target systems.
+
 ## What is in it
 
 - **Destruction physics**: voxel buildings sit on springs (they sway, crack, snap and topple); wood, brick, stone, glass,
@@ -94,13 +131,18 @@ Full list in [PORTING.md](PORTING.md).
 | `pages.yml` | manual | publishes `web/` to GitHub Pages |
 | `release.yml` | tag `v*` | tests, builds the DS ROM, attaches the ROM and `mandex.html` to a release |
 
-The DS and Dreamcast build workflows are the first real test of those Makefiles: expect to fix a few compile or link
-problems on the first runs.
+GitHub Actions has produced DS, 3DS homebrew, and experimental Dreamcast
+images. The combined ROM workflow packages the standalone browser HTML
+alongside the three console platforms. Build success is not the same as
+on-device verification.
 
 ## Honest status
 
-Everything compiles and passes on a normal PC compiler, but the console builds were written without a toolchain, no
-emulator or hardware has run them, DS frame time is unknown (the in-game profiler is on `L`), and none of the sounds
-have been heard.  The Dreamcast port has no sound yet.
+Console builds run in GitHub Actions; host rendering, save corruption,
+fixed/float physics and DeSmuME FPS smoke tests provide additional checks.
+The DS and 3DS synthesize audio, and Dreamcast routes music/effects to
+AICA. Actual device-level performance, save reliability and audio quality
+remain unverified. A build or host test succeeding does not establish
+console hardware FPS.
 
 DS character sprite clipping A/B instrumentation (`MX_DS_FAST_MAN`).
