@@ -3569,7 +3569,10 @@ const CUT=[
      ctx.fillStyle=cgRG(480,300,10,560,[0,'rgba(150,215,255,'+(.5+fl)+')',1,'rgba(150,215,255,0)']);ctx.fillRect(0,0,W,H);cgLamp(70,470);
      ctx.save();ctx.translate(480,468);ctx.scale(1.75,1.75);ctx.translate(-380,-396);cgCouchBack(215,396);cutGerald(380,395,1.7,G);cgCouchFront(215,396);ctx.restore();
      cgPizza(790,540,6);cgCan(80,530,.6);cgCan(120,540,-.4)}
-   else{cgFridge(t);cutGerald(480,520,3.4,Object.assign({},G,{face:'bliss'}))}
+   else{
+     cgFridge(t);cutGerald(400,520,3.4,Object.assign({},G,{face:'bliss'}));
+     cgRearPanel(t,790,244,.62,false,'PANTS ON STRIKE');
+   }
    txt('DAY '+day,60,70,54,'#ffd23f','left','#4a2a00')}},
  // 5. landlords: wide / from behind Gerald / his face
  {lines:["Then the landlord. \"Rent's due, Gerald.\"","Then all of them. Every hike. Every \"no refunds.\" The fee for the pigeon.","Something in Gerald snapped. Also his waistband."],hl:2,cuts:[0,1.6,4.0],draw(t){const k=cgK(this.cuts,t);
@@ -3578,7 +3581,9 @@ const CUT=[
      [[620,0],[720,1.3],[820,2.6]].forEach(([x,o])=>cgLord(x-t*9,395,2.8,t,o))}
    else if(k===1){cgSunsetStreet(560,250);cutCloud(250,90,1.2,'#ffd2a6');cgPole(880,395);
      [[470,0,2.7,392],[640,1.3,3.0,396],[820,2.6,3.3,398]].forEach(([x,o,s,y])=>cgLord(x-(t-1.6)*12,y,s,t,o));
-     cutGeraldBack(190,630,3.5,{boxers:1});cutBubble(640,140,"RENT'S DUE, GERALD.",1)}
+     cutGeraldBack(190+Math.sin(t*12)*4,630,3.5,{boxers:1});
+     cgRearPanel(t-1.6,796,266,.65,false,'RENTAL REAR VIEW');
+     cutBubble(640,140,"RENT'S DUE, GERALD.",1)}
    else{cgSky('#ff7a3c','#ffd7a0',540);cgBokeh(t,['#fff1c0','#ffb070','#ff8a5a'],14);cutGerald(480,624,4.6,{boxers:1,face:'sad',belly:[1.3,1.22],armL:[-27,-8,-26,16],armR:[27,-8,26,16],head:[0,5,0]})}}},
  // 6. the snap: wide storm / low angle / extreme close-up
  {lines:["Gerald snapped.","The sky snapped. Part of the roof snapped.","And something old, pink and terry-cloth answered. Damp. Determined."],hl:2,cuts:[0,1.6,3.2],shake:[0,5,8],tilt:[0,-.07,.05],draw(t){const k=cgK(this.cuts,t);
@@ -3665,14 +3670,86 @@ const CUT3=[
    else{cutFlag(4,()=>{SFX.whoosh();SFX.thud(.9)});ctx.fillStyle='rgba(255,255,235,'+Math.max(0,.8-u*2)+')';ctx.fillRect(0,0,W,H);
      for(let i=0;i<10;i++){const a=i*.7,x=480+Math.cos(a)*(30+u*240)*(i%2?1:-1),y=300+Math.sin(a*2)*30-u*70+u*u*200;ctx.save();ctx.translate(x,y);ctx.rotate(u*(4+i)*(i%2?1:-1));ctx.fillStyle=i%3?'#f6f9ff':'#2a4d9c';ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-12,-6);ctx.lineTo(10,-9);ctx.lineTo(13,5);ctx.lineTo(-6,10);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}
      cutBubble(740,120,"MY SHIRT!",0,26)}}},
- // 5. the rear view
+ 
+/* Kinetic comic insert: enormous clothed/furry rear-view closeup and harmless
+   suction-cup pratfall. Only paints into the existing canvas, in cutscenes. */
+function cgRearPanel(t,x,y,z=1,wolf=false,caption='REAR VIEW'){
+  ctx.save();ctx.translate(x,y);ctx.scale(z,z);
+  ctx.rotate(-.025+Math.sin(t*2.4)*.015);
+  ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.fillStyle='#150c21';ctx.fillRect(-137,-112,274,225);
+  ctx.strokeStyle=wolf?'#d6b6fb':'#ffdc69';ctx.lineWidth=4;ctx.strokeRect(-135,-110,270,220);
+  for(let i=0;i<8;i++){
+    ctx.fillStyle='rgba(255,255,255,.13)';
+    ctx.fillRect(-125+i*34,-107,14,4);ctx.fillRect(-125+i*34,103,14,4);
+  }
+  ctx.fillStyle=wolf?'#40304d':'#5d1b43';ctx.fillRect(-128,-97,256,183);
+  // Magazine spotlight and squash/stretch. Fast analytic shapes: no raster assets.
+  const pulse=Math.sin(t*10),bounce=Math.abs(Math.sin(t*7.4))*7;
+  const wob=Math.sin(t*12)*8,stretch=1+bounce/160;
+  ctx.fillStyle='rgba(255,237,193,.14)';
+  ctx.beginPath();ctx.ellipse(0,-10,112,88,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#1e101a';
+  for(const side of[-1,1]){
+    ctx.beginPath();
+    ctx.ellipse(side*(40+wob),-2+bounce,53+Math.abs(pulse)*2,69*stretch,side*.10,0,Math.PI*2);
+    ctx.fill();
+  }
+  for(const side of[-1,1]){
+    ctx.fillStyle=wolf?(side<0?'#b1a1bd':'#81758d'):(side<0?'#e94964':'#b72b52');
+    ctx.beginPath();
+    ctx.ellipse(side*(40+wob),-4+bounce,50+Math.abs(pulse)*2,65*stretch,side*.1,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.16)';
+    ctx.beginPath();ctx.ellipse(side*(48+wob)-10,-28+bounce,19,23,-.4,0,Math.PI*2);ctx.fill();
+  }
+  // Contrast stitching, stretchy waistband and tidy fabric highlights.
+  ctx.fillStyle='#24121d';ctx.fillRect(-106,-71+bounce,212,25);
+  ctx.fillStyle=wolf?'#e3d5e8':'#fff1e4';ctx.fillRect(-101,-68+bounce,202,10);
+  ctx.fillStyle=wolf?'#81758d':'#f08ca5';ctx.fillRect(-101,-54+bounce,202,6);
+  ctx.strokeStyle='#37182a';ctx.lineWidth=4;ctx.beginPath();
+  ctx.moveTo(0,-45+bounce);ctx.quadraticCurveTo(2+wob,8,0,64+bounce);ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;
+  for(const side of[-1,1]){ctx.beginPath();
+    ctx.moveTo(side*94,-24+bounce);ctx.quadraticCurveTo(side*120,32,side*81,58+bounce);ctx.stroke();}
+  if(wolf){
+    const tail=Math.sin(t*9)*26;
+    ctx.strokeStyle='#1e1526';ctx.lineWidth=27;ctx.beginPath();
+    ctx.moveTo(76,-52);ctx.quadraticCurveTo(104+tail,-95,107+tail,-53);ctx.stroke();
+    ctx.strokeStyle='#b2a4c1';ctx.lineWidth=20;ctx.stroke();
+    ctx.fillStyle='#e1d6e9';ctx.beginPath();ctx.ellipse(107+tail,-53,15,14,0,0,Math.PI*2);ctx.fill();
+  }
+  // The rubber prop stops at the surface of the shorts/fur, never pierces.
+  const approach=Math.min(1,t*2.6),spring=t>1.0?Math.min(1,(t-1)*1.9):0;
+  const cupX=90+48*(1-approach)+130*spring;
+  ctx.strokeStyle='#704125';ctx.lineWidth=11;ctx.beginPath();
+  ctx.moveTo(cupX+18,-2);ctx.lineTo(cupX+79,-47+Math.sin(t*9)*5);ctx.stroke();
+  ctx.strokeStyle='#e3b374';ctx.lineWidth=3;ctx.stroke();
+  ctx.fillStyle='#de7282';ctx.strokeStyle='#482238';ctx.lineWidth=4;
+  ctx.beginPath();ctx.ellipse(cupX,2,19,12,-.2,0,Math.PI*2);ctx.fill();ctx.stroke();
+  if(t>1.02&&t<2.1){
+    ctx.save();ctx.rotate(Math.sin(t*18)*.065);
+    txt('BOI-OI-OING!',0,-89,20,'#ffef78','center','#1e1028');ctx.restore();
+  }
+  for(let i=0;i<6;i++){
+    const dir=i%2?-1:1,l=14+Math.abs(pulse)*18;
+    ctx.strokeStyle=i%2?'#fff4c0':'#f39cb5';ctx.lineWidth=2.5;ctx.beginPath();
+    ctx.moveTo(dir*108,-62+i*27);ctx.lineTo(dir*(108+l),-71+i*27);ctx.stroke();
+  }
+  ctx.fillStyle='rgba(7,4,18,.88)';ctx.fillRect(-133,71,266,29);
+  txt(caption,0,91,17,'#ffedbb','center','#21142a');
+  ctx.restore();
+}
+// 5. the rear view
  {lines:["The shorts held out for one more second.","Then: a tail. And the discovery that pants were always optional.","Gerald checked the rear view. Round. Furry. Free."],hl:2,cuts:[0,1.5,3.2],tr:'iris',hold:3.6,shake:[0,6,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
    cgWood('#4a3a5a','#241a30');cgMoon(140,110,60,t);
    if(k===0){cutGerald(480,392,2.5,{wolf:true,face:'sad',pose:'up',dy:Math.sin(t*20)*1});if(u>.8)cutBubble(760,150,"...is that a breeze?",0)}
    else if(k===1){const sp=Math.min(1,u/.5),sx=Math.cos(sp*Math.PI);ctx.save();ctx.translate(480,0);ctx.scale(Math.abs(sx)||.01,1);ctx.translate(-480,0);if(sx>0)cutGerald(480,392,2.5,{wolf:true,pose:'up'});else cutGeraldBack(480,392,2.5,{wolf:true});ctx.restore();
      cutFlag(5,()=>SFX.whoosh());ctx.fillStyle='#8a5a2b';for(let i=0;i<6;i++){const a=u*3+i*1.4;ctx.save();ctx.translate(480+Math.sin(a*2+i)*(60+u*90)*(i%2?1:-1),360-u*40+u*u*160);ctx.rotate(a);ctx.fillRect(-9,-4,18,8);ctx.restore()}
      if(u>.7)cutBubble(760,150,"*riiip*",0)}
-   else{cutGeraldBack(480,440,2.55,{wolf:true,dy:Math.sin(u*5)*3});cutBubble(760,130,"Looking good, Gerald.",0)}}},
+   else{
+     cgRearPanel(u,480,275,1.48,true,'REAR VIEW: UNLICENSED');
+     cutBubble(800,130,u<1.0?"THAT'S A TAIL, RIGHT?":"LOOKING GOOD, GERALD.",0);
+   }}}
  // 6. the howl
  {lines:["Naturally, he howled.","At a moon he had called \"a lot\" two minutes earlier.","Three blocks away, a landlord's wine glass cracked."],hl:2,cuts:[0,1.8,3.5],tr:'wipe',hold:3.6,shake:[6,10,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
    if(k<2){cgSky('#0a0d24','#3a2a60',395);cgMoon(480,k===0?210:150,k===0?200:130,t);if(k===0){cgHowl(t,300,300);cgHowl(t+.5,660,300)}
@@ -3779,7 +3856,11 @@ const CUT_E1=[
    for(let i=0;i<7;i++)cgFolk(90+i*130+(k===0?0:-30),414+(i%2)*14,t+i*.3,cols[i%5],i%2?signs[i%5]:null);
    if(k===0){ctx.save();ctx.translate(480,300);ctx.scale(1.5,1.5);cgBrenda(0,0,t);ctx.restore();cutGerald(700,420,2.2,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]});cutBubble(350,150,"You did it, Gerald!",1)}
    else if(k===1){cutGerald(480,470,3.4,{face:'kiss',pose:'up',shirt:0});ctx.save();ctx.translate(250,330);ctx.scale(2.2,2.2);cgBrenda(0,0,t,true);ctx.restore();for(let i=0;i<5;i++){const ph=(t*.6+i*.2)%1;cgSpark(340+i*40,260-ph*140,7,'#ff6fa8')}cgHotTake(u,420,270);cutBubble(700,150,"Nice package, Gerald.",0);if(u>1.2)cutBubble(250,130,"The BELLY, I mean.",1)}
-   else{cutGerald(480,470,3.2,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]});cutBubble(720,150,"RENT IS CANCELLED!",0,22)}}},
+   else{
+     cutGerald(350+Math.sin(u*9)*12,470,3.2,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]});
+     cgRearPanel(u,776,284,.66,false,'ENCORE? NO REFUNDS');
+     cutBubble(700,150,"RENT IS CANCELLED!",0,22);
+   }}}
  // 3. the letter
  {shirt:0,lines:["Thump. The mailbox coughed up a metal tube.","Inside: one letter, on very expensive paper.","\"We noticed. Come to the office. Bring the belly.\""],hl:2,cuts:[0,1.6,3.4],tr:'iris',hold:3.8,shake:[0,6,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
    cgSky('#2a2f55','#9a7a9a',395);cgStars(t,30,260);cgHills(395,'#2a2f50','#222644','#1a1e38');cgGrass(395,145,'#2f4a3a','#16261c');cgMailbox(300,420);
@@ -3812,7 +3893,11 @@ const CUT_E2=[
    cgSky('#2a2250','#c86a6a',395);cgStars(t,34,220);const mr=k<2?46:46+(t-4.6)*50;cgMoon(k<2?820:560,k<2?300:260,Math.min(mr,150),t);cgHills(395,'#3a2e5a','#2a2248','#1c1634');cgGrass(395,145,'#3a4a3a','#18221a');cgConfetti(t,20);
    for(let i=0;i<6;i++)cgFolk(70+i*140,420+(i%2)*12,t+i*.4,['#2a4d9c','#c43a3a','#2a9c6a','#9c6a2a','#6a3a9c','#9c3a6a'][i],i%3===0?'PARTY':null);
    if(k===0){cutGerald(480,430,2.3,{face:'cool',pose:'up',shirt:0});cgPizza(580,418,3);cutBubble(700,160,"Best pizza of my life.",0)}
-   else if(k===1){cutGerald(480,430,2.5,{face:'cool',pose:'flex',shirt:0});cutBubble(700,150,"Eviction complete.",0)}
+   else if(k===1){
+     cutGerald(355+Math.sin(u*8)*10,430,2.5,{face:'cool',pose:'flex',shirt:0});
+     cgRearPanel(u,775,285,.65,false,'CAMERA: CONFISCATED');
+     cutBubble(690,150,"THE REAR OF THE LEASE!",0);
+   }
    else{cutGerald(380,440,2.6,{face:'sad',pose:'up',shirt:0});cutBubble(260,130,"...Huh. Weird moon.",1);if(u>1.4)cgHowl(u,720,310)}}},
  // 4. title card
  {shirt:0,lines:["CHAPTER 2 COMPLETE","Landlord HQ is now a very large rubble pile with a gift shop.","Next: the moon. It has opinions."],hl:0,cuts:[0],tr:'white',hold:4,shake:[6],draw(t){
