@@ -10,6 +10,8 @@ echo "float vs fixed per-shot comparison:"
 paste -d'|' float.txt fixed.txt | grep " L[0-9]" | sed 's/score=[0-9]*//g' | awk -F'|' '{print $1 "  ||  fixed: " substr($2, index($2,"destroyed"))}'
 echo "--- libnds hardware-math hooks vs software fixed point (must be bit-identical) ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DMX_LIBNDS_MATH -Istubs -I../core ../core/mx.c host_test.c -lm -o test_fixed_hw && ./test_fixed_hw > fixed_hw.txt && cmp fixed.txt fixed_hw.txt && echo "identical"
+echo "--- real-time frame meter: rendered FPS vs simulation steps/s ---"
+gcc -std=gnu99 -O2 -I../core fps_meter_test.c -o fps_meter_test && ./fps_meter_test
 echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
 if command -v node >/dev/null 2>&1; then
   node -e 'const fs=require("fs");const h=fs.readFileSync("../web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<a)throw Error("game script missing");const s=h.slice(a+8,b);new Function(s);for(const sym of ["function cgRearPanel","function cgHotTake","function cgMoonlitKiss"])if(!s.includes(sym))throw Error(sym+" missing");console.log("ok: browser script parses and cutscene effects are present")'

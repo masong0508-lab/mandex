@@ -23,6 +23,7 @@
 #include "gfx.h"
 #include "sfx.h"
 #include "intro.h"
+#include "mx_fps_meter.h"
 #define MS_ENUM_ONLY
 #include "manspr.h"
 #include "manidle.h"
@@ -43,6 +44,29 @@ static u8 buf_bot[256 * 192] __attribute__((aligned(4)));
 
 enum { ST_TITLE, ST_PLAY, ST_PAUSE, ST_INTRO };
 static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
+static MxFpsMeter fps_meter;
+/* ARM9 hardware timers use 33.513982 MHz ticks. Keep previous frame costs
+   for the L profiler, without allocating another framebuffer. */
+static int ds_vblank_ticks,ds_dma_ticks,ds_draw_top_ticks,ds_draw_bot_ticks;
+#ifdef MX_BARE_NDS_H
+static u16 ds_vblank_prev;static int ds_vblank_primed;
+static void ds_fps_complete(int sim_steps){
+  u16 now=MX_IPC->alive;
+  if(ds_vblank_primed){
+    unsigned delta=(u16)(now-ds_vblank_prev);
+    mx_fps_meter_add(&fps_meter,delta,60,1,(unsigned)sim_steps);
+  }else ds_vblank_primed=1;
+  ds_vblank_prev=now;
+}
+#else
+static void ds_fps_complete(int sim_steps){ (void)sim_steps; }
+#endif
+#ifdef MX_DS_PROFILE_HOST
+extern void ds_perf_mark(int stage);
+#define DS_PERF_MARK(stage) ds_perf_mark(stage)
+#else
+#define DS_PERF_MARK(stage) ((void)0)
+#endif
 static int intro_seen, wolf_seen, intro_level, end_seen;   /* wolf_seen: the chapter 3 wolfman cutscene, once per power-on too */
 static int intro_seen_unused;               /* the opening cutscene (ds/source/intro.c) plays once per power-on, the first time level 1 is started from the title */
 static int disp_score, cells0 = 1, end_t, was_state;      /* best scores live in stats.best[] (core, saved by port 5) */
@@ -1110,18 +1134,22 @@ static void title_bottom(View *v){
 }
 
 /* ---------------------------------------------------------------------- main */
-static void present(void){
+static void present(int bot_dirty){
   DC_FlushRange(buf_top, sizeof buf_top);
   DC_FlushRange(buf_bot, sizeof buf_bot);
+  cpuStartTiming(0);
   swiWaitForVBlank();
+  ds_vblank_ticks=(int)cpuEndTiming();
   if(title_pal_on != (app == ST_TITLE)){                         /* the top screen's palette: the title picture on the title, the game's otherwise */
     title_pal_on = app == ST_TITLE;
     if(title_pal_on) title_t = 0;                                /* the pan starts from the logo every time the title comes up */
     for(int k = 0; k < TITLE_DS_NCOL; k++)
       BG_PALETTE_SUB[TITLE_DS_BASE + k] = title_pal_on ? RGB15(TITLE_DS_PAL[k * 3] >> 3, TITLE_DS_PAL[k * 3 + 1] >> 3, TITLE_DS_PAL[k * 3 + 2] >> 3) : gfx_pal[TITLE_DS_BASE + k];
   }
-  dmaCopy(buf_bot, BG_GFX, sizeof buf_bot);
+  cpuStartTiming(0);
+  if(bot_dirty) dmaCopy(buf_bot, BG_GFX, sizeof buf_bot);
   dmaCopy(buf_top, BG_GFX_SUB, sizeof buf_top);
+  ds_dma_ticks=(int)cpuEndTiming();
 }
 
 static real clampr(real v, real lo, real hi){ return v < lo ? lo : v > hi ? hi : v; }
@@ -1160,6 +1188,7 @@ int main(void){
   for(;;){
     { static int last_app = ST_TITLE; if(app == ST_TITLE && last_app != ST_TITLE) save_sync(); last_app = app; }   /* back on the title: flush anything earned in a lost run */
     frame++;
+    DS_PERF_MARK(0);
     scanKeys();
     int down = keysDown(), held = keysHeld(), up = keysUp();
     touchPosition t = { 0, 0 };
@@ -1309,9 +1338,11 @@ int main(void){
       { int aim = world.man.mode == MAN_AIM && world.state == MX_PLAY;       /* the start tool is armed once each time he is back in the sling; a later tap on a power-up button still wins */
         if(aim && !was_aim){ int pw = mx_tool_power(opt.tool); if(pw && world.pw_sel != pw) mx_select_power(&world, pw); }
         was_aim = aim; }
+      DS_PERF_MARK(1);
       cpuStartTiming(0);
       mx_update(&world, DT);
       phys_ticks = (int)cpuEndTiming();
+      DS_PERF_MARK(2);
       /* adaptive quality: fewer substeps when the solver eats too much of the frame, more when there is headroom */
       /* order of sacrifice when the solver is slow: collapsible buildings first (the cheapest thing to lose), then chunk substeps, then the wobble lattice;
          the reverse when there is headroom (the preference in `opt` is never touched, so it comes back by itself) */
@@ -1383,7 +1414,9 @@ int main(void){
     top.cx += sx; top.cy += sy;
 
     /* ---------------- render ---------------- */
+    DS_PERF_MARK(3);
     cpuStartTiming(0);
+    int bot_dirty=1;
     View bot = { buf_bot, 2, -8, -40 };
     if(app == ST_TITLE){
       title_top(&top);
@@ -1396,7 +1429,11 @@ int main(void){
       top_hud(buf_top);
       banner(buf_top);
       end_panel(buf_top);
-      if(!(lite && (frame & 1) && app == ST_PLAY && !dragging)){       /* keep stylus aiming at 60Hz; throttle only noninteractive bottom redraws */
+      ds_draw_top_ticks=(int)cpuEndTiming();
+      DS_PERF_MARK(4);
+      cpuStartTiming(0);
+      bot_dirty=!(lite && (frame & 1) && app == ST_PLAY && !dragging);
+      if(bot_dirty){       /* keep stylus aiming at 60Hz; throttle only noninteractive bottom redraws */
       if(world.man.mode == MAN_AIM && world.state == MX_PLAY){
         bot = (View){ buf_bot, 4, 0, 56 };
         bot.cx += sx; bot.cy += sy;
@@ -1427,9 +1464,31 @@ int main(void){
       gfx_text(buf_top, 124, 183, gfx_int((int)world.stat_cells), C_GOLD, 1);
       gfx_text(buf_top, 150, 183, "COL", C_WHITE, 1);
       gfx_text(buf_top, 162, 183, world.collapse ? "ON" : coll_shed ? "SHED" : "OFF", C_GOLD, 1);
+      gfx_rect(buf_top,0,166,256,12,C_UIBG);
+#ifdef MX_BARE_NDS_H
+      gfx_text(buf_top,2,169,"FPS",C_WHITE,1);
+      gfx_text(buf_top,20,169,gfx_int((int)fps_meter.render_x10/10),C_GOLD,1);
+      gfx_text(buf_top,40,169,"SIM",C_WHITE,1);
+      gfx_text(buf_top,60,169,gfx_int((int)fps_meter.sim_x10/10),C_GOLD,1);
+      gfx_text(buf_top,78,169,"MISS",C_WHITE,1);
+      gfx_text(buf_top,103,169,gfx_int((int)fps_meter.last_dropped),C_GOLD,1);
+#else
+      gfx_text(buf_top,2,169,"FPS/SIM: HARDWARE ONLY",C_WHITE,1);
+#endif
+      gfx_text(buf_top,134,169,"TOP",C_WHITE,1);
+      gfx_text(buf_top,152,169,gfx_int(ds_draw_top_ticks/33514),C_GOLD,1);
+      gfx_text(buf_top,170,169,"BOT",C_WHITE,1);
+      gfx_text(buf_top,188,169,gfx_int(ds_draw_bot_ticks/33514),C_GOLD,1);
+      gfx_text(buf_top,206,169,"DMA",C_WHITE,1);
+      gfx_text(buf_top,224,169,gfx_int(ds_dma_ticks/33514),C_GOLD,1);
     }
-    draw_ticks = (int)cpuEndTiming();
-    present();
+    ds_draw_bot_ticks=(int)cpuEndTiming();
+    DS_PERF_MARK(5);
+    if(app!=ST_PLAY && app!=ST_PAUSE){ds_draw_top_ticks=ds_draw_bot_ticks;ds_draw_bot_ticks=0;}
+    draw_ticks=ds_draw_top_ticks+ds_draw_bot_ticks;
+    present(bot_dirty);
+    DS_PERF_MARK(6);
+    ds_fps_complete(app==ST_PLAY);
   }
   return 0;
 }
