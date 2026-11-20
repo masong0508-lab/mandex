@@ -34,8 +34,9 @@ int main(void){
     uint64_t sum=0,peak=0;
     for(int f=0;f<17000;f++){
       int scene=intro_scene();
-      if(scene!=last){seen++;last=scene;}
-      if(scene!=last||f%23==0||f==0){
+      int new_scene=scene!=last;
+      if(new_scene){seen++;last=scene;}
+      if(new_scene||f%23==0){
         if(n>=MAX_SAMPLES){fputs("too many render samples\n",stderr);return 1;}
         uint64_t beg=nano();
         intro_draw(top,bottom);
