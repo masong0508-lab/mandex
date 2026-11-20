@@ -502,18 +502,18 @@ static void blit_frame(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, i
     if(lo<hi&&ylo<yhi){
       for(int j=ylo;j<yhi;j++){
         const u8 *row=fr->px+(j*4/ppc)*w;
-        u8 *d=b+(y0+j)*256+x0;
+        u8 *d=b+(y0+j)*256;
         if(ppc==4){
           if(f>0){
-            for(int i=lo;i<hi;i++){u8 c=row[i];if(c)d[i]=(u8)(C_MAN0+c-1);}
+            for(int i=lo;i<hi;i++){u8 c=row[i];if(c)d[x0+i]=(u8)(C_MAN0+c-1);}
           }else{
-            for(int i=lo;i<hi;i++){u8 c=row[w-1-i];if(c)d[i]=(u8)(C_MAN0+c-1);}
+            for(int i=lo;i<hi;i++){u8 c=row[w-1-i];if(c)d[x0+i]=(u8)(C_MAN0+c-1);}
           }
         }else{
           for(int i=lo;i<hi;i++){
             int sx=i*4/ppc;
             u8 c=row[f>0?sx:w-1-sx];
-            if(c)d[i]=(u8)(C_MAN0+c-1);
+            if(c)d[x0+i]=(u8)(C_MAN0+c-1);
           }
         }
       }
