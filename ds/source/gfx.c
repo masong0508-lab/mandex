@@ -466,6 +466,24 @@ void gfx_wall(const View *v, int pal, int px, int py){
   const u8 *t = walltiles[n - 2][pal & 3];
   if(px >= 0 && py >= 0 && px + n <= 256 && py + n <= 192){        /* the usual case: wholly on screen, copy rows without a bounds test per pixel */
     u8 *d = &v->buf[py * 256 + px];
+#ifndef MX_DS_FAST_WALL
+#define MX_DS_FAST_WALL 1
+#endif
+#if MX_DS_FAST_WALL
+    if(n==4){
+      /* Four tiny opaque rows: no function calls or row-size branches. */
+      d[0]=t[0];d[1]=t[1];d[2]=t[2];d[3]=t[3];d+=256;t+=4;
+      d[0]=t[0];d[1]=t[1];d[2]=t[2];d[3]=t[3];d+=256;t+=4;
+      d[0]=t[0];d[1]=t[1];d[2]=t[2];d[3]=t[3];d+=256;t+=4;
+      d[0]=t[0];d[1]=t[1];d[2]=t[2];d[3]=t[3];
+      return;
+    }
+    if(n==2){
+      d[0]=t[0];d[1]=t[1];d+=256;t+=2;
+      d[0]=t[0];d[1]=t[1];
+      return;
+    }
+#endif
     for(int j=0;j<n;j++,d+=256,t+=n)opaque_row(d,t,n);
     return;
   }

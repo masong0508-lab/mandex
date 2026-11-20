@@ -25,6 +25,7 @@ jobs:
           gcc -std=gnu99 -O2 -Icore test/fps_meter_test.c -o /tmp/ds_fps_meter_test
           /tmp/ds_fps_meter_test
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_HOST_PHYS_PROFILE -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_physics_detail
+          gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_FAST_WALL=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_walltile_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_CLIP_ROT=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_rot_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_FAST_MAN=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_sprite_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_CULL_TARGETS=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_targets_before
@@ -43,6 +44,7 @@ jobs:
         run: |
           mkdir -p out/ds-fps-phases
           for L in 0 9 21 29 39 40 50 59; do
+            DS_PERF_BENCH=1 /tmp/ds_fps_walltile_before /tmp/mandex-walltile-before 520 "$L" > "out/ds-fps-phases/walltile-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_rot_before /tmp/mandex-rot-before 520 "$L" > "out/ds-fps-phases/rot-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_sprite_before /tmp/mandex-sprite-before 520 "$L" > "out/ds-fps-phases/sprite-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_targets_before /tmp/mandex-target-before 520 "$L" > "out/ds-fps-phases/target-before-level-$L.txt"
@@ -70,6 +72,26 @@ jobs:
           for level,x,y,pct in output:print(f'{level:>5} | {x:>22.1f} | {y:>32.1f} | {pct:>12.1f}%')
           pathlib.Path('out/ds-fps-phases/summary.txt').write_text(
             hdr+'\n'+'\n'.join(f'{level} {x:.1f} {y:.1f} {pct:.1f}%' for level,x,y,pct in output)+'\n')
+          PY
+      - name: Check wallpaper tile checksum and measure the dense-room cost
+        run: |
+          python3 - <<'PY'
+          import pathlib,re
+          lines=['level identical_frame old_us new_us reduction_pct old_wall_layer_us new_wall_layer_us']
+          for L in (0,9,21,29,39,40,50,59):
+            a=pathlib.Path(f'out/ds-fps-phases/walltile-before-level-{L}.txt').read_text()
+            b=pathlib.Path(f'out/ds-fps-phases/level-{L}.txt').read_text()
+            p=r'DS_FRAME_HASH checksum=([0-9a-f]+) screen_samples=(\d+)'
+            x=re.search(p,a);y=re.search(p,b)
+            if not x or not y or x.groups()!=y.groups():raise SystemExit(f'WALL TILE REGRESSION {L+1}')
+            def value(s,p):return float(re.search(p,s).group(1))
+            old=value(a,r'cpu_frame_mean_us=([0-9.]+)')
+            new=value(b,r'cpu_frame_mean_us=([0-9.]+)')
+            before=value(a,r'DS_TOP_LAYER name=wallpaper_facades mean_us=([0-9.]+)')
+            after=value(b,r'DS_TOP_LAYER name=wallpaper_facades mean_us=([0-9.]+)')
+            lines.append(f'{L+1} YES {old:.2f} {new:.2f} {(old-new)*100/old:.1f}% {before:.2f} {after:.2f}')
+          print('\n'.join(lines))
+          pathlib.Path('out/ds-fps-phases/walltile-ab-summary.txt').write_text('\n'.join(lines)+'\n')
           PY
       - name: Verify rotated-sprite clipping preserves every sampled game frame
         run: |
