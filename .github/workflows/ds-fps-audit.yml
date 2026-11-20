@@ -9,6 +9,7 @@ on:
       - "ds/**"
       - "core/**"
       - "test/ds_render.c"
+      - "test/gfx_opaque_test.c"
       - ".github/workflows/ds-fps-audit.yml"
   workflow_dispatch:
 
@@ -24,6 +25,14 @@ jobs:
           gcc -std=gnu99 -O2 -Icore test/fps_meter_test.c -o /tmp/ds_fps_meter_test
           /tmp/ds_fps_meter_test
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_BOTTOM30=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_before
+      - name: Prove optimized tiny tile copies are pixel-identical
+        run: |
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_FAST_TILES=0 -Itest/stubs -Icore -Iart -Ids/source test/gfx_opaque_test.c ds/source/gfx.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_tile_before
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_FAST_TILES=1 -Itest/stubs -Icore -Iart -Ids/source test/gfx_opaque_test.c ds/source/gfx.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_tile_after
+          /tmp/ds_tile_before > /tmp/ds_tiles_reference.txt
+          /tmp/ds_tile_after > /tmp/ds_tiles_optimized.txt
+          diff -u /tmp/ds_tiles_reference.txt /tmp/ds_tiles_optimized.txt
+          cat /tmp/ds_tiles_optimized.txt
       - name: Measure simulation, upper/lower rendering and presentation for eight levels
         run: |
           mkdir -p out/ds-fps-phases

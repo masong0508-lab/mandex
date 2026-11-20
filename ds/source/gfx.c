@@ -415,13 +415,26 @@ void gfx_ground(const View *v){
   }
 }
 
+/* Common DS tile rows have two or four bytes. Bypass the variable-width
+   per-pixel loop for the un-clipped majority of tiles; leave edge clipping
+   unchanged. Can disable with -DMX_DS_FAST_TILES=0 for A/B testing. */
+#ifndef MX_DS_FAST_TILES
+#define MX_DS_FAST_TILES 1
+#endif
+static inline void opaque_row(u8 *d,const u8 *t,int n){
+#if MX_DS_FAST_TILES
+  if(n==4){d[0]=t[0];d[1]=t[1];d[2]=t[2];d[3]=t[3];return;}
+  if(n==2){d[0]=t[0];d[1]=t[1];return;}
+#endif
+  for(int i=0;i<n;i++)d[i]=t[i];
+}
 void gfx_tile(const View *v, int mat, int dmg, int var, int px, int py){
   int n = v->ppc;
   if(px + n <= 0 || py + n <= 0 || px >= 256 || py >= 192) return;
   const u8 *t = tiles[n - 2][mat][dmg][var & 1];
   u8 *d = &v->buf[py * 256 + px];
   if(px >= 0 && py >= 0 && px + n <= 256 && py + n <= 192){
-    for(int j = 0; j < n; j++, d += 256, t += n) for(int i = 0; i < n; i++) d[i] = t[i];
+    for(int j=0;j<n;j++,d+=256,t+=n)opaque_row(d,t,n);
   } else {
     for(int j = 0; j < n; j++) for(int i = 0; i < n; i++) gfx_px(v->buf, px + i, py + j, t[j * n + i]);
   }
@@ -433,7 +446,7 @@ void gfx_wall(const View *v, int pal, int px, int py){
   const u8 *t = walltiles[n - 2][pal & 3];
   if(px >= 0 && py >= 0 && px + n <= 256 && py + n <= 192){        /* the usual case: wholly on screen, copy rows without a bounds test per pixel */
     u8 *d = &v->buf[py * 256 + px];
-    for(int j = 0; j < n; j++, d += 256, t += n) for(int i = 0; i < n; i++) d[i] = t[i];
+    for(int j=0;j<n;j++,d+=256,t+=n)opaque_row(d,t,n);
     return;
   }
   for(int j = 0; j < n; j++) for(int i = 0; i < n; i++) gfx_px(v->buf, px + i, py + j, t[j * n + i]);
