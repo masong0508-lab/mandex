@@ -31,6 +31,12 @@ jobs:
               test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
               core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fac_$fast
           done
+      - name: Check all three Landlord HQ district transitions against uncached geometry
+        run: |
+          DS_FACADE_DISTRICT_PROBE=1 /tmp/ds_fac_0 > /tmp/ds_fac_ref.txt
+          DS_FACADE_DISTRICT_PROBE=1 /tmp/ds_fac_1 > /tmp/ds_fac_opt.txt
+          diff -u /tmp/ds_fac_ref.txt /tmp/ds_fac_opt.txt
+          cat /tmp/ds_fac_opt.txt
       - name: Check identical pixels and four paired measurements in eight heavy levels
         run: |
           mkdir -p out/ds-fac-ab
