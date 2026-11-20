@@ -491,6 +491,34 @@ static void blit_frame(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, i
   int m = live ? JM : 0;
   if(x0 - m >= 256 || y0 - m >= 192 || x0 + dw + m <= 0 || y0 + dh + m <= 0) return;
   if(!live){
+#ifndef MX_DS_FAST_MAN
+#define MX_DS_FAST_MAN 1
+#endif
+#if MX_DS_FAST_MAN
+    /* The source transform is constant across each row. Clip once, not per
+       pixel, and avoid per-pixel division in the common native 4px scale. */
+    int lo=x0<0?-x0:0,hi=x0+dw>256?256-x0:dw;
+    int ylo=y0<0?-y0:0,yhi=y0+dh>192?192-y0:dh;
+    if(lo<hi&&ylo<yhi){
+      for(int j=ylo;j<yhi;j++){
+        const u8 *row=fr->px+(j*4/ppc)*w;
+        u8 *d=b+(y0+j)*256+x0;
+        if(ppc==4){
+          if(f>0){
+            for(int i=lo;i<hi;i++){u8 c=row[i];if(c)d[i]=(u8)(C_MAN0+c-1);}
+          }else{
+            for(int i=lo;i<hi;i++){u8 c=row[w-1-i];if(c)d[i]=(u8)(C_MAN0+c-1);}
+          }
+        }else{
+          for(int i=lo;i<hi;i++){
+            int sx=i*4/ppc;
+            u8 c=row[f>0?sx:w-1-sx];
+            if(c)d[i]=(u8)(C_MAN0+c-1);
+          }
+        }
+      }
+    }
+#else
     for(int j = 0; j < dh; j++){
       int py = y0 + j;
       if((unsigned)py >= 192u) continue;
@@ -504,6 +532,7 @@ static void blit_frame(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, i
         if(c) d[px] = (u8)(C_MAN0 + c - 1);
       }
     }
+#endif
     return;
   }
   /* jiggling path: per-column / per-row source maps (with squash about the anchor), then a displacement field */

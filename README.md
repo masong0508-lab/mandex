@@ -98,3 +98,5 @@ problems on the first runs.
 Everything compiles and passes on a normal PC compiler, but the console builds were written without a toolchain, no
 emulator or hardware has run them, DS frame time is unknown (the in-game profiler is on `L`), and none of the sounds
 have been heard.  The Dreamcast port has no sound yet.
+
+DS character sprite clipping A/B instrumentation (`MX_DS_FAST_MAN`).

@@ -25,6 +25,7 @@ jobs:
           gcc -std=gnu99 -O2 -Icore test/fps_meter_test.c -o /tmp/ds_fps_meter_test
           /tmp/ds_fps_meter_test
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_HOST_PHYS_PROFILE -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_physics_detail
+          gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_FAST_MAN=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_sprite_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_CULL_TARGETS=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_targets_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_WALL_RUNS=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_wall_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_FAST_RECT=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_rect_before
@@ -41,6 +42,7 @@ jobs:
         run: |
           mkdir -p out/ds-fps-phases
           for L in 0 9 21 29 39 40 50 59; do
+            DS_PERF_BENCH=1 /tmp/ds_fps_sprite_before /tmp/mandex-sprite-before 520 "$L" > "out/ds-fps-phases/sprite-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_targets_before /tmp/mandex-target-before 520 "$L" > "out/ds-fps-phases/target-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_wall_before /tmp/mandex-wall-before 520 "$L" > "out/ds-fps-phases/wall-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_rect_before /tmp/mandex-rect-before 520 "$L" > "out/ds-fps-phases/rect-before-level-$L.txt"
@@ -66,6 +68,27 @@ jobs:
           for level,x,y,pct in output:print(f'{level:>5} | {x:>22.1f} | {y:>32.1f} | {pct:>12.1f}%')
           pathlib.Path('out/ds-fps-phases/summary.txt').write_text(
             hdr+'\n'+'\n'.join(f'{level} {x:.1f} {y:.1f} {pct:.1f}%' for level,x,y,pct in output)+'\n')
+          PY
+      - name: Verify character sprite parity and compare per-level host timing
+        run: |
+          python3 - <<'PY'
+          import re,pathlib
+          lines=['level framebuffer_equal old_us new_us cpu_reduction_pct old_man_layer_us new_man_layer_us']
+          p=r'DS_FRAME_HASH checksum=([0-9a-f]+) screen_samples=(\\d+)'
+          for L in (0,9,21,29,39,40,50,59):
+            old=pathlib.Path(f'out/ds-fps-phases/sprite-before-level-{L}.txt').read_text()
+            new=pathlib.Path(f'out/ds-fps-phases/level-{L}.txt').read_text()
+            a=re.search(p,old);b=re.search(p,new)
+            if not a or not b or a.groups()!=b.groups():
+              raise SystemExit(f'SPRITE PIXEL REGRESSION level={L+1}: {a.groups() if a else None} != {b.groups() if b else None}')
+            def metric(s,key):return float(re.search(key,s).group(1))
+            t=r'cpu_frame_mean_us=([0-9.]+)'
+            layer=r'DS_TOP_LAYER name=man_and_aim mean_us=([0-9.]+)'
+            a0=metric(old,t);b0=metric(new,t)
+            a1=metric(old,layer);b1=metric(new,layer)
+            row=f'{L+1} YES {a0:.2f} {b0:.2f} {(a0-b0)/a0*100:.1f}% {a1:.2f} {b1:.2f}'
+            print(row);lines.append(row)
+          pathlib.Path('out/ds-fps-phases/sprite-ab-summary.txt').write_text('\\n'.join(lines)+'\\n')
           PY
       - name: Verify landlord visibility culling frame parity and host CPU speed
         run: |
