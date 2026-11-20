@@ -30,6 +30,12 @@ int main(int argc, char **argv){
   { MxEvent e; memset(&e, 0, sizeof e); int o[2], n = 0, seen[SFX_COUNT] = { 0 };
     for(int t = 0; t < 40; t++){ e.type = t; e.a = R(1); e.b = R(1); n = mx_event_sfx(&e, o); if(n < 0 || n > 2){ printf("FAIL: event %d -> %d sounds\n", t, n); fails++; } for(int i = 0; i < n; i++){ if(o[i] < 0 || o[i] >= SFX_COUNT){ printf("FAIL: event %d -> bad id\n", t); fails++; } else seen[o[i]]++; } }
     int used = 0; for(int i = 0; i < SFX_COUNT; i++) used += seen[i] > 0;
-    printf("%s events reach %d of %d effects\n", used >= 16 ? "ok:" : "FAIL:", used, SFX_COUNT); if(used < 16) fails++; }
+    printf("%s events reach %d of %d effects\n", used >= 16 ? "ok:" : "FAIL:", used, SFX_COUNT); if(used < 16) fails++;
+    /* Core always passes rubble force as event.a, with event.b reserved. */
+    e.type=EV_THUD; e.a=R(0.8); e.b=0;
+    if(mx_event_sfx(&e,o)!=1 || o[0]!=SFX_THUD){ puts("FAIL: heavy rubble impacts must be audible"); fails++; }
+    e.a=R(0.2); e.b=R(0.9);
+    if(mx_event_sfx(&e,o)!=0){ puts("FAIL: weak thuds must not use the b parameter"); fails++; }
+  }
   puts(fails ? "snd_test: FAILED" : "snd_test: all passed"); return fails != 0;
 }
