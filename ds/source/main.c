@@ -360,17 +360,45 @@ static void draw_band(const View *v, int front){
   else       gfx_tline(v->buf, tr, tip, mx_ + ppc, my + ppc / 2, th + 1, C_HAIR);
 }
 
+/* The close-up and overview draw the same trajectory in world coordinates.
+   Cache up to 16 points per presented frame; both screens still project
+   independently, preserving their original sampled pixels. */
+#ifndef MX_DS_AIM_CACHE
+#define MX_DS_AIM_CACHE 1
+#endif
+#if MX_DS_AIM_CACHE
+static real aimdot_x[16], aimdot_y[16];
+static int aimdot_frame = -1, aimdot_count;
+#endif
 static void draw_aim_dots(const View *v){
   const MxMan *m = &world.man;
   if(m->mode != MAN_AIM) return;
   real dx = m->x - MX_ANCHOR_X, dy = m->y - MX_ANCHOR_Y;
   if(rmul(dx, dx) + rmul(dy, dy) < R(3)) return;
+#if MX_DS_AIM_CACHE
+  if(aimdot_frame != frame){
+    aimdot_frame = frame; aimdot_count = 0;
+    for(int k = 1; k <= 16; k++){
+      real ox, oy;
+      mx_preview_point(&world, RI(k) / 9, &ox, &oy);
+      int gx = ox >> 12, gy = oy >> 12;
+      if(gx < 0 || gx >= MX_COLS || gy >= MX_ROWS) break;
+      if(gy >= 0 && world.grid[gy * MX_COLS + gx]) break;
+      aimdot_x[aimdot_count] = ox; aimdot_y[aimdot_count] = oy; aimdot_count++;
+    }
+  }
+#endif
   for(int k = 1; k <= 16; k++){
     real ox, oy;
+#if MX_DS_AIM_CACHE
+    if(k > aimdot_count) break;
+    ox = aimdot_x[k - 1]; oy = aimdot_y[k - 1];
+#else
     mx_preview_point(&world, RI(k) / 9, &ox, &oy);
     int gx = ox >> 12, gy = oy >> 12;
     if(gx < 0 || gx >= MX_COLS || gy >= MX_ROWS) break;
-    if(gy >= 0 && world.grid[gy * MX_COLS + gx]) break;                  /* stop where it would hit */
+    if(gy >= 0 && world.grid[gy * MX_COLS + gx]) break;
+#endif
     int px = vx(v, ox), py = vy(v, oy);
     if(k & 1){ gfx_rect(v->buf, px - 1, py - 1, 3, 3, C_BLACK); gfx_px(v->buf, px, py, C_WHITE); }
     else     { gfx_rect(v->buf, px - 2, py - 2, 5, 5, C_BLACK); gfx_rect(v->buf, px - 1, py - 1, 3, 3, C_GOLD); }
