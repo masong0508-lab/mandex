@@ -56,14 +56,14 @@ static void mus_note(int v, int hz, int steps, int vol){
   if(mv[v].id >= 0) soundKill(mv[v].id);
   mv[v].id = soundPlayWave(MUS_WAVE, (u16)hz, (u8)(vol / 2), v ? 40 : 80); mv[v].t = 0; mv[v].len = steps * MUS_STEP_FRAMES; mv[v].vol = vol;
 }
-static void mus_env(int v){
+static void mus_env(int v, int commit_audio){
   if(mv[v].id < 0) return;
   int t = mv[v].t++, L = mv[v].len;
   if(t >= L){ soundKill(mv[v].id); mv[v].id = -1; return; }
   int e = 100 - 60 * t / L;                                   /* pluck: 100% -> 40% over the note */
   if(t < 2) e = e * (t + 1) / 3;                              /* two-frame attack: no click */
   if(L - t <= 3) e = e * (L - t) / 4;                         /* and a release */
-  soundSetVol(mv[v].id, (u8)(mv[v].vol * e / 100));
+  if(commit_audio) soundSetVol(mv[v].id, (u8)(mv[v].vol * e / 100));
 }
 
 void music_set(int on){
@@ -74,7 +74,7 @@ void music_set(int on){
 }
 int music_on(void){ return mus_on; }
 
-static void sfx_step(void){
+static void sfx_step(int commit_audio){
   for(int i = 0; i < SFX_COUNT; i++) if(cool[i] > 0) cool[i]--;
   for(int i = 0; i < NV; i++){
     if(!vo[i].active) continue;
@@ -86,7 +86,7 @@ static void sfx_step(void){
     } else if(s->glide && vo[i].seg + 1 < s->n){
       int target = s->noise ? s->f[vo[i].seg + 1] * 3 / 5 : sfx_fcap(s->f[vo[i].seg + 1]), cur = vo[i].freq;      /* glide toward the next note over the segment */
       vo[i].freq = cur + (target - cur) / (vo[i].left + 1);
-      soundSetFreq(vo[i].id, vo[i].freq);
+      if(commit_audio) soundSetFreq(vo[i].id, vo[i].freq);
     }
   }
   if(mus_on){
@@ -95,7 +95,7 @@ static void sfx_step(void){
       if(n >= 0){ int k = 1; while(k < 8 && TUNE[(mus_step + k) % (MUS_BARS * 8)] < 0) k++; mus_note(0, NF[n], k, MUS_VOL); }     /* a note lasts until the next one */
       if((mus_step & 3) == 0) mus_note(1, BASS[mus_step >> 3][(mus_step >> 2) & 1], 4, MUS_VOL * 3 / 4);
     }
-    mus_env(0); mus_env(1);
+    mus_env(0,commit_audio); mus_env(1,commit_audio);
     if(++mus_t >= MUS_STEP_FRAMES){ mus_t = 0; mus_step = (mus_step + 1) % (MUS_BARS * 8); }
   }
 }
@@ -104,6 +104,8 @@ static void sfx_step(void){
 void sfx_tick_steps(int elapsed){
   if(elapsed < 1) elapsed = 1;
   if(elapsed > 8) elapsed = 8;
-  for(int i=0; i<elapsed; i++) sfx_step();
+  /* Preserve 60-Hz voice/note state through every missed VBlank, but issue
+     only the final envelope/glide update to the 64-command ARM7 ring. */
+  for(int i=0; i<elapsed; i++) sfx_step(i==elapsed-1);
 }
 void sfx_tick(void){ sfx_tick_steps(1); }

@@ -87,7 +87,7 @@ static int ach_open, ach_page;       /* achievements list shown on the title's b
 static int combo_held, cheat_t;      /* L+R+SELECT on the title = unlock every level for this session: latch (set while the three are held) and the on-screen message timer */
 static MxOptions opt;                /* port 13: collapsible buildings + start tool.  Saved in the cartridge blob (version 2); defaults until a save loads */
 static int opt_open, opt_cur;        /* options screen shown on the title's bottom screen; opt_cur = the highlighted row */
-static int coll_shed, was_aim;       /* coll_shed: the speed safety net switched collapse off (the preference in opt stays); was_aim: edge detector that arms the start tool once per aim */
+static int was_aim; /* tool arming edge detector; collapse always follows opt.collapse */
 static int out_open, out_cur;        /* outfits screen shown on the title's bottom screen; out_cur = the highlighted outfit (outfit_sel = the one worn) */
 static int outfit_sel, toast_t = -1, toast_id, toast_q[4], toast_nq;
 static void toast_push(int id){ if(toast_nq < 4) toast_q[toast_nq++] = id; }
@@ -1177,7 +1177,7 @@ static void apply_outfit(int o){
 }
 /* the air valve exists only while it is the start tool (and unlocked); NONE and the three power-ups hide it, as in the browser */
 static int valve_allowed(void){ return opt.tool == MX_TOOL_VALVE && mx_valve_unlocked(&stats); }
-static void apply_options(void){ mx_set_collapse(&world, opt.collapse && !coll_shed); world.valve_ok = valve_allowed(); mx_set_fight(&world, !opt.nofight); }
+static void apply_options(void){ mx_set_collapse(&world, opt.collapse); world.valve_ok = valve_allowed(); mx_set_fight(&world, !opt.nofight); }
 static void load_level(int l){
   mx_load(&world, l); mx_meta_level_start(&stats, &world); apply_options(); was_aim = 0;
 #if MX_DS_FACADE_CACHE
@@ -1340,7 +1340,7 @@ enum { OPT_COLLAPSE, OPT_TOOL, OPT_FIGHT, OPT_MUSIC, OPT_ROWS };
 #define OPT_RW 240
 static const int OPT_RY[OPT_ROWS] = { 10, 56, 102, 130 }, OPT_RH[OPT_ROWS] = { 44, 44, 26, 26 };
 static void opt_change(int row, int dir){                 /* dir +1 / -1; the two-state rows ignore the sign */
-  if(row == OPT_COLLAPSE){ opt.collapse = !opt.collapse; coll_shed = 0; }
+  if(row == OPT_COLLAPSE){ opt.collapse = !opt.collapse; }
   else if(row == OPT_TOOL){ opt.tool = (u8)((opt.tool + dir + MX_NUM_TOOLS) % MX_NUM_TOOLS); }
   else if(row == OPT_FIGHT){ opt.nofight = !opt.nofight; }
   else { music_pref = !music_pref; music_set(music_pref && world.state == MX_PLAY); }
@@ -1363,7 +1363,7 @@ static void options_bottom(u8 *b){
       gfx_text(b, x + w - 8 - gfx_text_w(v, 2), y + 3, v, opt.collapse ? C_GOO : C_GRAY, 2);
       gfx_text(b, x + 6, y + 17, "ON: FALLEN RUBBLE KEEPS SLUMPING AND TOPPLING", C_WHITE, 1);
       gfx_text(b, x + 6, y + 25, "OFF: IT SETTLES AND LOCKS SOLID AT ONCE", C_GRAY, 1);
-      gfx_text(b, x + 6, y + 34, coll_shed ? "SWITCHED OFF FOR NOW: THE DS WAS TOO SLOW" : "SWITCHES ITSELF OFF IF THE DS CANNOT KEEP UP", C_UILINE, 1);
+      gfx_text(b, x + 6, y + 34, "STAYS ON UNDER LOAD; WOBBLE/SUBSTEPS ADAPT FIRST", C_UILINE, 1);
     } else if(i == OPT_TOOL){
       gfx_text(b, x + 6, y + 5, "START TOOL", lc, 1);
       const char *v = mx_tool_name(opt.tool);
@@ -1486,6 +1486,20 @@ int main(void){
     int down = keysDown(), held = keysHeld(), up = keysUp();
     touchPosition t = { 0, 0 };
     if(held & KEY_TOUCH) touchRead(&t);
+#ifdef MX_BARE_NDS_H
+    /* Advance the sound clock BEFORE the expensive physics/render work.
+       ARM7 consumes a bounded command stream on VBlank independently. */
+    { static u16 last_vblank; static int primed;
+      u16 now = MX_IPC->alive;
+      if(!primed){last_vblank=now;primed=1;}
+      unsigned elapsed=(u16)(now-last_vblank);
+      last_vblank=now;
+      sfx_tick_steps(elapsed ? (int)elapsed : 1);
+    }
+#else
+    sfx_tick();
+#endif
+
     if(down & KEY_Y){ music_pref = !music_pref; music_set(music_pref && app != ST_PAUSE && world.state == MX_PLAY); }
     if(app == ST_TITLE && !ach_open && !out_open && !opt_open && (held & (KEY_L | KEY_R | KEY_SELECT)) == (KEY_L | KEY_R | KEY_SELECT) && !combo_held){
       combo_held = 1; stats.unlock_all = !stats.unlock_all; cheat_t = 120; sfx_play(SFX_TARGET, 64);       /* never saved (port 5 must leave unlock_all out) */
@@ -1668,23 +1682,21 @@ int main(void){
       phys_ticks=(int)cpuEndTiming();
       DS_PERF_MARK(2);
       /* adaptive quality: fewer substeps when the solver eats too much of the frame, more when there is headroom */
-      /* order of sacrifice when the solver is slow: collapsible buildings first (the cheapest thing to lose), then chunk substeps, then the wobble lattice;
-         the reverse when there is headroom (the preference in `opt` is never touched, so it comes back by itself) */
+      /* Never auto-disable opted-in building collapse. Cut wobble workload first,
+         then chunk substeps; turn off wobble only as the final emergency step. */
       /* a hit wakes the wobble lattice, which is what costs time: the core caps the cells it walks (wob_budget) and this loop moves that cap with the measured cost,
          at once (one slow frame is enough) and back up slowly.  Only when the cap is already at its floor are the other quality switches touched. */
       { int load = phys_ticks + draw_ticks; lite = load > 460000 ? 1 : load < 330000 ? 0 : lite; }      /* a 60 Hz frame is ~560 000 ticks: what counts is physics + drawing, not physics alone */
       if(phys_ticks > 330000){ fast_frames = 0;
         if(wob_budget > DS_WOB_MIN){ wob_budget = wob_budget * 2 / 3; if(wob_budget < DS_WOB_MIN) wob_budget = DS_WOB_MIN; mx_set_wobble_budget(&world, wob_budget); slow_frames = 0; }
         else if(++slow_frames >= 2){ slow_frames = 0;
-          if(world.collapse){ coll_shed = 1; mx_set_collapse(&world, 0); }
-          else if(world.substeps > 2) mx_set_substeps(&world, world.substeps - 1);
+          if(world.substeps > 2) mx_set_substeps(&world, world.substeps - 1);
           else if(world.wob_enabled) mx_set_wobble(&world, 0); } }
       else if(phys_ticks < 180000){ slow_frames = 0;
         if(wob_budget < DS_WOB_MAX && (frame & 15) == 0){ wob_budget += 24; if(wob_budget > DS_WOB_MAX) wob_budget = DS_WOB_MAX; mx_set_wobble_budget(&world, wob_budget); }
         if(++fast_frames >= 120){ fast_frames = 0;
           if(!world.wob_enabled) mx_set_wobble(&world, 1);
-          else if(world.substeps < MX_DS_MAX_SUBSTEPS) mx_set_substeps(&world, world.substeps + 1);
-          else if(coll_shed && opt.collapse){ coll_shed = 0; mx_set_collapse(&world, 1); } } }
+          else if(world.substeps < MX_DS_MAX_SUBSTEPS) mx_set_substeps(&world, world.substeps + 1); } }
       else { slow_frames = 0; fast_frames = 0; }
       for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0);
       update_parts();
@@ -1699,20 +1711,7 @@ int main(void){
     } else if(app == ST_TITLE){
       update_parts();
     }
-#ifdef MX_BARE_NDS_H
-    /* The independent ARM7 increments 'alive' each VBlank even if ARM9
-       takes more than 1/60 s in physics/drawing. Recover missed music beats
-       without coupling music speed to game FPS (16-bit wrap is intentional). */
-    { static u16 last_vblank; static int primed;
-      u16 now = MX_IPC->alive;
-      if(!primed){last_vblank=now;primed=1;}
-      unsigned elapsed=(u16)(now-last_vblank);
-      last_vblank=now;
-      sfx_tick_steps(elapsed ? (int)elapsed : 1);
-    }
-#else
-    sfx_tick();     /* host/older libnds builds step once per scripted frame */
-#endif
+
 
     if(!(held & (KEY_L | KEY_R | KEY_SELECT))) combo_held = 0;
     if(cheat_t > 0) cheat_t--;
@@ -1758,7 +1757,8 @@ int main(void){
          Keep full-rate pointer/drag feedback, but share the CPU frame budget
          with physics when the lower screen is only an overview. */
       int quiet_bottom=app==ST_PLAY && !dragging && !pad_used &&
-                        !(held&KEY_TOUCH);
+                        !((held|down|up)&KEY_TOUCH) &&
+                        !(down&(KEY_X|KEY_A|KEY_START|KEY_SELECT|KEY_R));
       int bottom_half_rate=MX_DS_BOTTOM30 && quiet_bottom && (frame&1);
       int bottom_overload_rate=MX_DS_OVERLOAD_BOTTOM15 && lite &&
                                quiet_bottom && (frame&3);
@@ -1794,7 +1794,7 @@ int main(void){
       gfx_text(buf_top, 90, 183, "CONTACTS", C_WHITE, 1);
       gfx_text(buf_top, 124, 183, gfx_int((int)world.stat_cells), C_GOLD, 1);
       gfx_text(buf_top, 150, 183, "COL", C_WHITE, 1);
-      gfx_text(buf_top, 162, 183, world.collapse ? "ON" : coll_shed ? "SHED" : "OFF", C_GOLD, 1);
+      gfx_text(buf_top, 162, 183, world.collapse ? "ON" : "OFF", C_GOLD, 1);
       gfx_rect(buf_top,0,166,256,12,C_UIBG);
 #ifdef MX_BARE_NDS_H
       gfx_text(buf_top,2,169,"FPS",C_WHITE,1);
