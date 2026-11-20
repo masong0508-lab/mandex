@@ -265,6 +265,12 @@ static void on_events(void){
     case EV_CELL: { const uint8_t *c = mx_material_rgb(e->m);
       spawn(x, y, RTOF(e->a) * .3f + (rand() % 9 - 4) * .2f, RTOF(e->b) * .3f - (rand() % 7) * .2f, 30 + rand() % 20, RGB(c[0], c[1], c[2])); } break;
     case EV_BOOM: for(int k = 0; k < 24; k++) spawn(x, y, (rand() % 21 - 10) * .35f, (rand() % 21 - 10) * .35f, 30, RGB(255, 200 - rand() % 100, 40)); break;
+    case EV_CRACK: for(int k = 0; k < 2; k++) spawn(x, y, (rand() % 9 - 4) * .1f, -(.2f + (rand() % 5) * .1f), 17, RGB(185, 170, 148)); break;
+    case EV_THUD: if(e->a > R(0.6)) for(int k = 0; k < 4; k++)
+      spawn(x, y, (rand() % 11 - 5) * .22f, -(rand() % 8) * .12f, 20, RGB(178, 165, 139)); break;
+    case EV_CRUMBLE:
+      for(int k = 0; k < 8; k++) spawn(x + (rand() % 9 - 4), y, (rand() % 11 - 5) * .14f, -(rand() % 8) * .14f, 22, RGB(178, 165, 139));
+      popup(x, y - 4, "CRUMBLE!", RGB(255, 210, 63)); break;
     case EV_SPLAT: for(int k = 0; k < 12; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 30, RGB(110, 255, 90)); break;
     case EV_TUBE: { static const u32 TC[3] = { RGB(255, 154, 60), RGB(79, 208, 255), RGB(140, 255, 90) };        /* posted through a pneumatic tube */
       for(int k = 0; k < 16; k++){ float an = k * .39f; spawn(x, y, cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); spawn(RTOF(e->a), RTOF(e->b), cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); }
