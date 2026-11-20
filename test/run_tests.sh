@@ -91,7 +91,7 @@ echo "--- DS music: one soft PCM note at a time, every note fades, no leaked cha
 for L in 3 6; do ./ds_render /tmp/dsM$L 12000 $L | grep -q "music wave channels peak=[2-8] (fades=[0-9][0-9]*, bad=0)" && echo "ok: level index $L: music (melody + bass) and tone effects share the 8 PCM channels, volumes and frequencies in range" || { echo "FAIL: music channel leak or bad wave parameters (level index $L)"; exit 1; }; done
 echo "--- DS outfits screen: open, walk, wear, locked swatches, back (scripted stylus + d-pad) ---"
 OUTFIT_SHOTS=1 ./ds_render /tmp/dsout 400 0 | grep -v "^ok:"
-echo "--- DS options screen (port 13): open, tap + d-pad, start tool pre-armed, valve hidden, collapse dropped FIRST when the solver is slow and restored LAST, saved and reloaded ---"
+echo "--- DS options screen (port 13): open, tap + d-pad, start tool pre-armed, valve hidden, collapse stays ON while overload cuts wobble work and substeps, saved and reloaded ---"
 rm -f /tmp/mx_opt.sav; MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_TEST=1 ./ds_render /tmp/dsopt 3000 0 | grep -v "^ok:"
 MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_LOAD=1 ./ds_render /tmp/dsopt2 400 0
 echo "--- DS title cheat: L+R+SELECT unlocks every level for the session, in any key order ---"

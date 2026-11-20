@@ -20,8 +20,9 @@ int main(void){
   sfx_init();music_set(1);
   for(int i=0;i<MUS_STEP_FRAMES*3;i+=3)sfx_tick_steps((MUS_STEP_FRAMES*3-i)<3 ? (MUS_STEP_FRAMES*3-i) : 3);
   if(mus_step!=3 || mus_t!=0){fprintf(stderr,"song tempo lost: step=%d t=%d\n",mus_step,mus_t);return 1;}
-  music_set(1);sfx_tick_steps(50);
+  music_set(1);int prev_fades=fade_calls;sfx_tick_steps(50);
   if(mus_t!=8){fprintf(stderr,"catch-up overran IPC budget: %d\n",mus_t);return 1;}
+  if(fade_calls-prev_fades>2){fprintf(stderr,"catch-up flooded IPC: %d repeated envelopes\n",fade_calls-prev_fades);return 1;}
   music_set(0);if(mus_on||faults||!fade_calls){fprintf(stderr,"audio channels fault=%d fade=%d\n",faults,fade_calls);return 1;}
   puts("music clock: passed - 3 bars caught up, capped backlog, no channel leaks");return 0;
 }

@@ -269,17 +269,17 @@ void swiWaitForVBlank(void){
       if(vf == f0 + 4){ g_keys |= KEY_TOUCH; g_touch.px = vpx + 6; g_touch.py = vpy - 5; PCHECK(world.man.seated && world.man.vlv, "stylus drag: pulling the sling all the way back drops him onto the air valve"); }
       if(vf == f0 + 6){ PCHECK(world.man.seated, "stylus lifted on the valve: he stays seated and keeps filling"); st = 4; f0 = vf; g_ticks = 400000; } }   /* the solver now looks slow */
     if(st == 4 && vf == f0 + 3){ PCHECK(world.wob_budget < DS_WOB_MAX && world.collapse == 1 && world.substeps == MX_DS_MAX_SUBSTEPS, "slow solver: one slow frame at a time shrinks the wobble cap first, nothing else is touched yet"); st = 41; }
-    if(st == 41 && vf == f0 + 7){ PCHECK(world.wob_budget == DS_WOB_MIN, "...down to its floor"); PCHECK(world.collapse == 0 && coll_shed == 1 && opt.collapse == 1, "...and only then collapse is dropped, the preference stays on");
-      PCHECK(world.substeps == MX_DS_MAX_SUBSTEPS && world.wob_enabled, "...before substeps or the wobble lattice are touched"); st = 5; f0 = vf; }
-    if(st == 5 && vf == f0 + 2){ PCHECK(world.substeps == 2 && world.wob_enabled, "still slow: substeps go next"); st = 6; f0 = vf; }
-    if(st == 6 && vf == f0 + 3){ PCHECK(!world.wob_enabled && world.collapse == 0, "still slow: the wobble lattice goes last"); st = 7; f0 = vf; g_ticks = 100000; }
-    if(st == 7 && vf == f0 + 130){ PCHECK(world.wob_enabled && world.substeps == 2 && !world.collapse, "headroom: the wobble lattice comes back first"); st = 8; f0 = vf; }
-    if(st == 8 && vf == f0 + 125){ PCHECK(world.substeps == MX_DS_MAX_SUBSTEPS && !world.collapse, "...then the substeps"); st = 9; f0 = vf; }
-    if(st == 9 && vf == f0 + 125){ PCHECK(world.collapse == 1 && coll_shed == 0, "...and collapsible buildings last");
-      load_level(world.level); PCHECK(world.collapse == 1, "a reloaded level keeps the preference");
-      coll_shed = 1; load_level(world.level); PCHECK(world.collapse == 0, "...but not while the safety net has it shed");
-      opt_change(OPT_COLLAPSE, 1); opt_change(OPT_COLLAPSE, 1); PCHECK(opt.collapse == 1 && coll_shed == 0 && world.collapse == 1, "changing the option clears the shed flag (a fresh chance)");
-      opt.collapse = 0; opt.tool = MX_TOOL_SPLAT; save_off = 0; save_sync(); st = 10;                       /* leave a recognisable option set on the chip */
+    if(st == 41 && vf == f0 + 7){ PCHECK(world.wob_budget == DS_WOB_MIN, "...wobble reaches its floor");
+      PCHECK(world.collapse == 1 && opt.collapse == 1, "opted-in building collapse survives sustained overload");
+      PCHECK(world.substeps == 2 && world.wob_enabled, "reduce chunk substeps before disabling wobble"); st = 5; f0 = vf; }
+    if(st == 5 && vf == f0 + 2){ PCHECK(!world.wob_enabled && world.collapse == 1, "only wobble is disabled in final fallback"); st = 7; f0 = vf; g_ticks = 100000; }
+    if(st == 7 && vf == f0 + 130){ PCHECK(world.wob_enabled && world.substeps == 2 && world.collapse == 1, "wobble returns under headroom, collapse stays ON"); st = 8; f0 = vf; }
+    if(st == 8 && vf == f0 + 125){ PCHECK(world.substeps == MX_DS_MAX_SUBSTEPS && world.collapse == 1, "full substeps recover after headroom"); st = 9; f0 = vf; }
+    if(st == 9 && vf == f0 + 125){ PCHECK(world.collapse == 1, "collapse never auto-shed even after recovery");
+      load_level(world.level); PCHECK(world.collapse == 1, "level reload preserves collapse preference");
+      opt_change(OPT_COLLAPSE, 1); PCHECK(opt.collapse == 0 && world.collapse == 0, "user OFF explicitly disables collapse");
+      opt_change(OPT_COLLAPSE, 1); PCHECK(opt.collapse == 1 && world.collapse == 1, "user ON restores collapse");
+      opt.collapse = 0; opt.tool = MX_TOOL_SPLAT; save_off = 0; save_sync(); st = 10;
       printf(fails ? "options: %d FAILED\n" : "options: all passed\n", fails); save_report(); exit(fails != 0); }
   } else if(getenv("INTRO_TEST")){                                         /* the opening cutscene played start to finish with no input, photographed as it goes */
     static int fails, lf, last_sc = -1, played;
