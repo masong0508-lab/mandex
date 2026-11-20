@@ -215,10 +215,32 @@ void swiWaitForVBlank(void){
   if(vf == 1 && !getenv("END_TEST")) end_seen = 6;                  /* the other scripted runs press A on the title and expect level 1 at once */
   if(getenv("OPTIONS_LOAD")){                                      /* second boot after OPTIONS_TEST: the options come back from the chip (collapse off, splat) */
     if(vf == 3){ int ok = opt.collapse == 0 && opt.tool == MX_TOOL_SPLAT; printf(ok ? "ok: options loaded from the chip at boot\n" : "FAIL: options not loaded (collapse=%d tool=%d)\n", opt.collapse, opt.tool); exit(!ok); }
+  } else if(getenv("TOOLBAR_TEST")){
+    static int fails;
+#define TCHECK(c,msg) do{if(!(c)){printf("FAIL: %s\n",msg);fails++;}else printf("ok: %s\n",msg);}while(0)
+    if(vf==2){
+      stats.stars[0]=stats.stars[1]=stats.stars[2]=1;
+      app=ST_PLAY;load_level(0);
+      TCHECK(!world.valve_ok&&!valve_equipped,"air valve is absent by default");
+      TCHECK(aim_tool_at(&(touchPosition){.px=12,.py=158})==0,"DS AIR touch target fits within lower screen");
+      TCHECK(aim_tool_at(&(touchPosition){.px=110,.py=180})==4,"DS TURBO has a distinct tappable slot");
+      TCHECK(aim_tool_at(&(touchPosition){.px=200,.py=180})==5,"DS QUAKE has a distinct tappable slot");
+    }
+    if(vf==4){g_keys|=KEY_TOUCH;g_touch.px=20;g_touch.py=158;}
+    if(vf==5)TCHECK(world.valve_ok&&valve_equipped,"tapping AIR reveals the valve");
+    if(vf==8){g_keys|=KEY_TOUCH;g_touch.px=110;g_touch.py=180;}
+    if(vf==9)TCHECK(!world.valve_ok&&!valve_equipped&&world.pw_sel==PW_TURBO,"TURBO replaces AIR and arms one shot");
+    if(vf==12){g_keys|=KEY_TOUCH;g_touch.px=200;g_touch.py=180;}
+    if(vf==13)TCHECK(world.pw_sel==PW_QUAKE,"QUAKE selected from touchscreen");
+    if(vf==16){g_keys|=KEY_TOUCH;g_touch.px=20;g_touch.py=158;}
+    if(vf==17)TCHECK(world.valve_ok&&world.pw_sel==0,"AIR selection disarms QUAKE");
+    if(vf==20){g_keys|=KEY_TOUCH;g_touch.px=20;g_touch.py=158;}
+    if(vf==21)TCHECK(!world.valve_ok&&!valve_equipped,"AIR can be turned off before normal aiming");
+    if(vf==23){printf(fails?"toolbar: %d FAILED\n":"toolbar: all passed\n",fails);exit(fails!=0);}
   } else if(getenv("OPTIONS_TEST")){                                       /* port 13: the options screen, the start tool, the speed safety net, saving */
     static int fails, st, men0, f0;
 #define PCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
-    if(vf == 2){ stats.stars[0] = stats.stars[1] = stats.stars[2] = 1; PCHECK(opt.collapse == 0 && opt.tool == MX_TOOL_VALVE && !opt_open, "fresh boot: collapse off, air valve, screen closed"); }
+    if(vf == 2){ stats.stars[0] = stats.stars[1] = stats.stars[2] = 1; PCHECK(opt.collapse == 0 && opt.tool == MX_TOOL_NONE && !opt_open, "fresh boot: collapse off, air valve, screen closed"); }
     if(vf == 4){ g_keys |= KEY_TOUCH; g_touch.px = 130; g_touch.py = 180; }                              /* the OPTIONS button on the title */
     if(vf == 7){ PCHECK(opt_open && opt_cur == 0 && app == ST_TITLE, "the OPTIONS button opens the screen without starting a level"); shot("opt1"); }
     if(vf == 8){ g_keys |= KEY_TOUCH; g_touch.px = 100; g_touch.py = 30; }                                /* tap the collapse row */
@@ -226,17 +248,17 @@ void swiWaitForVBlank(void){
     if(vf == 11) g_keys |= KEY_DOWN;
     if(vf == 13) PCHECK(opt_cur == 1, "d-pad down moves to the tool row");
     if(vf == 14) g_keys |= KEY_A;
-    if(vf == 16) PCHECK(opt.tool == MX_TOOL_BEANS, "A steps the tool on (air valve -> beans)");
+    if(vf == 16) PCHECK(opt.tool == MX_TOOL_VALVE, "A steps NONE to AIR VALVE title preference (still hidden in gameplay)");
     if(vf == 17) g_keys |= KEY_RIGHT;
-    if(vf == 19) PCHECK(opt.tool == MX_TOOL_TOWEL, "d-pad right steps it on (towel)");
+    if(vf == 19) PCHECK(opt.tool == MX_TOOL_BEANS, "d-pad right steps it to beans");
     if(vf == 20){ g_keys |= KEY_TOUCH; g_touch.px = 12; g_touch.py = 86; }                                /* the left arrow */
-    if(vf == 22) PCHECK(opt.tool == MX_TOOL_BEANS, "tapping the left end of the tool row steps back");
+    if(vf == 22) PCHECK(opt.tool == MX_TOOL_VALVE, "tapping the left end of the tool row steps back");
     if(vf == 23){ g_keys |= KEY_TOUCH; g_touch.px = 180; g_touch.py = 90; }
-    if(vf == 25){ PCHECK(opt.tool == MX_TOOL_TOWEL, "tapping elsewhere on the row steps forward"); shot("opt3"); }
-    if(vf == 26) g_keys |= KEY_LEFT; if(vf == 28) PCHECK(opt.tool == MX_TOOL_BEANS, "d-pad left steps back");
-    if(vf == 29) g_keys |= KEY_LEFT; if(vf == 31) PCHECK(opt.tool == MX_TOOL_VALVE, "...to the air valve");
-    if(vf == 32) g_keys |= KEY_LEFT; if(vf == 34) PCHECK(opt.tool == MX_TOOL_NONE, "...to none");
-    if(vf == 35) g_keys |= KEY_LEFT; if(vf == 37) PCHECK(opt.tool == MX_TOOL_SPLAT, "...and the list wraps round to splat");
+    if(vf == 25){ PCHECK(opt.tool == MX_TOOL_BEANS, "tapping elsewhere on the row steps forward"); shot("opt3"); }
+    if(vf == 26) g_keys |= KEY_LEFT; if(vf == 28) PCHECK(opt.tool == MX_TOOL_VALVE, "d-pad left steps back");
+    if(vf == 29) g_keys |= KEY_LEFT; if(vf == 31) PCHECK(opt.tool == MX_TOOL_NONE, "...to none");
+    if(vf == 32) g_keys |= KEY_LEFT; if(vf == 34) PCHECK(opt.tool == MX_TOOL_QUAKE, "...wraps around to quake");
+    if(vf == 35) g_keys |= KEY_LEFT; if(vf == 37) PCHECK(opt.tool == MX_TOOL_TURBO, "...then to turbo");
     if(vf == 38) g_keys |= KEY_DOWN; if(vf == 40) PCHECK(opt_cur == 2, "d-pad down to the landlords-fight-back row");
     if(vf == 41) g_keys |= KEY_A; if(vf == 43){ PCHECK(opt.nofight == 1 && world.nofight == 1, "A on the fight-back row switches it off (and the world follows)"); shot("opt4f"); }
     if(vf == 44) g_keys |= KEY_A; if(vf == 46) PCHECK(opt.nofight == 0 && world.nofight == 0, "...and back on");
@@ -257,9 +279,10 @@ void swiWaitForVBlank(void){
     if(st == 2 && world.man.mode == MAN_AIM && world.state == MX_PLAY && world.men < men0 && vf > 74){
       PCHECK(world.pw_sel == 0, "back in the sling with no towel left: nothing is armed again"); st = 3; f0 = vf; }
     if(st == 3 && vf == f0 + 2){                                                                          /* apply_options(): the valve is only there when it is the start tool */
-      opt.tool = MX_TOOL_VALVE; apply_options(); PCHECK(world.valve_ok == 1, "air valve as the start tool and 3 levels beaten: the valve is usable");
-      opt.tool = MX_TOOL_NONE; apply_options(); PCHECK(world.valve_ok == 0, "tool NONE: no valve");
-      opt.tool = MX_TOOL_VALVE; apply_options();
+      opt.tool=MX_TOOL_VALVE;apply_options();PCHECK(world.valve_ok==0,"title option never auto-spawns the valve");
+      valve_equipped=1;apply_options();PCHECK(world.valve_ok==1,"AIR toolbar selection equips the unlocked valve");
+      valve_equipped=0;apply_options();PCHECK(world.valve_ok==0,"deselection hides the valve");
+      valve_equipped=1;apply_options();
       st = 30; f0 = vf; }                                                                                 /* first the stylus-on-the-valve check, then the slow solver */
     if(st == 30){                                                                                         /* drag the man with the stylus, back onto the valve */
       int vpx = (int)(RTOF(MX_VALVE_X) * 4), vpy = (int)(RTOF(MX_VALVE_Y) * 4) - 56, mpx = (int)(RTOF(MX_ANCHOR_X) * 4), mpy = (int)(RTOF(MX_ANCHOR_Y) * 4) - 56;

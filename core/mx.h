@@ -126,7 +126,7 @@ enum {
   EV_DISTRICT  /* Landlord HQ: the district was cleared and the next one is up (m = its number, 1 or 2); +MX_HQ_BONUS_MEN men and +3000 were added */
 };
 /* power-ups: one use of each per level */
-enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT };
+enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT, PW_TURBO, PW_QUAKE, PW_COUNT }; /* appended: preserve legacy save IDs */
 
 typedef struct { uint8_t type, m; real x, y, a, b; } MxEvent;
 
@@ -200,7 +200,7 @@ typedef struct {
   MxChunk chunks[MX_MAX_CHUNKS];
   MxTarget targets[MX_MAX_TARGETS];
   int ntargets;
-  int pw_sel, pw_left[4];        /* armed power-up (PW_*), uses left this level */
+  int pw_sel, pw_left[PW_COUNT];        /* armed power-up (PW_*), uses left this level */
   int valve_ok;                  /* air valve unlocked (front-ends set it from mx_valve_unlocked; survives mx_load) */
   int st_inflated, st_pops, st_pw[4];   /* session counters for achievements */
   MxMan man;

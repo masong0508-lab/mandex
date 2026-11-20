@@ -1,0 +1,58 @@
+name: Tool selector, air-valve gating and new power-ups
+on:
+  push:
+    branches: [main]
+    paths:
+      - "core/mx.c"
+      - "core/mx.h"
+      - "core/mx_meta.c"
+      - "core/mx_meta.h"
+      - "ds/source/main.c"
+      - "test/ds_render.c"
+      - "test/valve_test.c"
+      - "test/save_test.c"
+      - "3ds/main.c"
+      - "dreamcast/main.c"
+      - "web/index.html"
+      - ".github/workflows/tool-selector.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all power-up physics in float and fixed-point
+        run: |
+          for MODE in "" "-DMX_FIXED"; do
+            gcc -std=c99 -O2 -Wall $MODE -Icore core/mx.c core/mx_meta.c test/valve_test.c -lm -o /tmp/mandex-tool-valve
+            /tmp/mandex-tool-valve
+          done
+      - name: Save-format backward-compatibility checks
+        run: |
+          for MODE in "" "-DMX_FIXED"; do
+            gcc -std=c99 -O2 -Wall $MODE -Icore core/mx.c core/mx_meta.c test/save_test.c -lm -o /tmp/mandex-tool-save
+            /tmp/mandex-tool-save
+          done
+      - name: DS stylus toolbar clicks and options regression
+        run: |
+          gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Itest/stubs -Icore -Iart -Ids/source \
+            test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+            core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex-tool-ds
+          TOOLBAR_TEST=1 /tmp/mandex-tool-ds /tmp/tool-selector-test 80 0
+          OPTIONS_TEST=1 /tmp/mandex-tool-ds /tmp/tool-options-test 1500 0
+      - name: Browser game JavaScript parses, with new thong and tool animations
+        run: |
+          node - <<'JS'
+          const fs=require('fs');
+          const h=fs.readFileSync('web/index.html','utf8');
+          const a=h.indexOf('<script>'),b=h.indexOf('</script>',a);
+          if(a<0||b<a)throw Error('main game script not found');
+          new Function(h.slice(a+8,b));
+          for(const x of ['function thongFront','function thongBack','function pwTurbo','function pwQuake',"id:'turbo'","id:'quake'","OPT().tool='none'"])
+            if(!h.includes(x))throw Error('missing tool/body element '+x);
+          console.log('PASS: browser script parses and includes new tool/body features');
+          JS

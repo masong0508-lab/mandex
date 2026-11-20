@@ -85,6 +85,7 @@ static int disp_score, cells0 = 1, end_t, was_state;      /* best scores live in
 static MxStats stats;                 /* achievements / outfits / best scores; loaded from the cartridge backup chip at boot, written by save_sync() */
 static int ach_open, ach_page;       /* achievements list shown on the title's bottom screen */
 static int combo_held, cheat_t;      /* L+R+SELECT on the title = unlock every level for this session: latch (set while the three are held) and the on-screen message timer */
+static int valve_equipped;      /* gameplay toolbar gadget: default OFF, not an obstacle when flinging */
 static MxOptions opt;                /* port 13: collapsible buildings + start tool.  Saved in the cartridge blob (version 2); defaults until a save loads */
 static int opt_open, opt_cur;        /* options screen shown on the title's bottom screen; opt_cur = the highlighted row */
 static int was_aim; /* tool arming edge detector; collapse always follows opt.collapse */
@@ -1091,7 +1092,7 @@ static void draw_world(const View *v, int parallax){
   if(world.ntubes) draw_tubes(v);
   if(world.npads) draw_pads(v);
   draw_cases(v);
-  if(opt.tool == MX_TOOL_VALVE) draw_valve(v);
+  if(world.valve_ok) draw_valve(v);
   DS_LAYER(v,7);
   { const MxMan *m = &world.man;                                   /* his shadow on the ground, smaller the higher he is */
     if(m->mode == MAN_AIM || m->mode == MAN_FLY){ int hgt = gfx_clamp((int)((RI(MX_ROWS) - m->y) >> 12), 0, 40), rw = (v->ppc * (5 * (80 - hgt))) / 80;
@@ -1225,29 +1226,49 @@ static void bottom_overview(View *v){
   if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) gfx_text_c(v->buf, 128, 6, "TAP = BELLY FLOP!", C_WHITE, C_BLACK, 1);
 }
 
+/* Six real touch targets fit the 256x192 lower DS screen. The existing
+   power gauge keeps its own 82px strip; no sprites or framebuffers added. */
+static const struct { int x,y,w,h,pw; const char *name; } AIM_TOOLS[6]={
+  {6,150,82,18,0,"AIR VALVE"},
+  {94,150,49,18,PW_BEANS,"BEANS"},
+  {146,150,49,18,PW_TOWEL,"TOWEL"},
+  {198,150,51,18,PW_SPLAT,"SPLAT"},
+  {94,172,75,16,PW_TURBO,"TURBO"},
+  {174,172,75,16,PW_QUAKE,"QUAKE"}
+};
+static int aim_tool_at(const touchPosition *t){
+  for(int i=0;i<6;i++)if(hit(t,AIM_TOOLS[i].x,AIM_TOOLS[i].y,AIM_TOOLS[i].w,AIM_TOOLS[i].h))return i;
+  return -1;
+}
 /* the 4 px/cell sling zoom */
 static void bottom_aim(View *v){
-  draw_world(v, 1);
-  draw_popups(v, 1);
-  gfx_rect(v->buf, 0, 0, 256, 11, C_UIBG); gfx_rect(v->buf, 0, 11, 256, 1, C_UILINE);
-  gfx_text(v->buf, 4, 3, "MEN", C_GOLD, 1);
-  draw_men_icons(v->buf, 36, 1, 1);
-  gfx_text(v->buf, 256 - 4 - gfx_text_w("SELECT RESTART", 1), 3, "SELECT RESTART", C_UILINE, 1);
-  const MxMan *m = &world.man;
-  real dx = m->x - MX_ANCHOR_X, dy = m->y - MX_ANCHOR_Y;
-  int pct = rsqrt(rmul(dx, dx) + rmul(dy, dy)) * 100 / MX_PULL_MAX;
-  gfx_text_o(v->buf, 6, 172, "POWER", C_WHITE, C_BLACK, 1);
-  gfx_rect(v->buf, 6, 180, 82, 8, C_UIBG); gfx_rect(v->buf, 7, 181, 80, 6, C_DARK);
-  gfx_rect(v->buf, 7, 181, gfx_clamp(pct, 0, 100) * 80 / 100, 6, pct < 50 ? C_GOO : pct < 85 ? C_GOLD : C_RED);
-  if(pct < 14 && (frame & 32)) gfx_text_c(v->buf, 150, 40, "DRAG THE MAN BACK, LET GO TO FLING", C_WHITE, C_BLACK, 1);
-  static const char *const PWN[3] = { "BEANS", "TOWEL", "SPLAT" };      /* one use each per level; touch to arm, then fling */
-  for(int k = 0; k < 3; k++){
-    int left = world.pw_left[k + 1], on = world.pw_sel == k + 1;
-    gfx_rect(v->buf, 96 + k * 52, 172, 50, 16, on ? C_GOLD : C_UIBG);
-    gfx_rect(v->buf, 96 + k * 52, 172, 50, 1, C_UILINE);
-    gfx_text_c(v->buf, 96 + k * 52 + 25, 176, PWN[k], on ? C_BLACK : left ? C_WHITE : C_GRAY, on ? C_GOLD : C_UIBG, 1);
+  draw_world(v,1);
+  draw_popups(v,1);
+  gfx_rect(v->buf,0,0,256,11,C_UIBG);gfx_rect(v->buf,0,11,256,1,C_UILINE);
+  gfx_text(v->buf,4,3,"MEN",C_GOLD,1);
+  draw_men_icons(v->buf,36,1,1);
+  gfx_text(v->buf,256-4-gfx_text_w("SELECT RESTART",1),3,"SELECT RESTART",C_UILINE,1);
+  const MxMan *m=&world.man;
+  real dx=m->x-MX_ANCHOR_X,dy=m->y-MX_ANCHOR_Y;
+  int pct=rsqrt(rmul(dx,dx)+rmul(dy,dy))*100/MX_PULL_MAX;
+  gfx_rect(v->buf,0,149,256,43,C_UIBG);
+  gfx_rect(v->buf,0,149,256,1,C_UILINE);
+  gfx_text(v->buf,6,172,"POWER",C_WHITE,1);
+  gfx_rect(v->buf,6,180,82,8,C_UIBG);gfx_rect(v->buf,7,181,80,6,C_DARK);
+  gfx_rect(v->buf,7,181,gfx_clamp(pct,0,100)*80/100,6,pct<50?C_GOO:pct<85?C_GOLD:C_RED);
+  if(pct<14&&(frame&32))gfx_text_c(v->buf,128,139,"DRAG MAN BACK - RELEASE TO FLING",C_WHITE,C_BLACK,1);
+  for(int k=0;k<6;k++){
+    int pw=AIM_TOOLS[k].pw;
+    int left=k==0?mx_valve_unlocked(&stats):world.pw_left[pw]>0;
+    int on=k==0?world.valve_ok:world.pw_sel==pw;
+    int x=AIM_TOOLS[k].x,y=AIM_TOOLS[k].y,w=AIM_TOOLS[k].w,h=AIM_TOOLS[k].h;
+    gfx_rect(v->buf,x,y,w,h,on?C_GOLD:C_UIBG);
+    gfx_rect(v->buf,x,y,w,1,on?C_WHITE:C_UILINE);
+    gfx_rect(v->buf,x,y,1,h,C_UILINE);
+    gfx_rect(v->buf,x+w-1,y,1,h,C_UILINE);
+    gfx_rect(v->buf,x,y+h-1,w,1,C_UILINE);
+    gfx_text_c(v->buf,x+w/2,y+(h-5)/2,AIM_TOOLS[k].name,on?C_BLACK:left?C_WHITE:C_GRAY,on?C_GOLD:C_UIBG,1);
   }
-  if(world.pw_sel) gfx_text_c(v->buf, 128, 160, world.pw_sel == PW_BEANS ? "TAP IN THE AIR = FART JET" : world.pw_sel == PW_TOWEL ? "TOWEL: GLIDE FURTHER" : "SPLAT: BIG GOO BLAST", C_GOLD, C_BLACK, 1);
 }
 
 /* ------------------------------------------------------------------ title */
@@ -1278,11 +1299,12 @@ static void apply_outfit(int o){
   { uint8_t sk[4][3]; extern int gfx_man_fur; gfx_man_fur = mx_outfit_skin(o, sk);                                   /* the Wolfman's skin is grey fur */
     for(int k = 0; k < 4; k++){ u16 c = RGB15(sk[k][0] >> 3, sk[k][1] >> 3, sk[k][2] >> 3); gfx_pal[C_MAN0 + 1 + k] = c; BG_PALETTE[C_MAN0 + 1 + k] = c; BG_PALETTE_SUB[C_MAN0 + 1 + k] = c; } }
 }
-/* the air valve exists only while it is the start tool (and unlocked); NONE and the three power-ups hide it, as in the browser */
-static int valve_allowed(void){ return opt.tool == MX_TOOL_VALVE && mx_valve_unlocked(&stats); }
+/* AIR is an explicit gameplay toolbar selection. The title's remembered
+   start tool must never silently summon the valve into normal shots. */
+static int valve_allowed(void){ return valve_equipped && mx_valve_unlocked(&stats); }
 static void apply_options(void){ mx_set_collapse(&world, opt.collapse); world.valve_ok = valve_allowed(); mx_set_fight(&world, !opt.nofight); }
 static void load_level(int l){
-  mx_load(&world, l); mx_meta_level_start(&stats, &world); apply_options(); was_aim = 0;
+  mx_load(&world, l); mx_meta_level_start(&stats, &world); valve_equipped=0; apply_options(); was_aim = 0;
 #if MX_DS_FACADE_CACHE
   fac_dirty=1;
 #endif
@@ -1472,8 +1494,8 @@ static void options_bottom(u8 *b){
       const char *v = mx_tool_name(opt.tool);
       gfx_text(b, x + w - 8 - gfx_text_w(v, 2), y + 3, v, C_GOLD, 2);
       gfx_text(b, x + 6, y + 17, "<", C_WHITE, 2); gfx_text(b, x + 6 + 12, y + 17, ">", C_WHITE, 2);
-      static const char *const D1[MX_NUM_TOOLS] = { "NO AIR VALVE AND NOTHING PRE-ARMED", "THE AIR VALVE: BEAT 3 LEVELS TO UNLOCK IT", "BEANS ARE ARMED BEFORE EVERY SHOT", "THE TOWEL IS ARMED BEFORE EVERY SHOT", "SPLAT IS ARMED BEFORE EVERY SHOT" };
-      static const char *const D2[MX_NUM_TOOLS] = { "", "", "ONE USE PER LEVEL. THE AIR VALVE IS HIDDEN", "ONE USE PER LEVEL. THE AIR VALVE IS HIDDEN", "ONE USE PER LEVEL. THE AIR VALVE IS HIDDEN" };
+      static const char *const D1[MX_NUM_TOOLS] = { "NO GADGET; EQUIP ONE IN THE AIM TOOLBAR", "AIR VALVE: EQUIP IN THE AIM TOOLBAR", "BEANS: PRE-ARM WHEN YOU RELOAD", "TOWEL: PRE-ARM WHEN YOU RELOAD", "SPLAT: PRE-ARM WHEN YOU RELOAD", "TURBO: FASTER LAUNCH, 1 PER LEVEL", "QUAKE: HEAVY IMPACT, 1 PER LEVEL" };
+      static const char *const D2[MX_NUM_TOOLS] = { "AIR STAYS HIDDEN UNTIL TAPPED", "AIR IS OFF AT LEVEL START", "ONE USE PER LEVEL; AIR STAYS OFF", "ONE USE PER LEVEL; AIR STAYS OFF", "ONE USE PER LEVEL; AIR STAYS OFF", "NO HEAP / EXTRA ASSETS", "STRONGER, SMALLER SHOCK THAN SPLAT" };
       gfx_text(b, x + 34, y + 21, D1[opt.tool], C_WHITE, 1);
       gfx_text(b, x + 34, y + 29, D2[opt.tool], C_GRAY, 1);
     } else if(i == OPT_FIGHT){
@@ -1682,17 +1704,52 @@ int main(void){
       MxMan *m = &world.man;
       if(m->mode == MAN_AIM){
         View av = { buf_bot, 4, 0, 56 };
-        if(down & KEY_TOUCH){
-          for(int k = 0; k < 3; k++) if(hit(&t, 96 + k * 52, 172, 50, 16)){ mx_select_power(&world, k + 1); sfx_play(SFX_CLICK, 64); }
+        int toolbar_hit=(down&KEY_TOUCH)?aim_tool_at(&t):-1;
+        if(toolbar_hit>=0){
+          if(toolbar_hit==0){
+            if(mx_valve_unlocked(&stats)){
+              valve_equipped=!valve_equipped;
+              if(valve_equipped && world.pw_sel)mx_select_power(&world,world.pw_sel);
+              if(!valve_equipped && m->seated)mx_set_pull(&world,0,0);
+              apply_options();sfx_play(SFX_CLICK,64);
+            }else sfx_play(SFX_CLICK,24);
+          }else{
+            int pw=AIM_TOOLS[toolbar_hit].pw;
+            if(world.pw_left[pw]>0){
+              if(valve_equipped){
+                valve_equipped=0;
+                if(m->seated)mx_set_pull(&world,0,0);
+                apply_options();
+              }
+              mx_select_power(&world,pw);sfx_play(SFX_CLICK,64);
+            }else sfx_play(SFX_CLICK,24);
+          }
         }
-        if(down & KEY_X){ int nx = world.pw_sel; for(int tries = 0; tries < 4; tries++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; } if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); sfx_play(SFX_CLICK, 64); }
-        world.valve_ok = valve_allowed();                                 /* beat 3 levels to unlock the air valve; hidden unless it is the start tool */
-        if((down & KEY_R) && mx_valve_seat(&world)) sfx_play(SFX_CLICK, 64);
-        if(down & KEY_TOUCH){
-          int vdx = t.px - vx(&av, MX_VALVE_X), vdy = t.py - vy(&av, MX_VALVE_Y);
-          int dx = t.px - vx(&av, m->x), dy = t.py - vy(&av, m->y);
-          if(!m->seated && vdx * vdx + vdy * vdy < 20 * 20 && mx_valve_seat(&world)){ dragging = 0; sfx_play(SFX_CLICK, 64); }   /* tap the valve */
-          else dragging = dx * dx + dy * dy < 34 * 34;                   /* grab the man */
+        if(down&KEY_X){
+          int nx=world.pw_sel;
+          for(int tries=0;tries<PW_COUNT;tries++){
+            nx=(nx+1)%PW_COUNT;
+            if(nx==PW_NONE||world.pw_left[nx]>0)break;
+          }
+          if(nx==PW_NONE && world.pw_sel)mx_select_power(&world,world.pw_sel);
+          else if(nx){
+            if(valve_equipped){
+              valve_equipped=0;
+              if(m->seated)mx_set_pull(&world,0,0);
+              apply_options();
+            }
+            mx_select_power(&world,nx);
+          }
+          sfx_play(SFX_CLICK,64);
+        }
+        world.valve_ok=valve_allowed();  /* off by default; only an equipped AIR receives interactions */
+        if((down&KEY_R)&&mx_valve_seat(&world))sfx_play(SFX_CLICK,64);
+        if((down&KEY_TOUCH)&&toolbar_hit<0){
+          int vdx=t.px-vx(&av,MX_VALVE_X),vdy=t.py-vy(&av,MX_VALVE_Y);
+          int dx=t.px-vx(&av,m->x),dy=t.py-vy(&av,m->y);
+          if(world.valve_ok&&!m->seated&&vdx*vdx+vdy*vdy<20*20&&mx_valve_seat(&world)){
+            dragging=0;sfx_play(SFX_CLICK,64);
+          }else dragging=dx*dx+dy*dy<34*34;
         }
         if((held & KEY_TOUCH) && dragging){
           real cx = RI(t.px + av.cx) >> 2, cy = RI(t.py + av.cy) >> 2;    /* stylus px -> cells (4 px per cell) */

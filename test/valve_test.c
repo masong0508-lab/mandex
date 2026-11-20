@@ -92,6 +92,22 @@ int main(void){
     /* the pad never grabs: mx_set_pull stays as it was */
     mx_load(&W, 0); run(120); W.valve_ok = 1; mx_set_pull(&W, R(ux * RTOF(MX_PULL_MAX)), R(uy * RTOF(MX_PULL_MAX)));
     CHECK(!W.man.seated, "stick/pad pull toward the valve still never grabs it"); }
+  const int prior_beans=W.st_pw[PW_BEANS],prior_towel=W.st_pw[PW_TOWEL],prior_splat=W.st_pw[PW_SPLAT];
+  /* New one-shot tools: unlike the valve, their power is armed explicitly
+     and consumed only when the player releases a real shot. */
+  mx_load(&W,0); W.banner=0; W.state=MX_PLAY;
+  CHECK(W.pw_left[PW_TURBO]==1&&W.pw_left[PW_QUAKE]==1,"new powers each start with one use");
+  mx_select_power(&W,PW_TURBO);
+  CHECK(W.pw_sel==PW_TURBO,"TURBO can be armed");
+  mx_set_pull(&W,R(-8),R(4));mx_release(&W);
+  CHECK(W.man.pwr==PW_TURBO&&W.pw_left[PW_TURBO]==0,"TURBO launches and consumes one charge");
+  CHECK(RTOF(W.man.vx)>80,"TURBO increases launch velocity");
+  mx_load(&W,0);W.banner=0;W.state=MX_PLAY;
+  mx_select_power(&W,PW_QUAKE);
+  CHECK(W.pw_sel==PW_QUAKE,"QUAKE can be armed");
+  mx_set_pull(&W,R(-8),R(4));mx_release(&W);
+  CHECK(W.man.pwr==PW_QUAKE&&W.pw_left[PW_QUAKE]==0,"QUAKE launches and consumes one charge");
+  CHECK(W.st_pw[PW_BEANS]==prior_beans&&W.st_pw[PW_TOWEL]==prior_towel&&W.st_pw[PW_SPLAT]==prior_splat,"new charges never corrupt legacy saved achievement counters");
   printf(fails ? "VALVE TEST FAILED\n" : "valve test passed\n");
   return fails != 0;
 }

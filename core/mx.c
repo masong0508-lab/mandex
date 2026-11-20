@@ -1135,6 +1135,21 @@ static void stick(MxWorld *w){
     ev(w, EV_SPLOOSH, m->x, m->y, 0, 0, 0);
     if(w->shake < R(10)) w->shake = R(10);
   }
+  /* QUAKE: compact, high-impact structural shockwave (smaller but harder
+     than SPLAT). Trigger only at a real landing; one use per level. */
+  if(m->pwr == PW_QUAKE && !m->splatted){
+    m->splatted = 1;
+    int cx=rfloor(m->x),cy=rfloor(m->y);
+    for(int j=-5;j<=5;j++)for(int i=-5;i<=5;i++)
+      if(i*i+j*j<=25)damage_cell(w,cx+i,cy+j,RI(13));
+    for(int i=0;i<w->ntargets;i++){
+      MxTarget *t=&w->targets[i];
+      real dx=t->x-m->x,dy=t->y-m->y;
+      if(t->alive && rmul(dx,dx)+rmul(dy,dy)<RI(64))kill_target(w,t);
+    }
+    ev(w,EV_CRUNCH,m->x,m->y,0,R(0.75),0);
+    if(w->shake<R(8))w->shake=R(8);
+  }
   if(w->walk && !m->walked){ enter_walk(w); return; }          /* walk levels: he lands on his feet and you steer him */
   m->mode = MAN_STUCK; m->vx = m->vy = 0; m->t = 0; m->gooT = 0;
   if(w->shake < R(4)) w->shake = R(4);
@@ -1342,13 +1357,22 @@ void mx_release(MxWorld *w){
     m->rad = rmul(MAN_R0, RI(1) + rmul(m->inf, R(0.9)));
     m->vx = rmul(rmul(dx, R(9.2)), sp0); m->vy = rmul(rmul(dy, R(9.2)), sp0);
     if(m->inf > R(0.6)) w->st_inflated++;
-    if(w->pw_sel){ m->pwr = (uint8_t)w->pw_sel; w->pw_left[w->pw_sel]--; w->st_pw[w->pw_sel]++; w->pw_sel = 0; } }
+    if(w->pw_sel){
+      int pw=w->pw_sel;
+      m->pwr=(uint8_t)pw;
+      w->pw_left[pw]--;
+      /* Legacy 4-counter achievement/save data remains binary-identical.
+         New one-shot powers are per-level and do not alter old counters. */
+      if(pw<=PW_SPLAT)w->st_pw[pw]++;
+      w->pw_sel=0;
+      if(pw==PW_TURBO){m->vx=rmul(m->vx,R(1.35));m->vy=rmul(m->vy,R(1.35));}
+    } }
   m->mode = MAN_FLY; m->gt = 0; w->men--;
   m->spin = 0; m->ang = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
   ev(w, EV_LAUNCH, m->x, m->y, 0, 0, 0);
 }
 void mx_select_power(MxWorld *w, int pw){
-  if(w->man.mode != MAN_AIM || pw < PW_BEANS || pw > PW_SPLAT || w->pw_left[pw] <= 0) return;
+  if(w->man.mode != MAN_AIM || pw < PW_BEANS || pw >= PW_COUNT || w->pw_left[pw] <= 0) return;
   w->pw_sel = (w->pw_sel == pw) ? 0 : pw;
 }
 void mx_dive(MxWorld *w){
@@ -2170,7 +2194,7 @@ static void load_level(MxWorld *w, int level, int district){
   build(w, level);
   for(int r = 0; r < w->nrooms; r++){ const MxRoom *rm = &w->rooms[r]; for(int y = rm->y; y < rm->y + rm->h; y++) for(int x = rm->x; x < rm->x + rm->w; x++) w->paper[IDX(x, y)] = (uint8_t)(rm->pal + 1); }
   unclip_targets(w);
-  w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = 1;
+  w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = w->pw_left[PW_TURBO] = w->pw_left[PW_QUAKE] = 1;
   w->sand_on = 1;
   /* anything that wouldn't hold at spawn is welded in place, so levels never collapse on load */
   support_pass(w);

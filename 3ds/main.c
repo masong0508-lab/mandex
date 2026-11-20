@@ -80,6 +80,7 @@ void sfx_play(int id, int pan){
   ndspChnWaveBufAdd(c, &snd_wb[c]);
 }
 static int app = ST_TITLE, sel = 0, frame, dragging, pad_used, cells0 = 1;
+static int valve_equipped; /* explicitly selected on the touchscreen, hidden on level start */
 static float pad_dx, pad_dy;
 static int new_best;                                     /* this win beat the level's old best score */
 static uint32_t prev_best;                              /* best[level] just before the win was recorded */
@@ -890,6 +891,7 @@ static void draw_parts(const View *v){
   }
 }
 static void draw_valve(const View *v){
+  if(!world.valve_ok)return;
   if(dragging && world.valve_ok && world.man.mode == MAN_AIM && !world.man.seated){           /* ghost seat while a pull is in hand: a ring of dots */
     static const signed char RX[12] = { 100, 87, 50, 0, -50, -87, -100, -87, -50, 0, 50, 87 }, RY[12] = { 0, 50, 87, 100, 87, 50, 0, -50, -87, -100, -87, -50 };
     int gx = VX(v, RTOF(MX_VALVE_X)), gyy = VY(v, RTOF(MX_VALVE_Y)), rr = v->ppc * 5 / 2 + ((frame >> 3) & 1), on = (frame >> 2) & 1;
@@ -1006,7 +1008,7 @@ static void draw_end(void){
 static const struct { int x, w; const char *s; } WB[6] = { { 4, 44, "<" }, { 52, 44, ">" }, { 104, 52, "JUMP" }, { 160, 56, "PUNCH" }, { 220, 52, "SLAM" }, { 276, 40, "QUIT" } };
 static int walk_btn_at(int tx, int ty){ if(ty < 196 || ty >= 236) return -1; for(int i = 0; i < 6; i++) if(tx >= WB[i].x && tx < WB[i].x + WB[i].w) return i; return -1; }
 static void load_level(int l){
-  mx_load(&world, l); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats);
+  mx_load(&world, l); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); valve_equipped=0; world.valve_ok=0;
   memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); mi_reset(&mi);
 #if MX_N3DS_PARTICLE_HINT
   part_free_hint = 0;
@@ -1076,8 +1078,15 @@ int main(void){
       if((down & KEY_START) && world.state == MX_PLAY) app = ST_PAUSE;
       if(down & KEY_SELECT) mus_pref = !mus_pref;                                            /* SELECT: music on / off */
       if(down & KEY_SELECT) load_level(world.level);
-      if((down & KEY_X) && m->mode == MAN_AIM){ int nx = world.pw_sel; for(int k = 0; k < 4; k++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; }
-        if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); }
+      if((down&KEY_X)&&m->mode==MAN_AIM){
+        int nx=world.pw_sel;
+        for(int k=0;k<PW_COUNT;k++){nx=(nx+1)%PW_COUNT;if(nx==PW_NONE||world.pw_left[nx]>0)break;}
+        if(nx==PW_NONE&&world.pw_sel)mx_select_power(&world,world.pw_sel);
+        else if(nx){
+          if(valve_equipped){valve_equipped=0;if(m->seated)mx_set_pull(&world,0,0);}
+          world.valve_ok=0;mx_select_power(&world,nx);
+        }
+      }
       if((down & KEY_B) && world.state != MX_PLAY){ app = ST_TITLE; sel = world.level; load_level(sel); }       /* B on the end screen = back to the title */
       if(world.state != MX_PLAY){
         if(down & (KEY_A | KEY_START | KEY_TOUCH)){
@@ -1087,9 +1096,26 @@ int main(void){
           else if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel = 0; load_level(0); } else { sel = next; load_level(next); }
         }
       } else if(m->mode == MAN_AIM){
-        world.valve_ok = mx_valve_unlocked(&stats);
-        if((down & KEY_R) && mx_valve_seat(&world)) pad_used = 0;       /* R: sit on the air valve (beat 3 levels) */
-        if(down & KEY_TOUCH) dragging = 1;
+        /* The dedicated bottom toolbar is separate from the aiming view. */
+        int tool_hit=(down&KEY_TOUCH)&&t.py>=216 ? (t.px>=265?5:t.px/53) : -1;
+        if(tool_hit>=0){
+          if(tool_hit==0){
+            if(mx_valve_unlocked(&stats)){
+              valve_equipped=!valve_equipped;
+              if(valve_equipped&&world.pw_sel)mx_select_power(&world,world.pw_sel);
+              if(!valve_equipped&&m->seated)mx_set_pull(&world,0,0);
+            }
+          }else{
+            int pw=tool_hit; /* BEANS...QUAKE = 1..5 */
+            if(world.pw_left[pw]>0){
+              if(valve_equipped){valve_equipped=0;if(m->seated)mx_set_pull(&world,0,0);}
+              mx_select_power(&world,pw);
+            }
+          }
+        }
+        world.valve_ok=valve_equipped&&mx_valve_unlocked(&stats);
+        if((down&KEY_R)&&world.valve_ok&&mx_valve_seat(&world))pad_used=0;
+        if((down&KEY_TOUCH)&&tool_hit<0)dragging=1;
         if((held & KEY_TOUCH) && dragging){
           float cx = (float)t.px / 4.0f + vb.cx, cy = (float)t.py / 4.0f + vb.cy;
           mx_drag(&world, R(1) * (cx - RTOF(MX_ANCHOR_X)), R(1) * (cy - RTOF(MX_ANCHOR_Y)));   /* stretches on toward the valve; drops onto it up close */
@@ -1190,7 +1216,18 @@ int main(void){
     }
     if(app == ST_PLAY){
       if(world.man.mode == MAN_AIM && !dragging && world.state == MX_PLAY) textc(&bot, 200, 12, "DRAG BACK AND LET GO", 2, RGB(255, 255, 255));
-      if(world.man.mode == MAN_AIM && world.state == MX_PLAY){ static const char *const PWN[4] = { "NONE", "BEANS", "TOWEL", "SPLAT" }; char pb[48]; sprintf(pb, "X: POWER-UP %s", PWN[world.pw_sel]); textc(&bot, 160, 228, pb, 1, world.pw_sel ? RGB(255, 210, 63) : RGB(200, 200, 200)); }
+      if(world.man.mode==MAN_AIM && world.state==MX_PLAY){
+        static const char *const names[6]={"AIR","BEANS","TOWEL","SPLAT","TURBO","QUAKE"};
+        for(int k=0;k<6;k++){
+          int x=k*53,w=k==5?55:53;
+          int available=k==0?mx_valve_unlocked(&stats):world.pw_left[k]>0;
+          int selected=k==0?world.valve_ok:world.pw_sel==k;
+          rect(&bot,x+1,216,w-2,24,selected?RGB(255,210,63):RGB(22,29,51));
+          rect(&bot,x+1,216,w-2,1,available?RGB(210,220,242):RGB(76,79,96));
+          textc(&bot,x+w/2,224,names[k],1,selected?RGB(15,18,30):available?RGB(255,255,255):RGB(100,103,118));
+        }
+        textc(&bot,160,204,"TAP TOOL  /  X CYCLE  /  R USE AIR",1,RGB(255,210,63));
+      }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
     } else textc(&bot, 160, 12, "TOUCH TO START", 2, RGB(255, 255, 255));
     gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();

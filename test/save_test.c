@@ -53,7 +53,7 @@ int main(void){
   CHECK(buf[6 + 4 * 8] == (61234 & 255) && buf[7 + 4 * 8] == ((61234 >> 8) & 255) && buf[8 + 4 * 8] == 0, "bestScore is the 9th counter");
   CHECK(buf[50] == 10 && buf[66] == S.stars[0] && buf[66 + 3] == S.stars[3], "pw[] at 50, stars[] at 66");
   CHECK(buf[66 + MX_NUM_LEVELS + 4] == 5, "outfit index byte follows stars and ach");
-  CHECK(buf[n - 5] == (0 | (MX_TOOL_VALVE << 1)), "options byte (default: collapse off, air valve) sits just before the CRC");
+  CHECK(buf[n - 5] == (0 | (MX_TOOL_NONE << 1)), "options byte (default: collapse off, air valve) sits just before the CRC");
   { uint32_t crc = mx_crc32(buf, n - 4); CHECK(buf[n - 4] == (uint8_t)crc && buf[n - 1] == (uint8_t)(crc >> 24), "CRC is the last four bytes, little-endian"); }
 
   /* round trip */
@@ -119,7 +119,7 @@ int main(void){
     W.level = MX_NUM_LEVELS; W.score = 5; mx_meta_win(&B, &W); CHECK(B.best[3] == 900, "an out-of-range level is ignored, not written"); }
 
   /* ---- options (port 13): saved in version 2, version 1 blobs still load with the defaults ---- */
-  { MxOptions d; mx_options_default(&d); CHECK(d.collapse == 0 && d.tool == MX_TOOL_VALVE, "default options: collapse off, air valve (the browser's defaults)"); }
+  { MxOptions d; mx_options_default(&d); CHECK(d.collapse == 0 && d.tool == MX_TOOL_NONE, "default options: collapse off, air valve (the browser's defaults)"); }
   { MxStats A; fill(&A); MxOptions o = { 1, MX_TOOL_SPLAT }, r = { 0, 0 }; uint8_t b[MX_SAVE_MAX]; int of2 = -1; MxStats B; mx_meta_init(&B);
     int n1 = mx_meta_pack_opt(&A, 7, &o, b, (int)sizeof b);
     CHECK(n1 == MX_SAVE_MAX && b[n1 - 5] == (1 | (MX_TOOL_SPLAT << 1)), "collapse on + splat packs into the options byte");

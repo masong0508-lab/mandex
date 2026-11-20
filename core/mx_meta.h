@@ -47,11 +47,11 @@ void mx_outfit_shades(int i, uint8_t out[6][3]);
 /* the four skin shades of the man sprites (palette entries 1..4 of art/manspr.h: base, shadow, highlight, mid): his pink skin, or the Wolfman's grey fur */
 int mx_outfit_skin(int i, uint8_t out[4][3]);      /* returns 1 when the outfit is furry */
 
-/* ---- options (port 13): kept by each front-end, saved in the blob (version 2).  Default = off / air valve, the browser's defaults. ---- */
-enum { MX_TOOL_NONE, MX_TOOL_VALVE, MX_TOOL_BEANS, MX_TOOL_TOWEL, MX_TOOL_SPLAT, MX_NUM_TOOLS };   /* appended, never inserted (stored as an index); Burpbuster is slot 5 when port 14 lands */
+/* ---- options (port 13): kept by each front-end, saved in the blob (version 2).  Default = collapse off / no gadget. The air valve must be armed in the gameplay toolbar. ---- */
+enum { MX_TOOL_NONE, MX_TOOL_VALVE, MX_TOOL_BEANS, MX_TOOL_TOWEL, MX_TOOL_SPLAT, MX_TOOL_TURBO, MX_TOOL_QUAKE, MX_NUM_TOOLS };   /* new tool IDs appended, preserving all save index meanings; fits bits 1-3 */
 typedef struct { uint8_t collapse, tool, nofight; } MxOptions;   /* collapse: collapsible buildings; tool: the start tool (MX_TOOL_*); nofight: 1 = landlords just stand there (default 0: they fight back) */
 void mx_options_default(MxOptions *o);
-const char *mx_tool_name(int tool);                      /* "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT" */
+const char *mx_tool_name(int tool);                      /* "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE" */
 int mx_tool_power(int tool);                             /* the PW_* a start tool pre-arms before every launch, or PW_NONE (none / air valve) */
 
 /* ---- save blob (port 5): identical bytes from the float and fixed builds, no struct memcpy, no malloc ----

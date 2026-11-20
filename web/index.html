@@ -15,7 +15,7 @@ const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const V=8,ROWS=60,GY=ROWS*V,G=900,K=1100,RC=V*.5;let COLS=120;   // COLS: 120 for every level except the wide finale (see setWorld)
 let W=960,H=540,WW=960;const WH=540;   // W,H = the screen (960x540, or a tall 540xN in portrait play); WW,WH = the world (WW = COLS*V: 960, or 2880 for the wide finale)
 let SX=128,SY=GY-118,VX=36,VY=SY+58;const PULL=92,VGRAB=40,VKEEP=44,VPULL=76;   // VX,VY: the air valve, tucked in the far lower-left corner: a full pull-back stops ~15px short of it
-let pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1}};
+let pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1}};
 const DX=[1,-1,0,0],DY=[0,0,1,-1];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v,rnd=Math.random;
 const idx=(x,y)=>y*COLS+x,inb=(x,y)=>x>=0&&x<COLS&&y>=0&&y<ROWS;
@@ -511,7 +511,10 @@ function unclipTargets(){for(const t of targets){const row=Math.floor(t.y/V+.875
 function load(l,custom){
   CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
-  pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;banner=2.4;waitT=0;
+  /* The air valve and every tool begin unequipped for each new level;
+     a previously saved AIR choice cannot obstruct the very next shot. */
+  OPT().tool='none';
+  pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;banner=2.4;waitT=0;
   tubes=[];pads=[];CL.build();paper.fill(0);interiors.forEach((r,n)=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(inb(x,y))paper[idx(x,y)]=n+1});unclipTargets();
   zonePaid=[];if(CL.slings){const zb=CL.zones||[];for(const t of targets){t.zone=0;for(let k=0;k<zb.length;k++)if(t.x>=zb[k]*V)t.zone=k+1}setSling(0)}else{SX=128;SY=GY-118;VX=36;VY=SY+58;slingK=0}
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
@@ -792,7 +795,7 @@ function cleanChunks(dt){
 // =====================================================================
 //  THE MAN: plowing physics (kinetic energy pays for each destroyed voxel)
 // =====================================================================
-function stick(){const m=man;if(m.pwr==='splat'&&!m.splatted){m.splatted=true;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);for(let j=-7;j<=7;j++)for(let i=-7;i<=7;i++)if(i*i+j*j<=49)damageCell(cx+i,cy+j,9);for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<85)killTarget(t);goo(m.x,m.y,70,420);ring(m.x,m.y,90,'#7dff5a');ring(m.x,m.y,60,'#fff');shake=Math.max(shake,10);flash=.25;SFX.boom();popText(m.x,m.y-40,'SPLOOSH!','#7dff5a',34)}
+function stick(){const m=man;if(m.pwr==='quake'&&!m.splatted){m.splatted=true;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);for(let j=-5;j<=5;j++)for(let i=-5;i<=5;i++)if(i*i+j*j<=25)damageCell(cx+i,cy+j,13);for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<64)killTarget(t);ring(m.x,m.y,76,'#ffd23f');ring(m.x,m.y,45,'#fff');shake=Math.max(shake,8);if(m.jg){m.jg.bvy-=22;m.jg.sq=1;m.jg.st=0}SFX.boom();popText(m.x,m.y-40,'KAPOW!','#ffd23f',30)}if(m.pwr==='splat'&&!m.splatted){m.splatted=true;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);for(let j=-7;j<=7;j++)for(let i=-7;i<=7;i++)if(i*i+j*j<=49)damageCell(cx+i,cy+j,9);for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<85)killTarget(t);goo(m.x,m.y,70,420);ring(m.x,m.y,90,'#7dff5a');ring(m.x,m.y,60,'#fff');shake=Math.max(shake,10);flash=.25;SFX.boom();popText(m.x,m.y-40,'SPLOOSH!','#7dff5a',34)}
   if(CL&&CL.walk&&!m.walked){enterWalk();return}
   if(m.pwr==='burp'&&!m.burped)m.burpT=1.0;m.mode='stuck';m.vx=m.vy=0;m.t=0;m.gooT=0;shake=Math.max(shake,4);goo(m.x,m.y,22,260);SFX.splat();ring(m.x,m.y,40,'#7dff5a')}
 function bounceRubber(){
@@ -816,14 +819,14 @@ function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long 
     if(stom(m)>.5){SFX.creak(Math.min(1,stom(m)))}
     if(stom(m)>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
   if(!OPT().noBurst&&stom(m)>=1)explodeMan()}
-// ---- power-up tool slots: ten in all. Slots 0-4 are the air valve, burpbuster, beans, towel and splat; slots 5-9 are reserved (invisible, skipped by the switcher) for tools still to come.
-const TOOLS=[{id:'valve',name:'AIR VALVE'},{id:'burp',name:'BURPBURSTER'},{id:'beans',name:'BEANS'},{id:'towel',name:'TOWEL'},{id:'splat',name:'SPLAT'}].concat(Array.from({length:5},(_,i)=>({id:'slot'+(i+5),name:'',reserved:true})));
+// ---- gameplay toolbar: valve and six tools are opt-in. Three reserved slots remain for future updates.
+const TOOLS=[{id:'valve',name:'AIR VALVE'},{id:'burp',name:'BURPBURSTER'},{id:'beans',name:'BEANS'},{id:'towel',name:'TOWEL'},{id:'splat',name:'SPLAT'},{id:'turbo',name:'TURBO'},{id:'quake',name:'QUAKE'}].concat(Array.from({length:3},(_,i)=>({id:'slot'+(i+7),name:'',reserved:true})));
 const toolList=()=>TOOLS.filter(t=>!t.reserved);          // what the player can actually pick
-const toolOn=id=>(OPT().tool||'valve')===id;               // default stays the air valve; 'none' switches every tool off
-function toolCycle(){const ids=['none'].concat(toolList().map(t=>t.id)),o=OPT(),i=ids.indexOf(o.tool||'valve');o.tool=ids[(i+1)%ids.length]}
-const PWTOOLS=['beans','towel','splat'];
-function toolArm(){const t=OPT().tool||'valve';if(man.mode!=='aim'||man.chug||pw.sel==='burp')return;pw.sel=PWTOOLS.includes(t)&&pw.left[t]>0?t:null}
-const toolName=()=>{const t=OPT().tool||'valve';return t==='none'?'NONE':(TOOLS.find(x=>x.id===t)||{name:'?'}).name};
+const toolOn=id=>(OPT().tool||'none')===id;                // the air valve exists only after explicit selection
+function toolCycle(){const ids=['none'].concat(toolList().map(t=>t.id)),o=OPT(),i=ids.indexOf(o.tool||'none');o.tool=ids[(i+1)%ids.length]}
+const PWTOOLS=['beans','towel','splat','turbo','quake'];
+function toolArm(){const t=OPT().tool||'none';if(man.mode!=='aim'||man.chug||pw.sel==='burp')return;pw.sel=PWTOOLS.includes(t)&&pw.left[t]>0?t:null}
+const toolName=()=>{const t=OPT().tool||'none';return t==='none'?'NONE':(TOOLS.find(x=>x.id===t)||{name:'?'}).name};
 function valveOpen(){return PD.unlockAll||storyDone()>=3}   // unlockable: beat 3 story levels (U on the level select unlocks everything)
 function drawValve(){
   if(!toolOn('valve'))return;
@@ -973,7 +976,13 @@ function manStep(dt){
 function pullVec(){let dx=SX-man.x,dy=SY-man.y;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}return[dx,dy]}
 function launch(){const[dx,dy]=pullVec();if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}man.x=SX-dx;man.y=SY-dy;
   const sp0=1-.5*man.inf-.1*(man.bel||0);man.R=14*(1+.9*man.inf+.35*(man.bel||0));man.vx=dx*9.2*sp0;man.vy=dy*9.2*sp0;man.mode='fly';if(man.inf>.6){ST().inflated++;popText(man.x,man.y-60,'HOT AIR!','#9fd8ff',26)}
-  if(pw.sel){man.pwr=pw.sel;man.bm=pw.sel==='burp'?burpMult(man):1;pw.left[pw.sel]--;ST()['pw_'+pw.sel]++;pw.sel=null}pdTouch();man.gt=0;men--;onShot();hint=0;SFX.launch();SFX.wooo();man.ang=Math.atan2(man.vy,man.vx)*.6}
+  if(pw.sel){man.pwr=pw.sel;man.bm=pw.sel==='burp'?burpMult(man):1;pw.left[pw.sel]--;ST()['pw_'+pw.sel]++;pw.sel=null}
+  if(man.pwr==='turbo'){
+    man.vx*=1.35;man.vy*=1.35;
+    if(man.jg){man.jg.bvx+=Math.sign(man.vx)*24;man.jg.bvy-=11;man.jg.sq=1;man.jg.st=0;}
+    ring(man.x,man.y,35,'#ffcd61');popText(man.x,man.y-35,'TURBO TUSH!','#ffd23f',20);
+  }
+  pdTouch();man.gt=0;men--;onShot();hint=0;SFX.launch();SFX.wooo();man.ang=Math.atan2(man.vy,man.vx)*.6}
 // ---- BURPBURSTER: two big sodas on a stand, chugged in the sling's shadow; then a burp shockwave (tap) or a small delayed burst (no tap)
 const STX=88,CHUG_Y=GY-30,BEL_MAX=.3,BEL_SET=.27;
 // ONE stomach for both tools: air from the valve (m.inf, also slows the launch) + soda (m.bel, cosmetic).  stom(m) is how full he is overall.
@@ -1097,11 +1106,34 @@ function burpCrate(cx,TY){ctx.save();ctx.lineJoin='round';const x=cx-38,w=76,h=G
   txt('BURP-COLA',cx,TY+17.5,7,'#ffe6b0','center','#4a2208');
   ctx.fillStyle='#e2dccb';for(const[nx,ny]of[[x+4,TY+3],[x+w-4,TY+3]]){ctx.beginPath();ctx.arc(nx,ny,1.1,0,7);ctx.fill()}ctx.restore()}
 // the placed prop for the three one-shot tools
-function drawPwProp(){if(state!=='play')return;const t=OPT().tool||'valve';if(!PWTOOLS.includes(t))return;const armed=pw.sel===t&&man.mode==='aim',spent=pw.left[t]<=0;
-  (t==='beans'?pwBeans:t==='towel'?pwTowel:pwSplat)(armed,spent)}
+/* New props are grounded and the animation is attached to a coherent base. */
+function pwTurbo(armed,spent){
+  const cx=88,y=GY-28;pwCrate(cx,66,12);ctx.save();if(spent)ctx.globalAlpha=.4;
+  if(armed)pwGlow(cx,y,45,'rgba(255,200,80,.32)');
+  pwRR(cx-20,y-18,40,30,5,'#9a5c25',2);
+  ctx.fillStyle='#ffe2a2';ctx.beginPath();ctx.arc(cx,y-3,14,0,7);ctx.fill();
+  ctx.fillStyle='#452413';ctx.beginPath();ctx.arc(cx,y-3,11,0,7);ctx.fill();
+  ctx.save();ctx.translate(cx,y-3);ctx.rotate(armed?time*8:time*1.5);
+  for(let k=0;k<4;k++){ctx.rotate(Math.PI/2);pwRR(0,-10,6,10,2,'#ffc544',1)}
+  ctx.restore();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx,y-3,3,0,7);ctx.fill();
+  txt('TURBO',cx,y+27,10,'#ffd23f','center');ctx.restore();
+}
+function pwQuake(armed,spent){
+  const cx=88,y=GY-26;pwCrate(cx,66,12);ctx.save();if(spent)ctx.globalAlpha=.4;
+  if(armed)pwGlow(cx,y,44,'rgba(255,110,80,.28)');
+  pwRR(cx-19,y-19,38,30,3,'#b43d33',2);
+  ctx.fillStyle='#ffdc70';ctx.beginPath();ctx.moveTo(cx-3,y-17);ctx.lineTo(cx+8,y-17);
+  ctx.lineTo(cx+1,y-4);ctx.lineTo(cx+11,y-4);ctx.lineTo(cx-8,y+10);
+  ctx.lineTo(cx-2,y-3);ctx.closePath();ctx.fill();
+  txt('QUAKE',cx,y+27,10,'#ffd23f','center');ctx.restore();
+}
+function drawPwProp(){if(state!=='play')return;const t=OPT().tool||'none';if(!PWTOOLS.includes(t))return;const armed=pw.sel===t&&man.mode==='aim',spent=pw.left[t]<=0;
+  (t==='beans'?pwBeans:t==='towel'?pwTowel:t==='splat'?pwSplat:t==='turbo'?pwTurbo:pwQuake)(armed,spent)}
 // in flight: the towel cape, a goo trail, stink behind the beans, fizz around a loaded burp
 function pwFlightFX(m){const R=m.R||14,sp=Math.hypot(m.vx,m.vy)||1,ux=-m.vx/sp,uy=-m.vy/sp,t=time;
   if(m.mode!=='fly')return;
+  if(m.pwr==='turbo'){for(let i=0;i<5;i++){const d=R+i*6,x=ux*d+Math.sin(t*13+i)*2,y=uy*d+Math.cos(t*11+i)*2;ctx.globalAlpha=.75-i*.12;ctx.fillStyle=i%2?'#fff':'#ffca59';ctx.fillRect(x-2,y-2,4,4)}ctx.globalAlpha=1}
+  if(m.pwr==='quake'&&!m.splatted){ctx.globalAlpha=.65+.2*Math.sin(t*7);ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,R+4,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1}
   if(m.pwr==='splat'&&!m.splatted){for(let i=0;i<7;i++){const d=R*.8+i*9+Math.sin(t*14+i*2)*2,x=ux*d+(pwQ(i)-.5)*10,y=uy*d+(pwQ(i+9)-.5)*10,r=Math.max(1.6,5.4-i*.55);ctx.globalAlpha=Math.max(.2,1-i*.11);ctx.fillStyle=pwVG(y-r,y+r,[0,'#b8ff7a',1,'#46a024']);ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle='#1c4a0c';ctx.stroke()}
     ctx.globalAlpha=1;for(const a of[.5,2.3,4.1]){const x=Math.cos(a)*R*.7,y=Math.sin(a)*R*.7;ctx.fillStyle='#8cf04a';ctx.beginPath();ctx.ellipse(x,y,4.4,3.2,a,0,7);ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle='#1c4a0c';ctx.stroke();ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(x-1.6,y-1.6,1.8,1)}}
   if(m.pwr==='beans'&&!m.beaned){for(let i=0;i<6;i++){const d=R+i*9,x=ux*d+Math.sin(t*9+i*1.7)*4,y=uy*d+Math.cos(t*8+i)*3,r=3.4+i*.9;ctx.fillStyle='rgba(150,205,60,'+Math.max(.08,.5-i*.075)+')';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}}
@@ -1459,12 +1491,37 @@ function wolfSnoutS(cx,cy){if(!WOLF&&!WOLFH)return;const a=.5+.5*Math.sin(time*9
   ctx.restore()}
 function wolfHeadB(){ctx.save();ctx.lineJoin='round';for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5,-54);ctx.lineTo(q*13,-68);ctx.lineTo(q*17,-52);ctx.closePath();ctx.fillStyle=WF;ctx.fill();ctx.strokeStyle='#2c2f3a';ctx.lineWidth=1.6;ctx.stroke()}
   furTufts([[-9,-30,1],[0,-28,1],[9,-30,1],[-15,-40,1],[15,-40,1]],WFD);ctx.restore()}
-function thongFront(){if(WOLF)return wolfFront();ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
-  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*5.5,20.5);ctx.quadraticCurveTo(q*13,18,q*21,14.5);ctx.stroke()}          // the side strings
-  ctx.beginPath();ctx.moveTo(0,31);ctx.lineTo(0,37.4);ctx.lineWidth=1.7;ctx.stroke();ctx.lineWidth=1.3;   // the strap runs down between the legs
-  ctx.beginPath();ctx.moveTo(-6,19.6);ctx.quadraticCurveTo(-8.6,25.4,-3.4,30.2);ctx.quadraticCurveTo(0,32.8,3.4,30.2);ctx.quadraticCurveTo(8.6,25.4,6,19.6);ctx.quadraticCurveTo(0,21.2,-6,19.6);ctx.closePath();   // a small pouch that tapers into the strap, not a loincloth
-  ctx.fillStyle=TG;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1.3;ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(-2.6,25.2,1.2,3.2,.2,0,6.3);ctx.fill();ctx.restore()}
+/* Thong anatomy: the front panel lies flat against the lower pelvis; two
+   elastic hip bands connect to it. Keep all fabric INSIDE the thigh/hip
+   silhouette, without a dangling vertical tube or swollen blob. */
+function thongFront(){if(WOLF)return wolfFront();ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.strokeStyle='#b51b55';ctx.lineWidth=2.2;
+  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*7.8,19.8);ctx.bezierCurveTo(q*12,18,q*17,14.9,q*21,13.4);ctx.stroke()}
+  ctx.strokeStyle='rgba(255,190,210,.65)';ctx.lineWidth=.75;
+  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*9,19.4);ctx.quadraticCurveTo(q*15.5,16,q*20.3,13.8);ctx.stroke()}
+  const p=new Path2D();
+  p.moveTo(-8.3,19.2);p.quadraticCurveTo(0,20.8,8.3,19.2);
+  p.bezierCurveTo(7.7,23.1,4.8,27,2.7,31.4);
+  p.quadraticCurveTo(0,32.6,-2.7,31.4);
+  p.bezierCurveTo(-4.8,27,-7.7,23.1,-8.3,19.2);p.closePath();
+  /* A gently rounded central pouch with fabric tension, not a flat triangle
+     or an unconnected bulge. All shading is clipped to the garment panel. */
+  const cloth=ctx.createLinearGradient(-8,20,8,32);
+  cloth.addColorStop(0,'#f76299');cloth.addColorStop(.46,TG);cloth.addColorStop(1,'#b71a57');
+  ctx.fillStyle=cloth;ctx.fill(p);
+  ctx.save();ctx.clip(p);
+  const volume=ctx.createRadialGradient(-2.3,23.7,1.5,.5,26.2,8.9);
+  volume.addColorStop(0,'rgba(255,237,242,.55)');
+  volume.addColorStop(.5,'rgba(255,151,190,.17)');
+  volume.addColorStop(1,'rgba(92,9,46,.44)');
+  ctx.fillStyle=volume;ctx.beginPath();ctx.ellipse(0,25.4,6.6,6.2,0,0,6.2832);ctx.fill();
+  ctx.strokeStyle='rgba(255,223,234,.62)';ctx.lineWidth=.75;
+  ctx.beginPath();ctx.moveTo(-6.3,20.4);ctx.quadraticCurveTo(-5.5,25.2,-2.8,29.7);ctx.stroke();
+  ctx.strokeStyle='rgba(106,12,49,.34)';ctx.lineWidth=.8;
+  ctx.beginPath();ctx.moveTo(5.8,22);ctx.quadraticCurveTo(5.2,27.1,2.8,30.4);ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle='#872043';ctx.lineWidth=1.1;ctx.stroke(p);
+  ctx.restore()}
 // the butt creases seen from the front: each cheek's underside bulges just past the hip and folds over the thigh, so the fold shows as a curved crease low on each side (soft shadow + a crisp line + a lit lip below it)
 function gluteCreases(){ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
   for(const q of[-1,1]){const fold=()=>{ctx.beginPath();ctx.moveTo(q*22.4,22.4);ctx.bezierCurveTo(q*22.8,26.8,q*21,29.8,q*16.6,31.4);ctx.stroke()};
@@ -1472,10 +1529,27 @@ function gluteCreases(){ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
     ctx.strokeStyle='rgba(140,62,34,.8)';ctx.lineWidth=1.2;fold();
     ctx.strokeStyle='rgba(255,238,222,.42)';ctx.lineWidth=.9;ctx.beginPath();ctx.moveTo(q*24.1,24.4);ctx.quadraticCurveTo(q*23.8,28.2,q*21.2,31);ctx.stroke()}
   ctx.restore()}
-function thongBack(bx,cy0){if(WOLF)return wolfBack(bx,cy0);ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=TG;ctx.lineWidth=1.3;
-  for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*13,15);ctx.quadraticCurveTo(bx+q*8,18.5,bx+q*3.2,20.5);ctx.stroke()}
-  ctx.beginPath();ctx.moveTo(bx,20);ctx.quadraticCurveTo(bx,cy0+4,bx,cy0+12);ctx.stroke();                                    // the strap down the cleft
-  ctx.beginPath();ctx.moveTo(bx-4,18.2);ctx.lineTo(bx+4,18.2);ctx.lineTo(bx,25.5);ctx.closePath();ctx.fillStyle=TG;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1.1;ctx.stroke();ctx.restore()}
+/* The rear band conforms to the pelvis and the narrow center strap
+   follows BOTH animated cheek offsets. No disconnected cloth or rigid
+   waistband floating over the hips during the wiggle frames. */
+function thongBack(bx,cy0,cl,cr){
+  if(WOLF)return wolfBack(bx,cy0);
+  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  const yL=15+(cl||0)*.33,yR=15+(cr||0)*.33,m=(cl+cr)*.18;
+  ctx.strokeStyle='#ba2257';ctx.lineWidth=2.2;
+  ctx.beginPath();ctx.moveTo(bx-23,yL);ctx.quadraticCurveTo(bx-10,18.1+cl*.3,bx-1.8,19.5+m);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(bx+23,yR);ctx.quadraticCurveTo(bx+10,18.1+cr*.3,bx+1.8,19.5+m);ctx.stroke();
+  ctx.strokeStyle='rgba(255,219,229,.54)';ctx.lineWidth=.75;
+  ctx.beginPath();ctx.moveTo(bx-22.3,yL-.8);ctx.quadraticCurveTo(bx-10,17.3+cl*.3,bx-2.4,18.8+m);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(bx+22.3,yR-.8);ctx.quadraticCurveTo(bx+10,17.3+cr*.3,bx+2.4,18.8+m);ctx.stroke();
+  const p=new Path2D();
+  p.moveTo(bx-3.3,18.8+m);p.quadraticCurveTo(bx,20.1+m,bx+3.3,18.8+m);
+  p.quadraticCurveTo(bx+2.7,22.1+m,bx+1.35,26.2+m);
+  p.lineTo(bx+1.1,cy0+10.2+m);
+  p.quadraticCurveTo(bx,cy0+11.7+m,bx-1.1,cy0+10.2+m);
+  p.lineTo(bx-1.35,26.2+m);p.quadraticCurveTo(bx-2.7,22.1+m,bx-3.3,18.8+m);p.closePath();
+  ctx.fillStyle=TG;ctx.fill(p);ctx.strokeStyle='#842044';ctx.lineWidth=.8;ctx.stroke(p);
+  ctx.restore()}
 function bandAlong(P0,C,P1,hw,step){if(THONG)hw=Math.max(.9,hw*.3);const N=22,T=[],B=[],M=[];
   for(let i=0;i<=N;i++){const u=i/N,a=(1-u)*(1-u),b=2*u*(1-u),c=u*u,x=a*P0[0]+b*C[0]+c*P1[0],y=a*P0[1]+b*C[1]+c*P1[1],tx=2*(1-u)*(C[0]-P0[0])+2*u*(P1[0]-C[0]),ty=2*(1-u)*(C[1]-P0[1])+2*u*(P1[1]-C[1]),l=Math.hypot(tx,ty)||1,nx=-ty/l,ny=tx/l,h=hw*(1-.2*Math.pow(2*u-1,4))+.25*Math.sin(i*1.7);
     T.push([x+nx*h,y+ny*h]);B.push([x-nx*h,y-ny*h]);M.push([x,y,nx,ny,h])}
@@ -2044,14 +2118,31 @@ function drawBack(pose,t,o){o=jigMerge(o)||{};const bo=o.bo||[0,0],ro=o.ro||[0,0
   // briefs hugging two round cheeks (crease, highlight, soft shading, a pinch of fabric at the top), then waistband + tag, then love handles on top
   const bx=hip*.6,cy0=23;ctx.save();ctx.translate(ro[0],ro[1]);
   const chk=[-1,1].map(q=>{const dy=q<0?cl:cr,sc=1+puff*.12+lean*.08;return{q,cx:bx+q*11.6*sc,cy:cy0+dy-lean*2,rx:14.2*sc,ry:13.8*sc}});
-  blob([pEll(bx,cy0+2,25+puff*2.5,11,BR)].concat(chk.map(c=>pEll(c.cx,c.cy,c.rx,c.ry,BR))),{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});         // the shorts: one soft mass of cloth
-  for(const c of chk){ctx.fillStyle='rgba(255,255,255,.26)';ctx.beginPath();ctx.ellipse(c.cx+c.q*4.6,c.cy-3.6,2.8,6,c.q*.3,0,6.3);ctx.fill()}
-  ctx.strokeStyle='rgba(100,8,30,.28)';ctx.lineWidth=2.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bx,17);ctx.quadraticCurveTo(bx+(cl-cr)*.25,cy0+5,bx,cy0+12.5);ctx.stroke();      // the crease: a soft line
-  ctx.strokeStyle='rgba(100,8,30,.8)';ctx.lineWidth=1.2;ctx.stroke();
-  ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*1.4,20);ctx.quadraticCurveTo(bx+q*6,20.4,bx+q*8.6,26.5);ctx.stroke()}   // a pinch of fabric
+  if(THONG&&!WOLF){
+    /* Skin, not the shorts-colored oval: a tapered pelvis flows into two
+       distinct gluteal masses, with weight carried through the thighs. */
+    blob([pEll(bx,cy0-5,21.8+puff*1.2,14.5,SK)].concat(chk.map(c=>
+      pEll(c.cx,c.cy+.4,c.rx*.97,c.ry*.94,SK))),
+      {ow:1.7,shc:'rgba(150,82,50,.20)',hlc:'rgba(255,235,214,.20)'});
+    for(const c of chk){
+      ctx.fillStyle='rgba(255,246,231,.20)';ctx.beginPath();
+      ctx.ellipse(c.cx+c.q*3,c.cy-3.6,5,6.5,c.q*.18,0,6.3);ctx.fill();
+      ctx.strokeStyle='rgba(132,71,48,.56)';ctx.lineWidth=1.15;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(c.cx-c.q*7,c.cy+10.5);
+      ctx.bezierCurveTo(c.cx-c.q*3,c.cy+13.1,c.cx+c.q*4,c.cy+12.8,c.cx+c.q*10.7,c.cy+7.7);ctx.stroke();
+    }
+    ctx.strokeStyle='rgba(122,64,48,.36)';ctx.lineWidth=1.25;
+    ctx.beginPath();ctx.moveTo(bx,cy0-5);ctx.quadraticCurveTo(bx+(cl-cr)*.22,cy0+3,bx,cy0+12);ctx.stroke();
+  }else{
+    blob([pEll(bx,cy0+2,25+puff*2.5,11,BR)].concat(chk.map(c=>pEll(c.cx,c.cy,c.rx,c.ry,BR))),{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
+    for(const c of chk){ctx.fillStyle='rgba(255,255,255,.26)';ctx.beginPath();ctx.ellipse(c.cx+c.q*4.6,c.cy-3.6,2.8,6,c.q*.3,0,6.3);ctx.fill()}
+    ctx.strokeStyle='rgba(100,8,30,.28)';ctx.lineWidth=2.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bx,17);ctx.quadraticCurveTo(bx+(cl-cr)*.25,cy0+5,bx,cy0+12.5);ctx.stroke();
+    ctx.strokeStyle='rgba(100,8,30,.8)';ctx.lineWidth=1.2;ctx.stroke();
+    ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*1.4,20);ctx.quadraticCurveTo(bx+q*6,20.4,bx+q*8.6,26.5);ctx.stroke()}
+  }
   if(WORK)workVestB(sh);
   {const yc=x=>14+1.5*(1-Math.pow((x-bx)/24.5,2)),xa=bx-24.5,xb=bx+24.5;blob([ribbonPoly(xa,xb,yc,3.9,26,WORK?'#6b4423':'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});if(!WORK)ribbonStripes(xa,xb,yc,3.9,6.2,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
-  if(THONG)thongBack(bx,cy0);
+  if(THONG)thongBack(bx,cy0,cl,cr);
   if(!THONG&&!WORK){ctx.fillStyle='#f2f2f2';ctx.strokeStyle='#aaa';ctx.lineWidth=.8;ctx.fillRect(bx-4,19,8,5);ctx.strokeRect(bx-4,19,8,5);ctx.fillStyle=BR;ctx.fillRect(bx-2,21,4,1.3)}
   if(puff){ctx.strokeStyle=BRD;ctx.lineWidth=1.4;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*21,22);ctx.quadraticCurveTo(bx+q*25,28,bx+q*22,36);ctx.stroke()}
     ctx.fillStyle='rgba(150,210,70,.55)';for(const[q,w,r]of[[-14,45,5],[0,48,6],[15,45,4.5],[-5,53,3.5],[9,52,3]]){ctx.beginPath();ctx.arc(bx+q,w+Math.sin(t*10+q)*1.5,r,0,6.3);ctx.fill()}}
@@ -2306,10 +2397,20 @@ function drawSpin(th,o){
   if(OP)addButt();else{
   const lo={low:1,ox:oL+ro[0],oy:ro[1]};
   const hipsR=G3(0,21,-2,23.5,12.5,16,lo),chk=[-1,1].map(q=>G3(q*11,23.5,-7,13,12.5,11,Object.assign({},lo,{oy:ro[1]+((q*C2<0)?cl:cr)})));
-  const RED={ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'},pe=r=>pEll(r.px,r.py,r.rx,r.b,BR);
+  const RED=THONG?{ow:1.65,shc:'rgba(150,82,50,.20)',hlc:'rgba(255,235,214,.18)'}:{ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'};
+  const pe=r=>pEll(r.px,r.py,THONG?r.rx*.97:r.rx,THONG?r.b*.94:r.b,THONG?SK:BR);
   const logo=()=>THONG?0:dec([hipsR],0,25,()=>{ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-5,4);ctx.lineTo(-5,-4);ctx.lineTo(0,1);ctx.lineTo(5,-4);ctx.lineTo(5,4);ctx.stroke()});
-  const deco=(r,q)=>{dec([r],q*5.2,23.5,()=>{ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-q*3.8,-3.5);ctx.quadraticCurveTo(q*.8,-3.1,q*3.4,3);ctx.stroke()},{back:1});   // a pinch of fabric
-    dec([r],q*7,19,()=>{ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(0,0,2.6,5.4,q*.4,0,6.3);ctx.fill()})};
+  const deco=(r,q)=>{
+    if(THONG){
+      dec([r],q*6,27,()=>{
+        ctx.strokeStyle='rgba(137,75,50,.55)';ctx.lineWidth=1.1;ctx.lineCap='round';
+        ctx.beginPath();ctx.moveTo(-q*8,4);ctx.quadraticCurveTo(0,8,q*8,2);ctx.stroke();
+        ctx.fillStyle='rgba(255,240,220,.19)';ctx.beginPath();ctx.ellipse(q*3,-4,3.5,5,q*.25,0,6.3);ctx.fill();
+      },{back:1});return;
+    }
+    dec([r],q*5.2,23.5,()=>{ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-q*3.8,-3.5);ctx.quadraticCurveTo(q*.8,-3.1,q*3.4,3);ctx.stroke()},{back:1});
+    dec([r],q*7,19,()=>{ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(0,0,2.6,5.4,q*.4,0,6.3);ctx.fill()});
+  };
   if(Math.abs(S2)<.45)add(hipsR.d,()=>{blob([pe(hipsR),pe(chk[0]),pe(chk[1])],RED);logo();deco(chk[0],-1);deco(chk[1],1)});        // front or back: one soft mass of cloth
   else{add(hipsR.d,()=>{blob([pe(hipsR)],RED);logo()});chk.forEach((r,n)=>add(r.d,()=>{blob([pe(r)],RED);deco(r,n?1:-1)}))}     // from the side the near cheek keeps its outline over the far one
   const bandR=G3(0,15.5,-1,23.8,3.6,17.5,Object.assign({},lo,{bias:3+14*Math.max(0,-C2)}));
@@ -3006,11 +3107,11 @@ function drawHUD(){
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
-  if(state==='play'){const tid=OPT().tool||'valve',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+pw.left[tid]:'';
+  if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+pw.left[tid]:'';
     if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
       btn(W-212,H-44,96,32,'< SLING',()=>goSling(slingK-1),{size:13,disabled:slingK<=0});btn(W-108,H-44,96,32,'SLING >',()=>goSling(slingK+1),{size:13,disabled:slingK>=CL.slings.length-1});void ny}
-    btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
-    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
+    btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
+    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
@@ -3107,14 +3208,14 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.
 //  META: save data, achievements, outfits, menus, level select, LEVEL CREATOR
 // =====================================================================
 const SAVE_KEY='mandex.save.v1';
-const ST0=()=>({kills:0,cells:0,booms:0,shots:0,flops:0,wins:0,oneShots:0,created:0,customWins:0,exported:0,maxChain:0,bestScore:0,inflated:0,pops:0,pw_beans:0,pw_towel:0,pw_splat:0,pw_burp:0});
-let PD={stars:{},best:{},ach:{},outfit:'classic',own:{},custom:[],st:ST0(),unlockAll:false,opt:{collapse:false}};
+const ST0=()=>({kills:0,cells:0,booms:0,shots:0,flops:0,wins:0,oneShots:0,created:0,customWins:0,exported:0,maxChain:0,bestScore:0,inflated:0,pops:0,pw_beans:0,pw_towel:0,pw_splat:0,pw_burp:0,pw_turbo:0,pw_quake:0});
+let PD={stars:{},best:{},ach:{},outfit:'classic',own:{},custom:[],st:ST0(),unlockAll:false,opt:{collapse:false,tool:'none'}};
 function pdLoad(){try{const s=localStorage.getItem(SAVE_KEY);if(s){const o=JSON.parse(s);PD=Object.assign(PD,o);PD.st=Object.assign(ST0(),o.st||{})}}catch(e){}}
 let pdDirty=false;
 function pdSave(){pdDirty=false;try{localStorage.setItem(SAVE_KEY,JSON.stringify(PD))}catch(e){}}
 function pdTouch(){pdDirty=true}
 pdLoad();
-const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'valve'});
+const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'none'});
 webEcoFX=!!OPT().ecoFX;             // load saved touch-friendly effects preference
 muted=!!OPT().muted;
 const ST=()=>PD.st;
@@ -4131,7 +4232,7 @@ function drawMenu(){
 let sliderDrag=false,sliX=0,sliW=1,armReset=0,armProg=0;
 function setVolFromX(x){const o=OPT();o.vol=clamp(Math.round((x-sliX)/sliW*20)/20,0,1);applyVol();pdTouch()}
 const GUIDES=['OFF','SHORT','FULL'],SHAKES=[['OFF',0],['LOW',.5],['FULL',1]];
-function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX'])delete o[k];o.tool='valve';muted=false;webEcoFX=false;applyVol();pdTouch();pdSave()}
+function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX'])delete o[k];o.tool='none';muted=false;webEcoFX=false;applyVol();pdTouch();pdSave()}
 function progReset(){PD.stars={};PD.best={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
 function drawOptions(){
   ctx.fillStyle='rgba(10,14,30,.62)';ctx.fillRect(0,0,W,H);
@@ -4344,7 +4445,7 @@ function onWin(){
   const st=men>=2?3:men>=1?2:1,sc=Math.round(score);
   if(CL&&CL.custom){if(testing||true)ST().customWins++}
   else{const hadValve=valveOpen();PD.stars[level]=Math.max(PD.stars[level]||0,st);PD.best[level]=Math.max(PD.best[level]||0,sc);ST().wins++;
-    if(!hadValve&&valveOpen())toast('ach','Air valve unlocked!','tap the valve at the lower left of the sling')}
+    if(!hadValve&&valveOpen())toast('ach','Air valve unlocked!','select AIR VALVE from the toolbar')}
   const used=CL?CL.men-men:0;if(used<=1)ST().oneShots++;
   ST().bestScore=Math.max(ST().bestScore,sc);
   achCheck();pdSave()}

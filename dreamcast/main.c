@@ -39,6 +39,7 @@ KOS_INIT_FLAGS(INIT_DEFAULT);
 #define DT  (1.0f / 60.0f)
 
 static MxWorld world;
+static int dc_valve_equipped; /* selected explicitly; hidden during ordinary shots */
 
 /* layers: bigger z is nearer */
 #define Z_BG     1.00f
@@ -625,8 +626,8 @@ static void draw_all(void){
     { float a = world.time * 5; for(int k = 0; k < 24; k++){ float aa = k * 0.3f + a, r = k * 0.5f; puff(ax + cosf(aa) * r, ay + sinf(aa) * r, 1.4f, Z_TARGET + 0.35f, c); } }
     quad(bx - 24, by - 8, 20, 16, Z_TARGET + 0.2f, argb(200, 150, 58, 255)); quad(bx - 22, by - 6, 17, 3, Z_TARGET + 0.25f, argb(255, 224, 138, 255)); quad(bx - 4, by - 9, 7, 18, Z_TARGET + 0.3f, c);
   }
-  /* the air valve */
-  { float vx = X(MX_VALVE_X), vy = Y(MX_VALVE_Y), gy = Y((float)MX_ROWS); int f = m->mode == MAN_AIM ? (int)(m->inf * 100) : 0;
+  /* the air valve has no presence until selected with DOWN. */
+  if(world.valve_ok){ float vx = X(MX_VALVE_X), vy = Y(MX_VALVE_Y), gy = Y((float)MX_ROWS); int f = m->mode == MAN_AIM ? (int)(m->inf * 100) : 0;
     quad(vx - 14, gy - 4, 28, 5, Z_MAN - 0.6f, argb(110, 115, 130, 255));
     quad(vx - 4, vy + 6, 8, gy - vy - 6, Z_MAN - 0.5f, argb(74, 85, 104, 255));
     quad(vx - 4, vy + 6, 3, gy - vy - 6, Z_MAN - 0.45f, argb(150, 160, 175, 255));
@@ -731,11 +732,11 @@ static void draw_all(void){
   }
   if(m->mode == MAN_FLY && !m->dive) text("PRESS A = BELLY FLOP", 320, 466, 20, argb(255, 255, 255, 205), 1, Z_HUD);
   if(world.state == MX_PLAY && m->mode == MAN_AIM){
-    static const char *const PWN[4] = { "NONE", "BEANS", "TOWEL", "SPLAT" };
-    snprintf(buf, sizeof buf, "X: POWER-UP  %s%s", PWN[world.pw_sel], world.pw_sel ? "" : " (B/T/S x1)");
+    static const char *const PWN[PW_COUNT] = { "NONE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE" };
+    snprintf(buf, sizeof buf, "X: POWER-UP  %s%s", PWN[world.pw_sel], world.pw_sel ? "" : " (B/T/S/T/Q x1)");
     text(buf, 12, 466, 14, world.pw_sel ? argb(255, 210, 63, 255) : argb(255, 255, 255, 200), 0, Z_HUD);
-    snprintf(buf, sizeof buf, "D-PAD DOWN = AIR VALVE (beat 3 levels)");
-    if(m->inf <= 0) text(buf, 628, 466, 11, argb(255, 255, 255, 150), 2, Z_HUD);
+    snprintf(buf,sizeof buf,"DOWN: AIR %s   UP: SEAT (3 LEVELS)",world.valve_ok?"ON":"OFF");
+    if(m->inf<=0)text(buf,628,444,12,world.valve_ok?argb(255,210,63,255):argb(255,255,255,155),2,Z_HUD);
   }
   toast_tick();
   if(toast_id >= 0){                                                          /* achievement popup: drops in, gold frame, star badge, time bar */
@@ -783,7 +784,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats); hint_t = 420; }
+static void load_level(int n){ mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
 
 static void draw_intro(void){
   intro_draw(ic_top, ic_bot); ic_upload(tx_ic_top, ic_top); ic_upload(tx_ic_bot, ic_bot);
@@ -866,14 +867,29 @@ int main(int argc, char **argv){
         if(pressed & CONT_START) paused = 1;
         if(pressed & CONT_Y) load_level(world.level);
         if(world.man.mode == MAN_AIM){
-          world.valve_ok = mx_valve_unlocked(&stats);
+          world.valve_ok = dc_valve_equipped && mx_valve_unlocked(&stats);
           float jx = st->joyx / 127.0f, jy = st->joyy / 127.0f;
           if(fabsf(jx) < 0.12f) jx = 0;
           if(fabsf(jy) < 0.12f) jy = 0;
-          if(pressed & CONT_X){ int nx = world.pw_sel; for(int k = 0; k < 4; k++){ nx = (nx + 1) % 4; if(nx == 0 || world.pw_left[nx] > 0) break; }
-            if(nx == 0 && world.pw_sel) mx_select_power(&world, world.pw_sel); else if(nx) mx_select_power(&world, nx); }
+          if(pressed & CONT_X){
+            int nx=world.pw_sel;
+            for(int k=0;k<PW_COUNT;k++){nx=(nx+1)%PW_COUNT;if(nx==PW_NONE||world.pw_left[nx]>0)break;}
+            if(nx==PW_NONE&&world.pw_sel)mx_select_power(&world,world.pw_sel);
+            else if(nx){
+              dc_valve_equipped=0;world.valve_ok=0;
+              if(world.man.seated)mx_set_pull(&world,0,0);
+              mx_select_power(&world,nx);
+            }
+          }
           if(!(world.man.seated && jx == 0 && jy == 0)) mx_set_pull(&world, jx * MX_PULL_MAX, jy * MX_PULL_MAX);   /* seated on the valve: a centred stick leaves him there */
-          if(pressed & CONT_DPAD_DOWN) mx_valve_seat(&world);
+          /* DOWN equips/unequips AIR; UP seats only after equipping. */
+          if((pressed&CONT_DPAD_DOWN)&&mx_valve_unlocked(&stats)){
+            dc_valve_equipped=!dc_valve_equipped;
+            world.valve_ok=dc_valve_equipped;
+            if(dc_valve_equipped&&world.pw_sel)mx_select_power(&world,world.pw_sel);
+            if(!dc_valve_equipped&&world.man.seated)mx_set_pull(&world,0,0);
+          }
+          if((pressed&CONT_DPAD_UP)&&world.valve_ok)mx_valve_seat(&world);
           if(pressed & (CONT_A | CONT_B)){ mx_release(&world); hint_t = 0; }
         } else if(world.man.mode == MAN_WALK){                                  /* walk levels: steer him on foot */
           int ax = 0;
