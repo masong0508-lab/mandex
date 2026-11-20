@@ -48,12 +48,12 @@ jobs:
         run: |
           mkdir -p out/cutscene-storyboards
           gcc -std=gnu99 -O2 -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source test/intro_shot.c ds/source/gfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_intro_shot
-          /tmp/mandex_intro_shot out/cutscene-storyboards/01_origin_apartment.ppm 0 3 12 122 262
-          /tmp/mandex_intro_shot out/cutscene-storyboards/02_origin_landlord.ppm 0 4 12 109 256
-          /tmp/mandex_intro_shot out/cutscene-storyboards/03_wolf_rear_view.ppm 1 4 12 105 205
-          /tmp/mandex_intro_shot out/cutscene-storyboards/04_wolf_flirt.ppm 1 6 12 153 315
-          /tmp/mandex_intro_shot out/cutscene-storyboards/05_chapter_one_victory.ppm 2 1 12 148 270
-          /tmp/mandex_intro_shot out/cutscene-storyboards/06_chapter_two_victory.ppm 3 2 12 155 290
+          /tmp/mandex_intro_shot out/cutscene-storyboards/01_origin_apartment.ppm 0 3 46 122 262
+          /tmp/mandex_intro_shot out/cutscene-storyboards/02_origin_landlord.ppm 0 4 46 109 256
+          /tmp/mandex_intro_shot out/cutscene-storyboards/03_wolf_rear_view.ppm 1 4 46 105 205
+          /tmp/mandex_intro_shot out/cutscene-storyboards/04_wolf_flirt.ppm 1 6 46 153 315
+          /tmp/mandex_intro_shot out/cutscene-storyboards/05_chapter_one_victory.ppm 2 1 46 148 270
+          /tmp/mandex_intro_shot out/cutscene-storyboards/06_chapter_two_victory.ppm 3 2 46 155 290
           python3 tools/ppm_to_png.py out/cutscene-storyboards/*.ppm
       - uses: actions/upload-artifact@v4
         with:

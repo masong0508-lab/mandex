@@ -677,11 +677,76 @@ static void brenda(u8 *b,int x,int fy,int s,int t,int flirt){ /* adult character
   }
 }
 static void w_visit(u8 *b, int k, int tt){
-  if(k == 0){ stars_night(b); night_hills(b, 150); gfx_rect(b, 150, 70, 60, 82, C_WALL3); gfx_rect(b, 164, 100, 32, 52, C_DIRT); gfx_ell(b, 192, 126, 2, 2, C_GOLD);
-    brenda(b, 90, 176, 3, tt, 0); gerald(b, 196, 176, 2, GF_FUR | GF_EARS | GF_SNOUT | GF_TAIL | GF_COOL); bubble(b, 70, 40, "HI, GERALD.", 0); }
+  if(k==0){
+    stars_night(b);moon(b,234,38,13);night_hills(b,150);
+    /* The doorstep is now a proper miniature stage: architectural silhouette,
+       layered shingles, brickwork, glazed mullions and warm porch lighting. */
+    gfx_rect(b,0,155,256,37,C_DIRT2);
+    gfx_rect(b,0,157,256,2,C_CLOUD2);
+    gfx_rect(b,148,68,72,88,C_HAIR);
+    gfx_rect(b,151,70,66,85,C_WALL3);
+    for(int i=0;i<11;i++){
+      int yy=76+i*7;
+      gfx_rect(b,154,yy,60,1,C_WALL1);
+      gfx_rect(b,154+(i&1)*12,yy+3,10,1,C_DIRT2);
+      gfx_rect(b,183+(i&1)*12,yy+3,10,1,C_DIRT2);
+    }
+    gfx_rect(b,203,48,7,26,C_HAIR);
+    gfx_rect(b,204,49,5,24,C_RED2);
+    gfx_tri(b,142,72,225,72,182,49,C_HAIR);
+    gfx_tri(b,146,70,221,70,182,53,C_RED2);
+    gfx_tline(b,146,70,221,70,2,C_RED);
+    for(int i=0;i<4;i++)gfx_line(b,155+i*14,67,167+i*14,61,C_RED);
+    gfx_rect(b,158,96,22,32,C_WHITE);
+    gfx_rect(b,160,98,18,28,C_SKY0+5);
+    gfx_rect(b,168,98,2,28,C_WHITE);
+    gfx_rect(b,160,109,18,2,C_WHITE);
+    gfx_rect(b,155,128,27,3,C_RED2);
+    gfx_rect(b,166,128,4,9,C_DIRT);
+    gfx_rect(b,183,93,29,63,C_HAIR);
+    gfx_rect(b,186,96,23,60,C_DIRT2);
+    gfx_rect(b,188,99,19,54,C_RED2);
+    gfx_rect(b,189,101,17,3,C_RED);
+    gfx_rect(b,191,109,13,14,C_DIRT);
+    gfx_rect(b,192,110,11,12,C_GOLD2);
+    gfx_rect(b,197,110,2,12,C_WHITE);
+    gfx_ell(b,204,127,2,2,C_GOLD);
+    gfx_rect(b,181,155,33,4,C_CLOUD2);
+    gfx_rect(b,178,160,39,3,C_GRAY);
+    gfx_rect(b,174,165,47,3,C_CLOUD);
+    /* Sconces and two little plant pots make the home feel inhabited. */
+    gfx_rect(b,180,94,3,7,C_HAIR);
+    gfx_ell(b,181,99,5,4,C_GOLD2);
+    gfx_ell(b,181,99,2,2,C_WHITE);
+    for(int i=0;i<2;i++){
+      int px=150+i*68;
+      gfx_rect(b,px-3,150,7,8,C_DIRT);
+      gfx_rect(b,px-4,149,9,2,C_RED2);
+      gfx_tline(b,px,148,px+(i?5:-5),139,2,C_GRASS2);
+      gfx_tline(b,px,148,px+(i?-6:6),142,2,C_GRASS2);
+      gfx_ell(b,px+(i?5:-5),138,2,2,C_PINK);
+    }
+    brenda(b,90,176,3,tt,0);
+    gerald(b,196,176,2,GF_FUR|GF_EARS|GF_SNOUT|GF_TAIL|GF_COOL);
+    bubble(b,70,40,"HI, GERALD.",0);
+  }
   else if(k==1){
     gfx_rect(b,0,0,256,192,C_RED2);
-    gfx_ell(b,126,100,118,88,C_RED);gfx_ell(b,130,94,80,68,C_PINK);
+    /* Stained-glass romance stage: radiating lines, fabric drapes and
+       a bright inset, all simple integer strokes behind the actors. */
+    for(int i=0;i<7;i++){
+      int px=12+i*37;
+      gfx_tline(b,128,94,px,0,1,(i&1)?C_GOLD2:C_RED);
+      gfx_tline(b,128,94,px,191,1,(i&1)?C_PINK:C_RED);
+    }
+    gfx_ell(b,126,100,118,88,C_RED);
+    gfx_ell(b,130,94,80,68,C_PINK);
+    for(int j=0;j<5;j++){
+      gfx_line(b,12+j*56,0,12+j*56,18,C_GOLD2);
+      gfx_ell(b,12+j*56,19+wv(tt+j*9,48,3),3,3,C_GOLD);
+    }
+    gfx_rect(b,0,175,256,17,C_RED);
+    gfx_rect(b,0,175,256,2,C_GOLD2);
     for(int i=0;i<9;i++){
       int xx=24+i*26+wv(tt+i*9,38,4),yy=110-((tt*2+i*24)%125);
       gfx_text(b,xx,yy,"<3",i&1?C_WHITE:C_RED2,1+(i%3==0));
@@ -692,8 +757,28 @@ static void w_visit(u8 *b, int k, int tt){
     if(tt>90)bubble(b,196,60,"WANNA FIND OUT?",0);
     if(tt>130)gfx_text_c(b,128,154,"TOO HOT FOR THIS CAMERA",C_GOLD,C_RED2,1);
   }
-  else { gfx_rect(b, 0, 0, 256, 192, C_UIBG); moon(b, 128, 90, 52); int c = tt < 40 ? tt : 40; gfx_rect(b, 0, 0, c * 128 / 40, 192, C_DARK); gfx_rect(b, 256 - c * 128 / 40, 0, c * 128 / 40, 192, C_DARK);
-    if(tt > 80) gfx_text_c(b, 128, 168, "THE CAMERA PREFERS THE MOON.", C_GOLD, C_BLACK, 1); }
+  else {
+    gfx_rect(b,0,0,256,192,C_UIBG);
+    moon(b,128,90,52);
+    /* Brief silhouettes behind frosted glass; a playful embrace and a kiss,
+       then curtains politely end the shot. Never graphic or naked. */
+    if(tt<54){
+      int lean=tt<22?tt/3:7;
+      gfx_rect(b,64,140,52,38,C_DARK);
+      gfx_rect(b,146,141,45,37,C_DARK);
+      gfx_ell(b,91+lean,114,17,19,C_DARK);
+      gfx_ell(b,154-lean,111,18,20,C_DARK);
+      gfx_tri(b,77+lean,114,84+lean,89,96+lean,109,C_DARK); /* hair */
+      gfx_tri(b,145-lean,104,150-lean,86,161-lean,108,C_DARK); /* ear */
+      gfx_tline(b,101+lean,149,146-lean,148,8,C_DARK);
+      gfx_tline(b,111+lean,136,138-lean,137,4,C_DARK);
+      if(tt>18)gfx_text_c(b,128,47,"SMOOCH!",C_PINK,C_UIBG,1);
+    }
+    int curtain=tt<40?tt:40;
+    gfx_rect(b,0,0,curtain*128/40,192,C_DARK);
+    gfx_rect(b,256-curtain*128/40,0,curtain*128/40,192,C_DARK);
+    if(tt>80)gfx_text_c(b,128,168,"THE CAMERA PREFERS THE MOON.",C_GOLD,C_BLACK,1);
+  }
 }
 static void w_title(u8 *b, int k, int tt){
   (void)k; stars_night(b); moon(b, 128, 80, 50 + wv(tt, 120, 3)); night_hills(b, 150);
