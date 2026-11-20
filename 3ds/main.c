@@ -212,9 +212,31 @@ static void rect(Scr *s, int x, int y, int w, int h, u32 c){
     for(int j = y0; j < y1; j++, p -= 3){ p[0] = b0; p[1] = b1; p[2] = b2; }
   }
 }
-static void disc(Scr *s, int cx, int cy, int r, u32 c){      /* one vertical run per column (the framebuffer is column-major): same pixels as the old per-pixel test */
+#ifndef MX_N3DS_INT_CIRCLE
+#define MX_N3DS_INT_CIRCLE 1
+#endif
+static void disc(Scr *s, int cx, int cy, int r, u32 c){
+  /* BGR8 framebuffer is column-major. Draw each clipped vertical span.
+     Each successive circle column differs by <=r in integer half-height.
+     An incremental lattice walk replaces 2*r+1 sqrtf calls PER disc with
+     <=2*r simple integer updates and preserves every sampled pixel. */
   if(r < 0) return;
   u8 b0 = c & 255, b1 = (c >> 8) & 255, b2 = (c >> 16) & 255;
+#if MX_N3DS_INT_CIRCLE
+  int h = 0, rr = r * r;
+  for(int x = -r; x <= r; x++){
+    int X = cx + x;
+    if(x <= 0){
+      while((h + 1) * (h + 1) + x * x <= rr) h++;
+    } else {
+      while(h * h + x * x > rr) h--;
+    }
+    if(X < 0 || X >= s->w) continue;
+    int y0 = cy - h, y1 = cy + h; if(y0 < 0) y0 = 0; if(y1 > s->h - 1) y1 = s->h - 1; if(y0 > y1) continue;
+    u8 *p = s->fb + (X * s->h + (s->h - 1 - y0)) * 3;
+    for(int j = y0; j <= y1; j++, p -= 3){ p[0] = b0; p[1] = b1; p[2] = b2; }
+  }
+#else
   for(int x = -r, rr = r * r; x <= r; x++){
     int X = cx + x; if(X < 0 || X >= s->w) continue;
     int h = (int)sqrtf((float)(rr - x * x)); while(h * h > rr - x * x) h--; while((h + 1) * (h + 1) <= rr - x * x) h++;
@@ -222,6 +244,7 @@ static void disc(Scr *s, int cx, int cy, int r, u32 c){      /* one vertical run
     u8 *p = s->fb + (X * s->h + (s->h - 1 - y0)) * 3;
     for(int j = y0; j <= y1; j++, p -= 3){ p[0] = b0; p[1] = b1; p[2] = b2; }
   }
+#endif
 }
 static void line(Scr *s, int x0, int y0, int x1, int y1, u32 c){
   int dx = abs(x1 - x0), dy = -abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, e = dx + dy;
