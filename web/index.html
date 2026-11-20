@@ -2900,7 +2900,17 @@ function draw(){
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='edit'){
     (state==='menu'?drawMenu:state==='options'?drawOptions:state==='select'?drawSelect:state==='ach'?drawAch:state==='outfit'?drawOutfits:drawEditor)();drawToasts(frameDt);return}
   ctx.save();ctx.translate((Math.random()-.5)*shake*shakeScale(),(Math.random()-.5)*shake*shakeScale());
-  for(let y=0;y<ROWS;y++){let x=0;while(x<COLS){const n=paper[idx(x,y)];if(!n||grid[idx(x,y)]){x++;continue}let x2=x;while(x2<COLS&&paper[idx(x2,y)]===n&&!grid[idx(x2,y)])x2++;
+  // During a zoom, thousands of interior wall strips may be fully outside
+  // the canvas. Preserve each original run's start (stripe phase) while
+  // skipping only wholly off-screen paint calls. Screen shake uses the
+  // reference path so particles and flashes are never accidentally cropped.
+  const paperCull=camOn&&shake===0;
+  const paperX0=paperCull?Math.max(0,Math.floor(CAM.x/V)-2):0;
+  const paperX1=paperCull?Math.min(COLS,Math.ceil((CAM.x+W/CAM.z)/V)+2):COLS;
+  const paperY0=paperCull?Math.max(0,Math.floor(CAM.y/V)-2):0;
+  const paperY1=paperCull?Math.min(ROWS,Math.ceil((CAM.y+H/CAM.z)/V)+2):ROWS;
+  for(let y=paperY0;y<paperY1;y++){let x=0;while(x<COLS){const n=paper[idx(x,y)];if(!n||grid[idx(x,y)]){x++;continue}let x2=x;while(x2<COLS&&paper[idx(x2,y)]===n&&!grid[idx(x2,y)])x2++;
+    if(x2<=paperX0||x>=paperX1){x=x2;continue}
     ctx.fillStyle=interiors[n-1].p;ctx.fillRect(x*V,y*V,(x2-x)*V,V);ctx.fillStyle='rgba(0,0,0,.07)';for(let k=0;k<(x2-x)*V;k+=16)ctx.fillRect(x*V+k,y*V,8,V);
     if(!paper[idx(x,y+1)]||y+1>=ROWS){ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x*V,(y+1)*V-5,(x2-x)*V,5)}x=x2}}
   drawSling(true);drawValve();drawBurpStand();drawPwProp();
