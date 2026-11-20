@@ -309,26 +309,56 @@ static void ridge(const View *v, int gy, int dx, int kind, u32 top, u32 bot){
     rect(s,x,y0,2,mid-y0,top);rect(s,x,mid,2,gy-mid,bot);
   }
 }
+/* Snow-cap heights belong to fixed world coordinates, not to the camera.
+   Memoize the 41 trigonometric samples once instead of calculating them for
+   every rendered frame (and separately for both stereoscopic eyes). */
+static float snowcap_h[41];static int snowcap_ready;
+static void snowcap_prepare(void){
+  if(snowcap_ready)return;
+  for(int i=0;i<41;i++){
+    int wx=i*24;
+    snowcap_h[i]=120+sinf(wx*.007f+1)*55+sinf(wx*.021f)*18;
+  }
+  snowcap_ready=1;
+}
 static void draw_sky(const View *v){
-  Scr *s = v->s; int gy = VY(v, MX_ROWS); float k = v->ppc / 8.0f;
+  Scr *s=v->s;int gy=VY(v,MX_ROWS);float k=v->ppc/8.0f;
+  int night=world.level>=MX_CH3_START;
+  snowcap_prepare();
   for(int y = 0; y < gy; y += 2){ float t = (float)y / (gy > 1 ? gy : 1), r, g, b;           /* #3d8fe8 -> #8ccaf7 -> #ffeccb: the web's warm horizon */
-    if(t < .55f){ float u = t / .55f; r = 61 + (140 - 61) * u; g = 143 + (202 - 143) * u; b = 232 + (247 - 232) * u; } else { float u = (t - .55f) / .45f; r = 140 + (255 - 140) * u; g = 202 + (236 - 202) * u; b = 247 + (203 - 247) * u; }
-    rect(s, 0, y, s->w, 2, RGB((int)r, (int)g, (int)b)); }
+    if(night){r=11+30*t;g=16+28*t;b=41+42*t;}
+    else if(t<.55f){float u=t/.55f;r=61+(140-61)*u;g=143+(202-143)*u;b=232+(247-232)*u;}
+    else{float u=(t-.55f)/.45f;r=140+(255-140)*u;g=202+(236-202)*u;b=247+(203-247)*u;}
+    rect(s,0,y,s->w,2,RGB((int)r,(int)g,(int)b)); }
   if(gy < s->h) rect(s, 0, gy, s->w, s->h - gy, RGB(100, 68, 40));
-  { int sx = 330 + LD(10) - (int)(g_pan * .02f); disc(s, sx, 44, 46, RGB(190, 226, 250)); disc(s, sx, 44, 36, RGB(222, 238, 244)); disc(s, sx, 44, 28, RGB(252, 246, 214)); disc(s, sx, 44, 22, RGB(255, 245, 190)); }   /* sun with a glow */
+  { int sx=330+LD(10)-(int)(g_pan*.02f);
+    if(night){disc(s,sx,44,46,RGB(64,77,117));disc(s,sx,44,36,RGB(132,151,183));disc(s,sx,44,28,RGB(214,220,228));disc(s,sx,44,22,RGB(240,240,233));}
+    else{disc(s,sx,44,46,RGB(190,226,250));disc(s,sx,44,36,RGB(222,238,244));disc(s,sx,44,28,RGB(252,246,214));disc(s,sx,44,22,RGB(255,245,190));}
+  } /* same staging, moonlit rather than sunny for chapter three */
   for(int c = 0; c < 5; c++){ int cx = LD(-2 * (c & 1)) + ((c * 97 + (int)(frame * (.12f + .05f * (c & 1))) - (int)(g_pan * .06f)) % 480) - 40;   /* drifting clouds */
-    int cy = 30 + (c * 23) % 60; disc(s, cx, cy + 3, 13, RGB(214, 226, 244)); disc(s, cx + 12, cy + 6, 9, RGB(214, 226, 244)); disc(s, cx, cy, 14, RGB(250, 252, 255)); disc(s, cx + 14, cy + 3, 11, RGB(244, 248, 255)); disc(s, cx - 13, cy + 4, 10, RGB(244, 248, 255)); }
-  ridge(v, gy, LD(-8), 0, RGB(156, 180, 220), RGB(176, 201, 232));        /* far mountains, hazed */
-  for(int wx = 0; wx <= 960; wx += 24){ float h = 120 + sinf(wx * .007f + 1) * 55 + sinf(wx * .021f) * 18; if(h > 150){ int x = WXS(v, wx) + LD(-8), y = gy - (int)(h * k); rect(s, x - 2, y + (int)(10 * k) - 1, 5, 2, RGB(230, 238, 250)); rect(s, x - 1, y + (int)(2 * k), 3, 2, RGB(244, 248, 255)); } }   /* snow caps */
-  ridge(v, gy, LD(-4), 1, RGB(150, 178, 214), RGB(170, 198, 230));
-  for(int wx = 0; wx < 960; wx += 26){ int h = 22 + (int)(hsh_(wx, 7) % 46); int x = WXS(v, wx) + LD(-4), y = gy - (int)((48 + h * .6f) * k); rect(s, x, y, (int)(18 * k) + 1, gy - y, RGB(162, 190, 222));
-    for(int wy = y + 3; wy < gy - 6; wy += 4) if(hsh_(wx, wy) & 1) rect(s, x + 2, wy, 2, 2, RGB(190, 214, 236)); }   /* distant city, with lit windows */
-  ridge(v, gy, 0, 2, RGB(142, 208, 112), RGB(90, 168, 84));                                                       /* rolling green hills */
+    int cy=30+(c*23)%60;
+    u32 shade=night?RGB(56,65,93):RGB(214,226,244);
+    u32 mist=night?RGB(87,99,125):RGB(250,252,255);
+    u32 rim=night?RGB(77,89,113):RGB(244,248,255);
+    disc(s,cx,cy+3,13,shade);disc(s,cx+12,cy+6,9,shade);
+    disc(s,cx,cy,14,mist);disc(s,cx+14,cy+3,11,rim);disc(s,cx-13,cy+4,10,rim);
+  }
+  ridge(v,gy,LD(-8),0,night?RGB(64,74,103):RGB(156,180,220),night?RGB(72,83,115):RGB(176,201,232));        /* far mountains, hazed */
+  for(int i=0;i<41;i++){int wx=i*24;float height=snowcap_h[i];
+    if(height>150){int x=WXS(v,wx)+LD(-8),y=gy-(int)(height*k);
+      rect(s,x-2,y+(int)(10*k)-1,5,2,night?RGB(149,163,195):RGB(230,238,250));
+      rect(s,x-1,y+(int)(2*k),3,2,night?RGB(187,198,219):RGB(244,248,255));
+    }
+  }
+  ridge(v,gy,LD(-4),1,night?RGB(53,67,91):RGB(150,178,214),night?RGB(62,75,104):RGB(170,198,230));
+  for(int wx = 0; wx < 960; wx += 26){ int h = 22 + (int)(hsh_(wx, 7) % 46); int x = WXS(v, wx) + LD(-4), y = gy - (int)((48 + h * .6f) * k); rect(s,x,y,(int)(18*k)+1,gy-y,night?RGB(46,57,81):RGB(162,190,222));
+    for(int wy = y + 3; wy < gy - 6; wy += 4) if(hsh_(wx,wy)&1)rect(s,x+2,wy,2,2,night?RGB(244,203,125):RGB(190,214,236)); }   /* distant city, with lit windows */
+  ridge(v,gy,0,2,night?RGB(50,97,91):RGB(142,208,112),night?RGB(30,68,69):RGB(90,168,84));                                                       /* rolling green hills */
   for(int wx = 14; wx < 960; wx += 58 + (int)(hsh_(wx, 3) % 40)){ if(wx > 520 && wx < 880) continue;           /* round trees */
-    float hh = 22 + sinf(wx * .013f) * 18, sc = .8f + (hsh_(wx, 1) % 5) * .12f; int x = WXS(v, wx), y = gy - (int)(hh * k); u32 lc = (hsh_(wx, 2) & 1) ? RGB(63, 158, 74) : RGB(76, 174, 80);
+    float hh = 22 + sinf(wx * .013f) * 18, sc = .8f + (hsh_(wx, 1) % 5) * .12f; int x = WXS(v, wx), y = gy - (int)(hh * k); u32 lc=(hsh_(wx,2)&1)?(night?RGB(34,77,64):RGB(63,158,74)):(night?RGB(38,88,70):RGB(76,174,80));
     rect(s, x - (int)(3 * k), y - (int)(8 * sc * k), (int)(6 * k) + 1, (int)(12 * sc * k), RGB(107, 74, 43));
     disc(s, x, y - (int)(20 * sc * k), (int)(16 * sc * k), lc); disc(s, x - (int)(10 * sc * k), y - (int)(12 * sc * k), (int)(11 * sc * k), lc); disc(s, x + (int)(10 * sc * k), y - (int)(12 * sc * k), (int)(11 * sc * k), lc);
-    disc(s, x - (int)(4 * sc * k), y - (int)(24 * sc * k), (int)(7 * sc * k), RGB(96, 196, 98)); }
+    disc(s,x-(int)(4*sc*k),y-(int)(24*sc*k),(int)(7*sc*k),night?RGB(53,113,85):RGB(96,196,98)); }
   for(int y = gy, c = 0; y < s->h; y += 10, c++){ int d = c > 12 ? 12 : c; rect(s, 0, y, s->w, 10, RGB(123 - d * 4, 84 - d * 3, 52 - d * 2)); }   /* soil #7b5434 -> #4d311d */
   for(int x = -((int)g_pan % 23); x < s->w; x += 23) for(int c = 0; c < 4; c++){ int yy = gy + 6 + c * 13 + ((x * 5 + c * 3) & 7), xx = x + c * 9 + ((c * 11) & 7); rect(s, xx, yy, 3, 2, RGB(78, 52, 30)); px(s, xx + 1, yy - 1, RGB(138, 132, 120)); }   /* pebbles */
   rect(s, 0, gy - 2, s->w, 4, RGB(79, 156, 59)); rect(s, 0, gy - 3, s->w, 1, RGB(105, 187, 79)); rect(s, 0, gy + 2, s->w, 2, RGB(44, 110, 48));

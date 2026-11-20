@@ -1,0 +1,40 @@
+name: Host gameplay performance report
+
+# Timing data is a host-only comparison of physics update cost, not console FPS.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "core/**"
+      - "3ds/**"
+      - "dreamcast/**"
+      - "ds/source/gfx.c"
+      - "test/bench.c"
+      - ".github/workflows/gameplay-perf.yml"
+  workflow_dispatch:
+
+jobs:
+  physics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build float and fixed-point gameplay profilers
+        run: |
+          gcc -std=gnu99 -O2 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float
+          gcc -std=gnu99 -O2 -DMX_FIXED -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed
+      - name: Measure every level with a deterministic 120-frame shot
+        run: |
+          mkdir -p out/gameplay-profiles
+          /tmp/mandex_physics_float --detailed 120 > out/gameplay-profiles/physics-float.txt
+          /tmp/mandex_physics_fixed --detailed 120 > out/gameplay-profiles/physics-fixed.txt
+          printf 'HOST ONLY, NOT HARDWARE FPS\n\nFloat mode:\n'
+          tail -n 1 out/gameplay-profiles/physics-float.txt
+          printf '\nFixed mode:\n'
+          tail -n 1 out/gameplay-profiles/physics-fixed.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-gameplay-host-profiles
+          path: out/gameplay-profiles/*.txt
+          retention-days: 7
+          if-no-files-found: error
