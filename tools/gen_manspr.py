@@ -201,6 +201,45 @@ def shade_butt(idx, PI, ay):
         if col == PI['BR'] and u * (-k) > -0.05 and u * (-k) < 0.0: col = PI['BR']
         idx[y, x] = col
 
+def finish_cel_shading(idx, PI, ay, name):
+    """Material-aware 1-2px rim lights/shadows baked into console sprites.
+    Exact silhouette and transparency stay unchanged; the expensive lighting
+    work happens only in the offline sprite generator, not on DS/3DS CPUs."""
+    if name.endswith("_W"):
+        return
+    h, w = idx.shape
+    source = idx.copy()
+    for y in range(max(0, int(ay) + 2), h - 1):
+        x = 0
+        while x < w:
+            v = int(source[y, x])
+            skin = 2 <= v <= 5
+            cloth = 6 <= v <= 8
+            if not (skin or cloth):
+                x += 1
+                continue
+            begin = x
+            while x < w and ((2 <= source[y, x] <= 5) if skin else (6 <= source[y, x] <= 8)):
+                x += 1
+            n = x - begin
+            if n < 5:
+                continue
+            if skin:
+                if source[y, begin] in (2, 5):
+                    idx[y, begin] = PI['SKH']
+                if source[y, x - 1] in (2, 5):
+                    idx[y, x - 1] = PI['SKD']
+                if n >= 11 and y < ay + 16 and source[y, begin + 1] == 2:
+                    idx[y, begin + 1] = PI['SKH']
+                if n >= 10 and source[y, x - 2] == 2:
+                    idx[y, x - 2] = PI['SKM']
+            elif y >= ay + 5 and not name.startswith(('BACK_', 'FART_', 'SPIN_', 'OOPS_')):
+                if source[y, begin] == 6:
+                    idx[y, begin] = PI['BRH']
+                if source[y, x - 1] == 6:
+                    idx[y, x - 1] = PI['BRD']
+
+
 def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
     """the generated heads are only ~10 px wide, so the face is pixelled by hand on top of the HTML shapes"""
     global WOLFMODE, WSIDE
@@ -395,7 +434,8 @@ def main():
                             if y - d >= 0 and y + d < idx.shape[0] and idx[y - d, x] and idx[y + 1, x] if d == 1 else (idx[y - 1, x] and idx[y + 2, x] if y + 2 < idx.shape[0] else 0):
                                 new[y, x] = idx[y - 1, x] or idx[y - d, x]; break
                 idx = new
-        if name.startswith("BACK") or name.startswith("FART") or name.startswith("SPIN_"): shade_butt(idx, PI, int(ay))   # (the oops frames keep the HTML's own bare / boxer shading)
+        if name.startswith("BACK") or name.startswith("FART") or name.startswith("SPIN_"): shade_butt(idx, PI, int(ay))
+        finish_cel_shading(idx, PI, int(ay), name)   # (the oops frames keep the HTML's own bare / boxer shading)
         ys, xs = np.nonzero(idx); y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
         idx = idx[y0:y1, x0:x1]; ax -= x0; ay -= y0; h, w = idx.shape
         (bx, by, br), (rx, ry, rr) = BLOBS[family(name)]

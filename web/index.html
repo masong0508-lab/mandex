@@ -157,12 +157,27 @@ function buildBG(){
   {const mg=x.createLinearGradient(0,GY-120,0,GY);mg.addColorStop(0,'#6f93c4');mg.addColorStop(1,'#a9c6e4');x.fillStyle=mg}x.beginPath();x.moveTo(0,GY);for(let i=0;i<=WW;i+=20)x.lineTo(i,GY-70-Math.sin(i*.011+3)*38-Math.sin(i*.04)*8);x.lineTo(WW,GY);x.fill();
   haze(x,GY-170,GY-40,'rgba(235,242,255,.0)','rgba(235,242,255,.55)');
   // distant city
-  x.fillStyle='#8fb0d4';for(let i=0;i<WW;i+=26){const h=22+(hsh(i,7)%46);x.fillRect(i,GY-48-h*.6,18,h*.6+48)}
+  // Far skyline: windows are baked into the parallax canvas at level load,
+  // not painted every frame. Alternating lit rooms give the blocks scale.
+  x.fillStyle='#8fb0d4';
+  for(let i=0;i<WW;i+=26){
+    const h=22+(hsh(i,7)%46),top=GY-48-h*.6;
+    x.fillStyle=(hsh(i,2)&1)?'#87a9cf':'#96b7d7';x.fillRect(i,top,18,h*.6+48);
+    x.fillStyle='rgba(238,245,255,.34)';x.fillRect(i,top,18,1);
+    for(let y=top+9;y<GY-8;y+=12){
+      const lit=((hsh(i,(y|0)+11)&3)===0);
+      x.fillStyle=lit?'rgba(255,224,164,.52)':'rgba(38,90,144,.28)';
+      x.fillRect(i+4,y,3,5);x.fillRect(i+11,y,3,5);
+    }
+  }
   haze(x,GY-120,GY-10,'rgba(235,245,255,0)','rgba(225,240,255,.42)');
   // rolling hills + trees
   {const hg=x.createLinearGradient(0,GY-60,0,GY);hg.addColorStop(0,'#8ed070');hg.addColorStop(1,'#5aa854');x.fillStyle=hg}x.beginPath();x.moveTo(0,GY);for(let i=0;i<=WW;i+=16)x.lineTo(i,GY-30-Math.sin(i*.013)*18);x.lineTo(WW,GY);x.fill();
   for(let i=14;i<WW;i+=58+(hsh(i,3)%40)){if(i>520&&i<880)continue;const hh=GY-22-Math.sin(i*.013)*18,s=.8+(hsh(i,1)%5)*.12;
-    x.fillStyle='#6b4a2b';x.fillRect(i-3,hh-8*s,6,12*s);x.fillStyle=(hsh(i,2)%2)?'#3f9e4a':'#4cae50';x.beginPath();x.arc(i,hh-20*s,16*s,0,7);x.arc(i-10*s,hh-12*s,11*s,0,7);x.arc(i+10*s,hh-12*s,11*s,0,7);x.fill()}
+    x.fillStyle='#6b4a2b';x.fillRect(i-3,hh-8*s,6,12*s);
+    x.fillStyle=(hsh(i,2)%2)?'#3f9e4a':'#4cae50';x.beginPath();x.arc(i,hh-20*s,16*s,0,7);x.arc(i-10*s,hh-12*s,11*s,0,7);x.arc(i+10*s,hh-12*s,11*s,0,7);x.fill();
+    x.fillStyle='rgba(32,92,55,.23)';x.beginPath();x.ellipse(i+6*s,hh-10*s,12*s,5*s,-.3,0,6.2832);x.fill();
+    x.fillStyle='rgba(215,248,166,.20)';x.beginPath();x.ellipse(i-6*s,hh-25*s,8*s,4*s,-.4,0,6.2832);x.fill()}
   // ground
   g=x.createLinearGradient(0,GY,0,WH);g.addColorStop(0,'#69bb4f');g.addColorStop(.07,'#4f9c3b');g.addColorStop(.075,'#7b5434');g.addColorStop(1,'#4d311d');x.fillStyle=g;x.fillRect(0,GY,WW,WH-GY);
   for(let i=0;i<260;i++){const px=hsh(i,11)%WW,py=GY+14+(hsh(i,12)%(WH-GY-14));x.fillStyle=(i%3)?'rgba(0,0,0,.18)':'rgba(255,220,170,.12)';x.fillRect(px,py,2+(i%3),2)}
@@ -946,15 +961,28 @@ function walkStep(dt){const m=man;
   if(m.gr&&!(m.padCd>0)){const by=Math.floor((m.y+WHH+2)/V);for(const o of[-4,0,4]){const bx=Math.floor((m.x+o)/V);if(inb(bx,by)&&grid[idx(bx,by)]===RUBBER){m.vy=m.stomp?-540:-470;m.gr=false;m.stomp=false;m.padCd=.3;SFX.boing();popText(m.x,m.y-34,'BOING!','#ff7eb0',26);ring(m.x,m.y+WHH,40,'#ff9ec8');dust(m.x,m.y+WHH,5,8);break}}}
   if(m.gr&&Math.abs(m.vx)>60&&((time*9)|0)%2===0&&rnd()<.25)dust(m.x,m.y+WHH,1,6);
   for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<WHH+t.r-4)killTarget(t)}   // bump into a landlord and he is done for
-function drawWalkMan(m){ctx.save();ctx.translate(m.x,m.y+WHH);
-  const mv=m.gr&&Math.abs(m.vx)>25,sc=.36,ph=time*(mv?12:0);
-  ctx.translate(0,-3);if(mv)ctx.translate(0,-Math.abs(Math.sin(ph))*1.6);
+function drawWalkMan(m){
+  const mv=m.gr&&Math.abs(m.vx)>25,sc=.36;
+  // Couple the gait to distance travelled: feet no longer keep cycling when
+  // the simulation slows down, and reversing direction reverses the stride.
+  const phase=mv?m.x/15:0,step=Math.sin(phase),hip=mv?2.4*step:0;
+  if(m.gr){
+    ctx.save();ctx.fillStyle='rgba(19,28,20,.26)';
+    ctx.beginPath();ctx.ellipse(m.x,m.y+WHH+1,12-(mv?Math.abs(step)*1.1:0),2.5,0,0,6.2832);ctx.fill();ctx.restore();
+  }
+  ctx.save();ctx.translate(m.x,m.y+WHH-3);
+  if(mv)ctx.translate(0,-Math.max(0,step)*1.35);
   ctx.scale(m.face<0?-sc:sc,sc);ctx.translate(0,-50);
-  if(!m.gr){ctx.rotate(m.stomp?0:m.vy<0?-.08:.08)}
-  const th=mv?(90+22*Math.sin(ph))*Math.PI/180:(m.gr?(90*Math.PI/180):(90*Math.PI/180));
-  JIG=null;drawSpin(th,Object.assign({},SPIN_POSE.SPIN_6,{th,dir:1,t:time}));
-  if(m.pT>0){ctx.rotate(0);ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=7;ctx.beginPath();ctx.arc(30,0,38,-.9,.9);ctx.stroke()}
-  ctx.restore()}
+  if(!m.gr)ctx.rotate(m.stomp?0:m.vy<0?-.08:.08);
+  // A side silhouette stays side-on; walking bends the pelvis rather than
+  // repeatedly turning the entire torso toward and away from the camera.
+  const th=Math.PI/2+(mv?.055*step:0);
+  JIG=null;drawSpin(th,Object.assign({},SPIN_POSE.SPIN_6,
+    {th,dir:1,hip,psi:mv?-3.7*step:0,t:time}));
+  if(m.pT>0){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=7;
+    ctx.beginPath();ctx.arc(30,0,38,-.9,.9);ctx.stroke()}
+  ctx.restore();
+}
 function walkTouch(x,y,id){for(const b of walkBtns())if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){KEYS[b.k]=true;TID[id]=b.k;return true}return false}
 function walkBtns(){const y=H-64,w=62,h=54,r=W-12,yl=H-128;return[{k:'TL',t:'<',x:10,y:yl,w,h},{k:'TR',t:'>',x:82,y:yl,w,h},{k:'TS',t:'STOMP',x:r-3*w-16,y,w,h},{k:'TP',t:'PUNCH',x:r-2*w-8,y,w,h},{k:'TJ',t:'JUMP',x:r-w,y,w,h}]}
 function drawWalkHUD(){const m=man;if(state!=='play'||m.mode!=='walk')return;

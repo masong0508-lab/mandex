@@ -1,0 +1,51 @@
+name: Gameplay art and animation gates
+on:
+  push:
+    branches: [main]
+    paths:
+      - "art/manspr.h"
+      - "tools/gen_manspr.py"
+      - "web/index.html"
+      - "ds/source/main.c"
+      - "dreamcast/main.c"
+      - "test/sprite_surface_test.py"
+      - ".github/workflows/gameplay-art-gates.yml"
+  workflow_dispatch:
+jobs:
+  art:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sprite geometry, material shading, zero-heap and gait invariants
+        run: python3 test/sprite_surface_test.py
+      - name: Validate browser script
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path("web/index.html").read_text()
+          a=src.rfind("<script>");b=src.rfind("</script>")
+          assert a>=0 and b>a
+          Path("/tmp/mandex-gameplay.js").write_text(src[a+8:b])
+          PY
+          node --check /tmp/mandex-gameplay.js
+          node test/room_backdrop_web_test.js
+      - name: Render Nintendo DS gameplay and movement review screenshots
+        run: |
+          mkdir -p out/art-review
+          gcc -std=gnu99 -O2 -DMX_FIXED -Wno-unused-function \
+            -Itest/stubs -Icore -Iart -Ids/source \
+            test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+            core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_art_review
+          INTRO_SKIP=1 /tmp/mandex_art_review out/art-review/gameplay 520 > out/art-review/host-report.txt
+          find out/art-review -name '*.ppm' -print | head -24
+          find out/art-review -name '*.ppm' -print0 | xargs -0 -r python3 tools/ppm_to_png.py
+          test -n "$(find out/art-review -name '*.png' -print -quit)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-gameplay-art-review
+          path: |
+            out/art-review/*.png
+            out/art-review/host-report.txt
+          retention-days: 7
+          if-no-files-found: error

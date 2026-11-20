@@ -743,7 +743,10 @@ static void draw_facades(const View *v){
       gfx_rect(v->buf, x - 2, y - 2, ww + 4, hh + 4, C_SHADOW);
       gfx_rect(v->buf, x - 1, y - 1, ww + 2, hh + 2, C_FENCE);
       gfx_rect(v->buf, x, y, ww, hh, glass);
+      /* A small upper-left reflected sky panel, dark glazed lower ledge and
+         consistent mullions. The extra 1px ledge uses existing palette ink. */
       gfx_rect(v->buf, x + 1, y + 1, ww/3, hh/3, C_CLOUD);
+      gfx_rect(v->buf, x + 1, y + hh - 2, ww - 2, 1, C_CITY2);
       gfx_rect(v->buf, x + ww/2, y, p > 2 ? 2 : 1, hh, C_WHITE);
       gfx_rect(v->buf, x, y + hh/2, ww, p > 2 ? 2 : 1, C_WHITE);
       gfx_rect(v->buf, x - p/2, y + hh + 1, ww + p, p > 2 ? 2 : 1, C_FENCE2);
