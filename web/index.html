@@ -3628,49 +3628,6 @@ function cutTrans(tr,t){if(t>=.5||tr==='cut')return;const u=t/.5;
 function cgMoon(x,y,r,t){ctx.save();const g=ctx.createRadialGradient(x,y,r*.2,x,y,r*2.2);g.addColorStop(0,'rgba(255,250,200,.5)');g.addColorStop(1,'rgba(255,250,200,0)');ctx.fillStyle=g;ctx.fillRect(x-r*2.2,y-r*2.2,r*4.4,r*4.4);ctx.restore();
   cgE(x,y,r,r,'#f6f1d0',3,'#cbbf7a');for(const[a,b,c]of[[-.3,-.2,.18],[.25,.1,.22],[-.1,.35,.12],[.4,-.35,.1]])cgE(x+a*r,y+b*r,r*c,r*c,'#e0d9a8',0)}
 function cgHowl(t,x,y){const a=Math.min(1,t*.8);ctx.save();ctx.globalAlpha=a*.7;ctx.strokeStyle='#fff';ctx.lineWidth=3;for(let i=0;i<3;i++){const r=30+((t*60+i*30)%90);ctx.beginPath();ctx.arc(x,y,r,-1.2,-.2);ctx.stroke()}ctx.restore()}
-const CUT3=[
- // 1. the walk: the moon is doing something unreasonable
- {shirt:2,lines:["One week after Landlord HQ. Mandex took the night off.","Gerald took a walk. In a shirt. Brenda would have wept.","Above him, the moon was doing something unreasonable."],hl:2,cuts:[0,2.8],tr:'fade',hold:3.6,shake:[0,3],draw(t){const k=cgK(this.cuts,t);
-   cgSky('#0a0d24','#2a3060',395);for(let i=0;i<46;i++)cgE(cgRnd(i)*W,cgRnd(i+50)*320,1+cgRnd(i+9)*1.3*(.6+.4*Math.sin(t*3+i)),1.4,'#fff');
-   const mr=k===0?58+t*8:120+(t-2.8)*14;cgMoon(k===0?760:500,k===0?140:170,mr,t);
-   cgHills(395,'#14183a','#10132e','#0c0e24');
-   if(k===0){ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);cgGrass(395,145,'#1d3a2c','#0f2218');
-     const wx=-80+t*150;cgShadow(wx,396,50,7,.4);cutGerald(wx,395,1.7,{walk:t*9,dy:-Math.abs(Math.sin(t*9))*4,face:'cool',pose:'up'});
-     if(t>1.9)cutBubble(Math.min(wx+170,820),230,"Nice night.",0)}
-   else{ctx.fillStyle='#10132a';ctx.fillRect(0,420,W,H-420);const u=t-2.8;
-     // a tiny wolf on the hill starts to howl, and its tail wags
-     ctx.save();ctx.translate(840,360);ctx.fillStyle='#07081a';ctx.beginPath();ctx.ellipse(0,0,16,9,-.2,0,6.3);ctx.ellipse(-12,-14,6,8,.6,0,6.3);ctx.fill();ctx.restore();cgHowl(u,830,330);
-     cutGerald(300,560,3.3,{face:'cool',pose:'up',dy:Math.sin(u*2)*2});cutBubble(640,150,"That's... a lot of moon.",0)}}},
- // 2. the fridge
- {lines:["Home: a garage, a couch, a fridge.","In the fridge: one wedge of MOON CHEESE.","\"BEST BEFORE: THE FULL MOON.\" Gerald read this as a deadline, not a warning."],hl:2,cuts:[0,1.5,3.3],tr:'wipe',hold:3.4,shake:[0,0,5],draw(t){const k=cgK(this.cuts,t);
-   if(k<2){cgFridge(t);const z=k===0?1:1.5,gl=.5+.5*Math.sin(t*6);ctx.save();ctx.translate(480,250);ctx.scale(z,z);
-     ctx.save();ctx.globalAlpha=.25+.2*gl;cgE(0,0,170,130,'#fff3a0');ctx.restore();
-     cgP([-150,70,150,70,110,-70,-110,-70],'#f2d24a',3);for(const[a,b,c]of[[-60,-10,15],[20,30,20],[70,-30,11],[-20,-45,9],[-95,35,9],[60,50,8]])cgE(a,b,c,c,'#d9b02a',2);
-     cgR(-60,76,120,30,'#d8352b',2,5);txt('EXPIRED',0,98,18,'#fff','center');ctx.restore();
-     if(k===0)txt('MOON CHEESE',480,100,34,'#fff','center','#5a3a00');
-     else{cgR(250,380,460,110,'rgba(0,0,0,.65)',2,12);txt('BEST BEFORE: THE FULL MOON',480,432,24,'#ffd23f','center','#000');txt('(it is currently the full moon)',480,466,15,'#fff','center')}}
-   else{cgWood('#3a2a1a','#1c120a');const u=t-3.3,ch=Math.sin(u*14);cutGerald(480,560,3.8,{face:u>.5?'cool':'sad',pose:'up',dy:Math.abs(ch)*5,sq:ch*.02});
-     cutFlag(3,()=>SFX.thud(.4));if(u>.8)cutBubble(740,150,"...tastes like Tuesday.",0);else cutBubble(740,150,"*CHOMP*",0)}}},
- // 3. the sneeze
- {shirt:2,lines:["An itch. Then a sniff. Then a physics problem.","The moon leaned in at the window. Gerald leaned back.","Gerald inhaled most of the room."],hl:2,cuts:[0,1.3,2.6],tr:'iris',hold:3.2,shake:[0,2,12],draw(t){const k=cgK(this.cuts,t);
-   cgWood('#4a3a2a','#241a14');const wx=620,wy=40;cgR(wx-12,wy-12,300,260,'#e9e0cf',3,6);cgR(wx,wy,276,236,'#0a0d24',2);cgMoon(wx+140+(k>0?-8:0),wy+120,k>0?96:70,t);cgLine(wx+138,wy,wx+138,wy+236,'#e9e0cf',6);cgLine(wx,wy+118,wx+276,wy+118,'#e9e0cf',6);
-   const tw=k===0?Math.sin(t*30)*1.2:0,inh=k===1?(t-1.3)*.05:k===2?.07:0,sh=k===2?Math.sin(t*70)*5:0;
-   cutGerald(320+sh,520,2.9,{face:k===0?'sad':'cool',pose:'up',sq:inh,dx:tw,dy:k===2?-6:0});
-   if(k===0)cutBubble(560,360,"...hm.",0);else if(k===1)cutBubble(560,360,"Ah... ahhh...",0);else{cutBubble(560,350,"AHHHH—",0,26)}}},
- // 4. the transformation, in stages
- {shirt:3,lines:["Ears. Boing.","A snout. Eleven shirt buttons resigning, one at a time.","His mustache did not move. It is load-bearing."],hl:1,cuts:[0,1.1,2.4,3.8],tr:'white',hold:3.6,shake:[10,6,8,16],draw(t){const k=cgK(this.cuts,t);
-   cgSky('#0a0d24','#2a3060',395);cgMoon(480,170,150,t);ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);
-   const u=t-this.cuts[k],st=k===0?0:k===1?1:k===2?2:3,boing=k===1?Math.exp(-u*5)*Math.sin(u*25)*.06:0;
-   if(k===0){cutFlag(1,()=>SFX.whoosh());ctx.fillStyle='rgba(255,255,235,'+Math.max(0,.9-u*1.6)+')';ctx.fillRect(0,0,W,H)}
-   cutGerald(480,392,2.5,{face:k>=3?'cool':'sad',pose:'up',wolf:st,shirt:3,sq:boing,dy:k===3?-Math.abs(Math.sin(u*18))*10*Math.exp(-u*2):0});
-   if(k===0){cutBubble(740,120,"AH-CHOO!",0,28)}
-   else if(k===1){cutFlag(2,()=>SFX.thud(.5));cutBubble(740,120,"My... ears?",0)}
-   else if(k===2){cutFlag(3,()=>SFX.thud(.5));for(let i=0;i<5;i++){const a=u*(1.4+i*.3),x=480+(i-2)*34+u*(i-2)*260,y=330-u*210+u*u*480;ctx.fillStyle='#fff';ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(x,y,5,0,6.3);ctx.fill();ctx.stroke()}   // buttons
-     cutBubble(740,120,"My... nose?",0)}
-   else{cutFlag(4,()=>{SFX.whoosh();SFX.thud(.9)});ctx.fillStyle='rgba(255,255,235,'+Math.max(0,.8-u*2)+')';ctx.fillRect(0,0,W,H);
-     for(let i=0;i<10;i++){const a=i*.7,x=480+Math.cos(a)*(30+u*240)*(i%2?1:-1),y=300+Math.sin(a*2)*30-u*70+u*u*200;ctx.save();ctx.translate(x,y);ctx.rotate(u*(4+i)*(i%2?1:-1));ctx.fillStyle=i%3?'#f6f9ff':'#2a4d9c';ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-12,-6);ctx.lineTo(10,-9);ctx.lineTo(13,5);ctx.lineTo(-6,10);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}
-     cutBubble(740,120,"MY SHIRT!",0,26)}}},
- 
 /* Kinetic comic insert: enormous clothed/furry rear-view closeup and harmless
    suction-cup pratfall. Only paints into the existing canvas, in cutscenes. */
 function cgRearPanel(t,x,y,z=1,wolf=false,caption='REAR VIEW'){
@@ -3739,27 +3696,8 @@ function cgRearPanel(t,x,y,z=1,wolf=false,caption='REAR VIEW'){
   txt(caption,0,91,17,'#ffedbb','center','#21142a');
   ctx.restore();
 }
-// 5. the rear view
- {lines:["The shorts held out for one more second.","Then: a tail. And the discovery that pants were always optional.","Gerald checked the rear view. Round. Furry. Free."],hl:2,cuts:[0,1.5,3.2],tr:'iris',hold:3.6,shake:[0,6,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
-   cgWood('#4a3a5a','#241a30');cgMoon(140,110,60,t);
-   if(k===0){cutGerald(480,392,2.5,{wolf:true,face:'sad',pose:'up',dy:Math.sin(t*20)*1});if(u>.8)cutBubble(760,150,"...is that a breeze?",0)}
-   else if(k===1){const sp=Math.min(1,u/.5),sx=Math.cos(sp*Math.PI);ctx.save();ctx.translate(480,0);ctx.scale(Math.abs(sx)||.01,1);ctx.translate(-480,0);if(sx>0)cutGerald(480,392,2.5,{wolf:true,pose:'up'});else cutGeraldBack(480,392,2.5,{wolf:true});ctx.restore();
-     cutFlag(5,()=>SFX.whoosh());ctx.fillStyle='#8a5a2b';for(let i=0;i<6;i++){const a=u*3+i*1.4;ctx.save();ctx.translate(480+Math.sin(a*2+i)*(60+u*90)*(i%2?1:-1),360-u*40+u*u*160);ctx.rotate(a);ctx.fillRect(-9,-4,18,8);ctx.restore()}
-     if(u>.7)cutBubble(760,150,"*riiip*",0)}
-   else{
-     cgRearPanel(u,480,275,1.48,true,'REAR VIEW: UNLICENSED');
-     cutBubble(800,130,u<1.0?"THAT'S A TAIL, RIGHT?":"LOOKING GOOD, GERALD.",0);
-   }}}
- // 6. the howl
- {lines:["Naturally, he howled.","At a moon he had called \"a lot\" two minutes earlier.","Three blocks away, a landlord's wine glass cracked."],hl:2,cuts:[0,1.8,3.5],tr:'wipe',hold:3.6,shake:[6,10,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
-   if(k<2){cgSky('#0a0d24','#3a2a60',395);cgMoon(480,k===0?210:150,k===0?200:130,t);if(k===0){cgHowl(t,300,300);cgHowl(t+.5,660,300)}
-     if(k===1){cgStreetNight(t);cgMoon(480,150,120,t);for(let i=0;i<3;i++)cgHowl(u+i*.5,480,200);cgR(-20,378,420,200,'#1a1630',3);cgR(-20,370,420,12,'#2a2448',2.4);const up=Math.min(1,u*1.6);cutGerald(180,378,2.2,{wolf:true,face:'cool',pose:'up',armR:[40,-22,46,-46-up*14],armL:[-40,-22,-46,-46-up*14]});cutBubble(420,300,"(distant howling)",0,16)}   // the howl, on a rooftop, so the wolf is in the shot
-     if(k===0){ctx.fillStyle='#10132a';ctx.fillRect(0,420,W,H-420);const up=Math.min(1,t*1.5);cutGerald(480,392,2.7,{wolf:true,face:'cool',pose:'up',armR:[40,-22,46,-46-up*14],armL:[-40,-22,-46,-46-up*14],dy:-up*6});cutBubble(740,170,"AWOOOOO!",0,28)}}
-   else{cgWood('#3a3060','#1a1430');cgR(240,40,480,330,'#ffe9a8',4,10);cgR(264,64,432,282,'#2a3060',3);cgMoon(480,200,120,t);cgLine(480,64,480,346,'#ffe9a8',8);cgLine(264,205,696,205,'#ffe9a8',8);
-     ctx.save();ctx.translate(480,330);ctx.scale(2.6,2.6);drawLandlordScared(t);ctx.restore();
-     const g=Math.min(1,u*1.4);ctx.fillStyle='#bfe8ff';ctx.beginPath();ctx.moveTo(540,260+g*160);ctx.lineTo(580,260+g*160);ctx.lineTo(570,300+g*160);ctx.lineTo(550,300+g*160);ctx.closePath();ctx.fill();if(u>.7){cutFlag(6,()=>SFX.glass());for(let i=0;i<8;i++){cgE(560+Math.cos(i)*u*40,440+Math.sin(i*3)*10+u*10,3,3,'#bfe8ff')}}
-     cutBubble(740,130,"Not again.",0)}}},
- // Stage-safe glamour effects: all pixels go to the existing canvas, no offscreen buffer.
+
+// Stage-safe glamour effects: all pixels go to the existing canvas, no offscreen buffer.
 function cgHotTake(t,x=480,y=290){
   ctx.save();
   const light=ctx.createRadialGradient(x,y,8,x,y,380);
@@ -3804,7 +3742,71 @@ function cgMoonlitKiss(t){
   ctx.globalAlpha=.32;ctx.fillStyle='#fff';ctx.fillRect(-99,-89,196,4);
   ctx.globalAlpha=1;ctx.restore();
 }
-// 6b. a visitor
+
+const CUT3=[
+ // 1. the walk: the moon is doing something unreasonable
+ {shirt:2,lines:["One week after Landlord HQ. Mandex took the night off.","Gerald took a walk. In a shirt. Brenda would have wept.","Above him, the moon was doing something unreasonable."],hl:2,cuts:[0,2.8],tr:'fade',hold:3.6,shake:[0,3],draw(t){const k=cgK(this.cuts,t);
+   cgSky('#0a0d24','#2a3060',395);for(let i=0;i<46;i++)cgE(cgRnd(i)*W,cgRnd(i+50)*320,1+cgRnd(i+9)*1.3*(.6+.4*Math.sin(t*3+i)),1.4,'#fff');
+   const mr=k===0?58+t*8:120+(t-2.8)*14;cgMoon(k===0?760:500,k===0?140:170,mr,t);
+   cgHills(395,'#14183a','#10132e','#0c0e24');
+   if(k===0){ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);cgGrass(395,145,'#1d3a2c','#0f2218');
+     const wx=-80+t*150;cgShadow(wx,396,50,7,.4);cutGerald(wx,395,1.7,{walk:t*9,dy:-Math.abs(Math.sin(t*9))*4,face:'cool',pose:'up'});
+     if(t>1.9)cutBubble(Math.min(wx+170,820),230,"Nice night.",0)}
+   else{ctx.fillStyle='#10132a';ctx.fillRect(0,420,W,H-420);const u=t-2.8;
+     // a tiny wolf on the hill starts to howl, and its tail wags
+     ctx.save();ctx.translate(840,360);ctx.fillStyle='#07081a';ctx.beginPath();ctx.ellipse(0,0,16,9,-.2,0,6.3);ctx.ellipse(-12,-14,6,8,.6,0,6.3);ctx.fill();ctx.restore();cgHowl(u,830,330);
+     cutGerald(300,560,3.3,{face:'cool',pose:'up',dy:Math.sin(u*2)*2});cutBubble(640,150,"That's... a lot of moon.",0)}}},
+ // 2. the fridge
+ {lines:["Home: a garage, a couch, a fridge.","In the fridge: one wedge of MOON CHEESE.","\"BEST BEFORE: THE FULL MOON.\" Gerald read this as a deadline, not a warning."],hl:2,cuts:[0,1.5,3.3],tr:'wipe',hold:3.4,shake:[0,0,5],draw(t){const k=cgK(this.cuts,t);
+   if(k<2){cgFridge(t);const z=k===0?1:1.5,gl=.5+.5*Math.sin(t*6);ctx.save();ctx.translate(480,250);ctx.scale(z,z);
+     ctx.save();ctx.globalAlpha=.25+.2*gl;cgE(0,0,170,130,'#fff3a0');ctx.restore();
+     cgP([-150,70,150,70,110,-70,-110,-70],'#f2d24a',3);for(const[a,b,c]of[[-60,-10,15],[20,30,20],[70,-30,11],[-20,-45,9],[-95,35,9],[60,50,8]])cgE(a,b,c,c,'#d9b02a',2);
+     cgR(-60,76,120,30,'#d8352b',2,5);txt('EXPIRED',0,98,18,'#fff','center');ctx.restore();
+     if(k===0)txt('MOON CHEESE',480,100,34,'#fff','center','#5a3a00');
+     else{cgR(250,380,460,110,'rgba(0,0,0,.65)',2,12);txt('BEST BEFORE: THE FULL MOON',480,432,24,'#ffd23f','center','#000');txt('(it is currently the full moon)',480,466,15,'#fff','center')}}
+   else{cgWood('#3a2a1a','#1c120a');const u=t-3.3,ch=Math.sin(u*14);cutGerald(480,560,3.8,{face:u>.5?'cool':'sad',pose:'up',dy:Math.abs(ch)*5,sq:ch*.02});
+     cutFlag(3,()=>SFX.thud(.4));if(u>.8)cutBubble(740,150,"...tastes like Tuesday.",0);else cutBubble(740,150,"*CHOMP*",0)}}},
+ // 3. the sneeze
+ {shirt:2,lines:["An itch. Then a sniff. Then a physics problem.","The moon leaned in at the window. Gerald leaned back.","Gerald inhaled most of the room."],hl:2,cuts:[0,1.3,2.6],tr:'iris',hold:3.2,shake:[0,2,12],draw(t){const k=cgK(this.cuts,t);
+   cgWood('#4a3a2a','#241a14');const wx=620,wy=40;cgR(wx-12,wy-12,300,260,'#e9e0cf',3,6);cgR(wx,wy,276,236,'#0a0d24',2);cgMoon(wx+140+(k>0?-8:0),wy+120,k>0?96:70,t);cgLine(wx+138,wy,wx+138,wy+236,'#e9e0cf',6);cgLine(wx,wy+118,wx+276,wy+118,'#e9e0cf',6);
+   const tw=k===0?Math.sin(t*30)*1.2:0,inh=k===1?(t-1.3)*.05:k===2?.07:0,sh=k===2?Math.sin(t*70)*5:0;
+   cutGerald(320+sh,520,2.9,{face:k===0?'sad':'cool',pose:'up',sq:inh,dx:tw,dy:k===2?-6:0});
+   if(k===0)cutBubble(560,360,"...hm.",0);else if(k===1)cutBubble(560,360,"Ah... ahhh...",0);else{cutBubble(560,350,"AHHHH—",0,26)}}},
+ // 4. the transformation, in stages
+ {shirt:3,lines:["Ears. Boing.","A snout. Eleven shirt buttons resigning, one at a time.","His mustache did not move. It is load-bearing."],hl:1,cuts:[0,1.1,2.4,3.8],tr:'white',hold:3.6,shake:[10,6,8,16],draw(t){const k=cgK(this.cuts,t);
+   cgSky('#0a0d24','#2a3060',395);cgMoon(480,170,150,t);ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);
+   const u=t-this.cuts[k],st=k===0?0:k===1?1:k===2?2:3,boing=k===1?Math.exp(-u*5)*Math.sin(u*25)*.06:0;
+   if(k===0){cutFlag(1,()=>SFX.whoosh());ctx.fillStyle='rgba(255,255,235,'+Math.max(0,.9-u*1.6)+')';ctx.fillRect(0,0,W,H)}
+   cutGerald(480,392,2.5,{face:k>=3?'cool':'sad',pose:'up',wolf:st,shirt:3,sq:boing,dy:k===3?-Math.abs(Math.sin(u*18))*10*Math.exp(-u*2):0});
+   if(k===0){cutBubble(740,120,"AH-CHOO!",0,28)}
+   else if(k===1){cutFlag(2,()=>SFX.thud(.5));cutBubble(740,120,"My... ears?",0)}
+   else if(k===2){cutFlag(3,()=>SFX.thud(.5));for(let i=0;i<5;i++){const a=u*(1.4+i*.3),x=480+(i-2)*34+u*(i-2)*260,y=330-u*210+u*u*480;ctx.fillStyle='#fff';ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(x,y,5,0,6.3);ctx.fill();ctx.stroke()}   // buttons
+     cutBubble(740,120,"My... nose?",0)}
+   else{cutFlag(4,()=>{SFX.whoosh();SFX.thud(.9)});ctx.fillStyle='rgba(255,255,235,'+Math.max(0,.8-u*2)+')';ctx.fillRect(0,0,W,H);
+     for(let i=0;i<10;i++){const a=i*.7,x=480+Math.cos(a)*(30+u*240)*(i%2?1:-1),y=300+Math.sin(a*2)*30-u*70+u*u*200;ctx.save();ctx.translate(x,y);ctx.rotate(u*(4+i)*(i%2?1:-1));ctx.fillStyle=i%3?'#f6f9ff':'#2a4d9c';ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-12,-6);ctx.lineTo(10,-9);ctx.lineTo(13,5);ctx.lineTo(-6,10);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}
+     cutBubble(740,120,"MY SHIRT!",0,26)}}},
+ 
+// 5. the rear view
+ {lines:["The shorts held out for one more second.","Then: a tail. And the discovery that pants were always optional.","Gerald checked the rear view. Round. Furry. Free."],hl:2,cuts:[0,1.5,3.2],tr:'iris',hold:3.6,shake:[0,6,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
+   cgWood('#4a3a5a','#241a30');cgMoon(140,110,60,t);
+   if(k===0){cutGerald(480,392,2.5,{wolf:true,face:'sad',pose:'up',dy:Math.sin(t*20)*1});if(u>.8)cutBubble(760,150,"...is that a breeze?",0)}
+   else if(k===1){const sp=Math.min(1,u/.5),sx=Math.cos(sp*Math.PI);ctx.save();ctx.translate(480,0);ctx.scale(Math.abs(sx)||.01,1);ctx.translate(-480,0);if(sx>0)cutGerald(480,392,2.5,{wolf:true,pose:'up'});else cutGeraldBack(480,392,2.5,{wolf:true});ctx.restore();
+     cutFlag(5,()=>SFX.whoosh());ctx.fillStyle='#8a5a2b';for(let i=0;i<6;i++){const a=u*3+i*1.4;ctx.save();ctx.translate(480+Math.sin(a*2+i)*(60+u*90)*(i%2?1:-1),360-u*40+u*u*160);ctx.rotate(a);ctx.fillRect(-9,-4,18,8);ctx.restore()}
+     if(u>.7)cutBubble(760,150,"*riiip*",0)}
+   else{
+     cgRearPanel(u,480,275,1.48,true,'REAR VIEW: UNLICENSED');
+     cutBubble(800,130,u<1.0?"THAT'S A TAIL, RIGHT?":"LOOKING GOOD, GERALD.",0);
+   }}}
+ // 6. the howl
+ {lines:["Naturally, he howled.","At a moon he had called \"a lot\" two minutes earlier.","Three blocks away, a landlord's wine glass cracked."],hl:2,cuts:[0,1.8,3.5],tr:'wipe',hold:3.6,shake:[6,10,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
+   if(k<2){cgSky('#0a0d24','#3a2a60',395);cgMoon(480,k===0?210:150,k===0?200:130,t);if(k===0){cgHowl(t,300,300);cgHowl(t+.5,660,300)}
+     if(k===1){cgStreetNight(t);cgMoon(480,150,120,t);for(let i=0;i<3;i++)cgHowl(u+i*.5,480,200);cgR(-20,378,420,200,'#1a1630',3);cgR(-20,370,420,12,'#2a2448',2.4);const up=Math.min(1,u*1.6);cutGerald(180,378,2.2,{wolf:true,face:'cool',pose:'up',armR:[40,-22,46,-46-up*14],armL:[-40,-22,-46,-46-up*14]});cutBubble(420,300,"(distant howling)",0,16)}   // the howl, on a rooftop, so the wolf is in the shot
+     if(k===0){ctx.fillStyle='#10132a';ctx.fillRect(0,420,W,H-420);const up=Math.min(1,t*1.5);cutGerald(480,392,2.7,{wolf:true,face:'cool',pose:'up',armR:[40,-22,46,-46-up*14],armL:[-40,-22,-46,-46-up*14],dy:-up*6});cutBubble(740,170,"AWOOOOO!",0,28)}}
+   else{cgWood('#3a3060','#1a1430');cgR(240,40,480,330,'#ffe9a8',4,10);cgR(264,64,432,282,'#2a3060',3);cgMoon(480,200,120,t);cgLine(480,64,480,346,'#ffe9a8',8);cgLine(264,205,696,205,'#ffe9a8',8);
+     ctx.save();ctx.translate(480,330);ctx.scale(2.6,2.6);drawLandlordScared(t);ctx.restore();
+     const g=Math.min(1,u*1.4);ctx.fillStyle='#bfe8ff';ctx.beginPath();ctx.moveTo(540,260+g*160);ctx.lineTo(580,260+g*160);ctx.lineTo(570,300+g*160);ctx.lineTo(550,300+g*160);ctx.closePath();ctx.fill();if(u>.7){cutFlag(6,()=>SFX.glass());for(let i=0;i<8;i++){cgE(560+Math.cos(i)*u*40,440+Math.sin(i*3)*10+u*10,3,3,'#bfe8ff')}}
+     cutBubble(740,130,"Not again.",0)}}},
+ // 6b. a visitor
  {lines:["A knock. Brenda, back for \"the good towels\".","She winked at the wolf. His tail wagged without permission.","A kiss, a closed door, and a camera that politely studied the moon."],hl:2,cuts:[0,2.4,5],tr:'wipe',hold:3.8,shake:[0,4,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
    if(k===0){cgStreetNight(t);cgGrass(395,H-395,'#2a3a2a','#162016');ctx.save();ctx.translate(300,300);ctx.scale(2.2,2.2);cgBrenda(0,0,t);ctx.restore();cutGerald(690,396,2.1,{wolf:true,face:'flirt'});cutBubble(330,250,"Hi, Gerald.",1)}
    else if(k===1){cgWood('#4a2438','#24101e');cgBokeh(t,['#ff4f8f','#ffd23f'],14);ctx.save();ctx.translate(230,250);ctx.scale(3.4,3.4);cgBrenda(0,0,t,true);ctx.restore();cutGerald(700,430,2.9,{wolf:true,face:'kiss'});
