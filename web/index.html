@@ -3796,7 +3796,7 @@ const CUT3=[
    else{
      cgRearPanel(u,480,275,1.48,true,'REAR VIEW: UNLICENSED');
      cutBubble(800,130,u<1.0?"THAT'S A TAIL, RIGHT?":"LOOKING GOOD, GERALD.",0);
-   }}}
+   }}},
  // 6. the howl
  {lines:["Naturally, he howled.","At a moon he had called \"a lot\" two minutes earlier.","Three blocks away, a landlord's wine glass cracked."],hl:2,cuts:[0,1.8,3.5],tr:'wipe',hold:3.6,shake:[6,10,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
    if(k<2){cgSky('#0a0d24','#3a2a60',395);cgMoon(480,k===0?210:150,k===0?200:130,t);if(k===0){cgHowl(t,300,300);cgHowl(t+.5,660,300)}
@@ -3862,7 +3862,7 @@ const CUT_E1=[
      cutGerald(350+Math.sin(u*9)*12,470,3.2,{face:'cool',pose:'flex',shirt:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-40,-22,-46,-46-Math.sin(t*6)*7]});
      cgRearPanel(u,776,284,.66,false,'ENCORE? NO REFUNDS');
      cutBubble(700,150,"RENT IS CANCELLED!",0,22);
-   }}}
+   }}},
  // 3. the letter
  {shirt:0,lines:["Thump. The mailbox coughed up a metal tube.","Inside: one letter, on very expensive paper.","\"We noticed. Come to the office. Bring the belly.\""],hl:2,cuts:[0,1.6,3.4],tr:'iris',hold:3.8,shake:[0,6,0],draw(t){const k=cgK(this.cuts,t),u=t-this.cuts[k];
    cgSky('#2a2f55','#9a7a9a',395);cgStars(t,30,260);cgHills(395,'#2a2f50','#222644','#1a1e38');cgGrass(395,145,'#2f4a3a','#16261c');cgMailbox(300,420);
