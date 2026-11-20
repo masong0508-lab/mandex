@@ -332,8 +332,14 @@ static void draw_fore(const View *v){               /* grass blades and a fence 
 static void draw_shadow(const View *v, int cx, int cy_ground, int w){ rect(v->s, cx - w / 2, cy_ground, w, 3, RGB(60, 90, 40)); }
 
 /* ---- the web's 8x8 voxel sprites (paintCell), ported: built once per zoom level, box-filtered down to ppc x ppc, drawn per voxel */
-static u32 tcol[MX_NMAT][4][3][64]; static u8 talp[MX_NMAT][4][3][64]; static int tile_p;
+/* Two fixed zooms (top=3, bottom=4 px/cell): each texture is generated ONCE.
+   Previously switching screens rebuilt all 8x8 materials two or three times
+   every frame, including for stereo eyes. ~35 KB extra 3DS BSS, zero heap. */
+static u32 tcol[2][MX_NMAT][4][3][64]; static u8 talp[2][MX_NMAT][4][3][64];
+static unsigned tile_ready;
 static void tile_build(int p){
+  int slot = p == 4 ? 1 : 0;
+  if(tile_ready & (1u << slot)) return;
   static const int VO[4] = {0, -9, 7, -4};
   for(int m = 1; m < MX_NMAT; m++) for(int v = 0; v < 4; v++) for(int d = 0; d < 3; d++){
     float T[64][4]; memset(T, 0, sizeof T);
@@ -365,13 +371,14 @@ static void tile_build(int p){
         float wx = (xx + 1 < x1 ? xx + 1 : x1) - (xx > x0 ? xx : x0), wy = (yy + 1 < y1 ? yy + 1 : y1) - (yy > y0 ? yy : y0), w = wx * wy, *q = T[yy * 8 + xx];
         sr += q[0] * q[3] * w; sg += q[1] * q[3] * w; sb += q[2] * q[3] * w; sa += q[3] * w; sw += w; }
       float al = sa / sw, r = sa > 0 ? sr / sa : 0, g2 = sa > 0 ? sg / sa : 0, b2 = sa > 0 ? sb / sa : 0;
-      tcol[m][v][d][j * 8 + i] = RGB((int)r, (int)g2, (int)b2); talp[m][v][d][j * 8 + i] = (u8)(al * 255 + .5f); }
+      tcol[slot][m][v][d][j * 8 + i] = RGB((int)r, (int)g2, (int)b2); talp[slot][m][v][d][j * 8 + i] = (u8)(al * 255 + .5f); }
   }
-  tile_p = p;
+  tile_ready |= 1u << slot;
 }
 /* one voxel: dm = brightness in 1/256ths (damage tint, dim), per-pixel alpha for glass */
 static void draw_tile(Scr *s, int sx, int sy, int p, int m, int v, int d, int dm){
-  const u32 *tc = tcol[m][v][d]; const u8 *ta = talp[m][v][d];
+  int slot = p == 4 ? 1 : 0;
+  const u32 *tc = tcol[slot][m][v][d]; const u8 *ta = talp[slot][m][v][d];
   for(int i = 0; i < p; i++){
     int X = sx + i; if((unsigned)X >= (unsigned)s->w) continue;
     for(int j = 0; j < p; j++){
@@ -386,7 +393,7 @@ static void draw_tile(Scr *s, int sx, int sy, int p, int m, int v, int d, int dm
 }
 static void draw_cells(const View *v){
   int p = v->ppc;
-  if(tile_p != p) tile_build(p);
+  tile_build(p);
   static float minv[MX_NMAT]; static int mready;
   if(!mready){ for(int m = 1; m < MX_NMAT; m++) minv[m] = 1.0f / (float)mx_material_hp(m); mready = 1; }
   const int sw = v->s->w, sh = v->s->h;
@@ -428,6 +435,81 @@ static void draw_rooms(const View *v){                  /* the wallpaper behind 
       x = x2;
     }
   }
+}
+/* Window frames, interior props and roof bevels make the shared core's rooms
+   read as furnished buildings rather than plain voxel silhouettes. Geometry
+   remains destructible: room-paper checks reveal damage and walls occlude props. */
+static void draw_facades(const View *v){
+  static const u32 GLASS[4] = {
+    RGB(120,180,223), RGB(255,207,133), RGB(130,207,193), RGB(162,175,222)
+  };
+  int p=v->ppc;
+  for(int r=0;r<world.nrooms;r++){
+    const MxRoom *rm=&world.rooms[r];
+    if(rm->w<6 || rm->h<5) continue;
+    int n=rm->w>=18 ? 3 : rm->w>=11 ? 2 : 1;
+    for(int k=0;k<n;k++){
+      int wx=rm->x + rm->w*(2*k+1)/(2*n), wy=rm->y+rm->h/2;
+      int idx=wy*MX_COLS+wx;
+      if(world.grid[idx] || !world.paper[idx]) continue;
+      int ww=(rm->w>=10 ? 4 : 3)*p, hh=(rm->h>=7 ? 4 : 3)*p;
+      int x=VX(v,(float)wx)-ww/2, y=VY(v,(float)wy)-hh/2;
+      if(x+ww<-3 || x>v->s->w+3 || y+hh<-3 || y>v->s->h+3) continue;
+      int lit=((r+k+world.level)%5)==0, night=world.level>=MX_CH3_START;
+      u32 glass=lit ? RGB(255,209,116) : night ? RGB(100,140,193) : GLASS[(r+k)&3];
+      rect(v->s,x-2,y-2,ww+4,hh+4,RGB(25,27,42));
+      rect(v->s,x-1,y-1,ww+2,hh+2,RGB(230,222,200));
+      rect(v->s,x,y,ww,hh,glass);
+      rect(v->s,x+1,y+1,ww/3,hh/3,RGB(227,242,250));  /* glass glare */
+      rect(v->s,x+ww/2,y,2,hh,RGB(246,236,207));
+      rect(v->s,x,y+hh/2,ww,2,RGB(246,236,207));
+      rect(v->s,x-p/2,y+hh+1,ww+p,2,RGB(123,92,77));
+      rect(v->s,x,y+2,1,hh-3,RGB(172,54,83)); rect(v->s,x+ww-1,y+2,1,hh-3,RGB(172,54,83));
+      if(lit) rect(v->s,x+ww/2+2,y+hh/2+2,ww/3,2,RGB(255,237,182));
+    }
+    if(rm->w>=9 && rm->h>=6){
+      int cx=rm->x+2, cy=rm->y+rm->h-2, idx=cy*MX_COLS+cx;
+      if(cy<MX_ROWS && !world.grid[idx] && world.paper[idx]){
+        int x=VX(v,(float)cx), y=VY(v,(float)cy);
+        rect(v->s,x,y,3*p,p,RGB(102,53,81)); rect(v->s,x,y-1,3*p,1,RGB(231,151,132));
+        rect(v->s,x,y+p,2,p,RGB(57,42,51)); rect(v->s,x+3*p-2,y+p,2,p,RGB(57,42,51));
+        rect(v->s,x+p,y-2*p,p,p,RGB(255,225,138)); rect(v->s,x+p+p/2,y-p,1,p,RGB(75,54,64));
+      }
+    }
+  }
+}
+static void draw_roof_trim(const View *v){
+  int p=v->ppc;
+  for(int r=0;r<world.nrooms;r++){
+    const MxRoom *rm=&world.rooms[r];
+    int roof=rm->y-3; if(roof<1 || rm->w<5) continue;
+    int upper=0;
+    for(int j=0;j<world.nrooms;j++) if(j!=r){
+      const MxRoom *o=&world.rooms[j];
+      if(o->y<rm->y && o->x<rm->x+rm->w && rm->x<o->x+o->w){upper=1;break;}
+    }
+    if(upper) continue;
+    for(int x=rm->x-1;x<=rm->x+rm->w;x++){
+      if(x<0 || x>=MX_COLS)continue;
+      int i=roof*MX_COLS+x;
+      if(!world.grid[i] || world.grid[i-MX_COLS])continue;
+      int sx=VX(v,(float)x),sy=VY(v,(float)roof);
+      if(sx<-p || sx>=v->s->w || sy<-p || sy>=v->s->h)continue;
+      rect(v->s,sx,sy,p,1,RGB(255,226,158));
+      rect(v->s,sx+p-1,sy+1,1,p-1,RGB(66,46,65));
+    }
+  }
+}
+static void draw_street_dressing(const View *v){
+  int p=v->ppc,x=VX(v,34.0f),y=VY(v,(float)MX_ROWS);
+  if(x<-30 || x>v->s->w+30 || y<0 || y>v->s->h+30)return;
+  rect(v->s,x-2,y-15*p,4,15*p,RGB(55,60,77));
+  rect(v->s,x-4,y-15*p-3,9,3,RGB(30,33,49));
+  disc(v->s,x,y-15*p+1,5,RGB(255,222,156));
+  rect(v->s,x-3,y-15*p-1,7,2,RGB(255,240,191));
+  rect(v->s,x+5,y-8*p,26,16,RGB(50,32,43));
+  rect(v->s,x+6,y-8*p+1,24,14,RGB(252,239,210));
+  text(v->s,x+8,y-8*p+4,"RENT?",1,RGB(150,45,62));
 }
 static void draw_landlords(const View *v){
   for(int i = 0; i < world.ntargets; i++){
@@ -585,7 +667,7 @@ static void draw_valve(const View *v){
   if(m->mode == MAN_AIM && f > 0){ rect(v->s, x - p * 5, y - p * 9, p * 10, p, RGB(20, 24, 40)); rect(v->s, x - p * 5 + 1, y - p * 9 + 1, f * (p * 10 - 2) / 100, p - 2, f < 50 ? RGB(125, 255, 90) : f < 80 ? RGB(255, 210, 63) : RGB(255, 70, 70)); }
 }
 static void draw_world(const View *v){
-  draw_sky(v); draw_rooms(v); draw_cells(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
+  draw_sky(v); draw_street_dressing(v); draw_rooms(v); draw_facades(v); draw_cells(v); draw_roof_trim(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
 }
 
 /* Stereoscopic top screen.  The slider sets how strong the depth is; each layer gets a horizontal disparity D (px at full slider):
@@ -599,10 +681,10 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
   float tp = (m->mode == MAN_FLY || m->mode == MAN_STUCK) ? (mxc - 20.0f) * 6.0f : 0.0f;   /* camera drift follows the flying man */
   g_pan += (tp - g_pan) * .08f;
   int fly = (m->mode == MAN_FLY) ? 1 : 0, dv = m->dive ? 3 : 0;
-  a.ox = vt->ox + DX(14); draw_sky(&a);                                                   /* far plane (hills/clouds inside carry their own parallax) */
-  a.ox = vt->ox + DX(8); draw_rooms(&a);                                                  /* wallpaper sits deep inside the building */
+  a.ox = vt->ox + DX(14); draw_sky(&a); draw_street_dressing(&a);                                                   /* far plane (hills/clouds inside carry their own parallax) */
+  a.ox = vt->ox + DX(8); draw_rooms(&a); draw_facades(&a);                               /* dressed interiors sit behind destructible front walls */
   if(stereo){ a.ox = vt->ox + DX(4); g_dim = .45f; draw_cells(&a); g_dim = 1.0f; }       /* back faces */
-  a.ox = vt->ox; draw_cells(&a);
+  a.ox = vt->ox; draw_cells(&a); draw_roof_trim(&a);
   a.ox = vt->ox + DX(-3); draw_landlords(&a); draw_tubes(&a); draw_pads(&a); draw_cases(&a);
   a.ox = vt->ox + DX(-4); draw_sling(&a); draw_valve(&a);
   a.ox = vt->ox + DX(-5); draw_aim(&a);
@@ -616,7 +698,16 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
 
 /* ---------------------------------------------------------------- HUD / panels */
 static int alive(void){ return mx_targets_alive(&world); }
+static int hud_wrecked; static int hud_sample=-1;
 static void draw_hud(void){
+  /* One 7,200-cell scan per eight frames, shared by both stereo eyes. */
+  if(hud_sample != (frame >> 3)){
+    int left=mx_cells_left(&world), base=cells0>0 ? cells0 : 1;
+    hud_wrecked=100-left*100/base;
+    if(hud_wrecked<0)hud_wrecked=0;
+    if(hud_wrecked>100)hud_wrecked=100;
+    hud_sample=frame >> 3;
+  }
   rect(&top, 0, 0, 400, 24, RGB(15, 18, 30)); rect(&top, 0, 0, 400, 12, RGB(24, 28, 46)); rect(&top, 0, 23, 400, 1, RGB(255, 210, 63));
   char b[48];
   text(&top, 6, 8, "LV", 2, RGB(255, 210, 63)); itoa_(world.level + 1, b); text(&top, 30, 8, b, 2, RGB(255, 210, 63));
@@ -626,6 +717,11 @@ static void draw_hud(void){
     rect(&top, 250, 6, 142, 12, RGB(255, 255, 255)); rect(&top, 251, 7, 140, 10, RGB(40, 40, 50)); rect(&top, 251, 7, k * 140 / 100, 10, k > 30 ? RGB(125, 255, 90) : RGB(255, 74, 74));
     text(&top, 206, 8, "TIME", 1, RGB(255, 255, 255));
   }
+  rect(&top, 5, 29, 123, 13, RGB(18, 24, 42));
+  rect(&top, 5, 29, 123, 1, RGB(255, 210, 63));
+  text(&top, 8, 32, "WRECKED", 1, RGB(236, 228, 207));
+  rect(&top, 54, 33, 69, 5, RGB(55, 58, 78));
+  rect(&top, 54, 33, hud_wrecked*69/100, 5, hud_wrecked>70 ? RGB(255, 88, 91) : hud_wrecked>35 ? RGB(255, 210, 63) : RGB(125, 255, 90));
   rect(&top, 0, 216, 400, 24, RGB(15, 18, 30)); rect(&top, 0, 228, 400, 12, RGB(10, 12, 22)); rect(&top, 0, 216, 400, 1, RGB(255, 138, 138));
   text(&top, 6, 224, "MEN", 2, RGB(190, 190, 190)); itoa_(world.men, b); text(&top, 40, 224, b, 2, RGB(255, 255, 255));
   text(&top, 80, 224, "LANDLORDS", 2, RGB(255, 138, 138)); sprintf(b, "%d/%d", alive(), world.ntargets); text(&top, 168, 224, b, 2, RGB(255, 255, 255));
@@ -799,7 +895,13 @@ int main(void){
     top.fb = gfxGetFramebuffer(GFX_TOP, eye ? GFX_RIGHT : GFX_LEFT, NULL, NULL); top.w = 400; top.h = 240;
     draw_world_3d(&vt, eye ? 1 : -1, sl);
     if(app == ST_TITLE){
+      /* Poster framing: actual sprite art from the game, not substitute circles. */
+      rect(&top, 10, 32, 380, 2, RGB(255, 210, 63));
+      rect(&top, 10, 35, 380, 1, RGB(89, 30, 50));
+      blit_frame(&top, MSF_FLY_A, 49 + (int)(sinf(frame*.04f)*3), 151, 6, 1);
       rect(&top, 70, 40, 260, 90, RGB(15, 18, 30));
+      rect(&top, 70, 40, 260, 3, RGB(255, 210, 63));
+      rect(&top, 70, 128, 260, 2, RGB(124, 49, 70));
       textc(&top, 200, 52, "MANDEX", 6, RGB(255, 210, 63));
       textc(&top, 200, 100, "THE LANDLORD SMASHER", 2, RGB(255, 255, 255));
       char b[48]; sprintf(b, "< LEVEL %d  %s >", sel + 1, mx_level_name(sel)); textc(&top, 200, 150, b, 2, RGB(255, 255, 255));

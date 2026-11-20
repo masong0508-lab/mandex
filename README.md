@@ -36,6 +36,7 @@ One game, four builds: a browser version with its own JS physics, and three cons
   impact squash.  It is cosmetic and never touches the physics.
 - **Eviction combos**: chain landlord defeats within 2.5 real-time seconds for a capped +1,000/+2,000/+3,000/+4,000 score bonus and increasingly outrageous adult-comedy stingers. The browser and three consoles share the same score rules; it never affects saved-file structure or adds an allocation.
 - **Cinematic cutscene pass**: eased camera pushes, comic impact accents and dialogue progress on the browser; lightweight atmosphere, shot-decay camera shake, and narration progress cues in the DS/3DS shared intro.
+- **Handheld visual-parity pass**: DS and 3DS now dress destructible room backdrops with multi-pane windows, curtains, furniture, and surviving-roof highlights; matching street signage adds an environmental landmark. The 3DS also gets an improved title poster and demolition meter. Its top/bottom material tile atlases are cached separately instead of regenerated every time the drawing zoom changes (about 35 KB of extra static RAM, no heap allocation).
 
 ## Build and test
 

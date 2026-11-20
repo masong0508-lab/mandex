@@ -350,6 +350,87 @@ static void draw_rooms(const View *v){
   }
 }
 
+/* Façade depth pass, derived from the SAME destructible rooms as the core.
+   It is painted behind real blocks, so broken masonry occludes it, and torn-away
+   wallpaper removes windows and furniture automatically. No sprites or heap. */
+static void draw_facades(const View *v){
+  int p = v->ppc;
+  for(int r = 0; r < world.nrooms; r++){
+    const MxRoom *rm = &world.rooms[r];
+    if(rm->w < 6 || rm->h < 5) continue;
+    int n = rm->w >= 18 ? 3 : rm->w >= 11 ? 2 : 1;
+    for(int k = 0; k < n; k++){
+      int wx = rm->x + rm->w * (2*k + 1) / (2*n);
+      int wy = rm->y + rm->h / 2;
+      int idx = wy * MX_COLS + wx;
+      if(world.grid[idx] || !world.paper[idx]) continue;
+      int ww = (rm->w >= 10 ? 4 : 3) * p, hh = (rm->h >= 7 ? 4 : 3) * p;
+      int x = wx*p - v->cx - ww/2, y = wy*p - v->cy - hh/2;
+      if(x + ww < -3 || x > 259 || y + hh < -3 || y > 195) continue;
+      u8 glass = (r + k + world.level) % 5 == 0 ? C_GOLD2 : (r & 1) ? C_CITY2 : C_SKY0 + 9;
+      gfx_rect(v->buf, x - 2, y - 2, ww + 4, hh + 4, C_SHADOW);
+      gfx_rect(v->buf, x - 1, y - 1, ww + 2, hh + 2, C_FENCE);
+      gfx_rect(v->buf, x, y, ww, hh, glass);
+      gfx_rect(v->buf, x + 1, y + 1, ww/3, hh/3, C_CLOUD);
+      gfx_rect(v->buf, x + ww/2, y, p > 2 ? 2 : 1, hh, C_WHITE);
+      gfx_rect(v->buf, x, y + hh/2, ww, p > 2 ? 2 : 1, C_WHITE);
+      gfx_rect(v->buf, x - p/2, y + hh + 1, ww + p, p > 2 ? 2 : 1, C_FENCE2);
+      if(p >= 3){ gfx_rect(v->buf, x, y + 2, 1, hh - 3, C_RED2); gfx_rect(v->buf, x + ww - 1, y + 2, 1, hh - 3, C_RED2); }
+    }
+    /* Occupied interiors: furniture, wall pictures, and a small desk lamp.
+       The same wallpaper check makes these vanish when the room is demolished. */
+    if(rm->w >= 9 && rm->h >= 6){
+      int cx = rm->x + 2, cy = rm->y + rm->h - 2;
+      if(cy < MX_ROWS && !world.grid[cy*MX_COLS+cx] && world.paper[cy*MX_COLS+cx]){
+        int x = cx*p-v->cx, y = cy*p-v->cy;
+        gfx_rect(v->buf, x, y, 3*p, p, C_SUIT);
+        gfx_rect(v->buf, x, y-1, 3*p, 1, C_GOLD2);
+        gfx_rect(v->buf, x, y+p, p/2+1, p, C_HAIR2);
+        gfx_rect(v->buf, x+2*p, y+p, p/2+1, p, C_HAIR2);
+        gfx_rect(v->buf, x+p, y-p*2, p, p, C_SUNHALO);
+        gfx_rect(v->buf, x+p+p/2, y-p, 1, p, C_HAIR2);
+      }
+    }
+  }
+}
+/* Only top-floor rooms get a roof edge: not a floating sticker on every story.
+   The bevel requires an actual surviving roof voxel and so disappears on collapse. */
+static void draw_roof_trim(const View *v){
+  int p = v->ppc;
+  for(int r = 0; r < world.nrooms; r++){
+    const MxRoom *rm = &world.rooms[r];
+    int roof = rm->y - 3;
+    if(roof < 1 || rm->w < 5) continue;
+    int upper = 0;
+    for(int j = 0; j < world.nrooms; j++) if(j != r){
+      const MxRoom *o = &world.rooms[j];
+      if(o->y < rm->y && o->x < rm->x + rm->w && rm->x < o->x + o->w){ upper = 1; break; }
+    }
+    if(upper) continue;
+    for(int x = rm->x - 1; x <= rm->x + rm->w; x++){
+      if(x < 0 || x >= MX_COLS) continue;
+      int i = roof*MX_COLS + x;
+      if(!world.grid[i] || world.grid[i-MX_COLS]) continue;
+      int sx=x*p-v->cx, sy=roof*p-v->cy;
+      if(sx < -p || sx >= 256 || sy < -p || sy >= 192) continue;
+      gfx_rect(v->buf, sx, sy, p, 1, C_GOLD2);
+      if(p >= 3) gfx_rect(v->buf, sx+p-1, sy+1, 1, p-1, C_HAIR2);
+    }
+  }
+}
+/* A streetside rental notice and lamp, anchored to the street, never the camera. */
+static void draw_street_dressing(const View *v){
+  int p=v->ppc, x=34*p-v->cx, y=MX_ROWS*p-v->cy;
+  if(x < -35 || x > 285 || y < 0 || y > 225) return;
+  gfx_rect(v->buf, x-1, y-15*p, 3, 15*p, C_SUIT2);
+  gfx_rect(v->buf, x-4, y-15*p-2, 9, 3, C_HAIR2);
+  gfx_rect(v->buf, x-6, y-15*p+1, 13, 4, C_SUNHALO);
+  gfx_rect(v->buf, x-3, y-15*p+1, 7, 2, C_GOLD2);
+  gfx_rect(v->buf, x+5, y-8*p, 18, 10, C_HAIR2);
+  gfx_rect(v->buf, x+6, y-8*p+1, 16, 8, C_WHITE);
+  gfx_text(v->buf, x+7, y-8*p+2, p >= 3 ? "RENT?" : "NO", C_RED2, 1);
+}
+
 static void draw_voxels(const View *v){
   int ppc = v->ppc, wob = world.wob_on;
   int x0 = v->cx > 0 ? v->cx / ppc : 0, x1 = (v->cx + 256) / ppc + 1; if(x1 > MX_COLS) x1 = MX_COLS;
@@ -589,10 +670,13 @@ static void draw_popups(const View *v, int sc){
 static void draw_world(const View *v, int parallax){
   gfx_bg(v, parallax);
   gfx_ground(v);
+  draw_street_dressing(v);
   draw_prong_post(v);
   draw_band(v, 0);
   draw_rooms(v);
+  draw_facades(v);
   draw_voxels(v);
+  draw_roof_trim(v);
   draw_chunks(v);
   draw_targets(v);
   if(world.ntubes) draw_tubes(v);
