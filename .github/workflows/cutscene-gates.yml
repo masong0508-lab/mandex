@@ -40,5 +40,5 @@ jobs:
           /tmp/mandex_gfx_clip_test
       - name: All shared story cutscenes and framebuffer canaries
         run: |
-          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source test/cutscene_guard_test.c ds/source/gfx.c ds/source/intro.c -lm -o /tmp/mandex_cutscene_guard_test
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source test/cutscene_guard_test.c ds/source/gfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_cutscene_guard_test
           /tmp/mandex_cutscene_guard_test
