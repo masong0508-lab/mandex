@@ -108,9 +108,9 @@ int  intro_scene(void){ return sc; }
 
 /* sound cues, frame exact */
 static void cue(void){
-  if(mode == 2){ switch(sc){ case 0: if(t == 0) sfx_play(SFX_BOOM, 64); if(t == 156) sfx_play(SFX_EEK, 64); break; case 1: if(t == 0) sfx_play(SFX_WIN, 64); if(t == 132) sfx_play(SFX_POP, 64); break; case 2: if(t == 8) sfx_play(SFX_THUD, 64); if(t == 96) sfx_play(SFX_CLICK, 64); break; default: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
+  if(mode == 2){ switch(sc){ case 0: if(t == 0) sfx_play(SFX_BOOM, 64); if(t == 156) sfx_play(SFX_EEK, 64); break; case 1: if(t == 0) sfx_play(SFX_WIN, 64); if(t == 132) sfx_play(SFX_POP, 64); if(t == 260) sfx_play(SFX_BOING, 64); break; case 2: if(t == 8) sfx_play(SFX_THUD, 64); if(t == 96) sfx_play(SFX_CLICK, 64); break; default: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
   if(mode == 3){ switch(sc){ case 0: if(t == 144) sfx_play(SFX_THUD, 64); if(t == 252){ sfx_play(SFX_BOOM, 64); sfx_play(SFX_CRUNCH, 64); } break; case 1: if(t == 144) sfx_play(SFX_EEK, 64); break; case 2: if(t == 0) sfx_play(SFX_WIN, 64); if(t == 276) sfx_play(SFX_TARGET, 64); break; default: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
-  if(wolf){ switch(sc){ case 0: if(t == 168) sfx_play(SFX_TAUNT, 64); break; case 1: if(t == 90) sfx_play(SFX_POP, 64); break; case 2: if(t == 156) sfx_play(SFX_FART, 64); break; case 3: if(t == 20) sfx_play(SFX_BOING, 64); if(t == 144) sfx_play(SFX_CRACK, 64); if(t == 228) sfx_play(SFX_BOOM, 64); break; case 4: if(t == 0) sfx_play(SFX_CRACK, 64); if(t == 90) sfx_play(SFX_WHOOSH, 64); break; case 5: if(t == 0) sfx_play(SFX_YAWN, 64); if(t == 230) sfx_play(SFX_CRACK, 64); break; case 6: if(t == 0) sfx_play(SFX_POP, 64); if(t == 144) sfx_play(SFX_BOING, 64); if(t == 300) sfx_play(SFX_THUD, 64); break; case 7: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
+  if(wolf){ switch(sc){ case 0: if(t == 168) sfx_play(SFX_TAUNT, 64); break; case 1: if(t == 90) sfx_play(SFX_POP, 64); break; case 2: if(t == 156) sfx_play(SFX_FART, 64); break; case 3: if(t == 20) sfx_play(SFX_BOING, 64); if(t == 144) sfx_play(SFX_CRACK, 64); if(t == 228) sfx_play(SFX_BOOM, 64); break; case 4: if(t == 0) sfx_play(SFX_CRACK, 64); if(t == 90) sfx_play(SFX_WHOOSH, 64); if(t == 198) sfx_play(SFX_BOING, 64); break; case 5: if(t == 0) sfx_play(SFX_YAWN, 64); if(t == 230) sfx_play(SFX_CRACK, 64); break; case 6: if(t == 0) sfx_play(SFX_POP, 64); if(t == 144) sfx_play(SFX_BOING, 64); if(t == 300) sfx_play(SFX_THUD, 64); break; case 7: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
   switch(sc){
   case 0: if(t < 130 && t % 14 == 6) sfx_play(SFX_CLICK, 40); if(t == 138) sfx_play(SFX_TARGET, 64); break;
   case 1: if(t == 0) sfx_play(SFX_THUD, 64); for(int i = 0; i < 6; i++) if(t == 96 + i * 27) sfx_play(SFX_POP, 64); if(t == 336) sfx_play(SFX_THUD, 64); break;
@@ -416,6 +416,9 @@ static void sc_dennis(u8 *b, int k, int tt){
     int mx = 90 + (tt * 2) % 80; gfx_ell(b, mx, 40 + wv(tt, 24, 6), 4, 2, C_GRAY);
   }
 }
+/* Cartoon rear-view inserts, defined below and shared by all console builds. */
+static void gag_rear(u8 *b,int cx,int cy,int z,int tt,int wolf);
+static void gag_plunger(u8 *b,int x,int y,int z,int tt);
 static void sc_couch(u8 *b, int k, int tt){
   if(k == 0){
     gfx_rect(b, 0, 0, 256, 192, C_DARK); gfx_rect(b, 0, 150, 256, 42, C_UIBG);
@@ -429,7 +432,8 @@ static void sc_couch(u8 *b, int k, int tt){
     gfx_tri(b, 84, 20, 84, 180, 230, 170, C_UIHI); gfx_dither(b, 84, 20, 150, 160, C_BLACK);                          /* the fridge light */
     gfx_rect(b, 20, 14, 64, 170, C_WHITE); gfx_rect(b, 28, 20, 50, 158, C_CLOUD2);
     for(int i = 0; i < 3; i++){ gfx_rect(b, 28, 56 + i * 40, 50, 2, C_GRAY); gfx_rect(b, 40 + i * 12, 40 + i * 40, 8, 14, i == 1 ? C_RED : C_GOO2); }
-    gerald(b, 170, 192, 3, GF_BOXERS | GF_SAD);
+    gerald(b,170,192,3,GF_BOXERS|GF_SAD);
+    if(tt>38){gag_rear(b,216,65,1,tt,0);gfx_text_c(b,205,106,"PANTS: AWOL",C_GOLD,C_BLACK,1);}
   } else {
     gfx_rect(b, 0, 0, 256, 192, C_WALL0); gfx_rect(b, 40, 20, 176, 140, C_WHITE); gfx_rect(b, 40, 20, 176, 18, C_RED);
     gfx_text_c(b, 128, 25, "DAY 9", C_WHITE, C_RED2, 1);
@@ -564,11 +568,67 @@ static void w_ears(u8 *b, int k, int tt){
   else if(k == 2){ gfx_rect(b, 0, 0, 256, 192, C_UIBG); gerald(b, 128, 180, 4, GF_EARS | GF_FUR | GF_SNOUT | GF_COOL); for(int i = 0; i < 8; i++){ int y = 70 + (tt * 3 + i * 20) % 110; gfx_ell(b, 90 + (int)(hs(i) % 80), y, 3, 3, C_WHITE); } }
   else { gfx_rect(b, 0, 0, 256, 192, C_RED2); face(b, 128, 96, 16, GF_EARS | GF_FUR | GF_SNOUT); gfx_rect(b, 104, 112, 48, 6, C_BLACK); gfx_text_c(b, 128, 150, "LOAD-BEARING", C_GOLD, C_BLACK, 2); }
 }
+
+/* Squash-and-stretch close-up: all costume/fur and stylized comic linework.
+   Draws only into the existing 256x192 8-bit buffer, no image assets. */
+static void gag_rear(u8 *b,int cx,int cy,int z,int tt,int wolf){
+  int wig=wv(tt,28,3*z),bob=iabs(wv(tt,28,2*z));
+  u8 cloth=wolf?C_GRAY:C_RED,shade=wolf?C_DARK:C_RED2;
+  gfx_ell(b,cx,cy,35*z,29*z,C_BLACK);
+  gfx_ell(b,cx,cy,33*z,27*z,C_UIHI);
+  gfx_ell(b,cx,cy+2*z,31*z,25*z,C_DARK);
+  gfx_ell(b,cx-13*z-wig,cy+5*z+bob,16*z,19*z,C_BLACK);
+  gfx_ell(b,cx+13*z+wig,cy+5*z+bob,16*z,19*z,C_BLACK);
+  gfx_ell(b,cx-13*z-wig,cy+4*z+bob,15*z,17*z,cloth);
+  gfx_ell(b,cx+13*z+wig,cy+4*z+bob,15*z,17*z,shade);
+  gfx_ell(b,cx-19*z-wig,cy-2*z+bob,6*z,5*z,wolf?C_CLOUD2:C_RED);
+  gfx_ell(b,cx+7*z+wig,cy-2*z+bob,6*z,5*z,wolf?C_GRAY:C_PINK);
+  gfx_rect(b,cx-30*z,cy-13*z+bob,60*z,5*z,C_BLACK);
+  gfx_rect(b,cx-28*z,cy-13*z+bob,56*z,3*z,wolf?C_CLOUD2:C_WHITE);
+  gfx_rect(b,cx-28*z,cy-10*z+bob,56*z,z,wolf?C_DARK:C_RED2);
+  gfx_tline(b,cx,cy-6*z+bob,cx+wig/2,cy+20*z+bob,z,C_BLACK);
+  gfx_tline(b,cx-25*z,cy+13*z+bob,cx-10*z,cy+20*z+bob,1,C_WHITE);
+  gfx_tline(b,cx+11*z,cy+19*z+bob,cx+26*z,cy+12*z+bob,1,C_PINK);
+  if(wolf){
+    int tip=cx+29*z+wv(tt,18,9*z);
+    gfx_tline(b,cx+20*z,cy-11*z,tip,cy-23*z+bob,4*z,C_BLACK);
+    gfx_tline(b,cx+20*z,cy-12*z,tip,cy-24*z+bob,2*z,C_GRAY);
+    gfx_ell(b,tip,cy-24*z+bob,3*z,3*z,C_CLOUD2);
+  }
+  for(int i=0;i<4;i++){
+    int a=tt<14?tt*3:36,xx=cx+(i&1?1:-1)*(30*z+a);
+    gfx_line(b,xx,cy-12*z+i*8*z,xx+(i&1?7:-7)*z,cy-10*z+i*8*z,C_GOLD);
+  }
+}
+/* Plunger comedy: the rubber cup touches clothing, then springs off it.
+   The prop never enters clothing, the body, or anything else. */
+static void gag_plunger(u8 *b,int x,int y,int z,int tt){
+  int contact=tt<22?tt:22,retreat=tt>28?(tt-28)*3:0;
+  if(retreat>90)retreat=90;
+  int cup=x+28*z+18*z-contact*z/2+retreat;
+  int end=cup+24*z+wv(tt,28,2*z);
+  gfx_tline(b,cup,y+7*z,end,y-9*z,3*z,C_DIRT2);
+  gfx_tline(b,cup,y+7*z,end,y-9*z,1,C_GOLD2);
+  gfx_ell(b,cup,y+7*z,7*z,5*z,C_BLACK);
+  gfx_ell(b,cup-2*z,y+6*z,5*z,3*z,C_PINK);
+  if(tt>28&&tt<51){
+    gfx_text(b,cup-7*z,y-23*z,"BOING!",C_GOLD,1);
+    gfx_line(b,cup,y-5*z,cup+8*z,y-15*z,C_WHITE);
+  }
+}
 static void w_tail(u8 *b, int k, int tt){
   stars_night(b); gfx_rect(b, 0, 150, 256, 42, C_DARK);
   if(k == 0){ gerald(b, 128, 176, 4, GF_EARS | GF_FUR | GF_SNOUT | GF_COOL); gfx_text_c(b, 128, 20, "RRRIP.", C_GOLD, C_BLACK, 2); }
   else if(k == 1){ gerald(b, 120, 176, 4, GF_EARS | GF_FUR | GF_SNOUT | GF_TAIL | GF_COOL); gfx_text_c(b, 128, 20, "PANTS: OPTIONAL", C_WHITE, C_BLACK, 2); }
-  else { gfx_ell(b, 128, 110, 46, 40, C_GRAY); gfx_ell(b, 128, 150, 40, 6, C_DARK); gfx_ell(b, 128 + wv(tt, 16, 14), 100, 14, 14, C_CLOUD2); gfx_text_c(b, 128, 20, "ROUND. FURRY. FREE.", C_GOLD, C_BLACK, 2); }
+  else {
+    gfx_rect(b,0,0,256,192,C_RED2);
+    rays(b,128,100,tt/2,12,C_RED);
+    gag_rear(b,115,104,2,tt,1);
+    if(tt<80)gag_plunger(b,115,104,1,tt);
+    gfx_rect(b,5,19,246,18,C_BLACK);
+    gfx_text_c(b,128,23,"EXTREME REAR VIEW",C_GOLD,C_BLACK,2);
+    gfx_text_c(b,128,172,tt<90?"WARNING: WIGGLE ZONE":"TAIL: UNLICENSED",C_WHITE,C_BLACK,1);
+  }
 }
 static void w_howl(u8 *b, int k, int tt){
   stars_night(b);
@@ -674,7 +734,13 @@ static void e1_street(u8 *b, int k, int tt){
   if(k == 0){ brenda(b, 100, 176, 3, tt, 0); spr_man(b, 190, 130, 6, 1, POSE_FLEX, tt >> 3); bubble(b, 90, 16, "YOU DID IT, GERALD!", 0); }
   else if(k == 1){ brenda(b, 60, 186, 4, tt, 1); spr_man(b, 170, 140, 8, 1, POSE_IDLE, tt >> 3); for(int i = 0; i < 4; i++) gfx_text(b, 100 + i * 20 + wv(tt + i * 9, 50, 6), 70 - ((tt + i * 26) % 60), "<3", C_PINK, 2);
     bubble(b,60,14,"NICE PACKAGE, GERALD.",0);if(tt>80)bubble(b,190,56,"THE BELLY, I MEAN.",0);}
-  else { spr_man(b, 128, 136, 8, 1, POSE_FLEX, tt >> 3); bubble(b, 128, 12, "RENT IS CANCELLED!", 0); }
+  else {
+    spr_man(b,128+wv(tt,32,3),136-iabs(wv(tt,28,3)),8,1,(tt/20)&1?POSE_IDLE:POSE_FLEX,tt>>3);
+    gag_rear(b,213,112,1,tt,0);
+    if(tt<72)gag_plunger(b,213,112,1,tt);
+    bubble(b,128,12,"RENT IS CANCELLED!",0);
+    gfx_text_c(b,213,159,"ENCORE!",C_GOLD,C_BLACK,1);
+  }
 }
 static void e1_letter(u8 *b, int k, int tt){
   stars_night(b); night_hills(b, 150);
@@ -713,7 +779,12 @@ static void e2_dusk(u8 *b, int k, int tt){
   gfx_rect(b, 0, 164, 256, 28, C_UIBG); confetti(b, tt, 16);
   for(int i = 0; i < 6; i++) folk(b, 16 + i * 44, 180 + (i & 1) * 6, tt + i * 9, col[i], i % 3 == 0);
   if(k == 0){ pizza(b, 150, 176, 3); spr_man(b, 100, 140, 6, 1, POSE_IDLE, tt >> 3); bubble(b, 150, 16, "BEST PIZZA OF MY LIFE.", 0); }
-  else if(k == 1){ spr_man(b, 110, 142, 7, 1, POSE_FLEX, tt >> 3); bubble(b, 160, 16, "EVICTION COMPLETE.", 0); }
+  else if(k==1){
+    spr_man(b,110+wv(tt,30,3),142-iabs(wv(tt,26,3)),7,1,(tt/18)&1?POSE_FLEX:POSE_IDLE,tt>>3);
+    gag_rear(b,211,119,1,tt+13,0);
+    bubble(b,160,16,"EVICTION COMPLETE.",0);
+    gfx_text_c(b,210,159,"NO CAMERAS!",C_GOLD,C_BLACK,1);
+  }
   else { spr_man(b, 90, 146, 7, 1, POSE_SAD, tt >> 3); bubble(b, 90, 12, "...HUH. WEIRD MOON.", 0); }
 }
 
