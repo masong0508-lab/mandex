@@ -5,6 +5,12 @@
 #define CK(c) do{if(!(c)){fprintf(stderr,"FAIL meter line %d\n",__LINE__);return 1;}}while(0)
 int main(void){
  MxFpsMeter m={0};
+ CK(mx_fps_catchup_steps(1,50000)==1);
+ CK(mx_fps_catchup_steps(2,50000)==2);
+ CK(mx_fps_catchup_steps(3,50000)==3);
+ CK(mx_fps_catchup_steps(3,150000)==2);
+ CK(mx_fps_catchup_steps(2,200000)==1);
+ CK(mx_fps_catchup_steps(5,10000)==1);
  for(int i=0;i<120;i++)mx_fps_meter_add(&m,1,60,1,1);
  CK(m.render_x10==600&&m.sim_x10==600&&m.last_dropped==0);
  for(int i=0;i<60;i++)mx_fps_meter_add(&m,2,60,1,1);

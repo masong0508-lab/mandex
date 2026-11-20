@@ -27,4 +27,14 @@ static inline void mx_fps_meter_add(MxFpsMeter *m, unsigned elapsed,
     m->max_gap_ticks=0;
   }
 }
+/* When the ARM9 misses a VBlank, the DS may submit 30 visible frames while
+ * only simulating 30 fixed 60-Hz steps. Run a bounded number of actual fixed
+ * steps only if the last physics update was cheap enough. One long stall should
+ * never trigger a huge backlog (which would itself stall rendering). */
+static inline unsigned mx_fps_catchup_steps(unsigned vblank_gap,
+                                            unsigned prior_phys_ticks){
+  if(vblank_gap<2u || vblank_gap>4u || prior_phys_ticks>=200000u)return 1u;
+  if(vblank_gap>=3u && prior_phys_ticks<95000u)return 3u;
+  return 2u;
+}
 #endif

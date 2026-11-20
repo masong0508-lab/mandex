@@ -1332,6 +1332,7 @@ int main(void){
     }
 
     /* ---------------- simulation ---------------- */
+    int sim_steps_done=0;
     if(app == ST_PLAY){
       /* idle gags: only while he waits in the sling and nobody is touching anything */
       if(world.man.mode == MAN_AIM && !dragging && !pad_used && world.banner <= 0 && world.state == MX_PLAY && !(down | held)){
@@ -1344,10 +1345,33 @@ int main(void){
       { int aim = world.man.mode == MAN_AIM && world.state == MX_PLAY;       /* the start tool is armed once each time he is back in the sling; a later tap on a power-up button still wins */
         if(aim && !was_aim){ int pw = mx_tool_power(opt.tool); if(pw && world.pw_sel != pw) mx_select_power(&world, pw); }
         was_aim = aim; }
+      /* Target one simulation tick per ARM7 VBlank rather than per completed
+         picture. Catch up only 2-3 small fixed steps when the solver has room.
+         Events must be consumed after EACH step, or explosions and rewards
+         from intermediate updates would be overwritten by the next step. */
+      unsigned requested_steps=1;
+#ifdef MX_BARE_NDS_H
+      {
+        static u16 last_sim_vblank;
+        static int sim_clock_ready;
+        u16 now=MX_IPC->alive;
+        if(sim_clock_ready){
+          unsigned elapsed=(u16)(now-last_sim_vblank);
+          requested_steps=mx_fps_catchup_steps(elapsed,(unsigned)phys_ticks);
+        }else sim_clock_ready=1;
+        last_sim_vblank=now;
+      }
+#endif
       DS_PERF_MARK(1);
       cpuStartTiming(0);
-      mx_update(&world, DT);
-      phys_ticks = (int)cpuEndTiming();
+      for(unsigned step=0;step<requested_steps;step++){
+        if(world.state!=MX_PLAY)break;
+        mx_update(&world,DT);
+        sim_steps_done++;
+        on_events();
+        mx_meta_events(&stats,&world);
+      }
+      phys_ticks=(int)cpuEndTiming();
       DS_PERF_MARK(2);
       /* adaptive quality: fewer substeps when the solver eats too much of the frame, more when there is headroom */
       /* order of sacrifice when the solver is slow: collapsible buildings first (the cheapest thing to lose), then chunk substeps, then the wobble lattice;
@@ -1368,8 +1392,6 @@ int main(void){
           else if(world.substeps < MX_DS_MAX_SUBSTEPS) mx_set_substeps(&world, world.substeps + 1);
           else if(coll_shed && opt.collapse){ coll_shed = 0; mx_set_collapse(&world, 1); } } }
       else { slow_frames = 0; fast_frames = 0; }
-      on_events();
-      mx_meta_events(&stats, &world);
       for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0);
       update_parts();
       if(world.state != MX_PLAY){
@@ -1500,7 +1522,7 @@ int main(void){
     draw_ticks=ds_draw_top_ticks+ds_draw_bot_ticks;
     present(bot_dirty);
     DS_PERF_MARK(6);
-    ds_fps_complete(app==ST_PLAY);
+    ds_fps_complete(sim_steps_done);
   }
   return 0;
 }
