@@ -3388,17 +3388,30 @@ function cutShirtBack(mode){const OU='#5a2f1b';ctx.save();ctx.lineJoin='round';c
   ctx.restore()}
 // Gerald: the same body, no cape, khaki shorts (or boxers), optional tie.  feetY = where his feet land
 function cutGerald(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;setFur(WOLF);if(o.wolf>=3){BR='#8c909e';BRD='#656979'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
-  const op={nocape:true},T=cutT;if(o.belly)op.belly=o.belly;op.head=o.head||[Math.sin(T*1.3)*.5,Math.sin(T*2.6)*.5,Math.sin(T*1.1)*.035];
+  const op={nocape:true},T=cutT;if(o.belly)op.belly=o.belly;const breath=Math.sin(T*1.6);op.head=o.head||[breath*.34,-breath*.5,breath*.012];
   if(o.armL){op.armL=o.armL;op.armR=o.armR}
   else if((o.pose||'up')==='up'){const a=Math.sin(T*2.1),b=Math.sin(T*2.1+1.2);op.armL=[-35-a*1.2,-12+b*1.5,-33-a*2.2,-34+b*3];op.armR=[35+a*1.2,-12+b*1.5,33+a*2.2,-34+b*3]}   // arms drift with the breathing
   if(o.walk!=null){const ph=o.walk;for(const q of[-1,1]){const w=ph+(q>0?Math.PI:0),sn=Math.sin(w),lf=Math.max(0,Math.cos(w));const L=[q*(12+3*sn),39-lf*3,q*(13+9*sn),55-lf*7];if(q<0)op.legL=L;else op.legR=L}}const shm=o.wolf>=3||o.noshirt?0:(o.shirt!=null?o.shirt:(CUTS&&CUTS[cutI]&&CUTS[cutI].shirt!=null?CUTS[cutI].shirt:1)),ti=o.tie;if(shm||ti)op.after=()=>{if(shm)cutShirt(shm);if(ti)cutTie()};WOLFH=o.wolf&&o.wolf<3?o.wolf:0;
-  const bz=Math.sin(cutT*3.1)*.012+(o.sq||0);ctx.save();ctx.translate(x+(o.dx||0),feetY-48*s+(o.dy||0));ctx.scale(s*(1-bz*.6),s*(1+bz));drawFront(o.pose||'up',o.face||'cool',cutT*.8+.3,op);ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf;WOLFH=0;setFur(WOLF)}
+  const bz=breath*.006+(o.sq||0);
+  // On wide shots, the feet share a real contact shadow with the ground.
+  if(feetY>=350&&feetY<=445&&o.shadow!==false)cgShadow(x+(o.dx||0),feetY+2,18*s,3.2*s,.22);
+  ctx.save();ctx.translate(x+(o.dx||0),feetY-48*s+(o.dy||0));
+  ctx.scale(s*(1-bz*.25),s*(1+bz*.4));
+  drawFront(o.pose||'up',o.face||'cool',cutT*.8+.3,op);ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf;WOLFH=0;setFur(WOLF)}
 function cutFlag(k,f){const b=1<<k;if(!(cutFx&b)){cutFx|=b;f()}}
 function cutWork(f){applyOutfit(outfitById('workman'),time);try{f()}finally{applyOutfit(outfitCur,time)}}
-function cutGear(x,fy,s,t){if(t>.7)cutFlag(10,()=>SFX.thud(.6));if(t>1.3)cutFlag(11,()=>SFX.thud(.6));if(t>1.9)cutFlag(12,()=>SFX.thud(.7));ctx.save();ctx.translate(x,fy-48*s);ctx.scale(s,s);const e=u=>{u=Math.max(0,Math.min(1,u));return 1-Math.pow(1-u,3)};
- ctx.save();ctx.translate(-480*(1-e((t-.7)/.6)),0);if(t>.7)workVestF({});ctx.restore();
- ctx.save();ctx.translate(480*(1-e((t-1.3)/.6)),0);if(t>1.3){const yc=x=>13+4.6*(1-(x/21)*(x/21));workBeltF()}ctx.restore();
- ctx.save();ctx.translate(0,-320*(1-e((t-.1)/.6)));workHatF();ctx.restore();ctx.restore()}
+function cutGear(x,fy,s,t){
+  if(t>.7)cutFlag(10,()=>SFX.thud(.6));
+  if(t>1.3)cutFlag(11,()=>SFX.thud(.6));
+  if(t>1.9)cutFlag(12,()=>SFX.thud(.7));
+  ctx.save();ctx.translate(x,fy-48*s);ctx.scale(s,s);
+  const ease=u=>{u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)};
+  // Costume follows physical body anchors, not a cloud of flying pieces.
+  if(t>.7){ctx.save();ctx.translate(0,-14*(1-ease((t-.7)/.42)));workVestF({});ctx.restore()}
+  if(t>1.3){ctx.save();ctx.translate(0,-8*(1-ease((t-1.3)/.36)));workBeltF();ctx.restore()}
+  if(t>1.9){ctx.save();ctx.translate(0,-20*(1-ease((t-1.9)/.4)));workHatF();ctx.restore()}
+  ctx.restore();
+}
 // ---- CUTSCENE ART (v2): shaded, outlined, textured backdrops and props.  Everything is drawn live with the same chunky dark outline the characters use.
 const CO='#3b2418';
 const cgRnd=i=>{const v=Math.sin(i*127.1+311.7)*43758.5453;return v-Math.floor(v)};
@@ -3642,14 +3655,22 @@ function cgDebris(t,gy,n){ctx.save();for(let i=0;i<n;i++){const ph=(t*.6+i*.173)
 // a hard cut with a short flash between them.  cuts = start time of each shot; shake / tilt = optional per-shot kick and dutch angle.
 // framing rule: the caption box covers y>406, so a close-up puts the face at y~205: feetY = 205 + 91*scale.
 function cgK(c,t){let k=0;for(let j=0;j<c.length;j++)if(t>=c[j])k=j;return k}
-function cutCam(i,t){const S=CUTS[i],c=S.cuts,k=cgK(c,t),dt=Math.max(0,t-c[k]),sk=((S.shake||[])[k]||0)*Math.exp(-5*dt),r=(S.tilt||[])[k]||0;
-  const pu=S.push!=null?S.push:.016,pn=(S.pan||[])[k]||[0,0];
-  // Ease into a deliberate dolly move, then drift. No re-layout of hand-composed character shots.
-  const glide=dt-(1-Math.exp(-dt*2.5))/2.5, push=(1-Math.exp(-dt*.85))/.85;
-  return{z:1.035+Math.abs(r)*2.4+Math.min(.18,pu*push)+Math.sin(t*1.1)*.002,
-    x:480+pn[0]*glide+Math.sin(t*.7)*.65,y:270+pn[1]*glide+Math.cos(t*.6)*.4,
-    r:r+Math.sin(dt*.9)*.0015,sx:Math.sin(t*93)*sk,sy:Math.cos(t*71)*sk,
-    fl:k>0?Math.max(0,.38*(1-dt/.13)):0}}
+function cutCam(i,t){
+  const S=CUTS[i],cuts=S.cuts||[0],shot=cgK(cuts,t),age=Math.max(0,t-cuts[shot]);
+  const impact=Math.min(12,Math.max(0,((S.shake||[])[shot]||0)));
+  const pan=(S.pan||[])[shot]||[0,0];
+  // Protect the hand-composed staging: minimal dolly, no continuous jitter,
+  // no automatic camera zoom on every cut. Brief impacts decay to stillness.
+  const approach=1-Math.exp(-age*.9),recoil=Math.exp(-age*11)*impact*.24;
+  const push=Math.min(.012,Math.max(0,(S.push==null?.008:S.push)*.6))*approach;
+  return {z:1+push,
+    x:480+Math.max(-7,Math.min(7,pan[0]*Math.min(age,1.8)*.12)),
+    y:270+Math.max(-5,Math.min(5,pan[1]*Math.min(age,1.8)*.12)),
+    r:Math.max(-.006,Math.min(.006,((S.tilt||[])[shot]||0)*.08))*Math.exp(-age*1.8),
+    sx:Math.sin(age*23)*recoil,sy:Math.cos(age*19)*recoil*.65,
+    fl:shot>0&&impact>=6?Math.max(0,.14*(1-age/.16)):0
+  };
+}
 // Gerald seen from behind (over-the-shoulder shots)
 function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;setFur(WOLF);if(o.wolf>=3){BR='#8c909e';BRD='#656979'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
   ctx.save();ctx.translate(x,feetY-48*s);ctx.scale(s,s);drawBack(null,cutT*.8+.3,{noflag:true});WOLFH=o.wolf&&o.wolf<3?o.wolf:0;if(!(o.wolf>=3)&&!o.noshirt){const sm=o.shirt!=null?o.shirt:(CUTS&&CUTS[cutI]&&CUTS[cutI].shirt!=null?CUTS[cutI].shirt:1);if(sm){ctx.save();ctx.translate(0,3);ctx.beginPath();ctx.rect(-40,-25,80,60);ctx.clip();cutShirtBack(sm);ctx.restore()}}ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
@@ -3699,7 +3720,8 @@ const CUT=[
    if(k===0){cgSky('#4aa8f5','#e9f6ff',395);cgSun(840,84,36,t);cgHills(395,'#8fd0a0','#6cbb7e','#4ea35c');cutCloud(150+t*6,90,1.1);cutCloud(520+t*4,58,.85);cutCloud(760+t*3,150,.7);
      cgGrass(395,145,'#79c26a','#3f8a3c');ctx.fillStyle=cgLG(0,395,0,H,[0,'#d9d2c0',1,'#b8b09a']);ctx.beginPath();ctx.moveTo(528,395);ctx.lineTo(580,395);ctx.lineTo(650,H);ctx.lineTo(420,H);ctx.fill();
      cutTree(76,396,1.15);cutHouse(560,395);cutFence(410,548,396);cutFence(806,960,396);cgMailbox(380,398);cgBrenda(611,330,t);
-     const wx=Math.min(290,-80+t*230);cutGerald(wx,395,1.7,{tie:1,face:'cool',walk:wx<290?t*11:null,dy:wx<290?-Math.abs(Math.sin(t*11))*4:0,armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-27,-8,-26,16]})}
+     const u=Math.min(1,Math.max(0,t/1.7)),arrive=u*u*(3-2*u),wx=-80+370*arrive;
+      cutGerald(wx,395,1.7,{tie:1,face:'cool',walk:u<1?arrive*18:null,dy:u<1?-Math.abs(Math.sin(arrive*18))*3:0,armR:[40,-22,46,-46+Math.sin(t*3)*4],armL:[-27,-8,-26,16]})}
    else if(k===1){cgSky('#2d7fe0','#bfe3ff',420);cgSun(170,110,42,t);cutCloud(520+t*5,80,1.7);cutCloud(820,180,1.2);cutCloud(300,230,.9);cgHills(430,'#8fd0a0','#6cbb7e','#4ea35c');
      ctx.save();ctx.translate(790,432);ctx.scale(.5,.5);cutHouse(0,0);ctx.restore();cutTree(110,452,2.2);cgGrass(432,120,'#79c26a','#3f8a3c');
      cutGerald(450,560,3.1,{tie:1,face:'cool',armR:[40,-22,46,-46+Math.sin(t*6)*7],armL:[-27,-8,-26,16]});cutBubble(700,150,"Honey, I'm home!",0)}
@@ -3786,10 +3808,14 @@ const CUT=[
 [3.2,5,3.6,3.6,3.4,3,4.5,3.2].forEach((h,i)=>{if(CUT[i])CUT[i].hold=h});
 function cutClassic(f){applyOutfit(outfitById('classic'),time);try{f()}finally{applyOutfit(outfitCur,time)}}
 // scene-to-scene transitions: fade, white, wipe (with a yellow edge), iris, or a straight cut
-function cutTrans(tr,t){if(t>=.5||tr==='cut')return;const u=t/.5;
- if(tr==='wipe'){ctx.fillStyle='#000';ctx.fillRect(u*W,0,W-u*W,H);ctx.fillStyle='#ffd23f';ctx.fillRect(u*W-4,0,4,H)}
- else if(tr==='iris'){ctx.beginPath();ctx.rect(0,0,W,H);ctx.arc(480,270,u*u*620+1,0,7);ctx.fillStyle='#000';ctx.fill('evenodd')}
- else{ctx.fillStyle=(tr==='white'?'rgba(255,255,255,':'rgba(0,0,0,')+(1-u)+')';ctx.fillRect(0,0,W,H)}}
+function cutTrans(tr,t){
+  // A stable held fade, rather than moving wipes/irises that turn interiors
+  // into seemingly unrelated rooms between adjacent compositions.
+  if(t>=.34||tr==='cut')return;
+  const fade=(1-t/.34)*(1-t/.34);
+  ctx.fillStyle=tr==='white'?'rgba(255,255,255,'+fade+')':'rgba(8,10,20,'+fade+')';
+  ctx.fillRect(0,0,W,H);
+}
 ['fade','wipe','wipe','iris','white','cut','cut','iris'].forEach((v,i)=>{if(CUT[i])CUT[i].tr=v});
 [1,1,1,2,2,2,0,0].forEach((v,i)=>{if(CUT[i])CUT[i].shirt=v});
 
@@ -3944,10 +3970,11 @@ const CUT3=[
  // 1. the walk: the moon is doing something unreasonable
  {shirt:2,lines:["One week after Landlord HQ. Mandex took the night off.","Gerald took a walk. In a shirt. Brenda would have wept.","Above him, the moon was doing something unreasonable."],hl:2,cuts:[0,2.8],tr:'fade',hold:3.6,shake:[0,3],draw(t){const k=cgK(this.cuts,t);
    cgSky('#0a0d24','#2a3060',395);for(let i=0;i<46;i++)cgE(cgRnd(i)*W,cgRnd(i+50)*320,1+cgRnd(i+9)*1.3*(.6+.4*Math.sin(t*3+i)),1.4,'#fff');
-   const mr=k===0?58+t*8:120+(t-2.8)*14;cgMoon(k===0?760:500,k===0?140:170,mr,t);
+   const mr=k===0?58+Math.min(12,t*5):122+Math.min(8,Math.max(0,t-2.8)*2);cgMoon(k===0?760:500,k===0?140:170,mr,t);
    cgHills(395,'#14183a','#10132e','#0c0e24');cgNightTown(t);
    if(k===0){ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);cgGrass(395,145,'#1d3a2c','#0f2218');
-     const wx=-80+t*150;cgShadow(wx,396,50,7,.4);cutGerald(wx,395,1.7,{walk:t*9,dy:-Math.abs(Math.sin(t*9))*4,face:'cool',pose:'up'});
+     const walk=Math.min(1,Math.max(0,t/2.8)),wx=-80+420*walk;
+      cutGerald(wx,395,1.7,{walk:walk*16,dy:-Math.abs(Math.sin(walk*16))*3,face:'cool',pose:'up'});
      if(t>1.9)cutBubble(Math.min(wx+170,820),230,"Nice night.",0)}
    else{ctx.fillStyle='#10132a';ctx.fillRect(0,420,W,H-420);const u=t-2.8;
      // a tiny wolf on the hill starts to howl, and its tail wags
@@ -3977,7 +4004,15 @@ const CUT3=[
    cutGerald(480,392,2.5,{face:k>=3?'cool':'sad',pose:'up',wolf:st,shirt:3,sq:boing,dy:k===3?-Math.abs(Math.sin(u*18))*10*Math.exp(-u*2):0});
    if(k===0){cutBubble(740,120,"AH-CHOO!",0,28)}
    else if(k===1){cutFlag(2,()=>SFX.thud(.5));cutBubble(740,120,"My... ears?",0)}
-   else if(k===2){cutFlag(3,()=>SFX.thud(.5));for(let i=0;i<5;i++){const a=u*(1.4+i*.3),x=480+(i-2)*34+u*(i-2)*260,y=330-u*210+u*u*480;ctx.fillStyle='#fff';ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(x,y,5,0,6.3);ctx.fill();ctx.stroke()}   // buttons
+   else if(k===2){cutFlag(3,()=>SFX.thud(.5));
+      // Ejected buttons start at the coat seam on the torso and follow
+      // a short ballistic arc instead of materializing near the waist.
+      for(let i=0;i<5;i++){
+        const p=Math.min(1.25,Math.max(0,u-.08-i*.045));
+        const x=480+(i-2)*9+(i-2)*70*p,y=269+(i%2)*10-p*(100+(i%3)*18)+p*p*175;
+        ctx.fillStyle='#fff';ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.3;
+        ctx.beginPath();ctx.arc(x,y,4.4,0,6.2832);ctx.fill();ctx.stroke();
+      }
      cutBubble(740,120,"My... nose?",0)}
    else{cutFlag(4,()=>{SFX.whoosh();SFX.thud(.9)});ctx.fillStyle='rgba(255,255,235,'+Math.max(0,.8-u*2)+')';ctx.fillRect(0,0,W,H);
      for(let i=0;i<10;i++){const a=i*.7,x=480+Math.cos(a)*(30+u*240)*(i%2?1:-1),y=300+Math.sin(a*2)*30-u*70+u*u*200;ctx.save();ctx.translate(x,y);ctx.rotate(u*(4+i)*(i%2?1:-1));ctx.fillStyle=i%3?'#f6f9ff':'#2a4d9c';ctx.strokeStyle='#5a2f1b';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-12,-6);ctx.lineTo(10,-9);ctx.lineTo(13,5);ctx.lineTo(-6,10);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}
@@ -4140,71 +4175,26 @@ function cutPixelBadge(id,x,y,sz,col){
 function cutGraphicDirection(sc,t){
   const mode=CUTS===CUT3?1:CUTS===CUT_E1?2:CUTS===CUT_E2?3:0;
   const info=CUT_CARD_DATA[mode][cutI]||CUT_CARD_DATA[0][0];
-  const idx=CUT_CARD_ICONS[mode][cutI]||0;
-  const beat=cgK(sc.cuts||[0],t),beg=(sc.cuts||[0])[beat]||0,elapsed=t-beg;
-  const col=mode===1?'#ff90b2':mode===3?'#cbb2ff':'#ffd45b';
+  const cuts=sc.cuts||[0],shot=cgK(cuts,t),age=Math.max(0,t-cuts[shot]);
+  const accent=mode===1?'#e7a9cf':mode===3?'#d3b9ea':'#edce82';
   ctx.save();
-  // Staggered print edges are a purposeful comic-book framing device.
-  ctx.strokeStyle='rgba(255,220,140,.32)';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(11,48);ctx.lineTo(11,H-35);ctx.moveTo(W-11,48);ctx.lineTo(W-11,H-35);ctx.stroke();
-  ctx.fillStyle=col;ctx.fillRect(11,49,3,50);ctx.fillRect(W-14,49,3,50);
-  // The editorial art card slides in at the start, then recedes before
-  // its title can obscure dialogue or the principal character.
-  if(t<1.55){
-    const intro=Math.min(1,t/.32),out=Math.max(0,(t-1.16)/.39);
-    const eased=1-(1-intro)*(1-intro)*(1-intro);
-    const left=-296*(1-eased)-out*300+22;
-    const alpha=Math.max(0,1-out);
-    ctx.globalAlpha=alpha;
-    ctx.fillStyle='rgba(12,15,29,.88)';ctx.fillRect(left+3,51,276,73);
-    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.strokeRect(left,48,276,73);
-    cutPixelBadge(idx,left+14,62,45,col);
-    ctx.fillStyle=col;ctx.font='bold 11px monospace';ctx.textAlign='left';
-    ctx.fillText('MANDEX  /  '+(mode===1?'ACT III':mode===2?'ACT I':mode===3?'ACT II':'THE ORIGIN'),left+77,68);
-    ctx.fillStyle='#fff3db';ctx.font='900 18px sans-serif';ctx.fillText(info[0],left+77,91);
-    ctx.fillStyle='#c4c7cf';ctx.font='13px sans-serif';ctx.fillText(info[1],left+77,111);
-    // Film-perforation ticks and a tiny moving exposure glint.
-    for(let i=0;i<7;i++)ctx.fillRect(left+6+i*38,119,15,2);
-    ctx.fillStyle='#fff';ctx.fillRect(left+6+(t*106)%248,119,7,2);
-    ctx.globalAlpha=1;
-  }
-  // Printed filmstrip/shot number: useful visual navigation without clutter.
-  ctx.fillStyle='rgba(9,14,25,.76)';ctx.fillRect(W-161,52,146,30);
-  ctx.strokeStyle='rgba(255,255,255,.30)';ctx.lineWidth=1;ctx.strokeRect(W-161,52,146,30);
-  ctx.fillStyle=col;ctx.textAlign='left';ctx.font='bold 12px monospace';
-  ctx.fillText('SCENE '+String(cutI+1).padStart(2,'0')+' / '+String(CUTS.length).padStart(2,'0'),W-151,70);
-  // Individual cuts have ink swishes and a keyed impact card, not generic
-  // particles. This gives the storyboard a clear rhythm on a real render.
-  if(beat>0&&elapsed>=0&&elapsed<.32){
-    const fade=1-elapsed/.32;
-    ctx.globalAlpha=fade*.62;ctx.strokeStyle=col;ctx.lineWidth=2+fade*5;
-    for(let i=0;i<8;i++){
-      const y=36+i*57+(i%2)*11;
-      ctx.beginPath();ctx.moveTo(i%2?-80:W+80,y);ctx.lineTo(i%2?245:W-245,y-25);ctx.stroke();
-    }
-    ctx.globalAlpha=1;
-  }
-  const marks=[
-    ['HAPPILY EVER AFTER?','ASSETS AWARDED','$400 / HOUR','DAY NINE','RENT HIKE','SNAP!','BEHOLD!','EVICTION NOTICE'],
-    ['FULL MOON','BEST BEFORE','SNIFF','BOING!','RIP!','AWOOOO','BRENDA?!','WOLFMAN'],
-    ['TIMBER','A STREET PARTY','URGENT','CHAPTER CLEAR'],
-    ['NO INSURANCE','ICE-COLD COFFEE','PARTY TIME','CHAPTER CLEAR']
-  ];
-  if(beat>0&&elapsed<.70&&(sc.shake||[])[beat]>=3){
-    const pop=Math.min(1,elapsed/.13),fall=Math.max(0,(elapsed-.44)/.26);
-    ctx.globalAlpha=(1-fall)*.84;ctx.save();
-    ctx.translate(W-170,186);ctx.rotate(-.075+Math.sin(elapsed*11)*.015);
-    ctx.scale(.72+.28*pop,.72+.28*pop);
-    ctx.fillStyle='#280e17';ctx.fillRect(-167,-30,334,61);
-    ctx.strokeStyle=col;ctx.lineWidth=4;ctx.strokeRect(-165,-28,330,57);
-    ctx.textAlign='center';ctx.font='900 26px sans-serif';ctx.fillStyle='#fff5c8';ctx.fillText(marks[mode][cutI],0,9);
-    ctx.restore();ctx.globalAlpha=1;
+  // Quiet cinematography labels instead of flying comic cards and swishes.
+  ctx.fillStyle='rgba(7,11,21,.73)';ctx.fillRect(18,26,280,25);
+  ctx.fillStyle=accent;ctx.fillRect(18,26,3,25);
+  ctx.fillStyle='#f7eede';ctx.textAlign='left';ctx.font='bold 13px sans-serif';
+  ctx.fillText(info[0],29,43);
+  ctx.fillStyle='rgba(8,12,22,.72)';ctx.fillRect(W-133,26,115,25);
+  ctx.fillStyle=accent;ctx.font='bold 11px monospace';
+  ctx.fillText('SHOT '+(shot+1)+' / '+cuts.length,W-121,43);
+  const impact=(sc.shake||[])[shot]||0;
+  if(shot>0&&impact>=6&&age<.12){
+    ctx.fillStyle='rgba(255,236,194,'+(.13*(1-age/.12))+')';
+    ctx.fillRect(0,0,W,H);
   }
   ctx.restore();
 }
-
 function drawCutscene(){
-  const sc=CUTS[cutI],cs=cutCam(cutI,cutT);ctx.save();ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);ctx.translate(-cs.x,-cs.y);sc.draw(cutT);ctx.restore();cutDust(cutT);cutVig();cutGraphicDirection(sc,cutT);
+  const sc=CUTS[cutI],cs=cutCam(cutI,cutT);ctx.save();ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);ctx.translate(-cs.x,-cs.y);sc.draw(cutT);ctx.restore();cutVig();cutGraphicDirection(sc,cutT);
   if(cs.fl>0){ctx.fillStyle='rgba(255,255,255,'+cs.fl+')';ctx.fillRect(0,0,W,H)}
   const bar=16*Math.min(1,cutT*3);ctx.fillStyle='#000';ctx.fillRect(0,0,W,bar);ctx.fillRect(0,H-bar,W,bar);cutTrans(sc.tr,cutT);
   // A short, inexpensive comic-panel impact treatment on strong camera beats.

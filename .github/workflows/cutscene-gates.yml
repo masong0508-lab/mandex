@@ -37,6 +37,8 @@ jobs:
           }
           console.log('Browser cutscene JavaScript syntax: OK');
           NODE
+      - name: Film camera and physically anchored animation regression
+        run: node test/cutscene_camera_test.js
       - name: Pixel-perfect console drawing regressions
         run: |
           gcc -std=gnu99 -O2 -DMX_FIXED -Itest/stubs -Icore -Ids/source -Iart test/gfx_clip_test.c ds/source/gfx.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_gfx_clip_test
