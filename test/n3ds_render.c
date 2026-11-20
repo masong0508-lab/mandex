@@ -112,6 +112,18 @@ static int n3_fastpath_probe(void){
   gfx_pal[29]^=0x1f;
   blit_pal(&top,indices);
   printf("N3_FAST_PALETTE_ANIM=%08x\n",n3_hash(fb_top[0],sizeof fb_top[0]));
+  /* Disc/ring primitive: radius 0 through 45, coordinates inside and
+     deliberately beyond all four edges. Reference/optimized code must
+     generate the identical BGR8 column-major framebuffer. */
+  memset(fb_top,0,sizeof fb_top);
+  top.fb=fb_top[0]; top.w=400; top.h=240;
+  for(int r=0;r<=45;r++){
+    disc(&top, (r*37)%450-25, (r*41)%292-26, r,
+         RGB((r*11)&255,(r*17)&255,(r*23)&255));
+    disc(&top, 396-r*3, 237-r, r/2,
+         RGB((r*29)&255,(r*7)&255,(r*13)&255));
+  }
+  printf("N3_FAST_CIRCLES=%08x\n",n3_hash(fb_top[0],sizeof fb_top[0]));
   load_level(0);
   mx_set_pull(&world,R(-9),R(5));
   dragging=1;
