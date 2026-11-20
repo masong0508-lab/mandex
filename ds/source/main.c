@@ -465,7 +465,7 @@ static void draw_rooms(const View *v){
         x++;
       }
       int n=x-first,sx=first*ppc-v->cx;
-      if(n<5||sx<0||sy<0||sx+n*ppc>256||sy+ppc>192){
+      if(n<10||sx<0||sy<0||sx+n*ppc>256||sy+ppc>192){
         for(int k=0;k<n;k++)gfx_wall(v,pal,sx+k*ppc,sy);
         continue;
       }
