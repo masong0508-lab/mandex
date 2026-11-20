@@ -108,18 +108,18 @@ int  intro_scene(void){ return sc; }
 
 /* sound cues, frame exact */
 static void cue(void){
-  if(mode == 2){ switch(sc){ case 0: if(t == 0) sfx_play(SFX_BOOM, 64); if(t == 156) sfx_play(SFX_EEK, 64); break; case 1: if(t == 0) sfx_play(SFX_WIN, 64); if(t == 132) sfx_play(SFX_POP, 64); if(t == 260) sfx_play(SFX_BOING, 64); break; case 2: if(t == 8) sfx_play(SFX_THUD, 64); if(t == 96) sfx_play(SFX_CLICK, 64); break; default: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
-  if(mode == 3){ switch(sc){ case 0: if(t == 144) sfx_play(SFX_THUD, 64); if(t == 252){ sfx_play(SFX_BOOM, 64); sfx_play(SFX_CRUNCH, 64); } break; case 1: if(t == 144) sfx_play(SFX_EEK, 64); break; case 2: if(t == 0) sfx_play(SFX_WIN, 64); if(t == 276) sfx_play(SFX_TARGET, 64); break; default: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
-  if(wolf){ switch(sc){ case 0: if(t == 168) sfx_play(SFX_TAUNT, 64); break; case 1: if(t == 90) sfx_play(SFX_POP, 64); break; case 2: if(t == 156) sfx_play(SFX_FART, 64); break; case 3: if(t == 20) sfx_play(SFX_BOING, 64); if(t == 144) sfx_play(SFX_CRACK, 64); if(t == 228) sfx_play(SFX_BOOM, 64); break; case 4: if(t == 0) sfx_play(SFX_CRACK, 64); if(t == 90) sfx_play(SFX_WHOOSH, 64); if(t == 198) sfx_play(SFX_BOING, 64); break; case 5: if(t == 0) sfx_play(SFX_YAWN, 64); if(t == 230) sfx_play(SFX_CRACK, 64); break; case 6: if(t == 0) sfx_play(SFX_POP, 64); if(t == 144) sfx_play(SFX_BOING, 64); if(t == 300) sfx_play(SFX_THUD, 64); break; case 7: if(t == 0) sfx_play(SFX_WIN, 64); break; } return; }
+  if(mode == 2){ switch(sc){ case 0: if(t == 1) sfx_play(SFX_BOOM, 64); if(t == 156) sfx_play(SFX_EEK, 64); break; case 1: if(t == 1) sfx_play(SFX_WIN, 64); if(t == 132) sfx_play(SFX_POP, 64); if(t == 260) sfx_play(SFX_BOING, 64); if(t == 290) sfx_play(SFX_TAUNT, 64); break; case 2: if(t == 8) sfx_play(SFX_THUD, 64); if(t == 96) sfx_play(SFX_CLICK, 64); break; default: if(t == 1) sfx_play(SFX_WIN, 64); break; } return; }
+  if(mode == 3){ switch(sc){ case 0: if(t == 144) sfx_play(SFX_THUD, 64); if(t == 252){ sfx_play(SFX_BOOM, 64); sfx_play(SFX_CRUNCH, 64); } break; case 1: if(t == 144) sfx_play(SFX_EEK, 64); break; case 2: if(t == 1) sfx_play(SFX_WIN, 64); if(t == 276) sfx_play(SFX_TARGET, 64); break; default: if(t == 1) sfx_play(SFX_WIN, 64); break; } return; }
+  if(wolf){ switch(sc){ case 0: if(t == 168) sfx_play(SFX_TAUNT, 64); break; case 1: if(t == 90) sfx_play(SFX_POP, 64); break; case 2: if(t == 156) sfx_play(SFX_FART, 64); break; case 3: if(t == 20) sfx_play(SFX_BOING, 64); if(t == 144) sfx_play(SFX_CRACK, 64); if(t == 228) sfx_play(SFX_BOOM, 64); break; case 4: if(t == 1) sfx_play(SFX_CRACK, 64); if(t == 90) sfx_play(SFX_WHOOSH, 64); if(t == 198) sfx_play(SFX_BOING, 64); break; case 5: if(t == 1) sfx_play(SFX_YAWN, 64); if(t == 230) sfx_play(SFX_CRACK, 64); break; case 6: if(t == 1) sfx_play(SFX_POP, 64); if(t == 144) sfx_play(SFX_BOING, 64); if(t == 210) sfx_play(SFX_POP, 64); if(t == 300) sfx_play(SFX_THUD, 64); break; case 7: if(t == 1) sfx_play(SFX_WIN, 64); break; } return; }
   switch(sc){
   case 0: if(t < 130 && t % 14 == 6) sfx_play(SFX_CLICK, 40); if(t == 138) sfx_play(SFX_TARGET, 64); break;
-  case 1: if(t == 0) sfx_play(SFX_THUD, 64); for(int i = 0; i < 6; i++) if(t == 96 + i * 27) sfx_play(SFX_POP, 64); if(t == 336) sfx_play(SFX_THUD, 64); break;
+  case 1: if(t == 1) sfx_play(SFX_THUD, 64); for(int i = 0; i < 6; i++) if(t == 96 + i * 27) sfx_play(SFX_POP, 64); if(t == 336) sfx_play(SFX_THUD, 64); break;
   case 2: if(t >= 90 && t < 186 && t % 12 == 0) sfx_play(SFX_CLICK, 64); if(t == 206) sfx_play(SFX_BOING, 64); if(t == 276) sfx_play(SFX_YAWN, 64); break;
-  case 3: if(t == 0) sfx_play(SFX_SNORE, 64); if(t == 114) sfx_play(SFX_WHOOSH, 64); if(t == 252) sfx_play(SFX_BURP, 64); break;
+  case 3: if(t == 1) sfx_play(SFX_SNORE, 64); if(t == 114) sfx_play(SFX_WHOOSH, 64); if(t == 252) sfx_play(SFX_BURP, 64); break;
   case 4: if(t == 10 || t == 26 || t == 42) sfx_play(SFX_THUD, 64); if(t == 96) sfx_play(SFX_WHOOSH, 64); if(t == 240){ sfx_play(SFX_CRACK, 64); sfx_play(SFX_SLAP, 64); } break;
-  case 5: if(t == 0) sfx_play(SFX_CRACK, 64); if(t == 96) sfx_play(SFX_THUD, 64); if(t == 192) sfx_play(SFX_WHOOSH, 64); break;
-  case 6: if(t == 0) sfx_play(SFX_BOOM, 64); if(t == 108) sfx_play(SFX_CRUNCH, 64); if(t == 204) sfx_play(SFX_WIN, 64); break;
-  case 7: if(t == 0) sfx_play(SFX_TARGET, 64); if(t == 96) sfx_play(SFX_EEK, 64); if(t == 186) sfx_play(SFX_TAUNT, 64); break;
+  case 5: if(t == 1) sfx_play(SFX_CRACK, 64); if(t == 96) sfx_play(SFX_THUD, 64); if(t == 192) sfx_play(SFX_WHOOSH, 64); break;
+  case 6: if(t == 1) sfx_play(SFX_BOOM, 64); if(t == 108) sfx_play(SFX_CRUNCH, 64); if(t == 204) sfx_play(SFX_WIN, 64); break;
+  case 7: if(t == 1) sfx_play(SFX_TARGET, 64); if(t == 96) sfx_play(SFX_EEK, 64); if(t == 186) sfx_play(SFX_TAUNT, 64); break;
   }
 }
 
@@ -209,7 +209,7 @@ static void bubble(u8 *b, int x, int y, const char *s, int tail){      /* speech
   gfx_tri(b, x - 3 + tail, y + 12, x + 5 + tail, y + 12, x + tail * 2, y + 22, C_BLACK); gfx_tri(b, x - 2 + tail, y + 12, x + 4 + tail, y + 12, x + tail * 2, y + 19, C_WHITE);
   gfx_text(b, x - gfx_text_w(s, 1) / 2, y + 4, s, C_BLACK, 1);
 }
-enum { GF_TIE = 1, GF_BOXERS = 2, GF_SAD = 4, GF_WAVE = 8, GF_COOL = 16, GF_ANGRY = 32, GF_FUR = 64, GF_EARS = 128, GF_SNOUT = 256, GF_TAIL = 512, GF_HOWL = 1024, GF_WALK = 2048, GF_SHIVER = 4096, GF_FLIRT = 8192 };
+enum { GF_TIE = 1, GF_BOXERS = 2, GF_SAD = 4, GF_WAVE = 8, GF_COOL = 16, GF_ANGRY = 32, GF_FUR = 64, GF_EARS = 128, GF_SNOUT = 256, GF_TAIL = 512, GF_HOWL = 1024, GF_WALK = 2048, GF_SHIVER = 4096, GF_FLIRT = 8192, GF_NOD = 16384, GF_RECOIL = 32768 };
 static int g_t;                                                   /* the frame counter of the shot being drawn: blinks, breathing, sway */
 static void face(u8 *b, int x, int y, int s, int fl){       /* head centred x,y, radius ~5 units */
   const u8 hc = (fl & GF_FUR) ? C_GRAY : C_SKIN, hs2 = (fl & GF_FUR) ? C_DARK : C_SKIN2;
@@ -232,8 +232,11 @@ static void face(u8 *b, int x, int y, int s, int fl){       /* head centred x,y,
     gfx_rect(b, x - 3 * s, ey - 1, ew2 + 1, ew2 + 2, C_WHITE); gfx_rect(b, x + s, ey - 1, ew2 + 1, ew2 + 2, C_WHITE);
     gfx_rect(b, x - 3 * s + (ew2 + 1) / 2 - 1 + dx, ey + 1, s - 1 + (s > 3), ew2 - 1, C_BLACK); gfx_rect(b, x + s + (ew2 + 1) / 2 - 1 + dx, ey + 1, s - 1 + (s > 3), ew2 - 1, C_BLACK);
   } else { gfx_rect(b, x - 3 * s, ey, ew2, ew2, C_BLACK); gfx_rect(b, x + s, ey, ew2, ew2, C_BLACK); }
-  if(wink){gfx_tline(b,x-4*s,y-s,x-s,y-s,2,C_HAIR);
-    gfx_tline(b,x+s,y-2*s,x+4*s,y-3*s,2,C_HAIR2);}
+  if(wink){
+    gfx_rect(b,x-3*s,ey-1,ew2+1,ew2+2,hc);
+    gfx_tline(b,x-3*s,ey+ew2/2,x-3*s+ew2,ey+ew2/2,2,C_HAIR);
+    gfx_tline(b,x+s,y-2*s,x+4*s,y-3*s,2,C_HAIR2);
+  }
   if(big && !(fl & GF_FUR)){ gfx_ell(b, x - 4 * s, y + 2 * s, s, s / 2 + 1, C_PINK); gfx_ell(b, x + 4 * s, y + 2 * s, s, s / 2 + 1, C_PINK); }   /* blush */
   if(fl & GF_SAD){ gfx_tline(b, x - 2 * s, y + 3 * s, x + 2 * s, y + 3 * s, ew, C_BLACK); gfx_tline(b, x - 2 * s, y + 3 * s, x - 3 * s, y + 4 * s, ew, C_BLACK); gfx_tline(b, x + 2 * s, y + 3 * s, x + 3 * s, y + 4 * s, ew, C_BLACK); }
   else if(fl & GF_ANGRY){ gfx_rect(b, x - 2 * s, y + 2 * s, 4 * s, 2 * s, C_BLACK); gfx_rect(b, x - 2 * s + 1, y + 2 * s + 1, 4 * s - 2, s, C_WHITE); }
@@ -250,8 +253,9 @@ static void gerald(u8 *b, int x, int fy, int s, int fl){
   /* Different footfalls, bob and counter-swing instead of sliding a still sprite. */
   const int stride = (fl & GF_WALK) ? wv(g_t,24,s*3) : 0;
   const int liftL = stride > 0 ? stride/3 : 0, liftR = stride < 0 ? -stride/3 : 0;
-  const int lx = x-4*s+stride/2, rx = x+s-stride/2;
   if(fl & GF_SHIVER)x += wv(g_t,12,s>2?2:1);
+  if(fl & GF_RECOIL)x += wv(g_t,22,s);
+  const int lx=x-4*s+stride/2,rx=x+s-stride/2;
   if(fl & GF_TAIL){ gfx_tline(b, x + 4 * s, fy - 10 * s, x + 11 * s + wv(g_t, 60, 2), fy - 16 * s, 3 * s, C_GRAY); gfx_ell(b, x + 11 * s + wv(g_t, 60, 2), fy - 17 * s, 2 * s, 2 * s, C_CLOUD2); }
   /* outline pass: one dark pixel around legs, torso and arms */
   gfx_rect(b,lx-1,fy-8*s-1,3*s+2,8*s+1-liftL,C_HAIR);
@@ -272,7 +276,7 @@ static void gerald(u8 *b, int x, int fy, int s, int fl){
   if(fl & GF_TIE){ gfx_tri(b, x - s, fy - 23 * s, x + s, fy - 23 * s, x, fy - 21 * s, C_BLACK); gfx_tri(b, x - s, fy - 22 * s, x + s, fy - 22 * s, x + s, fy - 14 * s, C_SKY0 + 4); gfx_tri(b, x - s, fy - 22 * s, x + s, fy - 14 * s, x - s, fy - 14 * s, C_SKY0 + 3); }
   if(fl & GF_WALK)gfx_tline(b,x-6*s,fy-21*s+br,x-7*s-stride/3,fy-14*s+br,2*s,sh);
   else gfx_rect(b,x-7*s,fy-23*s+br,2*s,9*s,sh);
-  if(fl & GF_WAVE){int wy=wv(g_t,24,2*s);
+  if(fl & (GF_WAVE|GF_RECOIL)){int wy=wv(g_t,(fl&GF_RECOIL)?16:24,(fl&GF_RECOIL)?3*s:2*s);
     gfx_tline(b,x+5*s,fy-22*s+br,x+9*s+wy/2,fy-31*s,2*s,sh);
     gfx_ell(b,x+9*s+wy/2,fy-32*s,s+1,s+1,lc);
   }else if(fl & GF_WALK){
@@ -280,8 +284,10 @@ static void gerald(u8 *b, int x, int fy, int s, int fl){
     gfx_ell(b,x+7*s+stride/3,fy-14*s+br,s+1,s+1,lc);
   }else{gfx_rect(b,x+5*s,fy-23*s+br,2*s,9*s,sh);gfx_rect(b,x+6*s,fy-23*s+br,s,9*s,shd);}
   gfx_ell(b,x-6*s-stride/3,fy-13*s,s+1,s+1,lc);
-  if(!(fl & (GF_WAVE|GF_WALK)))gfx_ell(b,x+6*s,fy-13*s,s+1,s+1,lc);
-  face(b,x+((fl&GF_WALK)?stride/7:0),fy-28*s+br,s,fl);
+  if(!(fl & (GF_WAVE|GF_WALK|GF_RECOIL)))gfx_ell(b,x+6*s,fy-13*s,s+1,s+1,lc);
+  int head_y=(fl&GF_NOD)?wv(g_t,36,s):0;
+  if(fl&GF_RECOIL)head_y-=iabs(wv(g_t,22,s));
+  face(b,x+((fl&GF_WALK)?stride/7:0),fy-28*s+br+head_y,s,fl);
 }
 static void towel(u8 *b, int x, int y, int w, int h, int ph, int th){         /* the pink towel, rippling, with two terry stripes */
   (void)th;
@@ -526,24 +532,69 @@ static void moon(u8 *b,int x,int y,int r){
   gfx_line(b,x-r/2,y-r/2,x-r/3,y-r*3/4,C_WHITE);
 }
 static void night_hills(u8 *b, int gy){ gfx_ell(b, 60, gy + 12, 120, 30, C_UIHI); gfx_ell(b, 210, gy + 16, 130, 28, C_UIBG); gfx_rect(b, 0, gy + 8, 256, 192 - gy, C_DARK); }
+
+/* Console story skyline: low-cost integer-only urban parallax.
+   Shared by DS, 3DS and Dreamcast; no allocations or texture uploads. */
+static void night_town(u8 *b,int tt){
+  for(int j=0;j<4;j++){
+    int bx=8+j*67-(tt/11%17),ht=28+(j*13)%26;
+    gfx_rect(b,bx,147-ht,49,ht+3,C_BLACK);
+    gfx_rect(b,bx+2,149-ht,45,ht,C_WALL3);
+    gfx_tline(b,bx-3,149-ht,bx+51,149-ht,2,C_HAIR);
+    for(int i=0;i<4;i++){
+      int wx=bx+8+(i&1)*23,wy=151-ht+(i>>1)*14;
+      gfx_rect(b,wx,wy,9,8,C_HAIR);
+      gfx_rect(b,wx+1,wy+1,7,6,(j+i+tt/120)%5?C_GOLD2:C_SKY0+4);
+      gfx_rect(b,wx+4,wy,1,8,C_HAIR);
+    }
+  }
+  for(int j=0;j<2;j++){
+    int lx=45+j*164;
+    gfx_rect(b,lx,101,3,48,C_GRAY);
+    gfx_rect(b,lx-11,100,14,3,C_GRAY);
+    gfx_ell(b,lx-11,104,7,4,C_GOLD2);
+    gfx_rect(b,lx-15,105,8,1,C_WHITE);
+    for(int k=0;k<3;k++)gfx_rect(b,lx-19+k*6,143+k,7,1,C_GOLD2);
+  }
+  gfx_rect(b,0,150,256,42,C_DARK);
+  gfx_rect(b,0,151,256,2,C_GRAY);
+  for(int i=0;i<7;i++)gfx_rect(b,(i*39+12)%256,178,17,1,C_CLOUD2);
+}
 static void w_walk(u8 *b, int k, int tt){
   stars_night(b);
   if(k == 0){
-    moon(b, 200, 40, 20 + tt / 20); night_hills(b, 140);
-    int gx = -20 + tt * 2; gerald(b, gx, 176 - iabs(wv(tt, 12, 3)), 2, GF_COOL | GF_WALK);
+    moon(b,200,40,20+tt/20);night_hills(b,140);night_town(b,tt);
+    int gx=-20+tt*2; gerald(b, gx, 176 - iabs(wv(tt, 12, 3)), 2, GF_COOL | GF_WALK);
     if(tt > 80 && gx < 220) bubble(b, gx + 40 > 200 ? 200 : gx + 40, 20, "NICE NIGHT.", 0);
   } else {
-    moon(b, 128, 60, 54 + tt / 8); night_hills(b, 150);
-    gfx_ell(b, 214, 146, 12, 6, C_BLACK); gfx_ell(b, 207, 138, 4, 6, C_BLACK);
-    gerald(b, 70, 190, 3, GF_COOL); bubble(b, 120, 120, "THAT'S... A LOT OF MOON.", 0);
+    moon(b,128,60,54+tt/8);night_hills(b,150);night_town(b,tt/2);
+    gfx_ell(b,214,146,12,6,C_BLACK); gfx_ell(b, 207, 138, 4, 6, C_BLACK);
+    gerald(b,70,190,3,GF_COOL|GF_RECOIL);bubble(b,120,120,"THAT'S... A LOT OF MOON.",0);
   }
 }
 static void w_fridge(u8 *b, int k, int tt){
   if(k == 0){
-    gfx_rect(b, 0, 0, 256, 192, C_WALL3); gfx_rect(b, 0, 150, 256, 42, C_DIRT);
-    couch_back(b, 20, 160); couch_front(b, 20, 160);
+    gfx_rect(b,0,0,256,192,C_WALL3);
+    gfx_rect(b,0,0,256,8,C_HAIR);
+    for(int i=0;i<4;i++)gfx_rect(b,15+i*78,8,4,142,C_DIRT2);
+    gfx_rect(b,0,144,256,6,C_HAIR);
+    gfx_rect(b,0,150,256,42,C_DIRT);
+    for(int i=0;i<7;i++)gfx_rect(b,0,153+i*7,256,1,C_DIRT2);
+    for(int i=0;i<8;i++)gfx_rect(b,(i*53)%256,154+(i%3)*12,24,1,C_HAIR);
+    gfx_rect(b,12,41,73,4,C_HAIR);gfx_rect(b,12,83,73,4,C_HAIR);
+    for(int i=0;i<6;i++){
+      int bx=15+(i%3)*22,by=46+(i/3)*42;
+      gfx_rect(b,bx,by,16,31,(i%3)?C_RED2:C_DIRT2);
+      gfx_rect(b,bx+3,by+3,10,2,C_GOLD2);
+    }
+    gfx_rect(b,100,24,48,41,C_WHITE);
+    gfx_rect(b,103,27,42,35,C_SKY0+5);
+    gfx_rect(b,122,27,3,35,C_WHITE);
+    gfx_rect(b,103,43,42,3,C_WHITE);
+    gfx_ell(b,135,36,7,7,C_CLOUD2);
+    couch_back(b,20,160);couch_front(b,20,160);
     gfx_rect(b, 180, 30, 50, 122, C_WHITE); gfx_rect(b, 184, 34, 42, 114, C_CLOUD2); gfx_rect(b, 180, 80, 50, 2, C_GRAY);
-    gerald(b, 120, 176, 2, GF_COOL);
+    gerald(b,120,176,2,GF_COOL|GF_NOD);
   } else if(k == 1){
     gfx_rect(b, 0, 0, 256, 192, C_UIBG); gfx_tri(b, 40, 10, 40, 182, 220, 170, C_UIHI); gfx_dither(b, 40, 10, 180, 170, C_BLACK);
     gfx_rect(b, 20, 20, 216, 140, C_WHITE); gfx_rect(b, 24, 24, 208, 132, C_CLOUD2); gfx_rect(b, 24, 96, 208, 3, C_GRAY);
@@ -559,7 +610,7 @@ static void w_fridge(u8 *b, int k, int tt){
 static void w_itch(u8 *b, int k, int tt){
   gfx_rect(b, 0, 0, 256, 192, C_UIBG);
   if(k == 0){ gfx_rect(b, 0, 150, 256, 42, C_DARK); face(b, 128, 90, 12, GF_COOL); gfx_tline(b, 98, 130, 112, 116 + wv(tt, 10, 3), 3, C_SKIN2); for(int i = 0; i < 3; i++) gfx_text(b, 170 + i * 14, 40 + wv(tt + i * 7, 20, 4), "~", C_GOLD, 2); }
-  else if(k == 1){ gfx_rect(b, 60, 20, 136, 120, C_BLACK); gfx_rect(b, 64, 24, 128, 112, C_UIBG); moon(b, 128 + wv(tt, 80, 8), 80, 40 + tt / 6); gfx_rect(b, 126, 24, 4, 112, C_DARK); gfx_rect(b, 64, 78, 128, 4, C_DARK); gerald(b, 214, 190, 2, GF_COOL); }
+  else if(k == 1){ gfx_rect(b, 60, 20, 136, 120, C_BLACK); gfx_rect(b, 64, 24, 128, 112, C_UIBG); moon(b, 128 + wv(tt, 80, 8), 80, 40 + tt / 6); gfx_rect(b, 126, 24, 4, 112, C_DARK); gfx_rect(b, 64, 78, 128, 4, C_DARK); gerald(b,214,190,2,GF_COOL|GF_RECOIL); }
   else { gfx_rect(b, 0, 150, 256, 42, C_DARK); moon(b, 128, 60, 70); face(b, 128, 100, 14 + (tt >> 3 & 1), GF_COOL | GF_SNOUT); for(int i = 0; i < 6; i++) gfx_text(b, 20 + i * 40, 20 + ((tt * 3 + i * 30) % 130), "<", C_WHITE, 1); }
 }
 static void w_ears(u8 *b, int k, int tt){
@@ -639,12 +690,13 @@ static void w_howl(u8 *b, int k, int tt){
 static void brenda(u8 *b,int x,int fy,int s,int t,int flirt){ /* adult character, deliberately cheeky glamour pose */
   if(flirt)x+=wv(t,60,2); /* hips sway; the face and hem follow */
   int bob=wv(t,40,1)+(flirt?wv(t,36,1):0),hy=fy-27*s+bob;
+  int skirt_sway=flirt?wv(t+9,40,s):0;
   gfx_ell(b, x, hy + s, 8 * s, 9 * s, C_GOLD2);                                                                              /* the hair behind, in shade */
   gfx_ell(b, x - 7 * s, hy + 7 * s, 3 * s, 4 * s, C_GOLD2); gfx_ell(b, x + 7 * s, hy + 7 * s, 3 * s, 4 * s, C_GOLD2);        /* curls on the shoulders */
   gfx_rect(b, x - 4 * s, fy - 10 * s, 2 * s, 10 * s, C_SKIN); gfx_rect(b, x + 2 * s, fy - 10 * s, 2 * s, 10 * s, C_SKIN);     /* legs */
   gfx_rect(b, x - 4 * s, fy - s, 3 * s, s, C_RED); gfx_rect(b, x + s, fy - s, 3 * s, s, C_RED);                              /* heels */
   gfx_rect(b, x - 3 * s / 2, hy + 4 * s, 3 * s, 5 * s, C_SKIN); gfx_rect(b, x + s / 2, hy + 4 * s, s, 5 * s, C_SKIN2);                  /* neck, shaded on one side */
-  gfx_tri(b, x - 8 * s, fy - 8 * s + bob, x + 8 * s, fy - 8 * s + bob, x, fy - 22 * s + bob, C_PINK);                         /* skirt */
+  gfx_tri(b,x-8*s+skirt_sway,fy-8*s+bob,x+8*s+skirt_sway,fy-8*s+bob,x,fy-22*s+bob,C_PINK);                         /* skirt */
   gfx_rect(b, x - 6 * s, fy - 12 * s + bob, 12 * s, 3 * s, C_PINK); gfx_rect(b, x - 6 * s, fy - 13 * s + bob, 12 * s, s, C_RED);   /* hem, belt */
   gfx_rect(b,x-5*s,fy-21*s+bob,10*s,8*s,C_PINK);
   gfx_tri(b,x-2*s,fy-21*s+bob,x+2*s,fy-21*s+bob,x,fy-18*s+bob,C_SKIN);
@@ -727,7 +779,7 @@ static void w_visit(u8 *b, int k, int tt){
       gfx_ell(b,px+(i?5:-5),138,2,2,C_PINK);
     }
     brenda(b,90,176,3,tt,0);
-    gerald(b,196,176,2,GF_FUR|GF_EARS|GF_SNOUT|GF_TAIL|GF_COOL);
+    gerald(b,196,176,2,GF_FUR|GF_EARS|GF_SNOUT|GF_TAIL|GF_COOL|GF_FLIRT|GF_NOD);
     bubble(b,70,40,"HI, GERALD.",0);
   }
   else if(k==1){
@@ -752,7 +804,7 @@ static void w_visit(u8 *b, int k, int tt){
       gfx_text(b,xx,yy,"<3",i&1?C_WHITE:C_RED2,1+(i%3==0));
     }
     brenda(b,60,186,4,tt,1);
-    gerald(b,190,186,3,GF_FUR|GF_EARS|GF_SNOUT|GF_TAIL|GF_COOL|GF_FLIRT);
+    gerald(b,190,186,3,GF_FUR|GF_EARS|GF_SNOUT|GF_TAIL|GF_COOL|GF_FLIRT|GF_NOD);
     bubble(b,62,20,"THAT TAIL'S TROUBLE.",0);
     if(tt>90)bubble(b,196,60,"WANNA FIND OUT?",0);
     if(tt>130)gfx_text_c(b,128,154,"TOO HOT FOR THIS CAMERA",C_GOLD,C_RED2,1);
