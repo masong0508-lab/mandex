@@ -1,7 +1,11 @@
 name: DS emulated FPS capture
 
-# DeSmuME emulation is not physical DS FPS. Compare unrolled wobble neighbors vs reference.
-# Both variants use the SAME default 30Hz lower screen and no 15Hz overload experiment.
+# DeSmuME emulation is not physical DS FPS. Isolate TWO changes:
+#   wob_ref:  former neighbor-loop solver, original wallpaper cells
+#   wall_ref: unrolled neighbors, original wallpaper cells
+#   wall_fast:unrolled neighbors, new long-span wallpaper renderer
+# All variants use identical audio and screen redraw policy (30Hz bottom).
+# These are snapshots, not same-simulation-state repeated FPS averages.
 on:
   push:
     branches: [main]
@@ -26,9 +30,10 @@ jobs:
           mkdir -p out
           for V in "0:suburb" "39:landlord_hq" "59:alpha_landlord"; do
             L=${V%%:*}; N=${V#*:}
-            for MODE in reference optimized; do
-              DEF="-DMX_WOB_UNROLL_NB=0"
-              [ "$MODE" = optimized ] && DEF="-DMX_WOB_UNROLL_NB=1"
+            for MODE in wob_ref wall_ref wall_fast; do
+              DEF="-DMX_WOB_UNROLL_NB=1 -DMX_DS_WALL_DIRECT_RUNS=0"
+              [ "$MODE" = wob_ref ] && DEF="-DMX_WOB_UNROLL_NB=0 -DMX_DS_WALL_DIRECT_RUNS=0"
+              [ "$MODE" = wall_fast ] && DEF="-DMX_WOB_UNROLL_NB=1 -DMX_DS_WALL_DIRECT_RUNS=1"
               sh tools/build_ds_bare.sh "out/$N-$MODE.nds" -DMX_FPS_DEMO_LEVEL=$L -DMX_NOSOUND $DEF
               python3 tools/ntr_patch.py "out/$N-$MODE.nds" "out/$N-$MODE.tmp.nds"
               mv "out/$N-$MODE.tmp.nds" "out/$N-$MODE.nds"
@@ -55,7 +60,7 @@ jobs:
           mkdir -p captures
           export LIBGL_ALWAYS_SOFTWARE=1
           for N in suburb landlord_hq alpha_landlord; do
-            for MODE in reference optimized; do
+            for MODE in wob_ref wall_ref wall_fast; do
               export ROM="$PWD/out/$N-$MODE.nds" LEVEL="$N-$MODE"
               xvfb-run -a -s "-screen 0 1024x768x24" bash -c '
                 desmume-cli --disable-sound "$ROM" > "captures/$LEVEL.log" 2>&1 &
