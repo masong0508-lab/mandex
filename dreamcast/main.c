@@ -217,7 +217,7 @@ static void spawn(float x, float y, uint32 c, float spd){
   spawn_k(PK_BIT, x, y, (frand() - 0.5f) * spd, -frand() * spd, 0.7f + frand() * 0.8f, c);
 }
 
-/* ---- achievements / outfits (session only: no save on this build) ---- */
+/* ---- achievements / outfits (persisted to VMU when available) ---- */
 static MxStats stats;
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq; static float toast_t;
 static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
@@ -434,6 +434,7 @@ static void dc_frame_complete(int simulated){
   dc_prev_ms=now;
 }
 static int nofight;                                       /* 1 = landlords don't fight back (title: Y; pause: X) */
+#include "vmu_save.h"
 static int title_pan(int t, int range){                 /* 0..range for tick t: hold (90), glide right (160), hold (150), glide back (160), smoothstep */
   t %= 560;
   int k = t < 90 ? 0 : t < 250 ? t - 90 : t < 400 ? 160 : t < 560 ? 160 - (t - 400) : 0;
@@ -790,6 +791,9 @@ int main(int argc, char **argv){
   (void)argc; (void)argv;
   gfx_init();
   sound_init();
+  mx_meta_init(&stats);
+  dc_save_load();                         /* before level-start rebases counters */
+  recolor_man(outfit_sel);
 
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
   load_level(0);
@@ -812,8 +816,9 @@ int main(int argc, char **argv){
         if(tl || tr){
           for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + (tr ? k : MX_NUM_OUTFITS - k)) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
           recolor_man(outfit_sel);
+          dc_save_sync();
         } }
-        if(pressed & CONT_Y) nofight = !nofight;
+        if(pressed & CONT_Y){ nofight = !nofight; dc_save_sync(); }
         if(pressed & (CONT_START | CONT_A)){ on_title = 0; if(tx_ttl){ pvr_mem_free(tx_ttl); tx_ttl = 0; }
           if(title_lv == 0 && !intro_seen && tx_ic_top && tx_ic_bot){ intro_seen = 1; intro_level = 0; in_intro = 1; intro_start(); }
           else if(title_lv == MX_CH3_START && !wolf_seen && tx_ic_top && tx_ic_bot){ wolf_seen = 1; intro_level = title_lv; in_intro = 1; intro_start_wolf(); }
@@ -827,7 +832,7 @@ int main(int argc, char **argv){
       } else if(paused){
         if(pressed & CONT_START) paused = 0;
         if(pressed & CONT_Y){ load_level(world.level); paused = 0; }
-        if(pressed & CONT_X){ nofight = !nofight; mx_set_fight(&world, !nofight); }
+        if(pressed & CONT_X){ nofight = !nofight; mx_set_fight(&world, !nofight); dc_save_sync(); }
         if(pressed & CONT_B) mus_pref = !mus_pref;                                      /* B in the pause menu: music on / off */
       } else {
         if(pressed & CONT_START) paused = 1;
@@ -857,7 +862,10 @@ int main(int argc, char **argv){
       handle_events();
       mx_meta_events(&stats, &world);
       for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0);
-      { static int was = MX_PLAY; if(world.state == MX_WIN && was == MX_PLAY){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0); } was = world.state; }
+      { static int was = MX_PLAY; if(world.state != MX_PLAY && was == MX_PLAY){
+          if(world.state == MX_WIN){ mx_meta_win(&stats, &world); for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0); }
+          dc_save_sync();
+        } was = world.state; }
       if(hint_t > 0) hint_t--;
       {
         int calm = st && world.state == MX_PLAY && world.man.mode == MAN_AIM && world.banner <= 0 && !st->buttons && abs(st->joyx) < 30 && abs(st->joyy) < 30;
