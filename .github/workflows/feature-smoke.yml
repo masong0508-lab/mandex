@@ -64,7 +64,7 @@ jobs:
               test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
               core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fx_$fast
           done
-          for l in 0 19 39 59; do
+          for l in 0 5 19 39 59; do
             DS_PERF_BENCH=1 /tmp/ds_fx_0 /tmp/ds_fx_ref 520 "$l" | grep '^DS_FRAME_HASH ' > /tmp/ds_fx_old.txt
             DS_PERF_BENCH=1 /tmp/ds_fx_1 /tmp/ds_fx_new 520 "$l" | grep '^DS_FRAME_HASH ' > /tmp/ds_fx_new.txt
             test -s /tmp/ds_fx_old.txt
