@@ -378,7 +378,7 @@ static void draw_aim_dots(const View *v){
 }
 
 #ifndef MX_DS_WALL_RUNS
-#define MX_DS_WALL_RUNS 1
+#define MX_DS_WALL_RUNS 0 /* pixel-identical, but slower in all eight CI benchmarks */
 #endif
 static void draw_rooms(const View *v){
   int ppc = v->ppc;
@@ -539,17 +539,36 @@ static void draw_chunks(const View *v){
   }
 }
 
+#ifndef MX_DS_CULL_TARGETS
+#define MX_DS_CULL_TARGETS 1
+#endif
 static void draw_targets(const View *v){
   const MxMan *m = &world.man;
-  for(int i = 0; i < world.ntargets; i++){
-    const MxTarget *t = &world.targets[i];
-    if(!t->alive) continue;
-    int scared = ((m->mode == MAN_FLY || m->mode == MAN_STUCK) && rabs(t->x - m->x) < RI(26)) || t->pan > 0;
-    real wx, wy; mx_target_offset(&world, t, &wx, &wy);
-    int st = (t->stun > 0 ? 1 : 0) | (t->wind > 0 ? 2 : 0) | (t->swing > 0 ? 4 : 0) | (t->mv == 1 ? 8 : 0) | (t->mv == 2 ? 16 : 0) | (t->armor ? 32 : 0);
-    if(t->kind || st) spr_landlord_k(v->buf, vx(v, t->x + wx), vy(v, t->y + wy), v->ppc, frame + i * 11, scared, t->kind, t->face < 0 ? -1 : 1, st);
-    else spr_landlord(v->buf, vx(v, t->x + wx), vy(v, t->y + wy), v->ppc, frame + i * 11, scared);
-    if(t->hpmax > 1) spr_hpbar(v->buf, vx(v, t->x + wx), vy(v, t->y + wy), v->ppc, t->hp, t->hpmax);
+  for(int i=0;i<world.ntargets;i++){
+    const MxTarget *t=&world.targets[i];
+    if(!t->alive)continue;
+    real wx,wy;mx_target_offset(&world,t,&wx,&wy);
+    int sx=vx(v,t->x+wx),sy=vy(v,t->y+wy);
+#if MX_DS_CULL_TARGETS
+    /* All sprites use a common anchor: the silhouette never projects
+       beyond +/- 10 cells horizontally or 12 above / 7 below it.
+       Account for unusually long multi-hit health bars too.
+       Skip both the lengthy landlord painter AND its health bar when
+       the entire bounds lie offscreen. Simulation and AI are untouched. */
+    int pad_x=v->ppc*10;
+    if(t->hpmax>1){
+      int bar=(t->hpmax*(v->ppc*7/8>1?v->ppc*7/8:1))/2+3;
+      if(bar>pad_x)pad_x=bar;
+    }
+    if(sx < -pad_x || sx >= 256+pad_x ||
+       sy < -v->ppc*12 || sy >= 192+v->ppc*7)continue;
+#endif
+    int scared=((m->mode==MAN_FLY||m->mode==MAN_STUCK)&&rabs(t->x-m->x)<RI(26))||t->pan>0;
+    int st=(t->stun>0?1:0)|(t->wind>0?2:0)|(t->swing>0?4:0)|
+           (t->mv==1?8:0)|(t->mv==2?16:0)|(t->armor?32:0);
+    if(t->kind||st)spr_landlord_k(v->buf,sx,sy,v->ppc,frame+i*11,scared,t->kind,t->face<0?-1:1,st);
+    else spr_landlord(v->buf,sx,sy,v->ppc,frame+i*11,scared);
+    if(t->hpmax>1)spr_hpbar(v->buf,sx,sy,v->ppc,t->hp,t->hpmax);
   }
 }
 

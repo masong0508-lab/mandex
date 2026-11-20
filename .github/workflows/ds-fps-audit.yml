@@ -24,6 +24,7 @@ jobs:
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_bench
           gcc -std=gnu99 -O2 -Icore test/fps_meter_test.c -o /tmp/ds_fps_meter_test
           /tmp/ds_fps_meter_test
+          gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_CULL_TARGETS=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_targets_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_WALL_RUNS=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_wall_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_FAST_RECT=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_rect_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_BOTTOM30=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_before
@@ -39,6 +40,7 @@ jobs:
         run: |
           mkdir -p out/ds-fps-phases
           for L in 0 9 21 29 39 40 50 59; do
+            DS_PERF_BENCH=1 /tmp/ds_fps_targets_before /tmp/mandex-target-before 520 "$L" > "out/ds-fps-phases/target-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_wall_before /tmp/mandex-wall-before 520 "$L" > "out/ds-fps-phases/wall-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_rect_before /tmp/mandex-rect-before 520 "$L" > "out/ds-fps-phases/rect-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_before /tmp/mandex-before 520 "$L" > "out/ds-fps-phases/baseline-level-$L.txt"
@@ -63,6 +65,27 @@ jobs:
           for level,x,y,pct in output:print(f'{level:>5} | {x:>22.1f} | {y:>32.1f} | {pct:>12.1f}%')
           pathlib.Path('out/ds-fps-phases/summary.txt').write_text(
             hdr+'\n'+'\n'.join(f'{level} {x:.1f} {y:.1f} {pct:.1f}%' for level,x,y,pct in output)+'\n')
+          PY
+      - name: Verify landlord visibility culling frame parity and host CPU speed
+        run: |
+          python3 - <<'PY'
+          import re,pathlib
+          rows=['level frames_equal old_us new_us gain_pct props_old_us props_new_us']
+          for L in (0,9,21,29,39,40,50,59):
+            before=pathlib.Path(f'out/ds-fps-phases/target-before-level-{L}.txt').read_text()
+            after=pathlib.Path(f'out/ds-fps-phases/level-{L}.txt').read_text()
+            pattern=r'DS_FRAME_HASH checksum=([0-9a-f]+) screen_samples=(\d+)'
+            a=re.search(pattern,before);b=re.search(pattern,after)
+            if not a or not b or a.groups()!=b.groups():
+              raise SystemExit(f'VISIBILITY CULL PIXEL REGRESSION level {L+1}: {a.groups() if a else None} vs {b.groups() if b else None}')
+            def val(s,p):return float(re.search(p,s).group(1))
+            old=val(before,r'cpu_frame_mean_us=([0-9.]+)')
+            new=val(after,r'cpu_frame_mean_us=([0-9.]+)')
+            p=r'DS_TOP_LAYER name=targets_props mean_us=([0-9.]+)'
+            lo=val(before,p);ln=val(after,p)
+            row=f'{L+1} YES {old:.2f} {new:.2f} {100*(old-new)/old:.1f}% {lo:.2f} {ln:.2f}'
+            print(row);rows.append(row)
+          pathlib.Path('out/ds-fps-phases/targets-ab-summary.txt').write_text('\n'.join(rows)+'\n')
           PY
       - name: Compare exact two-screen gameplay frames and wall batching CPU cost
         run: |
