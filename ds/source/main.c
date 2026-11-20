@@ -545,6 +545,14 @@ static void draw_rooms(const View *v){
           d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=base;
           d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=base;
           d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=accent;
+          /* Thin jagged plaster edge on exposed wallpaper, using the
+             existing 4px tile and accent colour. No extra draw pass. */
+          if(world.paper_torn){
+            if(x>0&&!world.paper[i-1]){d[-512]=accent;d[0]=accent;}
+            if(x+1<MX_COLS&&!world.paper[i+1]){d[-256+3]=accent;d[3]=accent;}
+            if(y>0&&!world.paper[i-MX_COLS]){d[-768+1]=accent;d[-768+2]=accent;}
+            if(y+1<MX_ROWS&&!world.paper[i+MX_COLS])d[1]=accent;
+          }
         }else gfx_wall(v,p-1,sx,sy);
       }
     }

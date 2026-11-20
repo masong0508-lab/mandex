@@ -632,6 +632,12 @@ static void draw_rooms(const View *v){                  /* the wallpaper behind 
       rect(v->s, sx, sy, w, p, RGB((int)(c[0] * g), (int)(c[1] * g), (int)(c[2] * g)));
       if(p >= 3) for(int k = 0; k < w; k += 5) rect(v->s, sx + k, sy, 2, p, RGB((int)(c[0] * g * .93f), (int)(c[1] * g * .93f), (int)(c[2] * g * .93f)));   /* wallpaper stripes */
       if(y + 1 >= MX_ROWS || !world.paper[(y + 1) * MX_COLS + x]) rect(v->s, sx, sy + p - 1, w, 1, RGB((int)(c[0] * g * .7f), (int)(c[1] * g * .7f), (int)(c[2] * g * .7f)));
+      if(world.paper_torn && p>=3){
+        /* A damaged edge costs at most two short lines per room run. */
+        u32 rip=RGB((int)(c[0]*g*.62f),(int)(c[1]*g*.62f),(int)(c[2]*g*.62f));
+        if(x>0&&!world.paper[i-1])rect(v->s,sx,sy,1,p,rip);
+        if(x2<MX_COLS&&!world.paper[y*MX_COLS+x2])rect(v->s,sx+w-1,sy,1,p,rip);
+      }
       x = x2;
     }
   }

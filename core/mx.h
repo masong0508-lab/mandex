@@ -231,7 +231,7 @@ typedef struct {
   int nrooms;
   /* Event-driven support for each painted room, no extra framebuffer. */
   uint16_t room_frame_init[MX_MAX_ROOMS];
-  uint8_t paper_dirty;
+  uint8_t paper_dirty, paper_torn; /* damaged back-wall edges can use subtle rip shading */
   uint8_t paper[MX_ROWS * MX_COLS];   /* wallpaper per cell: palette+1 (0 = none). Blasts, broken walls and collapsing rubble knock it out (3x3 around every voxel lost), so interiors are destructible */
   MxTube tubes[MX_MAX_TUBES];
   int ntubes;

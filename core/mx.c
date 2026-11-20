@@ -224,7 +224,7 @@ static void mark_dmg(MxWorld *w, int x, int y){
 }
 static void wob_zero(MxWorld *w, int i){ w->ox[i] = w->oy[i] = w->ovx[i] = w->ovy[i] = 0; }
 
-static void paper_hit(MxWorld *w, int x, int y){ for(int j = y - 1; j <= y + 1; j++) for(int i = x - 1; i <= x + 1; i++) if(i >= 0 && i < MX_COLS && j >= 0 && j < MX_ROWS) w->paper[IDX(i, j)] = 0; }
+static void paper_hit(MxWorld *w, int x, int y){ w->paper_torn=1; for(int j = y - 1; j <= y + 1; j++) for(int i = x - 1; i <= x + 1; i++) if(i >= 0 && i < MX_COLS && j >= 0 && j < MX_ROWS) w->paper[IDX(i, j)] = 0; }
 /* Background wallpaper does not have physical collision bodies. Track the
    real roof, floor and side posts surrounding each room. Only recheck after
    masonry is lost, so normal gameplay adds no per-frame grid scans. */

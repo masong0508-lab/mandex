@@ -535,6 +535,11 @@ static void draw_rooms(void){
       gquad(qx, qy, w, h, Z_ROOM, argb(p[0], p[1], p[2], 255), argb(p[0] * 9 / 10, p[1] * 9 / 10, p[2] * 9 / 10, 255));
       for(float k = 0; k < w; k += 10) quad(qx + k, qy, 5, h, Z_ROOM + 0.01f, argb(0, 0, 0, 18));
       if(y + 1 >= MX_ROWS || !world.paper[(y + 1) * MX_COLS + x]) quad(qx, qy + h - 3, w, 3, Z_ROOM + 0.02f, argb(0, 0, 0, 46));
+      if(world.paper_torn){
+        /* One narrow exposed plaster lip per edge, not per pixel. */
+        if(x>0&&!world.paper[i-1])quad(qx,qy,1.5f,h,Z_ROOM+0.025f,argb(72,45,40,175));
+        if(x2<MX_COLS&&!world.paper[y*MX_COLS+x2])quad(qx+w-1.5f,qy,1.5f,h,Z_ROOM+0.025f,argb(72,45,40,175));
+      }
       x = x2;
     }
   }
