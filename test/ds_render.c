@@ -72,6 +72,17 @@ void cpuStartTiming(int t){(void)t;} u32 cpuEndTiming(void){ return g_ticks; }
 /* Actual host CPU microseconds, never DS clock cycles or hardware FPS.
    These functions instrument the shared game loop but are built out of ROMs. */
 static uint64_t ds_marks[7],ds_phase_sum[6],ds_phase_max[6];
+static unsigned ds_frame_hash=2166136261u,ds_hash_samples;
+static void ds_hash_frame(void){
+  /* Entire two-screen image: captures every pixel from the real DS game
+     loop with deterministic controller inputs, not a synthetic test sprite. */
+  for(int i=0;i<256*192;i++){
+    ds_frame_hash=(ds_frame_hash^buf_top[i])*16777619u;
+    ds_frame_hash=(ds_frame_hash^buf_bot[i])*16777619u;
+  }
+  ds_hash_samples++;
+}
+
 static uint64_t ds_perf_nsec(void);
 static uint64_t ds_layer_stamp,ds_layer_sum[9],ds_layer_max[9];
 static unsigned ds_layer_frames;
@@ -94,6 +105,7 @@ static uint64_t ds_perf_nsec(void){
 }
 void ds_perf_mark(int stage){
   ds_marks[stage]=ds_perf_nsec();
+  if(stage==6&&app==ST_PLAY&&(frame%23)==0)ds_hash_frame();
   if(stage==6&&app==ST_PLAY&&ds_marks[1]>=ds_marks[0]&&ds_marks[2]>=ds_marks[1]&&
      ds_marks[3]>=ds_marks[2]&&ds_marks[4]>=ds_marks[3]&&
      ds_marks[5]>=ds_marks[4]&&ds_marks[6]>=ds_marks[5]){
@@ -107,6 +119,7 @@ void ds_perf_mark(int stage){
 }
 static void ds_perf_report(void){
   if(!ds_phase_frames){fputs("DS_HOST_PROFILE no play frames\n",stderr);exit(1);}
+  printf("DS_FRAME_HASH checksum=%08x screen_samples=%u\n",ds_frame_hash,ds_hash_samples);
   static const char*const labels[6]={"input","physics","events","top_draw","bottom_draw","vblank_dma"};
   uint64_t total=0;for(int k=0;k<6;k++)total+=ds_phase_sum[k];
   printf("DS_HOST_PROFILE level=%d name=%s samples=%u cpu_frame_mean_us=%.1f sim_updates=%u\n",

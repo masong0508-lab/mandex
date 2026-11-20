@@ -377,14 +377,48 @@ static void draw_aim_dots(const View *v){
   }
 }
 
+#ifndef MX_DS_WALL_RUNS
+#define MX_DS_WALL_RUNS 1
+#endif
 static void draw_rooms(const View *v){
   int ppc = v->ppc;
   int x0 = v->cx > 0 ? v->cx / ppc : 0, x1 = (v->cx + 256) / ppc + 1; if(x1 > MX_COLS) x1 = MX_COLS;
   int y0 = v->cy > 0 ? v->cy / ppc : 0, y1 = (v->cy + 192) / ppc + 1; if(y1 > MX_ROWS) y1 = MX_ROWS;
-  for(int y = y0; y < y1; y++) for(int x = x0; x < x1; x++){
-    int i = y * MX_COLS + x;
-    if(world.paper[i] && !world.grid[i]) gfx_wall(v, world.paper[i] - 1, x * ppc - v->cx, y * ppc - v->cy);   /* wallpaper survives only where nothing has knocked it out */
+#if MX_DS_WALL_RUNS
+  /* The wallpaper tile is a solid flat shade with exactly ONE darker
+     accent pixel (see make_tiles in gfx.c). Batch contiguous intact cells
+     of the same palette into 2-4 horizontal spans rather than calling
+     gfx_wall once per cell. Damaged/broken cells split runs at their exact
+     boundary, so collisions and destruction still reveal identical art.
+     No cache, extra framebuffer, heap allocation or new palette. */
+  for(int y=y0;y<y1;y++){
+    int base=y*MX_COLS,x=x0,sy=y*ppc-v->cy;
+    while(x<x1){
+      int idx=base+x,paper=world.paper[idx];
+      if(!paper || world.grid[idx]){x++;continue;}
+      int pal=(paper-1)&3,first=x++;
+      while(x<x1){
+        int q=base+x,p=world.paper[q];
+        if(!p||world.grid[q]||((p-1)&3)!=pal)break;
+        x++;
+      }
+      int n=x-first,sx=first*ppc-v->cx;
+      if(n<3){
+        for(int k=0;k<n;k++)gfx_wall(v,pal,sx+k*ppc,sy);
+        continue;
+      }
+      for(int j=0;j<ppc;j++)gfx_rect(v->buf,sx,sy+j,n*ppc,1,(u8)(C_WALL0+pal));
+      int dark_y=sy+(ppc==2?0:ppc-1);
+      int dark_x=sx+(ppc==2?0:ppc-1);
+      for(int k=0;k<n;k++)gfx_px(v->buf,dark_x+k*ppc,dark_y,(u8)(C_WALLD0+pal));
+    }
   }
+#else
+  for(int y=y0;y<y1;y++) for(int x=x0;x<x1;x++){
+    int i=y*MX_COLS+x;
+    if(world.paper[i]&&!world.grid[i])gfx_wall(v,world.paper[i]-1,x*ppc-v->cx,y*ppc-v->cy);
+  }
+#endif
 }
 
 /* Façade depth pass, derived from the SAME destructible rooms as the core.
