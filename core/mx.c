@@ -225,12 +225,39 @@ static void mark_dmg(MxWorld *w, int x, int y){
 static void wob_zero(MxWorld *w, int i){ w->ox[i] = w->oy[i] = w->ovx[i] = w->ovy[i] = 0; }
 
 static void paper_hit(MxWorld *w, int x, int y){ for(int j = y - 1; j <= y + 1; j++) for(int i = x - 1; i <= x + 1; i++) if(i >= 0 && i < MX_COLS && j >= 0 && j < MX_ROWS) w->paper[IDX(i, j)] = 0; }
+/* Background wallpaper does not have physical collision bodies. Track the
+   real roof, floor and side posts surrounding each room. Only recheck after
+   masonry is lost, so normal gameplay adds no per-frame grid scans. */
+static int paper_frame_support(const MxWorld *w, const MxRoom *r){
+  int n=0,x0=r->x,x1=x0+r->w,y0=r->y,y1=y0+r->h;
+  for(int x=x0;x<x1;x++){
+    if(INB(x,y0-1)&&w->grid[IDX(x,y0-1)])n++;
+    if(INB(x,y1)&&w->grid[IDX(x,y1)])n++;
+  }
+  for(int y=y0;y<y1;y++){
+    if(INB(x0-1,y)&&w->grid[IDX(x0-1,y)])n++;
+    if(INB(x1,y)&&w->grid[IDX(x1,y)])n++;
+  }
+  return n;
+}
+static void paper_room_update(MxWorld *w){
+  w->paper_dirty=0;
+  for(int n=0;n<w->nrooms;n++){
+    const MxRoom *r=&w->rooms[n];
+    int initial=w->room_frame_init[n];
+    if(initial<6||paper_frame_support(w,r)*5>initial*2)continue;
+    /* 60% of frame destroyed/detached: no more floating room backdrop. */
+    for(int y=r->y;y<r->y+r->h;y++)for(int x=r->x;x<r->x+r->w;x++)
+      if(INB(x,y))w->paper[IDX(x,y)]=0;
+    w->room_frame_init[n]=0;
+  }
+}
 static void wake_at(MxWorld *w, real px, real py, real r);
 static real kill(MxWorld *w, int x, int y, real bvx, real bvy){
   int i = IDX(x, y), m = w->grid[i];
   if(!m) return 0;
   real h = w->hp[i];
-  w->grid[i] = 0; w->hp[i] = 0; w->anch[i] = 0; w->need_support = 1; w->score += 10; paper_hit(w, x, y);
+  w->grid[i] = 0; w->hp[i] = 0; w->anch[i] = 0; w->need_support = 1; w->score += 10; paper_hit(w, x, y); w->paper_dirty=1;
   wob_zero(w, i); clear_links(w, i); w->sand_on = 1; mark_dmg(w, x, y);
   if(w->collapse){ w->act_x = RI(x); w->act_y = RI(y); wake_at(w, RI(x) + R(0.5), RI(y) + R(0.5), RI(3)); }
   ev(w, EV_CELL, RI(x) + R(0.5), RI(y) + R(0.5), m, rmul(bvx, R(0.25)), rmul(bvy, R(0.25)));
@@ -240,7 +267,11 @@ static real kill(MxWorld *w, int x, int y, real bvx, real bvy){
 static real damage_cell(MxWorld *w, int x, int y, real d){
   if(!INB(x, y)) return 0;
   int i = IDX(x, y);
-  if(!w->grid[i]) return 0;
+  if(!w->grid[i]){
+    /* A powerful blow also tears exposed BACKGROUND wallpaper. */
+    if(w->paper[i]&&d>=RI(4))paper_hit(w,x,y);
+    return 0;
+  }
   if(w->hp[i] <= d) return kill(w, x, y, 0, 0);
   w->hp[i] -= d;
   return d;
@@ -731,7 +762,7 @@ static MX_HOT void support_pass(MxWorld *w){
       c->wx = w->ovx[gi]; c->wy = w->ovy[gi];            /* ... remembering its velocity (temporarily in wx/wy) */
       real d = MATS[c->m].d, px = c->lx + R(0.5), py = c->ly + R(0.5);
       M += d; cx += rmul(d, px); cy += rmul(d, py); mvx += rmul(d, c->wx); mvy += rmul(d, c->wy);
-      w->grid[gi] = 0; w->hp[gi] = 0; w->anch[gi] = 0; paper_hit(w, gi % MX_COLS, gi / MX_COLS);
+      w->grid[gi] = 0; w->hp[gi] = 0; w->anch[gi] = 0; paper_hit(w, gi % MX_COLS, gi / MX_COLS); w->paper_dirty=1;
       wob_zero(w, gi); clear_links(w, gi);
     }
     cx = rdiv(cx, M); cy = rdiv(cy, M);
@@ -1241,6 +1272,10 @@ static void man_step(MxWorld *w, real dt){
       break;
     }
   }
+  /* A flying character punctures intact scenery behind the front blocks
+     without changing projectile collisions or creating new particles. */
+  {int x=rfloor(m->x),y=rfloor(m->y);
+    if(INB(x,y)&&w->paper[IDX(x,y)])paper_hit(w,x,y);}
   if(m->y + MAN_R >= RI(MX_ROWS)){
     m->y = RI(MX_ROWS) - MAN_R;
     real sp2 = rmul(m->vx, m->vx) + rmul(m->vy, m->vy);
@@ -2141,6 +2176,9 @@ static void load_level(MxWorld *w, int level, int district){
   support_pass(w);
   for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active){ settle(w, &w->chunks[c], 1); }
   w->need_support = 0;
+  for(int r=0;r<w->nrooms;r++)
+    w->room_frame_init[r]=(uint16_t)paper_frame_support(w,&w->rooms[r]);
+  w->paper_dirty=0;
   next_man(w);
 }
 
@@ -2319,6 +2357,7 @@ void mx_update(MxWorld *w, real dt){
   if(w->sand_on && (w->sand_t % 3) == 0) sand_step(w);
   if(w->need_support && w->support_cd <= 0){ support_pass(w); w->support_cd = MX_SUPPORT_INTERVAL; }
   MX_PH_MARK(5);
+  if(w->paper_dirty)paper_room_update(w);
   upd_targets(w, dt);
   upd_cases(w, dt);
   MX_PH_MARK(6);
