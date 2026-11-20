@@ -113,12 +113,12 @@ static Part parts[NPART];
 #define MX_DS_PARTICLE_HINT 1
 #endif
 #if MX_DS_PARTICLE_HINT
-/* Always the lowest available slot. Destruction bursts no longer restart a
-   128-entry scan for every chip, and the same slots draw in the same order. */
+/* Earliest possibly vacant slot (not necessarily itself free). Destruction
+   bursts skip occupied prefixes and retain the exact old drawing order. */
 static int part_free_hint;
 #endif
 
-static void spawn(int type, real wx, real wy, int vx, int vy, int col, int life){
+static int spawn(int type, real wx, real wy, int vx, int vy, int col, int life){
 #if MX_DS_PARTICLE_HINT
   for(int i = part_free_hint; i < NPART; i++) if(parts[i].life <= 0){
 #else
@@ -129,25 +129,17 @@ static void spawn(int type, real wx, real wy, int vx, int vy, int col, int life)
 #if MX_DS_PARTICLE_HINT
     part_free_hint = i + 1;
 #endif
-    return;
+    return i;
   }
+  return -1;            /* pool exhausted */
 }
 /* the browser's ring(): an outline that swells to rcells and fades */
 static void spawn_ring(real wx, real wy, int rcells, int col){
-#if MX_DS_PARTICLE_HINT
-  /* The hint is the exact same slot the legacy first-free scan would find. */
-  int i = part_free_hint;
-  if(i < NPART){
-    spawn(PT_RING, wx, wy, 0, 0, col, 27);
-    parts[i].r = (short)(rcells * 64);
-  }
-#else
-  for(int i = 0; i < NPART; i++) if(parts[i].life <= 0){
-    spawn(PT_RING, wx, wy, 0, 0, col, 27);
-    parts[i].r = (short)(rcells * 64);
-    return;
-  }
-#endif
+  /* A free-slot hint can point at an OCCUPIED index after scattered
+     expirations. Attach the radius to the actual allocated slot, not the
+     search start, or later ring sprites may corrupt other particles. */
+  int i = spawn(PT_RING, wx, wy, 0, 0, col, 27);
+  if(i >= 0) parts[i].r = (short)(rcells * 64);
 }
 typedef struct { int x, y, life; char txt[12]; u8 col; } Popup;
 static Popup pops[4];
