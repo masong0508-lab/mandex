@@ -83,6 +83,33 @@ jobs:
               print(cached);report.append(cached)
           (out/'wobble-reference-ab.txt').write_text('\n'.join(report)+'\n')
           PY
+      - name: Repeated alternating A/B (robust against noisy shared CI runners)
+        run: |
+          python3 - <<'PY'
+          import pathlib,statistics,re,subprocess
+          results=['Comparing 360 deterministic frames per level across 60 levels.',
+                   'Each binary runs four times; execution order alternates A-B / B-A.',
+                   'Host CPU milliseconds, NOT console FPS.']
+          for mode in ('fixed','float'):
+            vals={'reference':[],'optimized':[]}
+            digest=None
+            for turn in range(4):
+              order=('reference','optimized') if turn%2==0 else ('optimized','reference')
+              for which in order:
+                name=f'/tmp/mandex_physics_{mode}'+('_ref' if which=='reference' else '')
+                s=subprocess.check_output([name,'--quiet','360'],text=True)
+                m=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',s)
+                if not m:raise SystemExit('missing benchmark output: '+s)
+                if digest is not None and digest!=m.group(2):
+                  raise SystemExit('world outcome mismatch')
+                digest=m.group(2);vals[which].append(float(m.group(1)))
+            a=statistics.median(vals['reference']);b=statistics.median(vals['optimized'])
+            line=(f'{mode} median-reference={a:.1f}ms median-optimized={b:.1f}ms '
+                  f'reduction={100*(a-b)/a:.1f}% '
+                  f'ref-runs={vals["reference"]} optimized-runs={vals["optimized"]}')
+            print(line);results.append(line)
+          pathlib.Path('out/gameplay-profiles/repeated-median-ab.txt').write_text('\n'.join(results)+'\n')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: mandex-gameplay-host-profiles
