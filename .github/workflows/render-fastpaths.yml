@@ -41,18 +41,38 @@ jobs:
               test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
               core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_aim_$fast
           done
-      - name: Verify DS reference/cached frame hashes across representative levels
+      - name: Verify DS reference/cached hashes for all 60 levels, record paired host costs
         run: |
-          for level in 0 9 29 39 59; do
+          mkdir -p out/fastpath-profiles
+          echo "level reference_host_us optimized_host_us" > out/fastpath-profiles/ds-aim-host-ab.txt
+          for level in $(seq 0 59); do
             DS_PERF_BENCH=1 /tmp/ds_aim_0 /tmp/ds_aim_ref 520 "$level" > /tmp/ds_aim_old.txt
             DS_PERF_BENCH=1 /tmp/ds_aim_1 /tmp/ds_aim_fast 520 "$level" > /tmp/ds_aim_new.txt
             grep '^DS_FRAME_HASH ' /tmp/ds_aim_old.txt > /tmp/aim_before_hash.txt
             grep '^DS_FRAME_HASH ' /tmp/ds_aim_new.txt > /tmp/aim_after_hash.txt
             test -s /tmp/aim_before_hash.txt
             diff -u /tmp/aim_before_hash.txt /tmp/aim_after_hash.txt
-            echo "DS level $((level+1)) pixel hash identical"
-            grep '^DS_HOST_PROFILE ' /tmp/ds_aim_new.txt | head -n 1 || true
+            old_us=$(sed -n 's/^DS_HOST_PROFILE .*cpu_frame_mean_us=\([0-9.]*\).*/\1/p' /tmp/ds_aim_old.txt | head -n 1)
+            new_us=$(sed -n 's/^DS_HOST_PROFILE .*cpu_frame_mean_us=\([0-9.]*\).*/\1/p' /tmp/ds_aim_new.txt | head -n 1)
+            test -n "$old_us" && test -n "$new_us"
+            echo "$((level+1)) $old_us $new_us" >> out/fastpath-profiles/ds-aim-host-ab.txt
+            echo "DS level $((level+1))/60: pixel-identical; reference=$old_us us optimized=$new_us us (host only)"
           done
+          python3 - <<'PY'
+          import statistics
+          lines=open('out/fastpath-profiles/ds-aim-host-ab.txt').read().splitlines()[1:]
+          r=[tuple(map(float,l.split())) for l in lines]
+          assert len(r)==60, len(r)
+          old=sum(t[1] for t in r);new=sum(t[2] for t in r)
+          med=statistics.median([(a-b)/a*100 for _,a,b in r if a])
+          print(f'ALL 60 LEVELS: sampled screen hashes equal; mean per-level host-time sum old={old:.1f}us new={new:.1f}us; median per-level delta={med:+.2f}%')
+          print('HOST x86 CPU TIME ONLY: NOT DS HARDWARE FPS. Alternating repeated trials are needed before claiming a speedup.')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ds-aim-all-levels-host-parity
+          path: out/fastpath-profiles/ds-aim-host-ab.txt
+          if-no-files-found: error
 
       - name: Build 3DS reference and fast-path host probes
         run: |
