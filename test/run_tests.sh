@@ -32,6 +32,9 @@ echo "--- event-driven landlord structural-shock reactions (float, fixed, fallba
 gcc -std=gnu99 -O2 -Wno-unused-function -I../core landlord_shock_test.c -lm -o landlord_shock_float && ./landlord_shock_float
 gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -I../core landlord_shock_test.c -lm -o landlord_shock_fixed && ./landlord_shock_fixed
 gcc -std=gnu99 -O2 -Wno-unused-function -DMX_LORD_SHOCK_REACT=0 -I../core landlord_shock_test.c -lm -o landlord_shock_old && ./landlord_shock_old
+echo "--- Dreamcast VMU: two-sector mock for valid saves, torn writes and missing cards ---"
+gcc -std=gnu99 -O2 -Wall -Wno-unused-function -I../core ../core/mx.c ../core/mx_meta.c vmu_save_test.c -lm -o vmu_save_float && ./vmu_save_float
+gcc -std=gnu99 -O2 -Wall -Wno-unused-function -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c vmu_save_test.c -lm -o vmu_save_fixed && ./vmu_save_fixed
 echo "--- dual-slot progress journal: CRC, truncation, generation wrap (float and fixed) ---"
 gcc -std=gnu99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c journal_test.c -lm -o journal_float && ./journal_float
 gcc -std=gnu99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c journal_test.c -lm -o journal_fixed && ./journal_fixed
