@@ -34,6 +34,8 @@ One game, four builds: a browser version with its own JS physics, and three cons
   toppling) until the level ends; off, rubble settles and locks solid.  Either way, damaged walls crumble after each run.
 - **Body jiggle**: his belly and rear are damped springs, kicked while he flies, hits something or drops, plus an
   impact squash.  It is cosmetic and never touches the physics.
+- **Eviction combos**: chain landlord defeats within 2.5 real-time seconds for a capped +1,000/+2,000/+3,000/+4,000 score bonus and increasingly outrageous adult-comedy stingers. The browser and three consoles share the same score rules; it never affects saved-file structure or adds an allocation.
+- **Cinematic cutscene pass**: eased camera pushes, comic impact accents and dialogue progress on the browser; lightweight atmosphere, shot-decay camera shake, and narration progress cues in the DS/3DS shared intro.
 
 ## Build and test
 

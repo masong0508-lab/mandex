@@ -606,6 +606,23 @@ static void trans(u8 *b){
   else if(ty == 2){ int r = (u * u >> 8) * 180 / 256 + 1; for(int y = 0; y < 192; y++){ int dy = y - 96, d = r * r - dy * dy; int dx = d > 0 ? isq(d) : 0; if(dx < 128){ gfx_rect(b, 0, y, 128 - dx, 1, C_BLACK); gfx_rect(b, 128 + dx, y, 128 - dx, 1, C_BLACK); } } }
   else { u8 c = ty == 3 ? C_WHITE : C_BLACK; if(t < 8) gfx_rect(b, 0, 0, 256, 192, c); else if(t < 20) gfx_dither(b, 0, 0, 256, 192, c); else if(t & 1) gfx_dither(b, 0, 0, 256, 192, c); }
 }
+/* Subtle atmospheric depth, limited to a dozen cheap 1px glints per frame.
+   Shot-relative motion keeps the top screen alive without a second framebuffer. */
+static void film_fx(u8 *b, int k, int tt){
+  for(int i = 0; i < 12; i++){
+    u32 p = hs((u32)(i * 127 + sc * 61 + mode * 37));
+    int x = (int)((p & 255u) + (u32)(tt * (1 + (i & 3)))) & 255;
+    int y = (int)((p >> 9) % 148u) + 15;
+    if(y > 171) continue;
+    gfx_rect(b, x, y, (i & 3) == 0 ? 2 : 1, 1, (i & 1) ? C_CLOUD2 : C_GOLD2);
+  }
+  if(tt < 12 && k > 0){  /* tiny snap-cut flare: fast, then out of the characters' way */
+    for(int i = 0; i < 4; i++){
+      int x = 26 + (i * 67 + tt * 7) % 206;
+      gfx_rect(b, x, 18 + i * 39, (12 - tt) * 2, 1, C_WHITE);
+    }
+  }
+}
 static void shake(u8 *b, int amp){
   if(amp <= 0) return;
   int dx = (int)(hs(t * 3 + 1) % (u32)(2 * amp + 1)) - amp, dy = (int)(hs(t * 5 + 2) % (u32)(2 * amp + 1)) - amp;
@@ -646,6 +663,10 @@ static void narration(u8 *b){
   }
   gfx_rect(b, 184, 172, 66, 16, C_UIHI); gfx_rect(b, 184, 172, 66, 1, C_UILINE); gfx_rect(b, 184, 187, 66, 1, C_UILINE); gfx_rect(b, 184, 172, 1, 16, C_UILINE); gfx_rect(b, 249, 172, 1, 16, C_UILINE);
   gfx_text_c(b, 217, 177, "SKIP >>", C_WHITE, C_UIHI, 1);
+  /* Animated chapter/story progress rail and a pulsing dialogue pointer. */
+  { int end = type_end(sc); int progress = end > 0 ? (t < end ? t * 240 / end : 240) : 240;
+    gfx_rect(b, 8, 165, 240, 2, C_DARK); gfx_rect(b, 8, 165, progress, 2, C_GOLD);
+    if(t < end) gfx_rect(b, 10 + (t * 5 % 225), 160, 2, 3, C_GOLD2); }
   if(t >= type_end(sc) && (t & 32)) gfx_text(b, 8, 177, "A / TOUCH: NEXT", C_UILINE, 1);
 }
 
@@ -661,7 +682,10 @@ void intro_draw(u8 *top, u8 *bot){
   case 0: sc_suburb(top, k, tt); break;   case 1: sc_divorce(top, k, tt); break;  case 2: sc_dennis(top, k, tt); break;  case 3: sc_couch(top, k, tt); break;
   case 4: sc_landlord(top, k, tt); break; case 5: sc_snap(top, k, tt); break;     case 6: sc_born(top, k, tt); break;    default: sc_mission(top, k, tt); break;
   }
-  trans(top); shake(top, SHAKE(sc, k > 2 ? 2 : k));
+  trans(top);
+  /* Impact shake now falls off on each shot rather than jittering through every line of dialogue. */
+  { int amp = SHAKE(sc, k > 2 ? 2 : k); if(tt >= 24) amp = 0; else amp = amp * (24 - tt) / 24; shake(top, amp); }
+  film_fx(top, k, tt);
   /* letterbox bars sliding in, like the browser version */
   int bar = t * 3 > 12 ? 12 : t * 3; gfx_rect(top, 0, 0, 256, bar, C_BLACK); gfx_rect(top, 0, 192 - bar, 256, bar, C_BLACK);
   narration(bot);

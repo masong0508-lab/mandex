@@ -206,6 +206,9 @@ typedef struct {
   MxMan man;
   /* game */
   int level, state, men, score;
+  /* Evictions within 2.5 real-time seconds stack score bonuses; no allocations or save-format changes. */
+  int combo, combo_peak;
+  real combo_left;
   int district;                  /* Landlord HQ (level 39) is three 120-cell districts played one after another; 0..2 (always 0 on other levels) */
   real time, shake, slow, banner, flash, waitT, winT, loseT;
   int freeze, need_support, support_cd, substeps, nhouses;
@@ -280,6 +283,7 @@ void mx_walk_input(MxWorld *w, int ax, int jump, int punch, int stomp);
 void mx_walk_quit(MxWorld *w);
 void mx_set_fight(MxWorld *w, int on);          /* landlords fight back (default on) */
 #define MX_BAT_BREAK R(70)                       /* a bat landlord only swats shots slower than this (cells/s) */                /* put him on the valve. 0 if locked or not aiming */
+const char *mx_combo_taunt(int count);  /* compact adult-comedy stingers shared by all console HUDs */
 int  mx_targets_alive(const MxWorld *w);
 int  mx_cells_left(const MxWorld *w);
 const char *mx_level_name(int level);

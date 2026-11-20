@@ -259,7 +259,7 @@ static void on_events(void){
       spawn(PT_HAT, e->x, e->y - RI(3), rnd(9) - 4, -22, 0, 90);
       sfx_play(SFX_TARGET, pan);
       ev_fx = e->x; ev_fy = e->y; ev_ft = 90;
-      popup(e->x, e->y - RI(4), WORDS[rnd(4)], C_GOLD);
+      popup(e->x, e->y - RI(4), e->m > 1 ? mx_combo_taunt(e->m) : WORDS[rnd(4)], e->m > 1 ? C_PINK : C_GOLD);
       break; }
     case EV_LAUNCH: sfx_play(SFX_LAUNCH, pan); dragging = 0; break;
     case EV_DIVE:   sfx_play(SFX_DIVE, pan); break;
@@ -652,6 +652,9 @@ static void top_hud(u8 *b){
   gfx_text_o(b, 70, 15, "WRECKED", C_WHITE, C_BLACK, 1);
   gfx_text_o(b, 70 + 30, 15, gfx_int(pct), C_WHITE, C_BLACK, 1);
   gfx_text_o(b, 70 + 30 + gfx_text_w(gfx_int(pct), 1) + 2, 15, "%", C_WHITE, C_BLACK, 1);
+  if(world.combo > 1 && world.combo_left > 0){ gfx_rect(b, 140, 14, 110, 14, C_UIBG);
+    gfx_text_o(b, 144, 17, mx_combo_taunt(world.combo), C_PINK, C_BLACK, 1);
+    gfx_rect(b, 140, 28, (int)(rmul(world.combo_left, RI(110)) / R(2.5)), 2, C_GOLD); }
   gfx_text_o(b, 4, 24, "LANDLORDS", C_WHITE, C_BLACK, 1);
   draw_hats(b, 46, 28);
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                      /* walk levels: the clock, and what the buttons do */

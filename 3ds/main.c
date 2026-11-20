@@ -177,7 +177,8 @@ static void on_events(void){
     case EV_TUBE: { static const u32 TC[3] = { RGB(255, 154, 60), RGB(79, 208, 255), RGB(140, 255, 90) };        /* posted through a pneumatic tube */
       for(int k = 0; k < 16; k++){ float an = k * .39f; spawn(x, y, cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); spawn(RTOF(e->a), RTOF(e->b), cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); }
       popup(x, y - 5, "FWOOMP!", TC[e->m % 3]); } break;
-    case EV_TARGET: for(int k = 0; k < 14; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 11) * .3f, 36, RGB(255, 220, 60)); break;
+    case EV_TARGET: for(int k = 0; k < 14; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 11) * .3f, 36, RGB(255, 220, 60));
+      if(e->m > 1) popup(x, y - 9, mx_combo_taunt(e->m), RGB(255, 126, 176)); break;
     case EV_WALK: for(int k = 0; k < 10; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 30, RGB(110, 255, 90)); popup(x, y - 6, "ON FOOT!", RGB(125, 255, 90)); break;
     case EV_PUNCH: if(e->a > 0){ for(int k = 0; k < 6; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 20, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 3, e->m ? "SHOULDER!" : "POW!", RGB(255, 210, 63)); } break;
     case EV_SLAM: for(int k = 0; k < 10; k++) spawn(x + (rand() % 9 - 4), y, (rand() % 21 - 10) * .35f, -(rand() % 5) * .2f, 24, RGB(220, 220, 230)); popup(x, y - 5, "BELLY SLAM!", RGB(255, 138, 58)); break;
@@ -629,6 +630,9 @@ static void draw_hud(void){
   text(&top, 6, 224, "MEN", 2, RGB(190, 190, 190)); itoa_(world.men, b); text(&top, 40, 224, b, 2, RGB(255, 255, 255));
   text(&top, 80, 224, "LANDLORDS", 2, RGB(255, 138, 138)); sprintf(b, "%d/%d", alive(), world.ntargets); text(&top, 168, 224, b, 2, RGB(255, 255, 255));
   sprintf(b, "%06d", world.score); text(&top, 394 - tw(b, 2), 224, b, 2, RGB(255, 255, 255));
+  if(world.combo > 1 && world.combo_left > 0){
+    rect(&top, 6, 27, 188, 14, RGB(27, 16, 43)); text(&top, 12, 30, mx_combo_taunt(world.combo), 1, RGB(255, 126, 176));
+    rect(&top, 6, 41, (int)(188 * RTOF(world.combo_left) / 2.5f), 2, RGB(255, 210, 63)); }
   if(toast_t > 0 && toast_id >= 0){                                          /* achievement popup: drops in, gold frame, star badge, time bar */
     int t = toast_t, off = t < 10 ? (10 - t) * 5 : t > 140 ? (t - 140) * 5 : 0, y = 24 - off, x = 84, w = 232, h = 36;
     int oc = toast_id >= 100; u32 fc = oc ? RGB(125, 255, 90) : RGB(255, 210, 63);

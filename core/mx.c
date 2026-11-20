@@ -190,6 +190,19 @@ static void apply_impulse(MxChunk *ch, real px, real py, real jx, real jy){
   ch->sleep = 0;
 }
 
+/* A bounded arcade combo: reset between volleys, cap bonus at +4000 per landlord.
+   Keeping the timer in game state (not per-target) makes rubble/TNT chains count. */
+static void combo_tick(MxWorld *w, real dt){
+  if(w->combo_left > 0){
+    w->combo_left -= dt;
+    if(w->combo_left <= 0){ w->combo_left = 0; w->combo = 0; }
+  }
+}
+const char *mx_combo_taunt(int count){
+  static const char *const words[] = { "EVICTED!", "DOUBLE TROUBLE!", "THREESOME OF DOOM!", "FOURCLOSED!", "RENTAL ORGY!" };
+  return words[count <= 1 ? 0 : count >= 5 ? 4 : count - 1];
+}
+
 /* soft hit: a landlord with more than one hit point loses one (0.7 s of immunity, stunned, shield gone); hard (blast, crush, big fall) always kills */
 #define kill_target(w, t) kill_target_ex(w, t, 0)
 #define kill_hard(w, t) kill_target_ex(w, t, 1)
@@ -202,9 +215,14 @@ static void kill_target_ex(MxWorld *w, MxTarget *t, int hard){
     ev(w, EV_OOF, t->x, t->y, 0, RI(t->hp), 0);
     return;
   }
-  t->alive = 0; w->score += 5000; w->slow = R(0.25);
+  t->alive = 0;
+  w->combo = w->combo_left > 0 ? (w->combo < 5 ? w->combo + 1 : 5) : 1;
+  if(w->combo > w->combo_peak) w->combo_peak = w->combo;
+  w->combo_left = R(2.5);
+  int bonus = (w->combo - 1) * 1000;
+  w->score += 5000 + bonus; w->slow = R(0.25);
   if(w->man.mode == MAN_WALK){ w->man.wt += RI(3); if(w->man.wt > RI(MX_WALK_T + 15)) w->man.wt = RI(MX_WALK_T + 15); }   /* on foot, every landlord is worth +3 s */
-  ev(w, EV_TARGET, t->x, t->y, 0, 0, 0);
+  ev(w, EV_TARGET, t->x, t->y, w->combo, RI(bonus), 0);
 }
 
 static void shockwave(MxWorld *w, real px, real py, real rad, real power){
@@ -1964,9 +1982,10 @@ void mx_load(MxWorld *w, int level){ load_level(w, level, 0); }
 static void hq_next_district(MxWorld *w){
   int men = w->men + MX_HQ_BONUS_MEN, score = w->score + 3000, d = w->district + 1;
   int inf = w->st_inflated, pops = w->st_pops, pw[4] = { w->st_pw[0], w->st_pw[1], w->st_pw[2], w->st_pw[3] };
+  int combo = w->combo, peak = w->combo_peak; real combo_left = w->combo_left;
   uint32_t rng = w->rng;
   load_level(w, MX_HQ_LEVEL, d);
-  w->men = men; w->score = score; w->st_inflated = inf; w->st_pops = pops; for(int i = 0; i < 4; i++) w->st_pw[i] = pw[i]; w->rng ^= rng; w->banner = R(2.4);
+  w->men = men; w->score = score; w->combo = combo; w->combo_peak = peak; w->combo_left = combo_left; w->st_inflated = inf; w->st_pops = pops; for(int i = 0; i < 4; i++) w->st_pw[i] = pw[i]; w->rng ^= rng; w->banner = R(2.4);
   ev(w, EV_DISTRICT, 0, 0, d, 0, 0);
 }
 
@@ -2033,6 +2052,7 @@ void mx_update(MxWorld *w, real dt){
   w->nev = 0; w->crack_ev = 0; w->time += dt;
   if(w->support_cd > 0) w->support_cd--;
   if(w->freeze > 0){ w->freeze--; return; }
+  combo_tick(w, dt);            /* wall-clock dt, so bullet-time cannot artificially prolong a chain */
   if(w->slow > 0){ w->slow -= dt; dt = rmul(dt, R(0.4)); }
   if(w->banner > 0) w->banner -= dt;
   if(w->flash > 0) w->flash -= dt;

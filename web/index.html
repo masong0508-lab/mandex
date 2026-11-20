@@ -41,6 +41,7 @@ let tubes=[];   // pneumatic tubes of the current level (chapter 2): see tubeSte
 let pads=[];    // bounce pads of the current level (walk levels): pink rubber strips that boing the man up a shaft, see padCheck / drawPads
 let level=0,state='title',shake=0,freeze=0,slow=0,needSupport=false,dragging=false;
 let score=0,shownScore=0,time=0,winT=0,loseT=0,banner=0,hint=1,waitT=0,chunkId=0,flash=0;
+let combo=0,comboPeak=0,comboLeft=0;  // 2.5-second eviction streak, matching the shared console core
 
 // =====================================================================
 //  AUDIO (tiny synth)
@@ -510,7 +511,7 @@ function unclipTargets(){for(const t of targets){const row=Math.floor(t.y/V+.875
 function load(l,custom){
   CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
-  pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;banner=2.4;waitT=0;
+  pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;banner=2.4;waitT=0;
   tubes=[];pads=[];CL.build();paper.fill(0);interiors.forEach((r,n)=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(inb(x,y))paper[idx(x,y)]=n+1});unclipTargets();
   zonePaid=[];if(CL.slings){const zb=CL.zones||[];for(const t of targets){t.zone=0;for(let k=0;k<zb.length;k++)if(t.x>=zb[k]*V)t.zone=k+1}setSling(0)}else{SX=128;SY=GY-118;VX=36;VY=SY+58;slingK=0}
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
@@ -1115,8 +1116,11 @@ function dive(){
 function solidAt(px,py){if(!grid)return false;const gx=Math.floor(px/V),gy=Math.floor(py/V);if(gy>=ROWS)return true;return inb(gx,gy)&&grid[idx(gx,gy)]>0}
 function killTarget(t,hard){if(!t.alive)return;
   if(!hard&&t.hp>1){if(t.inv>0)return;t.hp--;t.inv=.7;t.stun=.6;t.armor=0;shake=Math.max(shake,6);SFX.crunch(.6);spark(t.x,t.y-6,8,240);popText(t.x,t.y-40,'OOF!  '+t.hp+' LEFT','#ffd23f',16);return}
-  t.alive=false;if(man&&man.mode==='walk'){man.wt=Math.min(man.wt+3,WALK_T+15);popText(t.x,t.y-38,'+3s','#7dff5a',18)}onLandlord();score+=5000;SFX.ding();slow=Math.max(slow,.25);
-  popText(t.x,t.y-14,'+5000','#ffd23f',24);
+  t.alive=false;if(man&&man.mode==='walk'){man.wt=Math.min(man.wt+3,WALK_T+15);popText(t.x,t.y-38,'+3s','#7dff5a',18)}onLandlord();combo=comboLeft>0?Math.min(5,combo+1):1;comboLeft=2.5;comboPeak=Math.max(comboPeak,combo);
+  const bonus=(combo-1)*1000;score+=5000+bonus;SFX.ding();slow=Math.max(slow,.25);
+  const comboWords=['EVICTED!','DOUBLE TROUBLE!','THREESOME OF DOOM!','FOURCLOSED!','RENTAL ORGY!'];
+  popText(t.x,t.y-52,comboWords[combo-1],combo>1?'#ff9ec8':'#ffd23f',combo>1?20:16);
+  popText(t.x,t.y-14,'+'+(5000+bonus),'#ffd23f',24);
   for(let i=0;i<14;i++)parts.push({k:4,x:t.x,y:t.y,vx:(rnd()-.5)*300,vy:-rnd()*300-60,l:1.6,l0:1.6,s:3+rnd()*3,r:rnd()*6});
   for(let i=0;i<10;i++)chip(t.x,t.y,['#4a5568','#f2c7a1','#111'][i%3],(rnd()-.5)*260,-rnd()*260);dust(t.x,t.y,4,9)}
 // ---------- landlords fight back ----------
@@ -1213,6 +1217,7 @@ function update(dt){
   if(state==='cutscene'){cutTick(dt);titleTick(dt);return}
   if(state==='title'||state==='edit'||UISTATES.includes(state)){titleTick(dt);return}
   if(freeze>0){freeze--;return}
+  if(comboLeft>0){comboLeft=Math.max(0,comboLeft-dt);if(!comboLeft)combo=0}
   if(slow>0){slow-=dt;dt*=.4}
   if(banner>0)banner-=dt;if(flash>0)flash-=dt;
   if(man){if(man.hurtCd>0)man.hurtCd-=dt;if(man.stun>0)man.stun-=dt}
@@ -2929,6 +2934,7 @@ function drawHUD(){
   {const nm=`${CL.custom?'CUSTOM':'LV '+(level+1)}  ${CL.name.toUpperCase()}`;let sz=18;{while(sz>11){ctx.font=`bold ${sz}px "Trebuchet MS",Impact,sans-serif`;if(ctx.measureText(nm).width<=(P?285:250))break;sz--}}txt(nm,12,24,sz,'#ffd23f','left')}
   const lb=aliveTargets();txt(`LANDLORDS ${lb}/${targets.length}`,P?12:Math.max(430,300+men*Math.min(20,230/Math.max(1,men))+24),P?54:24,18,lb?'#ff8a8a':'#7dff5a','left');
   txt(String(Math.round(shownScore)).padStart(6,'0'),W-12,24,20,'#fff','right');
+  if(combo>1&&state==='play'){const q=Math.min(1,comboLeft/2.5);ctx.fillStyle='rgba(40,12,47,.86)';ctx.fillRect(W-170,P?67:39,158,30);txt('x'+combo+'  EVICTION STREAK',W-91,P?87:59,15,'#ff9ec8','center');ctx.fillStyle='#ff9ec8';ctx.fillRect(W-168,P?95:67,154*q,2)}
   const mstp=Math.min(P?16:20,(P?190:230)/Math.max(1,men));   // a long row of men squeezes together (the wide finale can have 17)
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
@@ -3311,7 +3317,12 @@ function cutBox(lines,t,hl){
   const n=lines.length,bh=24+n*30,y0=H-bh-20;
   ctx.save();ctx.globalAlpha=.4;rrect(34,y0+5,W-60,bh,16);ctx.fillStyle='#000';ctx.fill();ctx.globalAlpha=1;
   rrect(30,y0,W-60,bh,16);ctx.fillStyle=cgLG(0,y0,0,y0+bh,[0,'rgba(24,28,52,.94)',1,'rgba(8,10,22,.94)']);ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle='rgba(255,210,63,.75)';ctx.stroke();
-  rrect(34,y0+4,W-68,bh-8,12);ctx.lineWidth=1;ctx.strokeStyle='rgba(255,255,255,.14)';ctx.stroke();ctx.restore();
+  rrect(34,y0+4,W-68,bh-8,12);ctx.lineWidth=1;ctx.strokeStyle='rgba(255,255,255,.14)';ctx.stroke();
+  // Gold story-progress rail doubles as a subtle visual metronome for the typewriter narration.
+  const read=Math.max(0,Math.min(1,(t-.4)*CPS/Math.max(1,cutTotal())));
+  ctx.fillStyle='rgba(255,255,255,.16)';ctx.fillRect(46,y0+bh-9,W-92,3);
+  ctx.fillStyle='#ffd23f';ctx.fillRect(46,y0+bh-9,(W-92)*read,3);
+  ctx.restore();
   let left=Math.floor(Math.max(0,t-.4)*CPS);
   for(let i=0;i<n;i++){const s=lines[i],k=Math.max(0,Math.min(s.length,left));left-=s.length;let fs=22;ctx.font=`bold 22px "Trebuchet MS",Impact,sans-serif`;const fw=ctx.measureText(s).width;if(fw>W-110)fs=Math.floor(22*(W-110)/fw);   // a long line shrinks to fit the box instead of running into its edge
     txt(s.slice(0,k),50,y0+38+i*30,fs,i===hl?'#ffd23f':'#fff','left')}
@@ -3450,13 +3461,18 @@ function cgHydrant(x,gy){cgShadow(x,gy+2,16,4,.3);cgR(x-9,gy-36,18,36,cgLG(x-9,0
 function cgPole(x,gy){cgR(x-4,gy-260,8,260,cgLG(x-4,0,x+4,0,[0,'#6b4a2e',1,'#3a2614']),2);cgR(x-34,gy-240,68,6,'#4a2e18',2);cgLine(x-34,gy-238,x-120,gy-228,'rgba(0,0,0,.6)',1.4);cgLine(x+34,gy-238,x+120,gy-228,'rgba(0,0,0,.6)',1.4)}
 function cgLamppost(x,gy,on){cgR(x-3,gy-170,6,170,'#2a2a30',2);cgR(x-9,gy-12,18,12,'#2a2a30',2);cgP([x-16,gy-172,x+16,gy-172,x+10,gy-190,x-10,gy-190],'#2a2a30',2);if(on){ctx.save();ctx.fillStyle=cgRG(x,gy-168,2,150,[0,'rgba(255,225,140,.55)',1,'rgba(255,225,140,0)']);ctx.fillRect(x-150,gy-320,300,320);ctx.restore();cgE(x,gy-170,8,5,'#ffe9a8',1.6)}}
 function cgDebris(t,gy,n){ctx.save();for(let i=0;i<n;i++){const ph=(t*.6+i*.173)%1,a=cgRnd(i)*6.28,x=480+Math.cos(a)*(40+ph*430)*(.6+cgRnd(i+4)),y=250-Math.abs(Math.sin(a))*(40+ph*280)+ph*ph*190;ctx.save();ctx.translate(x,y);ctx.rotate(t*3+i);ctx.globalAlpha=1-ph*.8;cgP([-9,-5,8,-7,10,6,-6,7],['#a4553a','#8a4632','#6b4a2e','#c4553a'][i%4],1.8);ctx.restore()}ctx.restore()}
-// >>> CUTSCENE SHOTS (v3): no zooming.  Every scene is cut from several separately composed shots (wide, low angle, reverse, over-the-shoulder, close-up, insert),
+// >>> CUTSCENE SHOTS (v4): subtly animated camera pushes and scene cuts. Every scene keeps its wide, low angle, reverse, over-the-shoulder, close-up and insert compositions,
 // a hard cut with a short flash between them.  cuts = start time of each shot; shake / tilt = optional per-shot kick and dutch angle.
 // framing rule: the caption box covers y>406, so a close-up puts the face at y~205: feetY = 205 + 91*scale.
 function cgK(c,t){let k=0;for(let j=0;j<c.length;j++)if(t>=c[j])k=j;return k}
-function cutCam(i,t){const S=CUTS[i],c=S.cuts,k=cgK(c,t),dt=t-c[k],sk=((S.shake||[])[k]||0)*Math.exp(-4*dt),r=(S.tilt||[])[k]||0;
+function cutCam(i,t){const S=CUTS[i],c=S.cuts,k=cgK(c,t),dt=Math.max(0,t-c[k]),sk=((S.shake||[])[k]||0)*Math.exp(-5*dt),r=(S.tilt||[])[k]||0;
   const pu=S.push!=null?S.push:.016,pn=(S.pan||[])[k]||[0,0];
-  return{z:1.04+Math.abs(r)*2.4+Math.min(.12,pu*dt),x:480+pn[0]*dt,y:270+pn[1]*dt,r:r,sx:Math.sin(t*93)*sk,sy:Math.cos(t*71)*sk,fl:k>0?Math.max(0,.45*(1-dt/.12)):0}}
+  // Ease into a deliberate dolly move, then drift. No re-layout of hand-composed character shots.
+  const glide=dt-(1-Math.exp(-dt*2.5))/2.5, push=(1-Math.exp(-dt*.85))/.85;
+  return{z:1.035+Math.abs(r)*2.4+Math.min(.18,pu*push)+Math.sin(t*1.1)*.002,
+    x:480+pn[0]*glide+Math.sin(t*.7)*.65,y:270+pn[1]*glide+Math.cos(t*.6)*.4,
+    r:r+Math.sin(dt*.9)*.0015,sx:Math.sin(t*93)*sk,sy:Math.cos(t*71)*sk,
+    fl:k>0?Math.max(0,.38*(1-dt/.13)):0}}
 // Gerald seen from behind (over-the-shoulder shots)
 function cutGeraldBack(x,feetY,s,o){o=o||{};const sb=BR,sd=BRD,sw=WORK,st=THONG,swf=WOLF;WORK=false;if(o.wolf===true)o.wolf=3;THONG=WOLF=o.wolf>=3;setFur(WOLF);if(o.wolf>=3){BR='#8c909e';BRD='#656979'}else if(!o.boxers){BR='#c9b37a';BRD='#9c8650'}
   ctx.save();ctx.translate(x,feetY-48*s);ctx.scale(s,s);drawBack(null,cutT*.8+.3,{noflag:true});WOLFH=o.wolf&&o.wolf<3?o.wolf:0;if(!(o.wolf>=3)&&!o.noshirt){const sm=o.shirt!=null?o.shirt:(CUTS&&CUTS[cutI]&&CUTS[cutI].shirt!=null?CUTS[cutI].shirt:1);if(sm){ctx.save();ctx.translate(0,3);ctx.beginPath();ctx.rect(-40,-25,80,60);ctx.clip();cutShirtBack(sm);ctx.restore()}}ctx.restore();BR=sb;BRD=sd;WORK=sw;THONG=st;WOLF=swf}
@@ -3752,6 +3768,8 @@ function drawCutscene(){
   const sc=CUTS[cutI],cs=cutCam(cutI,cutT);ctx.save();ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);ctx.translate(-cs.x,-cs.y);sc.draw(cutT);ctx.restore();cutDust(cutT);cutVig();
   if(cs.fl>0){ctx.fillStyle='rgba(255,255,255,'+cs.fl+')';ctx.fillRect(0,0,W,H)}
   const bar=16*Math.min(1,cutT*3);ctx.fillStyle='#000';ctx.fillRect(0,0,W,bar);ctx.fillRect(0,H-bar,W,bar);cutTrans(sc.tr,cutT);
+  // A short, inexpensive comic-panel impact treatment on strong camera beats.
+  if((sc.shake||[])[cgK(sc.cuts,cutT)]>=6){const d=cutT-sc.cuts[cgK(sc.cuts,cutT)];if(d>=0&&d<.28){ctx.save();ctx.strokeStyle=`rgba(255,238,185,${.28*(1-d/.28)})`;ctx.lineWidth=2;for(let i=0;i<9;i++){const a=i*6.28318/9+cutI;ctx.beginPath();ctx.moveTo(480+Math.cos(a)*270,260+Math.sin(a)*200);ctx.lineTo(480+Math.cos(a)*540,260+Math.sin(a)*400);ctx.stroke()}ctx.restore()}}
   cutBox(sc.lines,cutT,sc.hl);
   btn(W-112,8,104,32,'SKIP >>',()=>{},{size:14});
   for(let i=0;i<CUTS.length;i++){ctx.fillStyle=i===cutI?'#ffd23f':'rgba(255,255,255,.4)';ctx.beginPath();ctx.arc(24+i*16,24,4,0,7);ctx.fill()}}
