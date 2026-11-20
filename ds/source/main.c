@@ -101,7 +101,7 @@ static void toast_tick(void){
 static int pad_dx, pad_dy, pad_used, dragging;
 static int MAXHP[MX_NMAT];                    /* filled from the core's material table */
 #ifndef MX_DS_FACADE_CACHE
-#define MX_DS_FACADE_CACHE 1
+#define MX_DS_FACADE_CACHE 0 /* measured neutral/slower across 8 host scenarios; retain for A/B */
 #endif
 #if MX_DS_FACADE_CACHE
 /* At most 20 rooms and three windows per room: ~600 bytes of static storage,
