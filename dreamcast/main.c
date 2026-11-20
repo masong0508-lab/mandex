@@ -70,21 +70,21 @@ static sfxhnd_t snd_h[SFX_COUNT], mus_h; static int snd_ok, snd_cool[SFX_COUNT],
 static void le32(unsigned char *p, unsigned v){ p[0] = v; p[1] = v >> 8; p[2] = v >> 16; p[3] = v >> 24; }
 static void sound_init(void){
   if(snd_stream_init() < 0) return;
-  static short pcm[MX_SND_MAX]; static unsigned char wav[44 + MX_SND_MAX * 2];
+  /* Dreamcast SH-4 is little-endian: synthesize PCM directly into the WAV data
+     area (44 bytes from a 4-byte aligned base).  No duplicate PCM BSS. */
+  static unsigned char wav[44 + MX_SND_MAX * 2] __attribute__((aligned(4)));
   for(int i = 0; i < SFX_COUNT; i++){
-    int n = mx_snd_render(i, pcm, MX_SND_MAX);
+    int n = mx_snd_render(i, (short *)(void *)(wav + 44), MX_SND_MAX);
     memcpy(wav, "RIFF\0\0\0\0WAVEfmt \x10\0\0\0\1\0\1\0\0\0\0\0\0\0\0\0\2\0\x10\0data\0\0\0\0", 44);
     le32(wav + 4, 36 + n * 2); le32(wav + 24, MX_SND_RATE); le32(wav + 28, MX_SND_RATE * 2); le32(wav + 40, n * 2);
-    for(int k = 0; k < n; k++){ wav[44 + k * 2] = (unsigned char)pcm[k]; wav[45 + k * 2] = (unsigned char)((unsigned short)pcm[k] >> 8); }
     snd_h[i] = snd_sfx_load_buf((char *)wav);
     if(snd_h[i] == SFXHND_INVALID){ snd_ok = 0; return; }
   }
   snd_ok = 1;
-  { static short mpcm[MX_MUS_SAMPLES]; static unsigned char mwav[44 + MX_MUS_SAMPLES * 2];          /* the theme: one 12.8 s loop */
-    int n = mx_music_render(mpcm, MX_MUS_SAMPLES);
+  { static unsigned char mwav[44 + MX_MUS_SAMPLES * 2] __attribute__((aligned(4)));          /* the theme: one 12.8 s loop */
+    int n = mx_music_render((short *)(void *)(mwav + 44), MX_MUS_SAMPLES);
     if(n){ memcpy(mwav, "RIFF\0\0\0\0WAVEfmt \x10\0\0\0\1\0\1\0\0\0\0\0\0\0\0\0\2\0\x10\0data\0\0\0\0", 44);
       le32(mwav + 4, 36 + n * 2); le32(mwav + 24, MX_SND_RATE); le32(mwav + 28, MX_SND_RATE * 2); le32(mwav + 40, n * 2);
-      for(int k = 0; k < n; k++){ mwav[44 + k * 2] = (unsigned char)mpcm[k]; mwav[45 + k * 2] = (unsigned char)((unsigned short)mpcm[k] >> 8); }
       mus_h = snd_sfx_load_buf((char *)mwav); } }                                                   /* if it does not fit in sound RAM there is simply no music */
 }
 static void music_update(int want){                       /* plays the loop while a level runs; restarted every 12.8 s (the AICA effect player does not loop) */
