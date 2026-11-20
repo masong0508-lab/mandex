@@ -372,6 +372,18 @@ static uint16_t wob_act[MX_ROWS * MX_COLS];
 static uint8_t wob_nb[MX_ROWS * MX_COLS];               /* per listed voxel: which of its 4 joints (bit d = +x, -x, +y, -y) are alive this frame */
 static uint8_t wob_cx[MX_ROWS * MX_COLS], wob_cy[MX_ROWS * MX_COLS];     /* per listed voxel: column and row (so the steps never divide) */
 static real wob_lean[MX_ROWS];                           /* the row's lean spring, which only depends on the height */
+#ifndef MX_WOB_PRECOMPUTE_LEAN
+#define MX_WOB_PRECOMPUTE_LEAN 1
+#endif
+#if MX_WOB_PRECOMPUTE_LEAN
+static int wob_lean_ready;
+static void wob_lean_prepare(void){
+  if(wob_lean_ready)return;
+  for(int y=0;y<MX_ROWS-1;y++)
+    wob_lean[y]=rmul(LEANK,RI(MX_ROWS-1-y))-HOMEK;
+  wob_lean_ready=1;
+}
+#endif
 static int wob_nact;
 static real KK[MX_NMAT][MX_NMAT];                       /* joint stiffness of every pair of kinds (the weaker one) */
 /* A voxel that is barely moving, with only such neighbours, has next to no force on it, so the sub-steps skip it (it keeps its tiny offset until the lattice
@@ -395,11 +407,16 @@ static uint8_t occ_nb[MX_ROWS * MX_COLS];
 static void wob_list(MxWorld *w){
   int no = 0;
   const real cv = MX_WOB_COLD_V * (1 << w->wob_shift), co = MX_WOB_COLD_O * (1 << w->wob_shift);
+#if MX_WOB_PRECOMPUTE_LEAN
+  wob_lean_prepare();
+#endif
 #if MX_WOB_HOT_PROPAGATE
   memset(occ_nb,0,sizeof occ_nb);
 #endif
   for(int y=0;y<MX_ROWS-1;y++){
+#if !MX_WOB_PRECOMPUTE_LEAN
     wob_lean[y]=rmul(LEANK,RI(MX_ROWS-1-y))-HOMEK;
+#endif
     const uint8_t *row=&w->grid[y*MX_COLS];
     for(int x0=0;x0<MX_COLS;x0+=4){
       uint32_t q;memcpy(&q,__builtin_assume_aligned(row+x0,4),4);

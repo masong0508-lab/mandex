@@ -23,6 +23,8 @@ jobs:
         run: |
           gcc -std=gnu99 -O2 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float
           gcc -std=gnu99 -O2 -DMX_FIXED -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed
+          gcc -std=gnu99 -O2 -DMX_WOB_PRECOMPUTE_LEAN=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_lean_ref
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_PRECOMPUTE_LEAN=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_lean_ref
           gcc -std=gnu99 -O2 -DMX_WOB_HOT_PROPAGATE=1 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_hot_ref
           gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_HOT_PROPAGATE=1 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_hot_ref
           gcc -std=gnu99 -O2 -DMX_WOB_CACHE_DAMP=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_damp_ref
@@ -50,6 +52,18 @@ jobs:
             diff -u "out/gameplay-profiles/world-$MODE-before.txt" "out/gameplay-profiles/world-$MODE-after.txt"
             echo "$MODE byte-for-byte state parity: $(cat out/gameplay-profiles/world-$MODE-after.txt)"
           done
+      - name: Verify every byte of 60-level world state with and without cached lean factors
+        run: |
+          for MODE in fixed float; do
+            DEF=""
+            [ "$MODE" = fixed ] && DEF="-DMX_FIXED"
+            gcc -std=gnu99 -O2 $DEF -DMX_WOB_PRECOMPUTE_LEAN=0 -Icore core/mx.c test/wob_state_digest.c -lm -o /tmp/mandex_lean_uncached
+            gcc -std=gnu99 -O2 $DEF -DMX_WOB_PRECOMPUTE_LEAN=1 -Icore core/mx.c test/wob_state_digest.c -lm -o /tmp/mandex_lean_cached
+            /tmp/mandex_lean_uncached > "out/gameplay-profiles/lean-$MODE-before.txt"
+            /tmp/mandex_lean_cached > "out/gameplay-profiles/lean-$MODE-after.txt"
+            diff -u "out/gameplay-profiles/lean-$MODE-before.txt" "out/gameplay-profiles/lean-$MODE-after.txt"
+            echo "$MODE cached lean byte-for-byte parity"
+          done
       - name: Compare exact fixed/float gameplay outcomes and CPU time across 60 levels
         run: |
           python3 - <<'PY'
@@ -67,6 +81,13 @@ jobs:
               op=float(old.group(1));np=float(new.group(1))
               line=f'{mode} {frames} frames/level reference_ms={op:.1f} optimized_ms={np:.1f} gain_pct={100*(op-np)/op:.1f} checksum={new.group(2)}'
               print(line);report.append(line)
+              lean_text=subprocess.check_output([f'/tmp/mandex_physics_{mode}_lean_ref','--quiet',str(frames)],text=True)
+              lean=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',lean_text)
+              if not lean or lean.group(2)!=new.group(2):
+                raise SystemExit(f'{mode}/{frames}: lean precompute changes outcomes')
+              lv=float(lean.group(1))
+              lean_line=f'{mode} {frames} lean_before_ms={lv:.1f} lean_after_ms={np:.1f} gain_pct={100*(lv-np)/lv:.1f}'
+              print(lean_line);report.append(lean_line)
               hot_text=subprocess.check_output([f'/tmp/mandex_physics_{mode}_hot_ref','--quiet',str(frames)],text=True)
               hot=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',hot_text)
               if not hot or hot.group(2)!=new.group(2):
