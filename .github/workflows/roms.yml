@@ -8,7 +8,7 @@ name: ROMs
 on:
   push:
     branches: [main]
-    paths: ["ds/**", "dreamcast/**", "3ds/**", "core/**", "art/**", ".github/workflows/roms.yml"]
+    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", ".github/workflows/roms.yml"]
   workflow_dispatch:
 
 jobs:
@@ -99,20 +99,25 @@ jobs:
         with: { name: smoke-ds-shots, path: "shot*.png", if-no-files-found: ignore }
 
   package:
-    needs: [ds, dreamcast]
+    needs: [ds, dreamcast, n3ds]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with: { name: rom-nds, path: pack }
       - uses: actions/download-artifact@v4
         with: { name: rom-dreamcast, path: pack }
-      - name: Zip
+      - uses: actions/download-artifact@v4
+        with: { name: mandex-3ds, path: pack/3ds }
+      - name: Zip all console builds and standalone browser game
         run: |
-          cd pack && ls -la
-          printf 'MANDEX ROMs (built from commit %s, untested on real hardware)\n  mandex.nds  Nintendo DS  - hardware build (own start-up code, no libnds); DraStic / melonDS / DeSmuME / flashcart\n  mandex_nosound.nds  Nintendo DS - same with sound off\n  stage0_red_crt / stage1_red / stage2_green / stage4_yellow  - start-up test ROMs: the colour shows how far start-up got\n  mandex.cdi  Dreamcast    - Flycast / redream, or burn / SD-card loader\n  mandex.elf  Dreamcast    - bare ELF for developer loaders (emulators want the .cdi)\n' "${{ github.sha }}" > README.txt
-          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound.nds stage0_red_crt.nds stage1_red.nds stage2_green.nds stage4_yellow.nds mandex.cdi mandex.elf README.txt
+          cp web/index.html pack/mandex.html
+          cd pack && ls -la && ls -la 3ds
+          printf 'MANDEX ALL-PORT BUILDS (commit %s, hardware FPS not verified)\n\nPLAYABLE FILES:\n  mandex.nds             Nintendo DS: DraStic / melonDS / DeSmuME / flashcart\n  mandex_nosound.nds     Nintendo DS: same game with sound disabled\n  mandex.cdi             Dreamcast disc image: Flycast / redream\n  3ds/mandex.3dsx        Nintendo 3DS homebrew launcher (not a .3ds cartridge ROM)\n  mandex.html            Browser: open directly as a local standalone web page\n\nDEVELOPER / DIAGNOSTIC FILES:\n  mandex.elf             Dreamcast developer loader\n  3ds/mandex.elf         3DS developer binary\n  stage0_red_crt.nds     Early-boot diagnostic ROM\n  stage1_red.nds         Early-boot diagnostic ROM\n  stage2_green.nds       Early-boot diagnostic ROM\n  stage4_yellow.nds      Early-boot diagnostic ROM\n\nConsole binaries are automated builds, not guaranteed hardware-validated.\n' "${{ github.sha }}" > README.txt
+          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound.nds stage0_red_crt.nds stage1_red.nds stage2_green.nds stage4_yellow.nds mandex.cdi mandex.elf 3ds/mandex.3dsx 3ds/mandex.elf mandex.html README.txt
       - uses: actions/upload-artifact@v4
         with: { name: mandex-roms, path: mandex-roms.zip }
+      - uses: actions/upload-artifact@v4
+        with: { name: mandex-web, path: pack/mandex.html }
 
   n3ds:
     runs-on: ubuntu-latest
