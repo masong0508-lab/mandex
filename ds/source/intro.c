@@ -209,7 +209,7 @@ static void bubble(u8 *b, int x, int y, const char *s, int tail){      /* speech
   gfx_tri(b, x - 3 + tail, y + 12, x + 5 + tail, y + 12, x + tail * 2, y + 22, C_BLACK); gfx_tri(b, x - 2 + tail, y + 12, x + 4 + tail, y + 12, x + tail * 2, y + 19, C_WHITE);
   gfx_text(b, x - gfx_text_w(s, 1) / 2, y + 4, s, C_BLACK, 1);
 }
-enum { GF_TIE = 1, GF_BOXERS = 2, GF_SAD = 4, GF_WAVE = 8, GF_COOL = 16, GF_ANGRY = 32, GF_FUR = 64, GF_EARS = 128, GF_SNOUT = 256, GF_TAIL = 512, GF_HOWL = 1024 };
+enum { GF_TIE = 1, GF_BOXERS = 2, GF_SAD = 4, GF_WAVE = 8, GF_COOL = 16, GF_ANGRY = 32, GF_FUR = 64, GF_EARS = 128, GF_SNOUT = 256, GF_TAIL = 512, GF_HOWL = 1024, GF_WALK = 2048, GF_SHIVER = 4096 };
 static int g_t;                                                   /* the frame counter of the shot being drawn: blinks, breathing, sway */
 static void face(u8 *b, int x, int y, int s, int fl){       /* head centred x,y, radius ~5 units */
   const u8 hc = (fl & GF_FUR) ? C_GRAY : C_SKIN, hs2 = (fl & GF_FUR) ? C_DARK : C_SKIN2;
@@ -244,25 +244,42 @@ static void face(u8 *b, int x, int y, int s, int fl){       /* head centred x,y,
 static void gerald(u8 *b, int x, int fy, int s, int fl){
   int boxers = fl & GF_BOXERS; const u8 lc = (fl & GF_FUR) ? C_GRAY : C_SKIN, ld = (fl & GF_FUR) ? C_DARK : C_SKIN2;
   const u8 sh = boxers ? lc : C_WHITE, shd = boxers ? ld : C_CLOUD2;                                                       /* torso/sleeve colour and its shade */
-  const int br = s >= 2 ? wv(g_t, 90, 1) : 0;                                                                           /* breathing: the chest and head rise by a pixel */
+  const int br = s >= 2 ? wv(g_t,90,1) : 0;
+  /* Different footfalls, bob and counter-swing instead of sliding a still sprite. */
+  const int stride = (fl & GF_WALK) ? wv(g_t,24,s*3) : 0;
+  const int liftL = stride > 0 ? stride/3 : 0, liftR = stride < 0 ? -stride/3 : 0;
+  const int lx = x-4*s+stride/2, rx = x+s-stride/2;
+  if(fl & GF_SHIVER)x += wv(g_t,12,s>2?2:1);
   if(fl & GF_TAIL){ gfx_tline(b, x + 4 * s, fy - 10 * s, x + 11 * s + wv(g_t, 60, 2), fy - 16 * s, 3 * s, C_GRAY); gfx_ell(b, x + 11 * s + wv(g_t, 60, 2), fy - 17 * s, 2 * s, 2 * s, C_CLOUD2); }
   /* outline pass: one dark pixel around legs, torso and arms */
-  gfx_rect(b, x - 5 * s - 1, fy - 8 * s - 1, 4 * s + 2, 8 * s + 1, C_HAIR); gfx_rect(b, x + s - 1, fy - 8 * s - 1, 4 * s + 2, 8 * s + 1, C_HAIR);
-  gfx_rect(b, x - 7 * s - 1, fy - 23 * s - 1 + br, 14 * s + 2, 10 * s + 1, C_HAIR);
-  gfx_rect(b, x - 4 * s, fy - 8 * s, 3 * s, 8 * s, lc); gfx_rect(b, x + s, fy - 8 * s, 3 * s, 8 * s, lc);           /* legs */
-  gfx_rect(b, x + 2 * s, fy - 8 * s, s, 8 * s, ld);                                                                  /* shaded inner edge of the right leg */
-  gfx_rect(b, x - 5 * s, fy - s, 4 * s, s, C_BLACK); gfx_rect(b, x + s, fy - s, 4 * s, s, C_BLACK); gfx_rect(b, x - 5 * s, fy - s, 4 * s, 1, C_GRAY); gfx_rect(b, x + s, fy - s, 4 * s, 1, C_GRAY);   /* shoes with a shine */
+  gfx_rect(b,lx-1,fy-8*s-1,3*s+2,8*s+1-liftL,C_HAIR);
+  gfx_rect(b,rx-1,fy-8*s-1,3*s+2,8*s+1-liftR,C_HAIR);
+  gfx_rect(b,x-7*s-1,fy-23*s-1+br,14*s+2,10*s+1,C_HAIR);
+  gfx_rect(b,lx,fy-8*s,3*s,8*s-liftL,lc);
+  gfx_rect(b,rx,fy-8*s,3*s,8*s-liftR,lc);
+  gfx_rect(b,rx+s,fy-8*s,s,8*s-liftR,ld);
+  gfx_rect(b,lx-s,fy-s-liftL,4*s,s,C_BLACK);
+  gfx_rect(b,rx,fy-s-liftR,4*s,s,C_BLACK);
+  gfx_rect(b,lx-s,fy-s-liftL,4*s,1,C_GRAY);
+  gfx_rect(b,rx,fy-s-liftR,4*s,1,C_GRAY);
   gfx_rect(b, x - 5 * s, fy - 13 * s, 10 * s, 6 * s, boxers ? C_RED : C_GOLD2);                                             /* khaki shorts / red boxers */
   gfx_rect(b, x + 2 * s, fy - 13 * s, 3 * s, 6 * s, boxers ? C_RED2 : C_DIRT); gfx_rect(b, x - s / 2, fy - 13 * s, 1, 6 * s, boxers ? C_RED2 : C_DIRT);   /* shade, and the seam between the legs */
   if(boxers) gfx_rect(b, x - 5 * s, fy - 13 * s, 10 * s, s, C_RED2);
   if(boxers){ gfx_rect(b, x - 5 * s, fy - 23 * s + br, 10 * s, 10 * s, lc); gfx_ell(b, x, fy - 14 * s, 6 * s, 3 * s, ld); gfx_ell(b, x, fy - 15 * s, 5 * s, 2 * s, lc); if(s >= 2) gfx_px(b, x, fy - 14 * s, C_HAIR); }   /* shirtless, belly, navel */
   else { gfx_rect(b, x - 5 * s, fy - 23 * s + br, 10 * s, 10 * s - br, C_WHITE); gfx_rect(b, x + 3 * s, fy - 23 * s + br, 2 * s, 10 * s - br, C_CLOUD2); if(s >= 2){ for(int i = 0; i < 4; i++) gfx_px(b, x - s, fy - 22 * s + i * 2 * s + br, C_GRAY); } gfx_ell(b, x, fy - 14 * s, 5 * s, 2 * s, C_WHITE); }
   if(fl & GF_TIE){ gfx_tri(b, x - s, fy - 23 * s, x + s, fy - 23 * s, x, fy - 21 * s, C_BLACK); gfx_tri(b, x - s, fy - 22 * s, x + s, fy - 22 * s, x + s, fy - 14 * s, C_SKY0 + 4); gfx_tri(b, x - s, fy - 22 * s, x + s, fy - 14 * s, x - s, fy - 14 * s, C_SKY0 + 3); }
-  gfx_rect(b, x - 7 * s, fy - 23 * s + br, 2 * s, 9 * s, sh);                                                              /* left arm */
-  if(fl & GF_WAVE){ int wy = wv(g_t, 24, 2 * s); gfx_tline(b, x + 5 * s, fy - 22 * s + br, x + 9 * s + wy / 2, fy - 31 * s, 2 * s, sh); gfx_ell(b, x + 9 * s + wy / 2, fy - 32 * s, s + 1, s + 1, lc); }
-  else { gfx_rect(b, x + 5 * s, fy - 23 * s + br, 2 * s, 9 * s, sh); gfx_rect(b, x + 6 * s, fy - 23 * s + br, s, 9 * s, shd); }
-  gfx_ell(b, x - 6 * s, fy - 13 * s, s + 1, s + 1, lc); if(!(fl & GF_WAVE)) gfx_ell(b, x + 6 * s, fy - 13 * s, s + 1, s + 1, lc);   /* round hands */
-  face(b, x, fy - 28 * s + br, s, fl);
+  if(fl & GF_WALK)gfx_tline(b,x-6*s,fy-21*s+br,x-7*s-stride/3,fy-14*s+br,2*s,sh);
+  else gfx_rect(b,x-7*s,fy-23*s+br,2*s,9*s,sh);
+  if(fl & GF_WAVE){int wy=wv(g_t,24,2*s);
+    gfx_tline(b,x+5*s,fy-22*s+br,x+9*s+wy/2,fy-31*s,2*s,sh);
+    gfx_ell(b,x+9*s+wy/2,fy-32*s,s+1,s+1,lc);
+  }else if(fl & GF_WALK){
+    gfx_tline(b,x+6*s,fy-21*s+br,x+7*s+stride/3,fy-14*s+br,2*s,sh);
+    gfx_ell(b,x+7*s+stride/3,fy-14*s+br,s+1,s+1,lc);
+  }else{gfx_rect(b,x+5*s,fy-23*s+br,2*s,9*s,sh);gfx_rect(b,x+6*s,fy-23*s+br,s,9*s,shd);}
+  gfx_ell(b,x-6*s-stride/3,fy-13*s,s+1,s+1,lc);
+  if(!(fl & (GF_WAVE|GF_WALK)))gfx_ell(b,x+6*s,fy-13*s,s+1,s+1,lc);
+  face(b,x+((fl&GF_WALK)?stride/7:0),fy-28*s+br,s,fl);
 }
 static void towel(u8 *b, int x, int y, int w, int h, int ph, int th){         /* the pink towel, rippling, with two terry stripes */
   (void)th;
@@ -334,13 +351,14 @@ static void rays(u8 *b, int cx, int cy, int tt, int n, u8 c){       /* n slowly 
 }
 static void sparkle(u8 *b, int x, int y, int tt, int ph){ int u = (tt + ph) % 40; if(u < 14){ int r = u < 7 ? u : 14 - u; gfx_line(b, x - r, y, x + r, y, C_WHITE); gfx_line(b, x, y - r, x, y + r, C_WHITE); } }
 
+static void cut_icon(u8 *b,int x,int y,int which,u8 ink); /* scene props use the same packed artwork as the title card */
 /* ------------------------------------------------------------------ the scenes (top screen) */
 static void sc_suburb(u8 *b, int k, int tt){
   sky(b, 0, 150, 0); sun(b, 200, 40, 14); cloud(b, 60 + tt / 6, 36, 2); cloud(b, 170 - tt / 9, 62, 1); hills(b, 140, 0); ground(b, 150);
   if(k == 0){
     fence(b, 0, 110, 152, 2); house(b, 150, 152, 2, 1);
     int gx = -20 + tt * 2; if(gx > 100) gx = 100;
-    gerald(b, gx, 176 + (gx < 100 ? -iabs(wv(tt, 12, 3)) : 0), 2, GF_TIE | GF_COOL | (gx >= 100 ? GF_WAVE : 0));
+    gerald(b, gx, 176 + (gx < 100 ? -iabs(wv(tt, 12, 3)) : 0), 2, GF_TIE | GF_COOL | (gx >= 100 ? GF_WAVE : GF_WALK));
   } else if(k == 1){
     gfx_rect(b, 0, 150, 256, 42, C_GRASS); house(b, 120, 170, 3, 1);
     gerald(b, 60, 190, 3, GF_TIE | GF_COOL | GF_WAVE); fence(b, 0, 30, 172, 2);
@@ -355,11 +373,12 @@ static void sc_divorce(u8 *b, int k, int tt){
   if(k == 0){
     stars_night(b); gfx_rect(b, 0, 150, 256, 42, C_DARK); gfx_rect(b, 0, 150, 256, 2, C_UIHI);
     for(int i = 0; i < 3; i++) gfx_ell(b, 130 + i * 60, 170 + i * 8, 28 - i * 6, 3, C_UIHI);
-    lamp(b, 40, 150); gerald(b, 118, 160, 2, GF_TIE | GF_SAD); rain(b, tt, 50);
+    lamp(b, 40, 150); gerald(b, 118, 160, 2, GF_TIE | GF_SAD | GF_SHIVER); rain(b, tt, 50);
   } else if(k == 1){
     stars_night(b); rain(b, tt, 24);
     gfx_rect(b, 20, 10, 216, 172, C_WHITE); gfx_rect(b, 20, 10, 216, 3, C_UILINE);
     gfx_text_c(b, 128, 20, "DECREE OF DIVORCE", C_BLACK, C_WHITE, 1); gfx_rect(b, 32, 30, 192, 1, C_BLACK);
+    cut_icon(b,208,14,MX_CUT_PAPERS,C_RED2);
     static const char *ROW[6][2] = { {"HOUSE","BRENDA"}, {"DOG","BRENDA"}, {"BOAT","BRENDA"}, {"THE GOOD TOWELS","BRENDA"}, {"COUCH","GERALD"}, {"ONE PINK TOWEL","GERALD"} };
     for(int i = 0; i < 6; i++){
       int y = 38 + i * 22; if(i & 1) gfx_rect(b, 24, y - 3, 208, 18, C_CLOUD2);
@@ -379,11 +398,12 @@ static void sc_dennis(u8 *b, int k, int tt){
     gfx_rect(b, 190, 20, 40, 40, C_WHITE); gfx_ell(b, 210, 40, 17, 17, C_CLOUD2); gfx_line(b, 210, 40, 210, 28, C_BLACK); gfx_line(b, 210, 40, 218 + wv(tt, 60, 3), 40, C_BLACK);   /* wall clock */
   }
   if(k == 0){
-    dennis(b, 190, 120, 3, tt); gfx_rect(b, 110, 120, 140, 40, C_DIRT2); gfx_rect(b, 110, 120, 140, 3, C_DIRT); gerald(b, 50, 170, 2, GF_TIE | GF_SAD);
+    dennis(b, 190, 120, 3, tt); gfx_rect(b, 110, 120, 140, 40, C_DIRT2); gfx_rect(b, 110, 120, 140, 3, C_DIRT); gerald(b, 50, 170, 2, GF_TIE | GF_SAD | GF_SHIVER);
   } else if(k == 1){
     gfx_rect(b, 0, 0, 256, 192, C_UIBG);
     int n = 400 * (1 + tt / 8); char buf[12]; buf[0] = '$'; const char *d = gfx_int(n); int i = 0; while(d[i] && i < 9){ buf[i + 1] = d[i]; i++; } buf[i + 1] = 0;
     gfx_text_c(b, 128, 60, buf, C_GOLD, C_BLACK, 6); gfx_text_c(b, 128, 110, "AND COUNTING", C_WHITE, C_BLACK, 2);
+    cut_icon(b,22,84,MX_CUT_CASH,C_GOLD2);
     for(int j = 0; j < 5; j++){ int y = (tt * 3 + j * 40) % 200 - 8; gfx_text(b, 20 + j * 48, y, "$", C_GOO, 2); }
   } else if(k == 2){
     dennis(b, 170, 130, 5, tt); gfx_rect(b, 0, 130, 256, 62, C_DIRT2); gfx_rect(b, 0, 130, 256, 3, C_DIRT); gerald(b, 52, 200, 3, GF_TIE | GF_SAD);
@@ -399,7 +419,7 @@ static void sc_couch(u8 *b, int k, int tt){
     gfx_rect(b, 0, 0, 256, 192, C_DARK); gfx_rect(b, 0, 150, 256, 42, C_UIBG);
     int fl = 3 + ((tt * 7) & 3) + (hs(tt / 3) & 3); gfx_rect(b, 150, 30, 70, 50, C_BLACK); gfx_rect(b, 153, 33, 64, 44, C_SKY0 + 6 + (fl & 3));   /* TV */
     gfx_dither(b, 130, 14, 110, 80, C_SKY0 + 8);
-    couch_back(b, 30, 160); gerald(b, 85, 160, 2, GF_BOXERS | GF_SAD); couch_front(b, 30, 160);
+    couch_back(b, 30, 160); gerald(b, 85, 160, 2, GF_BOXERS | GF_SAD | GF_SHIVER); couch_front(b, 30, 160);
     pizza(b, 170, 170, 1 + tt / 28 > 6 ? 6 : 1 + tt / 28); can(b, 150, 176); can(b, 18, 180);
     gfx_rect(b, 8, 20, 28, 34, C_WHITE); gfx_text_c(b, 22, 24, "DAY", C_BLACK, C_WHITE, 1); gfx_text_c(b, 22, 34, gfx_int(1 + tt / 12 > 9 ? 9 : 1 + tt / 12), C_RED2, C_WHITE, 2);
   } else if(k == 1){
@@ -419,7 +439,8 @@ static void sc_landlord(u8 *b, int k, int tt){
   if(k == 0){
     gfx_rect(b, 0, 0, 256, 192, C_WALL1); gfx_rect(b, 0, 150, 256, 42, C_DIRT2);
     gfx_rect(b, 150, 40, 60, 112, C_DIRT); gfx_rect(b, 154, 44, 52, 104, C_RED2); gfx_ell(b, 198, 100, 3, 3, C_GOLD);
-    landlord(b, 90, 128, 10, tt, 0); gerald(b, 218, 190, 2, GF_BOXERS | GF_SAD);
+    landlord(b,tt<28?90-(28-tt)*3:90,128-(tt<28?iabs(wv(tt,10,3)):0),10,tt,0);
+    gerald(b,218,190,2,GF_BOXERS|GF_SAD|GF_SHIVER);
     if(tt > 30) bubble(b, 90, 14, "RENT'S DUE, GERALD.", 0);
     if(tt % 16 < 3 && tt < 48) gfx_text_c(b, 140, 70, "KNOCK", C_GOLD, C_BLACK, 1);
   } else if(k == 1){
@@ -470,6 +491,7 @@ static void sc_born(u8 *b, int k, int tt){
     rays(b, 128, 120, tt, 14, C_RED);
     spr_man(b, 128, 118, 8, 1, POSE_FLEX, tt >> 3);
     gfx_text_c(b, 128, 18, "MANDEX", C_GOLD, C_BLACK, 4);
+    cut_icon(b,26,72,MX_CUT_CAPE,C_GOLD);cut_icon(b,214,72,MX_CUT_TARGET,C_GOLD);
   }
 }
 static void sc_mission(u8 *b, int k, int tt){
@@ -502,7 +524,7 @@ static void w_walk(u8 *b, int k, int tt){
   stars_night(b);
   if(k == 0){
     moon(b, 200, 40, 20 + tt / 20); night_hills(b, 140);
-    int gx = -20 + tt * 2; gerald(b, gx, 176 - iabs(wv(tt, 12, 3)), 2, GF_COOL);
+    int gx = -20 + tt * 2; gerald(b, gx, 176 - iabs(wv(tt, 12, 3)), 2, GF_COOL | GF_WALK);
     if(tt > 80 && gx < 220) bubble(b, gx + 40 > 200 ? 200 : gx + 40, 20, "NICE NIGHT.", 0);
   } else {
     moon(b, 128, 60, 54 + tt / 8); night_hills(b, 150);
@@ -521,6 +543,7 @@ static void w_fridge(u8 *b, int k, int tt){
     gfx_rect(b, 20, 20, 216, 140, C_WHITE); gfx_rect(b, 24, 24, 208, 132, C_CLOUD2); gfx_rect(b, 24, 96, 208, 3, C_GRAY);
     gfx_tri(b, 80, 120, 170, 120, 125, 70, C_GOLD); gfx_tri(b, 125, 70, 170, 120, 170, 95, C_GOLD2); for(int i = 0; i < 5; i++) gfx_ell(b, 100 + i * 14, 108 + (i & 1) * 6, 3, 3, C_GOLD2);
     gfx_text_c(b, 128, 134, "MOON CHEESE", C_BLACK, C_CLOUD2, 1);
+    cut_icon(b,199,31,MX_CUT_CHEESE,C_GOLD2);
   } else {
     gfx_rect(b, 0, 0, 256, 192, C_UIBG); gfx_rect(b, 24, 40, 208, 110, C_WHITE); gfx_rect(b, 24, 40, 208, 14, C_RED);
     gfx_text_c(b, 128, 44, "BEST BEFORE", C_WHITE, C_RED2, 1); gfx_text_c(b, 128, 80, "THE FULL", C_BLACK, C_WHITE, 3); gfx_text_c(b, 128, 108, "MOON", C_BLACK, C_WHITE, 3);
@@ -643,6 +666,8 @@ static void e_title(u8 *b, int k, int tt, int ch){
   if(ch == 1){ sky(b, 0, 192, 1); rays(b, 128, 150, tt, 14, C_GOLD); confetti(b, tt, 36); gfx_text_c(b, 128, 12, "CHAPTER 1", C_GOLD, C_RED2, 3); gfx_text_c(b, 128, 38, "COMPLETE", C_WHITE, C_RED2, 2); gfx_rect(b, 0, 160, 256, 32, C_GRASS2); }
   else { stars_night(b); moon(b, 128, 90, 44 + wv(tt, 120, 3)); night_hills(b, 150); gfx_text_c(b, 128, 12, "CHAPTER 2", C_GOLD, C_DARK, 3); gfx_text_c(b, 128, 38, "COMPLETE", C_WHITE, C_DARK, 2); }
   spr_man(b, 128, ch == 1 ? 130 : 138, 7, 1, POSE_FLEX, tt >> 3);
+  cut_icon(b,22,70,MX_CUT_STAR,C_GOLD);
+  cut_icon(b,216,70,MX_CUT_STAR,C_GOLD);
 }
 static void e2_tower(u8 *b, int k, int tt){
   sky(b, 0, 150, 1); sun(b, 50, 110, 20); hills(b, 140, 0); gfx_rect(b, 0, 150, 256, 42, C_DARK);
