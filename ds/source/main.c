@@ -100,6 +100,20 @@ static void toast_tick(void){
 
 static int pad_dx, pad_dy, pad_used, dragging;
 static int MAXHP[MX_NMAT];                    /* filled from the core's material table */
+#ifndef MX_DS_FACADE_CACHE
+#define MX_DS_FACADE_CACHE 1
+#endif
+#if MX_DS_FACADE_CACHE
+/* At most 20 rooms and three windows per room: ~600 bytes of static storage,
+   no heap or extra framebuffer. Window positions, palette colors and cell
+   indices are unchanged until the next level/district; destruction checks
+   still consult the current grid+wallpaper on EVERY rendered frame. */
+typedef struct { u16 idx; u8 wx,wy,wc,hc,glass; } FacWin;
+typedef struct { u8 first,deskx,desky; } FacRoom;
+static FacWin fac_win[MX_MAX_ROOMS*3];
+static FacRoom fac_room[MX_MAX_ROOMS];
+static int fac_dirty=1;
+#endif
 
 static u32 rng = 0x2545F491u;
 static int rnd(int n){ rng = rng * 1664525u + 1013904223u; return (int)((rng >> 16) % (u32)n); }
@@ -356,6 +370,9 @@ static void on_events(void){
 #if MX_DS_PARTICLE_HINT
       part_free_hint = 0;
 #endif
+#if MX_DS_FACADE_CACHE
+      fac_dirty=1; /* Landlord HQ's next district replaces all room geometry. */
+#endif
       sfx_play(SFX_WIN, 64); break;
     case EV_WIN:    sfx_play(SFX_WIN, 64); music_set(0); break;
     case EV_LOSE:   sfx_play(SFX_LOSE, 64); music_set(0); break;
@@ -517,9 +534,36 @@ static void draw_rooms(const View *v){
 /* Façade depth pass, derived from the SAME destructible rooms as the core.
    It is painted behind real blocks, so broken masonry occludes it, and torn-away
    wallpaper removes windows and furniture automatically. No sprites or heap. */
+#if MX_DS_FACADE_CACHE
+static void facade_prepare(void){
+  int nwin=0;
+  for(int r=0;r<world.nrooms;r++){
+    const MxRoom *rm=&world.rooms[r];
+    FacRoom *out=&fac_room[r];
+    out->first=(u8)nwin;
+    out->deskx=(u8)(rm->x+2);
+    out->desky=(u8)(rm->y+rm->h-2);
+    if(rm->w<6||rm->h<5)continue;
+    int n=rm->w>=18?3:rm->w>=11?2:1;
+    for(int k=0;k<n;k++){
+      FacWin *w=&fac_win[nwin++];
+      w->wx=(u8)(rm->x+rm->w*(2*k+1)/(2*n));
+      w->wy=(u8)(rm->y+rm->h/2);
+      w->idx=(u16)(w->wy*MX_COLS+w->wx);
+      w->wc=(u8)(rm->w>=10?4:3);
+      w->hc=(u8)(rm->h>=7?4:3);
+      w->glass=(u8)((r+k+world.level)%5==0?C_GOLD2:(r&1)?C_CITY2:C_SKY0+9);
+    }
+  }
+  fac_dirty=0;
+}
+#endif
 static void draw_facades(const View *v){
   int p = v->ppc;
   if(p <= 2) return;  /* overview is only 2 pixels per cell: avoid costly unreadable microdetails */
+#if MX_DS_FACADE_CACHE
+  if(fac_dirty)facade_prepare();
+#endif
   for(int r = 0; r < world.nrooms; r++){
     const MxRoom *rm = &world.rooms[r];
     if(rm->w < 6 || rm->h < 5) continue;
@@ -527,14 +571,25 @@ static void draw_facades(const View *v){
        (rm->y + rm->h)*p - v->cy < -4 || rm->y*p - v->cy > 196) continue;
     int n = rm->w >= 18 ? 3 : rm->w >= 11 ? 2 : 1;
     for(int k = 0; k < n; k++){
+#if MX_DS_FACADE_CACHE
+      const FacWin *cached=&fac_win[fac_room[r].first+k];
+      int wx=cached->wx,wy=cached->wy,idx=cached->idx;
+      if(world.grid[idx] || !world.paper[idx]) continue;
+      int ww=cached->wc*p,hh=cached->hc*p;
+#else
       int wx = rm->x + rm->w * (2*k + 1) / (2*n);
       int wy = rm->y + rm->h / 2;
       int idx = wy * MX_COLS + wx;
       if(world.grid[idx] || !world.paper[idx]) continue;
       int ww = (rm->w >= 10 ? 4 : 3) * p, hh = (rm->h >= 7 ? 4 : 3) * p;
+#endif
       int x = wx*p - v->cx - ww/2, y = wy*p - v->cy - hh/2;
       if(x + ww < -3 || x > 259 || y + hh < -3 || y > 195) continue;
+#if MX_DS_FACADE_CACHE
+      u8 glass = cached->glass;
+#else
       u8 glass = (r + k + world.level) % 5 == 0 ? C_GOLD2 : (r & 1) ? C_CITY2 : C_SKY0 + 9;
+#endif
       gfx_rect(v->buf, x - 2, y - 2, ww + 4, hh + 4, C_SHADOW);
       gfx_rect(v->buf, x - 1, y - 1, ww + 2, hh + 2, C_FENCE);
       gfx_rect(v->buf, x, y, ww, hh, glass);
@@ -547,7 +602,11 @@ static void draw_facades(const View *v){
     /* Occupied interiors: furniture, wall pictures, and a small desk lamp.
        The same wallpaper check makes these vanish when the room is demolished. */
     if(rm->w >= 9 && rm->h >= 6){
+#if MX_DS_FACADE_CACHE
+      int cx=fac_room[r].deskx,cy=fac_room[r].desky;
+#else
       int cx = rm->x + 2, cy = rm->y + rm->h - 2;
+#endif
       if(cy < MX_ROWS && !world.grid[cy*MX_COLS+cx] && world.paper[cy*MX_COLS+cx]){
         int x = cx*p-v->cx, y = cy*p-v->cy;
         gfx_rect(v->buf, x, y, 3*p, p, C_SUIT);
@@ -1074,6 +1133,9 @@ static int valve_allowed(void){ return opt.tool == MX_TOOL_VALVE && mx_valve_unl
 static void apply_options(void){ mx_set_collapse(&world, opt.collapse && !coll_shed); world.valve_ok = valve_allowed(); mx_set_fight(&world, !opt.nofight); }
 static void load_level(int l){
   mx_load(&world, l); mx_meta_level_start(&stats, &world); apply_options(); was_aim = 0;
+#if MX_DS_FACADE_CACHE
+  fac_dirty=1;
+#endif
   mx_set_substeps(&world, world.substeps > MX_DS_MAX_SUBSTEPS ? MX_DS_MAX_SUBSTEPS : world.substeps);
   mx_set_wobble_budget(&world, wob_budget);
   cells0 = mx_cells_left(&world); disp_score = 0; end_t = 0; was_state = MX_PLAY; dragging = 0; pad_used = 0;
