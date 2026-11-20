@@ -74,7 +74,7 @@ int mx_tool_power(int tool);                             /* the PW_* a start too
 uint32_t mx_crc32(const uint8_t *p, int n);
 /* returns the number of bytes written, or 0 if cap is too small */
 int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap);                                  /* = mx_meta_pack_opt with the default options */
-int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t *out, int cap);       /* opt NULL = defaults; a tool index out of range is written as the air valve */
+int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t *out, int cap);       /* opt NULL = defaults; a tool index out of range is written as NONE */
 /* returns 1 and fills *s and *outfit, or returns 0 and leaves both untouched (wrong magic, unknown version, short buffer, CRC mismatch).  len may be longer than the
    blob (a chip read of a fixed size); bytes after it are ignored.  Counters are clamped to INT_MAX, stars to 3, achievement bits to the ones that exist and an
    outfit index this build does not have becomes 0.  The transients are cleared and unlock_all is left alone.  Call it BEFORE the first load_level(): that call

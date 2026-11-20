@@ -119,7 +119,7 @@ int main(void){
     W.level = MX_NUM_LEVELS; W.score = 5; mx_meta_win(&B, &W); CHECK(B.best[3] == 900, "an out-of-range level is ignored, not written"); }
 
   /* ---- options (port 13): saved in version 2, version 1 blobs still load with the defaults ---- */
-  { MxOptions d; mx_options_default(&d); CHECK(d.collapse == 0 && d.tool == MX_TOOL_NONE, "default options: collapse off, air valve (the browser's defaults)"); }
+  { MxOptions d; mx_options_default(&d); CHECK(d.collapse == 0 && d.tool == MX_TOOL_NONE, "default options: collapse off, no gadget selected"); }
   { MxStats A; fill(&A); MxOptions o = { 1, MX_TOOL_SPLAT }, r = { 0, 0 }; uint8_t b[MX_SAVE_MAX]; int of2 = -1; MxStats B; mx_meta_init(&B);
     int n1 = mx_meta_pack_opt(&A, 7, &o, b, (int)sizeof b);
     CHECK(n1 == MX_SAVE_MAX && b[n1 - 5] == (1 | (MX_TOOL_SPLAT << 1)), "collapse on + splat packs into the options byte");
@@ -127,12 +127,12 @@ int main(void){
     { uint8_t b2[MX_SAVE_MAX]; int n2 = mx_meta_pack_opt(&B, of2, &r, b2, (int)sizeof b2); CHECK(n2 == n1 && memcmp(b, b2, n1) == 0, "repack is byte-identical with options too"); }
     for(int t = 0; t < MX_NUM_TOOLS; t++) for(int c = 0; c < 2; c++){ MxOptions i2 = { (uint8_t)c, (uint8_t)t }, o2 = { 9, 9 }; uint8_t bb[MX_SAVE_MAX]; int nn = mx_meta_pack_opt(&A, 0, &i2, bb, (int)sizeof bb);
       if(!mx_meta_unpack_opt(&B, &of2, &o2, bb, nn) || o2.collapse != c || o2.tool != t){ CHECK(0, "every collapse x tool combination round trips"); t = 99; break; } }
-    CHECK(mx_tool_power(MX_TOOL_NONE) == PW_NONE && mx_tool_power(MX_TOOL_VALVE) == PW_NONE && mx_tool_power(MX_TOOL_BEANS) == PW_BEANS && mx_tool_power(MX_TOOL_TOWEL) == PW_TOWEL && mx_tool_power(MX_TOOL_SPLAT) == PW_SPLAT, "start tools map to the right power-ups (valve / none arm nothing)");
+    CHECK(mx_tool_power(MX_TOOL_NONE) == PW_NONE && mx_tool_power(MX_TOOL_VALVE) == PW_NONE && mx_tool_power(MX_TOOL_BEANS) == PW_BEANS && mx_tool_power(MX_TOOL_TOWEL) == PW_TOWEL && mx_tool_power(MX_TOOL_SPLAT) == PW_SPLAT && mx_tool_power(MX_TOOL_TURBO) == PW_TURBO && mx_tool_power(MX_TOOL_QUAKE) == PW_QUAKE, "tool mappings include TURBO and QUAKE; air and NONE arm nothing");
     CHECK(strcmp(mx_tool_name(MX_TOOL_VALVE), "AIR VALVE") == 0 && strcmp(mx_tool_name(MX_TOOL_NONE), "NONE") == 0 && strcmp(mx_tool_name(99), "?") == 0, "tool names");
     { MxOptions bad = { 5, 200 }; uint8_t bb[MX_SAVE_MAX]; MxOptions r2 = { 0, 0 }; int nn = mx_meta_pack_opt(&A, 0, &bad, bb, (int)sizeof bb);
-      CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, nn) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_VALVE, "an out-of-range tool packs as the air valve, any non-zero collapse as on"); }
+      CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, nn) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_NONE, "an out-of-range tool packs as NONE, any non-zero collapse as on"); }
     { uint8_t bb[MX_SAVE_MAX]; memcpy(bb, b, n1); bb[n1 - 5] = 0xFF; reseal(bb, n1); MxOptions r2 = { 0, 0 };
-      CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, n1) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_VALVE, "an options byte with a tool index this build lacks (and reserved bits set) loads as air valve, never trusted"); }
+      CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, n1) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_NONE, "an options byte with an invalid tool loads as NONE, never trusted"); }
     { MxOptions sent = { 1, MX_TOOL_BEANS }; uint8_t bb[MX_SAVE_MAX]; memcpy(bb, b, n1); bb[0] ^= 1; MxStats X; fill(&X);
       CHECK(mx_meta_unpack_opt(&X, &of2, &sent, bb, n1) == 0 && sent.collapse == 1 && sent.tool == MX_TOOL_BEANS, "a failed unpack leaves the options untouched"); }
     CHECK(mx_meta_unpack_opt(&B, &of2, 0, b, n1) == 1, "options pointer may be NULL");
@@ -141,7 +141,7 @@ int main(void){
       MxOptions d; mx_options_default(&d); CHECK(d.nofight == 0, "default: landlords fight back"); } }
   { uint8_t c[MX_SAVE_MAX + 8]; int cn = craft(c, MX_NUM_LEVELS); MxOptions r = { 1, MX_TOOL_SPLAT }; MxStats B; mx_meta_init(&B); int of2 = -1;
     CHECK(cn == MX_SAVE_MAX - 1 && c[4] == 1, "(the independent writer still produces a 175-byte version 1 blob)");
-    CHECK(mx_meta_unpack_opt(&B, &of2, &r, c, cn) == 1 && r.collapse == 0 && r.tool == MX_TOOL_VALVE && B.best[4] == 504 && of2 == 2, "a version 1 save still loads: progress kept, options = defaults");
+    CHECK(mx_meta_unpack_opt(&B, &of2, &r, c, cn) == 1 && r.collapse == 0 && r.tool == MX_TOOL_NONE && B.best[4] == 504 && of2 == 2, "a version 1 save still loads: progress kept, options = defaults");
     CHECK(mx_meta_unpack(&B, &of2, c, cn) == 1, "...also through the old entry point");
     CHECK(mx_meta_unpack_opt(&B, &of2, &r, c, cn - 1) == 0, "a version 1 blob one byte short is refused (the size check follows the version)"); }
 
