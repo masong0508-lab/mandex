@@ -70,6 +70,26 @@ static int dc_fastpath_probe(void){
   ic_upload(tx_ic_top,idx);
   printf("DC_FAST_PALETTE_ANIM=%08x\n",dc_hash((const unsigned char*)tx_ic_top,256*256*2));
   pvr_mem_free(tx_ic_top);
+  /* The first-free hint must NOT change which of the 256 particle slots
+     is occupied after repeated bursts and expiry/reuse. */
+  memset(parts,0,sizeof parts);
+  for(int wave=0;wave<7;wave++){
+    for(int k=0;k<112;k++)
+      spawn_k(PK_BIT,(float)(k%60), (float)(k%33),3.0f,-8.0f,
+              0.2f+(k%5)*0.03f,argb(k&255,wave&255,77,255));
+    for(int i=0;i<256;i++)
+      if(parts[i].life>0 && (i+wave)%9==0) parts[i].life=0.01f;
+    fx_step(0,0);
+  }
+  { unsigned h=2166136261u;
+    for(int i=0;i<256;i++){
+      h^=(unsigned)((int)(parts[i].life*100)+i*7+parts[i].kind);
+      h*=16777619u;
+      h^=(unsigned)(int)(parts[i].x*10);
+      h*=16777619u;
+    }
+    printf("DC_PARTICLE_POOL=%08x\n",h);
+  }
   return 0;
 }
 int main(void){
