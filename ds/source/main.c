@@ -545,14 +545,6 @@ static void draw_rooms(const View *v){
           d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=base;
           d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=base;
           d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=accent;
-          /* Thin jagged plaster edge on exposed wallpaper, using the
-             existing 4px tile and accent colour. No extra draw pass. */
-          if(world.paper_torn){
-            if(x>0&&!world.paper[i-1]){d[-512]=accent;d[0]=accent;}
-            if(x+1<MX_COLS&&!world.paper[i+1]){d[-256+3]=accent;d[3]=accent;}
-            if(y>0&&!world.paper[i-MX_COLS]){d[-768+1]=accent;d[-768+2]=accent;}
-            if(y+1<MX_ROWS&&!world.paper[i+MX_COLS])d[1]=accent;
-          }
         }else gfx_wall(v,p-1,sx,sy);
       }
     }
@@ -584,6 +576,34 @@ static void draw_rooms(const View *v){
     if(world.paper[i]&&!world.grid[i])gfx_wall(v,world.paper[i]-1,x*ppc-v->cx,y*ppc-v->cy);
   }
 #endif
+}
+
+/* Damage-only paper edge pass, AFTER any wallpaper drawing path.
+   Iterates known room rectangles rather than scanning the entire 120x60
+   world; the reference and inlined renderers retain identical pixels.
+   Four isolated palette pixels per torn tile edge, no extra buffers. */
+static void draw_room_rips(const View *v){
+  if(!world.paper_torn || v->ppc!=4)return;
+  for(int r=0;r<world.nrooms;r++){
+    const MxRoom *rm=&world.rooms[r];
+    int y0=rm->y,y1=y0+rm->h,x0=rm->x,x1=x0+rm->w;
+    for(int y=y0;y<y1;y++){
+      int sy=y*4-v->cy;
+      if((unsigned)sy>188u)continue;
+      for(int x=x0;x<x1;x++){
+        int sx=x*4-v->cx;
+        if((unsigned)sx>252u)continue;
+        int i=y*MX_COLS+x,p=world.paper[i];
+        if(!p||world.grid[i])continue;
+        u8 *d=v->buf+(size_t)sy*256+sx;
+        u8 accent=(u8)(C_WALLD0+((p-1)&3));
+        if(x>0&&!world.paper[i-1]){d[256]=accent;d[768]=accent;}
+        if(x+1<MX_COLS&&!world.paper[i+1]){d[512+3]=accent;d[768+3]=accent;}
+        if(y>0&&!world.paper[i-MX_COLS]){d[1]=accent;d[2]=accent;}
+        if(y+1<MX_ROWS&&!world.paper[i+MX_COLS])d[768+1]=accent;
+      }
+    }
+  }
 }
 
 /* Façade depth pass, derived from the SAME destructible rooms as the core.
@@ -984,6 +1004,7 @@ static void draw_world(const View *v, int parallax){
   draw_band(v, 0);
   DS_LAYER(v,2);
   draw_rooms(v);
+  draw_room_rips(v);
   draw_facades(v);
   DS_LAYER(v,3);
   draw_voxels(v);
