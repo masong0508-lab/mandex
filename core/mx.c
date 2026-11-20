@@ -10,6 +10,8 @@
 #include <stdint.h>
 static uint64_t mx_ptick_prev,mx_ph_sum[7],mx_ph_max[7];
 static unsigned mx_ph_count[7];
+static uint64_t mx_wob_prev,mx_wob_sum[3],mx_wob_max[3];
+static unsigned mx_wob_count[3];
 static uint64_t mx_ph_now(void){
   struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);
   return (uint64_t)t.tv_sec*1000000000ull+(uint64_t)t.tv_nsec;
@@ -24,7 +26,22 @@ static void mx_ph_mark(int stage){
   if(d>mx_ph_max[stage-1])mx_ph_max[stage-1]=d;
   mx_ph_count[stage-1]++;
 }
+static void mx_wob_mark(int stage){
+  uint64_t now=mx_ph_now();
+  if(stage==0){mx_wob_prev=now;return;}
+  if(stage<1||stage>3)return;
+  uint64_t d=now-mx_wob_prev;mx_wob_prev=now;
+  mx_wob_sum[stage-1]+=d;
+  if(d>mx_wob_max[stage-1])mx_wob_max[stage-1]=d;
+  mx_wob_count[stage-1]++;
+}
 void mx_profile_dump(void){
+  static const char*const wobnames[3]={"scan_active","spring_substeps","joint_breaks"};
+  for(int i=0;i<3;i++)if(mx_wob_count[i])
+    printf("CORE_WOB_PHASE name=%s samples=%u mean_us=%.3f peak_us=%.3f\n",
+           wobnames[i],mx_wob_count[i],
+           (double)mx_wob_sum[i]/mx_wob_count[i]/1000.,
+           (double)mx_wob_max[i]/1000.);
   static const char*const names[7]={
     "man_explosion","support_scan","chunk_solver","wobble_lattice",
     "sand_support","target_ai","pose_outcomes"};
@@ -35,8 +52,10 @@ void mx_profile_dump(void){
            (double)mx_ph_max[i]/1000.);
 }
 #define MX_PH_MARK(i) mx_ph_mark(i)
+#define MX_WOB_MARK(i) mx_wob_mark(i)
 #else
 #define MX_PH_MARK(i) ((void)0)
+#define MX_WOB_MARK(i) ((void)0)
 #endif
 
 #define IDX(x, y) ((y) * MX_COLS + (x))
@@ -343,6 +362,9 @@ static void wob_blast(MxWorld *w, int cx, int cy, int r, real speed){
 #ifndef MX_WOB_STEPS
 #define MX_WOB_STEPS WOB_STEPS
 #endif
+#ifndef MX_WOB_CACHE_DAMP
+#define MX_WOB_CACHE_DAMP 1
+#endif
 #ifdef MX_STATS
 int mx_stat_wob;
 #endif
@@ -398,9 +420,15 @@ static void wob_list(MxWorld *w){
   } else w->wob_shift = 0;
   wob_nact = n;
 }
-static MX_HOT void wobble_step(MxWorld *w, real dt){
+static MX_HOT void wobble_step(MxWorld *w, real dt
+#if MX_WOB_CACHE_DAMP
+, const real *fd
+#endif
+){
+#if !MX_WOB_CACHE_DAMP
   real fd[MX_NMAT];
-  for(int m = 0; m < MX_NMAT; m++){ fd[m] = RI(1) - rmul(MATS[m].damp, dt); if(fd[m] < 0) fd[m] = 0; }
+  for(int m=0;m<MX_NMAT;m++){fd[m]=RI(1)-rmul(MATS[m].damp,dt);if(fd[m]<0)fd[m]=0;}
+#endif
   if(KK[1][1] == 0) for(int a = 1; a < MX_NMAT; a++) for(int b = 1; b < MX_NMAT; b++) KK[a][b] = MATS[a].K < MATS[b].K ? MATS[a].K : MATS[b].K;
   /* pass 1: forces -> velocities (reads only positions, so the order does not matter) */
   for(int n = 0; n < wob_nact; n++){
@@ -2178,12 +2206,25 @@ void mx_update(MxWorld *w, real dt){
   clean_chunks(w, dt);
   MX_PH_MARK(3);
   if(w->wob_on){
+    MX_WOB_MARK(0);
     wob_list(w);
+    MX_WOB_MARK(1);
 #ifdef MX_STATS
     mx_stat_wob = wob_nact;
 #endif
-    for(int i = 0; i < MX_WOB_STEPS; i++) wobble_step(w, dt / MX_WOB_STEPS);
+#if MX_WOB_CACHE_DAMP
+    /* Every substep uses the same dt / MX_WOB_STEPS. Calculating material
+       damping once per full tick avoids repeating these fixed-point
+       multiplications and clamps 2-4 times without changing the result. */
+    real subdt=dt/MX_WOB_STEPS,fd[MX_NMAT];
+    for(int m=0;m<MX_NMAT;m++){fd[m]=RI(1)-rmul(MATS[m].damp,subdt);if(fd[m]<0)fd[m]=0;}
+    for(int i=0;i<MX_WOB_STEPS;i++)wobble_step(w,subdt,fd);
+#else
+    for(int i=0;i<MX_WOB_STEPS;i++)wobble_step(w,dt/MX_WOB_STEPS);
+#endif
+    MX_WOB_MARK(2);
     wobble_check(w);
+    MX_WOB_MARK(3);
   }
   MX_PH_MARK(4);
   w->sand_t++;

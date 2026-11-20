@@ -23,6 +23,8 @@ jobs:
         run: |
           gcc -std=gnu99 -O2 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float
           gcc -std=gnu99 -O2 -DMX_FIXED -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed
+          gcc -std=gnu99 -O2 -DMX_WOB_CACHE_DAMP=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_damp_ref
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_CACHE_DAMP=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_damp_ref
           gcc -std=gnu99 -O2 -DMX_WOB_UNROLL_NB=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_ref
           gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_UNROLL_NB=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_ref
       - name: Measure every level with a deterministic 120-frame shot
@@ -51,6 +53,13 @@ jobs:
               op=float(old.group(1));np=float(new.group(1))
               line=f'{mode} {frames} frames/level reference_ms={op:.1f} optimized_ms={np:.1f} gain_pct={100*(op-np)/op:.1f} checksum={new.group(2)}'
               print(line);report.append(line)
+              d=subprocess.check_output([f'/tmp/mandex_physics_{mode}_damp_ref','--quiet',str(frames)],text=True)
+              damp=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',d)
+              if not damp or damp.group(2)!=new.group(2):
+                raise SystemExit(f'{mode}/{frames}: caching changed solver outcomes')
+              dv=float(damp.group(1))
+              cached=f'{mode} {frames} cached_damping_old_ms={dv:.1f} new_ms={np:.1f} gain_pct={100*(dv-np)/dv:.1f}'
+              print(cached);report.append(cached)
           (out/'wobble-reference-ab.txt').write_text('\n'.join(report)+'\n')
           PY
       - uses: actions/upload-artifact@v4
