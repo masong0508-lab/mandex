@@ -51,7 +51,29 @@ int stub_snd_plays;
 static void dump(const char*fn){ FILE*f=fopen(fn,"wb"); fprintf(f,"P6\n640 480\n255\n"); fwrite(fb,1,sizeof fb,f); fclose(f); }
 static void frame(const char*fn){ memset(fb,0,sizeof fb); cur_hdr=0; draw_all(); dump(fn); }
 static void tick(int calm){ mx_update(&world,DT); handle_events(); fx_step(calm,0); }
+/* The real ic_upload() function, with exact RGB565 texture bytes, is run
+   in two separately compiled variants by render-fastpaths CI. */
+static unsigned dc_hash(const unsigned char *p,size_t n){
+  unsigned h=2166136261u;
+  for(size_t i=0;i<n;i++){h^=p[i];h*=16777619u;}
+  return h;
+}
+static int dc_fastpath_probe(void){
+  static unsigned char idx[256*192];
+  ds_gfx_init();
+  tx_ic_top=pvr_mem_malloc(256*256*2);
+  if(!tx_ic_top)return 1;
+  for(int i=0;i<256*192;i++)idx[i]=(unsigned char)((i*23u+(i>>6)*11u)&255);
+  ic_upload(tx_ic_top,idx);
+  printf("DC_FAST_PALETTE=%08x\n",dc_hash((const unsigned char*)tx_ic_top,256*256*2));
+  gfx_pal[29]^=0x1f;
+  ic_upload(tx_ic_top,idx);
+  printf("DC_FAST_PALETTE_ANIM=%08x\n",dc_hash((const unsigned char*)tx_ic_top,256*256*2));
+  pvr_mem_free(tx_ic_top);
+  return 0;
+}
 int main(void){
+  if(getenv("DC_FASTPATH_PROBE"))return dc_fastpath_probe();
   gfx_init(); sound_init(); if(!snd_ok){ puts("FAIL: dc sound did not initialise"); return 1; }
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
   memset(fb,0,sizeof fb); title_t=0; cur_hdr=0; draw_title(); dump("/tmp/dc_title.ppm"); title_t=40; cur_hdr=0; draw_title(); dump("/tmp/dc_title_blink.ppm");   /* the title, and the half of the blink with no PRESS START */
