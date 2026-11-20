@@ -21,8 +21,8 @@ jobs:
           for V in "0:suburb" "39:landlord_hq" "59:alpha_landlord"; do
             L=${V%%:*}; N=${V#*:}
             for MODE in baseline adaptive; do
-              DEF=""
-              [ "$MODE" = baseline ] && DEF="-DMX_DS_OVERLOAD_BOTTOM15=0"
+              DEF="-DMX_DS_OVERLOAD_BOTTOM15=0"
+              [ "$MODE" = adaptive ] && DEF="-DMX_DS_OVERLOAD_BOTTOM15=1"
               sh tools/build_ds_bare.sh "out/$N-$MODE.nds" -DMX_FPS_DEMO_LEVEL=$L -DMX_NOSOUND $DEF
               python3 tools/ntr_patch.py "out/$N-$MODE.nds" "out/$N-$MODE.tmp.nds"
               mv "out/$N-$MODE.tmp.nds" "out/$N-$MODE.nds"

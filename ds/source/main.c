@@ -47,7 +47,7 @@ static int wob_budget = DS_WOB_MAX;
    rather than starving the upper gameplay picture. Still use full-speed
    touch/drag/active D-pad frames. Can A/B on emulator with =0. */
 #ifndef MX_DS_OVERLOAD_BOTTOM15
-#define MX_DS_OVERLOAD_BOTTOM15 1
+#define MX_DS_OVERLOAD_BOTTOM15 0 /* off by default: DeSmuME A/B mixed */
 #endif
 
 static MxWorld world;                         /* ~320 KB, lives in main RAM */
@@ -1489,7 +1489,7 @@ int main(void){
       int bottom_overload_rate=MX_DS_OVERLOAD_BOTTOM15 && lite &&
                                quiet_bottom && (frame&3);
       bot_dirty=!(bottom_half_rate || bottom_overload_rate ||
-                  (lite && (frame&1) && app==ST_PLAY && !dragging));
+                  (lite && (frame&1) && quiet_bottom));
       if(bot_dirty){       /* keep stylus aiming at 60Hz; throttle only noninteractive bottom redraws */
       if(world.man.mode == MAN_AIM && world.state == MX_PLAY){
         bot = (View){ buf_bot, 4, 0, 56 };
