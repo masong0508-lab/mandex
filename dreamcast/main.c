@@ -27,6 +27,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "mx.h"
+#include "mx_fps_meter.h"
 #include "mx_meta.h"
 #include "cloth.h"
 
@@ -410,6 +411,14 @@ static void fx_step(int calm, int strain){
 /* The title: the whole landscape with the man dropping butt-first on a landlord (a 852x480 picture, art/dcart.h, from the HTML title, logo included).
    The picture is wider than the screen, so the screen pans across it: hold on the logo, glide right to the man, hold, glide back. */
 static int on_title = 1, title_t, paused, title_lv;
+static MxFpsMeter dc_fps;
+static unsigned long long dc_prev_ms;
+static void dc_frame_complete(int simulated){
+  unsigned long long now=timer_ms_gettime64();
+  if(dc_prev_ms&&now>=dc_prev_ms)
+    mx_fps_meter_add(&dc_fps,(unsigned)(now-dc_prev_ms),1000u,1u,(unsigned)simulated);
+  dc_prev_ms=now;
+}
 static int nofight;                                       /* 1 = landlords don't fight back (title: Y; pause: X) */
 static int title_pan(int t, int range){                 /* 0..range for tick t: hold (90), glide right (160), hold (150), glide back (160), smoothstep */
   t %= 560;
@@ -848,8 +857,17 @@ int main(int argc, char **argv){
     cur_hdr = 0;
     if(in_intro){ draw_intro();
     } else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART   B MUSIC", 320, 270, 24, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
+    if(st&&st->ltrig>128&&st->rtrig>128){
+      char stats_line[60];
+      snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d",
+               (int)dc_fps.render_x10/10,(int)dc_fps.render_x10%10,
+               (int)dc_fps.sim_x10/10,(int)dc_fps.sim_x10%10);
+      quad(8,8,224,24,Z_HUD+4,argb(12,16,31,225));
+      text(stats_line,120,12,15,argb(255,218,116,255),1,Z_HUD+5);
+    }
     pvr_list_finish();
     pvr_scene_finish();
+    dc_frame_complete(!on_title&&!paused&&!in_intro);
   }
   return 0;
 }

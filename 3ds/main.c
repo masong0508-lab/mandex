@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "mx.h"
+#include "mx_fps_meter.h"
 #include "intro.h"
 #include "sfx.h"
 #include "mx_snd.h"
@@ -834,7 +835,15 @@ static void load_level(int l){
   dragging = 0; pad_used = 0; pad_dx = pad_dy = 0; new_best = 0;
 }
 static int was_state;
-
+/* Real wall-clock frame completion, sampled after VBlank. */
+static MxFpsMeter n3_fps;
+static unsigned long long n3_prev_ms;
+static void n3_frame_complete(int simulated){
+  unsigned long long now=osGetTime();
+  if(n3_prev_ms && now>=n3_prev_ms)
+    mx_fps_meter_add(&n3_fps,(unsigned)(now-n3_prev_ms),1000u,1u,(unsigned)simulated);
+  n3_prev_ms=now;
+}
 int main(void){
   osSetSpeedupEnable(true);                  /* New 3DS: 804 MHz + L2 cache (a no-op on an old 3DS; emulators that model it get the speed-up too) */
   gfxInitDefault();
@@ -864,6 +873,7 @@ int main(void){
         bot.fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL); bot.w = 320; bot.h = 240; blit_pal(&bot, ic_bot);
       }
       gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();
+      n3_frame_complete(0);
       continue;
     }
     if(app == ST_TITLE){
@@ -972,6 +982,15 @@ int main(void){
       draw_hud(); draw_end();
       if(app == ST_PAUSE){ rect(&top, 110, 80, 180, 70, RGB(15, 18, 30)); textc(&top, 200, 88, "PAUSED", 3, RGB(255, 210, 63)); textc(&top, 200, 116, "START RESUME", 1, RGB(255, 255, 255)); textc(&top, 200, 126, "SELECT RESTART  B MENU", 1, RGB(255, 255, 255)); }
     }
+    /* An unobtrusive diagnostic in *both* eyes only while L+R is held. */
+    if((held&(KEY_L|KEY_R))==(KEY_L|KEY_R)){
+      char stats_line[48];
+      snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d",
+        (int)n3_fps.render_x10/10,(int)n3_fps.render_x10%10,
+        (int)n3_fps.sim_x10/10,(int)n3_fps.sim_x10%10);
+      rect(&top,2,2,168,13,RGB(15,18,30));
+      text(&top,5,4,stats_line,1,RGB(255,220,120));
+    }
     }
     vb.cx = world.man.mode == MAN_WALK ? fminf(fmaxf(RTOF(world.man.x) - 40.0f, 0.0f), 40.0f) : -24.0f;        /* on foot the touch screen follows him, above the buttons */
     vb.cy = world.man.mode == MAN_WALK ? fminf(fmaxf(RTOF(world.man.y) - 26.0f, 0.0f), 11.0f) : 0.0f;
@@ -986,6 +1005,7 @@ int main(void){
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
     } else textc(&bot, 160, 12, "TOUCH TO START", 2, RGB(255, 255, 255));
     gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();
+    n3_frame_complete(app==ST_PLAY);
   }
   if(snd_ok) ndspExit();
   gfxExit();
