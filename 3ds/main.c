@@ -23,6 +23,8 @@
 #include "mx_snd.h"
 extern u16 gfx_pal[256]; void gfx_init(void);      /* ds/source/gfx.c (built with -DMX_FIXED as its own unit; only the palette is used here) */
 #include "mx_meta.h"
+#include "mx_save_journal.h"
+#include <sys/stat.h>
 #include "manspr.h"                                /* the same pixel-art man as the DS and Dreamcast ports (generated from the web game) */
 #include "manidle.h"                                /* his idle gags, victory dance */
 
@@ -54,8 +56,10 @@ static void sound_init(void){
     ndspChnReset(c); ndspChnSetInterp(c, NDSP_INTERP_LINEAR); ndspChnSetRate(c, (float)MX_SND_RATE); ndspChnSetFormat(c, NDSP_FORMAT_MONO_PCM16); ndspChnSetMix(c, mix);
   }
   snd_ok = 1;
+  /* Render the theme directly into its DSP-visible buffer.  This removes
+     the former full-size malloc() scratch copy and one memory-bandwidth pass. */
   { mus_buf = (short *)linearAlloc(MX_MUS_SAMPLES * 2);
-    if(mus_buf){ int n = 0; short *tmpm = (short *)malloc(MX_MUS_SAMPLES * 2); if(tmpm){ n = mx_music_render(tmpm, MX_MUS_SAMPLES); if(n) memcpy(mus_buf, tmpm, n * 2); free(tmpm); }
+    if(mus_buf){ int n = mx_music_render(mus_buf, MX_MUS_SAMPLES);
       if(n){ DSP_FlushDataCache(mus_buf, n * 2); mus_n = n; float mix[12] = { 0 }; mix[0] = mix[1] = 0.32f;
         ndspChnReset(7); ndspChnSetInterp(7, NDSP_INTERP_LINEAR); ndspChnSetRate(7, (float)MX_SND_RATE); ndspChnSetFormat(7, NDSP_FORMAT_MONO_PCM16); ndspChnSetMix(7, mix); } } }
 }
@@ -90,6 +94,69 @@ static void apply_outfit(int o){
   for(int k = 0; k < 4; k++) for(int c = 0; c < 3; c++) man_pal[1 + k][c] = sk[k][c];
 }
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
+static int nofight;                       /* title option, restored from save */
+
+/* 3DS SD-card progress: two alternating CRC-checked files.  No writes
+   during gameplay frames; only on wins/losses or when title options change.
+   A torn write cannot destroy the previous valid slot.  Host graphics
+   harnesses define MX_N3DS_NO_SAVE; real libctru builds use the SD card. */
+#ifndef MX_N3DS_NO_SAVE
+#define MX_N3DS_NO_SAVE 0
+#endif
+#if defined(__3DS__) && !MX_N3DS_NO_SAVE
+static const char *const n3_save_paths[2] = {
+  "sdmc:/3ds/mandex/progress-a.sav", "sdmc:/3ds/mandex/progress-b.sav"
+};
+static uint32_t n3_save_generation;
+static int n3_save_slot = -1, n3_save_status;
+static uint8_t n3_saved_payload[MX_SAVE_MAX];
+static int n3_saved_len;
+static void n3_save_load(void){
+  uint8_t buf[MX_JOURNAL_MAX + 1];
+  for(int i = 0; i < 2; i++){
+    FILE *fp = fopen(n3_save_paths[i], "rb");
+    if(!fp) continue;
+    size_t n = fread(buf, 1, sizeof buf, fp);
+    fclose(fp);
+    if(n > MX_JOURNAL_MAX) continue;               /* includes extra bytes */
+    MxStats trial; mx_meta_init(&trial);
+    int o = 0; MxOptions opt; uint32_t generation = 0;
+    if(!mx_journal_unpack(&trial, &o, &opt, &generation, buf, (int)n)) continue;
+    if(n3_save_slot >= 0 && !mx_journal_newer(generation, n3_save_generation)) continue;
+    n3_save_slot = i; n3_save_generation = generation;
+    stats = trial; outfit_sel = o; nofight = opt.nofight;
+    n3_save_status = 1;
+  }
+  if(n3_save_slot >= 0){
+    MxOptions opt; mx_options_default(&opt); opt.nofight = (uint8_t)nofight;
+    n3_saved_len = mx_meta_pack_opt(&stats, outfit_sel, &opt,
+                                   n3_saved_payload, sizeof n3_saved_payload);
+  }
+}
+static void n3_save_sync(void){
+  uint8_t payload[MX_SAVE_MAX], record[MX_JOURNAL_MAX];
+  MxOptions opt; mx_options_default(&opt); opt.nofight = (uint8_t)nofight;
+  int n = mx_meta_pack_opt(&stats, outfit_sel, &opt, payload, sizeof payload);
+  if(!n || (n == n3_saved_len && !memcmp(payload, n3_saved_payload, n))) return;
+  int slot = n3_save_slot == 0 ? 1 : 0;
+  (void)mkdir("sdmc:/3ds/mandex", 0777);
+  int rn = mx_journal_pack(&stats, outfit_sel, &opt, n3_save_generation + 1,
+                           record, sizeof record);
+  FILE *fp = rn ? fopen(n3_save_paths[slot], "wb") : NULL;
+  if(!fp){ n3_save_status = -1; return; }
+  size_t written = fwrite(record, 1, (size_t)rn, fp);
+  int flushed = fflush(fp);
+  int closed = fclose(fp);
+  if(written != (size_t)rn || flushed || closed){ n3_save_status = -1; return; }
+  n3_save_slot = slot; n3_save_generation++;
+  memcpy(n3_saved_payload, payload, (size_t)n);
+  n3_saved_len = n;
+  n3_save_status = 2;
+}
+#else
+static void n3_save_load(void){}
+static void n3_save_sync(void){}
+#endif
 static void toast_push(int id){ if(toast_nq < 6) toast_q[toast_nq++] = id; }
 static unsigned outfit_seen = 1;                                   /* outfits already owned (bit per outfit): a new one pops a "NEW OUTFIT" toast, ids 100+ */
 static void outfit_scan(int quiet){ for(int i = 0; i < MX_NUM_OUTFITS; i++){ if(mx_outfit_unlocked(&stats, i) && !((outfit_seen >> i) & 1)){ outfit_seen |= 1u << i; if(!quiet) toast_push(100 + i); } } }
@@ -879,7 +946,6 @@ static void draw_end(void){
 /* walk levels: touch buttons on the bottom screen while he is on foot (one finger at a time; the pad and face buttons do the same) */
 static const struct { int x, w; const char *s; } WB[6] = { { 4, 44, "<" }, { 52, 44, ">" }, { 104, 52, "JUMP" }, { 160, 56, "PUNCH" }, { 220, 52, "SLAM" }, { 276, 40, "QUIT" } };
 static int walk_btn_at(int tx, int ty){ if(ty < 196 || ty >= 236) return -1; for(int i = 0; i < 6; i++) if(tx >= WB[i].x && tx < WB[i].x + WB[i].w) return i; return -1; }
-static int nofight;                                      /* Y on the title: landlords stand still instead of fighting back */
 static void load_level(int l){
   mx_load(&world, l); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats);
   memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); mi_reset(&mi);
@@ -902,7 +968,9 @@ int main(void){
   gfxSetDoubleBuffering(GFX_TOP, true); gfxSetDoubleBuffering(GFX_BOTTOM, true);
   srand(1234);
   sound_init();
-  apply_outfit(0);
+  mx_meta_init(&stats);
+  n3_save_load();
+  apply_outfit(outfit_sel);
   gfx_init();                                         /* the shared DS drawing library builds its palette in RAM (used by the cutscenes) */
   load_level(0);
   View vt = {&top, 3, 20, 28, 0, 0};                 /* whole level: 360x180 centred on the top screen */
@@ -931,8 +999,8 @@ int main(void){
     if(app == ST_TITLE){
       if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
-      if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } apply_outfit(outfit_sel); }
-      if(down & KEY_Y){ nofight = !nofight; mx_set_fight(&world, !nofight); }
+      if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } apply_outfit(outfit_sel); n3_save_sync(); }
+      if(down & KEY_Y){ nofight = !nofight; mx_set_fight(&world, !nofight); n3_save_sync(); }
       if(down & (KEY_A | KEY_START | KEY_TOUCH)){
         if(sel == 0 && !intro_seen){ intro_seen = 1; intro_level = 0; app = ST_INTRO; intro_start(); }
         else if(sel == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_level = sel; app = ST_INTRO; intro_start_wolf(); }
@@ -1002,7 +1070,10 @@ int main(void){
       if(toast_t > 0){ if(++toast_t > 150){ toast_t = 0; toast_id = -1; } }
       if(toast_t == 0 && toast_nq){ toast_id = toast_q[0]; for(int i = 1; i < toast_nq; i++) toast_q[i-1] = toast_q[i]; toast_nq--; toast_t = 1; }
       tick_parts();
-      if(world.state != MX_PLAY && was_state == MX_PLAY && world.state == MX_WIN){ prev_best = stats.best[world.level]; mx_meta_win(&stats, &world); new_best = world.score > 0 && (uint32_t)world.score > prev_best; for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0); }
+      if(world.state != MX_PLAY && was_state == MX_PLAY){
+        if(world.state == MX_WIN){ prev_best = stats.best[world.level]; mx_meta_win(&stats, &world); new_best = world.score > 0 && (uint32_t)world.score > prev_best; for(int a; (a = mx_meta_next_unlock(&stats)) >= 0; ){ toast_push(a); } outfit_scan(0); }
+        n3_save_sync();
+      }
       was_state = world.state;
     }
 
@@ -1028,6 +1099,10 @@ int main(void){
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
       if(!snd_ok){ char sb[48]; sprintf(sb, "NO SOUND (ndsp %08X) - NEEDS dspfirm.cdc", (unsigned)snd_err); textc(&top, 200, 212, sb, 1, RGB(255, 90, 90)); }
+#if defined(__3DS__) && !MX_N3DS_NO_SAVE
+      else if(n3_save_status < 0) textc(&top, 200, 212, "SD SAVE FAILED - CHECK CARD", 1, RGB(255, 90, 90));
+      else if(n3_save_status > 0) textc(&top, 200, 212, "PROGRESS SAVED TO SD", 1, RGB(125, 255, 90));
+#endif
       { char fb[48]; sprintf(fb, "Y: LANDLORDS FIGHT BACK  %s", nofight ? "OFF" : "ON"); textc(&top, 200, 190, fb, 1, nofight ? RGB(150, 150, 165) : RGB(125, 255, 90)); }
       { char ob[64]; sprintf(ob, "L/R: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {
@@ -1059,6 +1134,7 @@ int main(void){
     gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();
     n3_frame_complete(app==ST_PLAY);
   }
+  n3_save_sync();
   if(snd_ok) ndspExit();
   gfxExit();
   return 0;
