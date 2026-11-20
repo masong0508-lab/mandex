@@ -78,6 +78,14 @@ int main(void){
     reset();ref_rect(want+32,x,y,w,h,40);gfx_rect(have+32,x,y,w,h,40);
     if(check("rectangle",k))return 1;
   }
+  /* Tiny vertical accents are the hot rectangle path on dense façades.
+     Exercise clipping and 1-4px writes independently of larger boxes. */
+  for(int k=0;k<2048;k++){
+    int x=pick(-12,264),y=pick(-30,225),w=pick(1,4),h=pick(1,215);
+    if((k&31)==0){x=-2;y=191;w=4;h=10;}
+    reset();ref_rect(want+32,x,y,w,h,23);gfx_rect(have+32,x,y,w,h,23);
+    if(check("tiny_rectangle",k))return 1;
+  }
   for(int k=0;k<480;k++){
     int x=pick(-320,550),y=pick(-320,490);
     int rx=pick(0,210),ry=pick(0,210);
@@ -101,6 +109,6 @@ int main(void){
     gfx_dither(have+32,x,y,w,h,121);
     if(check("dither",k))return 1;
   }
-  puts("ok: clipped ellipses, triangles and dither are pixel-identical on 1,920 random/offscreen cases");
+  puts("ok: rectangle, tiny strokes, ellipses, triangles and dither are pixel-identical on 3,968 random/offscreen cases");
   return 0;
 }

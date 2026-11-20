@@ -30,6 +30,26 @@ void gfx_rect(u8 *b, int x, int y, int w, int h, u8 c){
   if(x1 > 256) x1 = 256;
   if(y1 > 192) y1 = 192;
   if(x1 <= x || y1 <= y) return;
+#ifndef MX_DS_FAST_RECT
+#define MX_DS_FAST_RECT 1
+#endif
+#if MX_DS_FAST_RECT
+  /* A large share of scene façade/UI decorations are 1-4px-wide strokes.
+     Direct byte stores avoid a libc memset call for every individual row,
+     especially the tall 1px lamp/window edges. Clip BEFORE entering here,
+     so the output is identical even for partially offscreen rectangles. */
+  const int width=x1-x;
+  if(width<=4){
+    u8 *row=b+(size_t)y*256+x;
+    for(int j=y;j<y1;j++,row+=256){
+      row[0]=c;
+      if(width>1)row[1]=c;
+      if(width>2)row[2]=c;
+      if(width>3)row[3]=c;
+    }
+    return;
+  }
+#endif
   /* The entire framebuffer and every full-width skyline/letterbox rectangle
      can be filled in one contiguous memset, not one memset per scanline. */
   if(x == 0 && x1 == 256){

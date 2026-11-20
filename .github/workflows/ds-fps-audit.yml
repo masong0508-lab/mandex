@@ -24,6 +24,7 @@ jobs:
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_bench
           gcc -std=gnu99 -O2 -Icore test/fps_meter_test.c -o /tmp/ds_fps_meter_test
           /tmp/ds_fps_meter_test
+          gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_FAST_RECT=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_rect_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_BOTTOM30=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_before
       - name: Prove optimized tiny tile copies are pixel-identical
         run: |
@@ -37,6 +38,7 @@ jobs:
         run: |
           mkdir -p out/ds-fps-phases
           for L in 0 9 21 29 39 40 50 59; do
+            DS_PERF_BENCH=1 /tmp/ds_fps_rect_before /tmp/mandex-rect-before 520 "$L" > "out/ds-fps-phases/rect-before-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_before /tmp/mandex-before 520 "$L" > "out/ds-fps-phases/baseline-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_bench /tmp/mandex-fps 520 "$L" > "out/ds-fps-phases/level-$L.txt"
             grep -E '^(DS_HOST_PROFILE|DS_PHASE|DS_TOP_LAYER)' "out/ds-fps-phases/level-$L.txt"
@@ -59,6 +61,23 @@ jobs:
           for level,x,y,pct in output:print(f'{level:>5} | {x:>22.1f} | {y:>32.1f} | {pct:>12.1f}%')
           pathlib.Path('out/ds-fps-phases/summary.txt').write_text(
             hdr+'\n'+'\n'.join(f'{level} {x:.1f} {y:.1f} {pct:.1f}%' for level,x,y,pct in output)+'\n')
+          PY
+      - name: Show matched before/after tiny-rectangle timings (host only)
+        run: |
+          python3 - <<'PY'
+          import pathlib,re
+          lines=['level rect_old_us rect_new_us change_pct top_layer_old_us top_layer_new_us']
+          for L in (0,9,21,29,39,40,50,59):
+            a=pathlib.Path(f'out/ds-fps-phases/rect-before-level-{L}.txt').read_text()
+            b=pathlib.Path(f'out/ds-fps-phases/level-{L}.txt').read_text()
+            def val(s,expr):return float(re.search(expr,s).group(1))
+            old=val(a,r'cpu_frame_mean_us=([0-9.]+)')
+            new=val(b,r'cpu_frame_mean_us=([0-9.]+)')
+            layer=r'DS_TOP_LAYER name=wallpaper_facades mean_us=([0-9.]+)'
+            lo=val(a,layer);ln=val(b,layer)
+            line=f'{L+1} {old:.2f} {new:.2f} {100*(old-new)/old:.1f}% {lo:.2f} {ln:.2f}'
+            print(line);lines.append(line)
+          pathlib.Path('out/ds-fps-phases/rect-ab-summary.txt').write_text('\n'.join(lines)+'\n')
           PY
       - uses: actions/upload-artifact@v4
         with:
