@@ -10,13 +10,17 @@ One game, four builds: a browser version with its own JS physics, and three cons
 | Port | Where | State |
 | --- | --- | --- |
 | Browser | `web/index.html` (single file, open it in any browser) | playable, has its own JS physics |
-| Nintendo DS | `ds/` (devkitPro / libnds, 20.12 fixed point) | written and tested on the host with stub libnds, **never built or run on a real DS or emulator** |
-| Nintendo 3DS | `3ds/` (devkitARM + libctru, float, software-drawn) | furthest behind: circles-and-rectangles man, no sound; **never built or run on a 3DS or emulator** |
-| Sega Dreamcast | `dreamcast/` (KallistiOS, float) | same: host-tested with a software rasteriser, **never built for real** |
+| Nintendo DS | `ds/` (bare-metal ARM9/ARM7, fixed point) | CI builds NDS ROMs and runs DeSmuME smoke/FPS probes; physical-device performance and cartridge save support remain unverified |
+| Nintendo 3DS | `3ds/` (devkitARM + libctru, float, software rendering) | CI builds 3DSX with sprite art and NDSP synthesis; new SD journaling needs console/emulator validation |
+| Sega Dreamcast | `dreamcast/` (KallistiOS, float) | CI builds experimental CDI and ELF with audio; new VMU journaling needs emulator/hardware verification |
 
 `core/mx.c` is the shared C game core for the three consoles (a 120x60 voxel grid, rigid chunks, a wobble lattice with
 8 block kinds and 60 levels (20 story levels, 20 chapter 2 levels, then 20 chapter 3 levels; same layouts and mechanics as the web game); `core/mx_meta.c` holds the stars, achievements and outfits rules), `art/` holds the generated pixel art and the idle-gag player, `tools/` the sprite generator,
 `test/` the host tests.  See [PORTING.md](PORTING.md) for the full status, design notes and what is not verified.
+
+See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20.md)
+for the current performance-sensitive improvements and the major features still
+outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
 ## What is in it
 
@@ -27,7 +31,7 @@ One game, four builds: a browser version with its own JS physics, and three cons
   boogers, sweat), a sleep with snot bubble after 20 s, a victory butt-wiggle dance and a sad slump on defeat.
 - **The towel** is a small cloth simulation (`core/cloth.c`, recipe in `docs/CLOTH.md`): it flutters, folds and turns edge-on
   with his body, the same in the browser, on the DS and on the Dreamcast.
-- **Progress** (all consoles, this session only until save data lands): 1-3 stars per level, 25 achievements, outfits.  The DS has an
+- **Progress**: 1-3 stars per level, 25 achievements, outfits.  The browser uses local storage; the DS has cartridge-save code (hardware unverified), the 3DS has dual-slot SD saves and Dreamcast has experimental dual-slot VMU saves.  The DS has an
   achievements list with progress bars and an outfits screen (swatches, padlocks, how to unlock).  Level locks (first 3 open, then in
   order) are built but switched off (`-DMX_LEVEL_LOCKS`) until saving exists; on the DS title L+R+SELECT is the unlock-all cheat.
 - **Options** (browser): a simple OPTIONS screen from the main menu.  *Collapsible buildings* keeps fallen rubble physical (it keeps slumping and
