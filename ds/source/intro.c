@@ -48,7 +48,7 @@ static const char *TXTW[WOLF_SCENES][3] = {
   { "Ears. Boing.", "A snout. Eleven shirt buttons resigning, one at a time.", "His mustache did not move. It is load-bearing." },
   { "The shorts held out for one more second.", "Then: a tail. And the discovery that pants were always optional.", "Gerald checked the rear view. Round. Furry. Free." },
   { "Naturally, he howled.", "At a moon he had called \"a lot\" two minutes earlier.", "Three blocks away, a landlord's wine glass cracked." },
-  { "A knock. Brenda, back for \"the good towels\".", "She looked at the wolf. The wolf looked at her. Eyebrows did things.", "The door closed. The camera, a gentleman, looked at the moon." },
+  { "A knock. Brenda, back for \"the good towels\".", "She winked at the wolf. His tail wagged WITHOUT PERMISSION.", "The door closed. This is a family camera. Allegedly." },
   { "CHAPTER 3: THE WOLFMAN", "Landlords now have health bars, riot shields and a healer. Nobody asked the healer.", "EVICT. EVERY. LANDLORD. AWOOOO." },
 };
 static const signed char HLW[WOLF_SCENES] = { 2, 2, 2, 1, 2, 2, 2, 2 };
@@ -59,7 +59,7 @@ static const signed char SHAKEW[WOLF_SCENES][3] = { {0,3,0}, {0,0,5}, {0,2,12}, 
 /* closing cutscenes: the end of chapter 1 (Mandex Manor) and of chapter 2 (Landlord HQ), four scenes each, same story as the browser's CUT_E1 / CUT_E2 */
 static const char *TXTE1[END_SCENES][3] = {
   { "The manor came down in eleven seconds.", "Gerald stood on top of it for the other four hours. For the view.", "Somewhere under the bricks, a top hat gave up." },
-  { "Word got round the street faster than a rent increase.", "Brenda brought the neighbours. The neighbours brought signs.", "Gerald brought the belly, as requested." },
+  { "Word got round the street faster than a rent increase.", "Brenda came with the neighbours. And a dangerously flirty smile.", "Gerald brought the belly. The crowd demanded an encore." },
   { "Thump. The mailbox coughed up a metal tube.", "Inside: one letter, on very expensive paper.", "\"We noticed. Come to the office. Bring the belly.\"" },
   { "CHAPTER 1 COMPLETE", "Every landlord on Maple Street has been evicted.", "Next: the paperwork. So much paperwork." },
 };
@@ -209,11 +209,11 @@ static void bubble(u8 *b, int x, int y, const char *s, int tail){      /* speech
   gfx_tri(b, x - 3 + tail, y + 12, x + 5 + tail, y + 12, x + tail * 2, y + 22, C_BLACK); gfx_tri(b, x - 2 + tail, y + 12, x + 4 + tail, y + 12, x + tail * 2, y + 19, C_WHITE);
   gfx_text(b, x - gfx_text_w(s, 1) / 2, y + 4, s, C_BLACK, 1);
 }
-enum { GF_TIE = 1, GF_BOXERS = 2, GF_SAD = 4, GF_WAVE = 8, GF_COOL = 16, GF_ANGRY = 32, GF_FUR = 64, GF_EARS = 128, GF_SNOUT = 256, GF_TAIL = 512, GF_HOWL = 1024, GF_WALK = 2048, GF_SHIVER = 4096 };
+enum { GF_TIE = 1, GF_BOXERS = 2, GF_SAD = 4, GF_WAVE = 8, GF_COOL = 16, GF_ANGRY = 32, GF_FUR = 64, GF_EARS = 128, GF_SNOUT = 256, GF_TAIL = 512, GF_HOWL = 1024, GF_WALK = 2048, GF_SHIVER = 4096, GF_FLIRT = 8192 };
 static int g_t;                                                   /* the frame counter of the shot being drawn: blinks, breathing, sway */
 static void face(u8 *b, int x, int y, int s, int fl){       /* head centred x,y, radius ~5 units */
   const u8 hc = (fl & GF_FUR) ? C_GRAY : C_SKIN, hs2 = (fl & GF_FUR) ? C_DARK : C_SKIN2;
-  const int big = s >= 3, blink = (g_t % 110) < 4;
+  const int big = s >= 3, blink = (g_t % 110) < 4, wink = (fl & GF_FLIRT) && (g_t % 100) > 60 && (g_t % 100) < 88;
   if(fl & GF_EARS){ gfx_tri(b, x - 5 * s, y - 3 * s, x - s, y - 5 * s, x - 5 * s, y - 11 * s, C_GRAY); gfx_tri(b, x + 5 * s, y - 3 * s, x + s, y - 5 * s, x + 5 * s, y - 11 * s, C_GRAY); gfx_tri(b, x - 4 * s, y - 4 * s, x - 2 * s, y - 5 * s, x - 4 * s, y - 8 * s, C_PINK); gfx_tri(b, x + 4 * s, y - 4 * s, x + 2 * s, y - 5 * s, x + 4 * s, y - 8 * s, C_PINK); }
   gfx_ell(b, x, y + (big ? 1 : 0), 5 * s + 1, 5 * s + 1, C_HAIR);                                                          /* outline */
   gfx_ell(b, x, y, 5 * s, 5 * s, hc); gfx_ell(b, x, y + s, 5 * s, 4 * s, hc);
@@ -232,6 +232,8 @@ static void face(u8 *b, int x, int y, int s, int fl){       /* head centred x,y,
     gfx_rect(b, x - 3 * s, ey - 1, ew2 + 1, ew2 + 2, C_WHITE); gfx_rect(b, x + s, ey - 1, ew2 + 1, ew2 + 2, C_WHITE);
     gfx_rect(b, x - 3 * s + (ew2 + 1) / 2 - 1 + dx, ey + 1, s - 1 + (s > 3), ew2 - 1, C_BLACK); gfx_rect(b, x + s + (ew2 + 1) / 2 - 1 + dx, ey + 1, s - 1 + (s > 3), ew2 - 1, C_BLACK);
   } else { gfx_rect(b, x - 3 * s, ey, ew2, ew2, C_BLACK); gfx_rect(b, x + s, ey, ew2, ew2, C_BLACK); }
+  if(wink){gfx_tline(b,x-4*s,y-s,x-s,y-s,2,C_HAIR);
+    gfx_tline(b,x+s,y-2*s,x+4*s,y-3*s,2,C_HAIR2);}
   if(big && !(fl & GF_FUR)){ gfx_ell(b, x - 4 * s, y + 2 * s, s, s / 2 + 1, C_PINK); gfx_ell(b, x + 4 * s, y + 2 * s, s, s / 2 + 1, C_PINK); }   /* blush */
   if(fl & GF_SAD){ gfx_tline(b, x - 2 * s, y + 3 * s, x + 2 * s, y + 3 * s, ew, C_BLACK); gfx_tline(b, x - 2 * s, y + 3 * s, x - 3 * s, y + 4 * s, ew, C_BLACK); gfx_tline(b, x + 2 * s, y + 3 * s, x + 3 * s, y + 4 * s, ew, C_BLACK); }
   else if(fl & GF_ANGRY){ gfx_rect(b, x - 2 * s, y + 2 * s, 4 * s, 2 * s, C_BLACK); gfx_rect(b, x - 2 * s + 1, y + 2 * s + 1, 4 * s - 2, s, C_WHITE); }
@@ -574,8 +576,9 @@ static void w_howl(u8 *b, int k, int tt){
   else if(k == 1){ moon(b, 128, 80, 30); gfx_rect(b, 0, 130, 256, 62, C_DARK); face(b, 128, 120, 16, GF_EARS | GF_FUR | GF_SNOUT | GF_HOWL); bubble(b, 128, 12, "A LOT. HE SAID A LOT.", 0); }
   else { gfx_rect(b, 0, 0, 256, 192, C_WALL1); gfx_rect(b, 0, 150, 256, 42, C_DIRT2); landlord(b, 128, 130, 10, tt, 1); int cr = tt > 20; gfx_rect(b, 150, 70, 10, 14, cr ? C_CLOUD2 : C_RED); gfx_rect(b, 154, 84, 2, 10, C_WHITE); if(cr) gfx_text_c(b, 160, 56, "CRACK!", C_GOLD, C_BLACK, 2); }
 }
-static void brenda(u8 *b, int x, int fy, int s, int t){      /* Brenda: big yellow hair, a pink dress, a handbag, a smile that means business */
-  int bob = wv(t, 40, 1), hy = fy - 27 * s + bob;
+static void brenda(u8 *b,int x,int fy,int s,int t,int flirt){ /* adult character, deliberately cheeky glamour pose */
+  if(flirt)x+=wv(t,60,2); /* hips sway; the face and hem follow */
+  int bob=wv(t,40,1)+(flirt?wv(t,36,1):0),hy=fy-27*s+bob;
   gfx_ell(b, x, hy + s, 8 * s, 9 * s, C_GOLD2);                                                                              /* the hair behind, in shade */
   gfx_ell(b, x - 7 * s, hy + 7 * s, 3 * s, 4 * s, C_GOLD2); gfx_ell(b, x + 7 * s, hy + 7 * s, 3 * s, 4 * s, C_GOLD2);        /* curls on the shoulders */
   gfx_rect(b, x - 4 * s, fy - 10 * s, 2 * s, 10 * s, C_SKIN); gfx_rect(b, x + 2 * s, fy - 10 * s, 2 * s, 10 * s, C_SKIN);     /* legs */
@@ -583,7 +586,15 @@ static void brenda(u8 *b, int x, int fy, int s, int t){      /* Brenda: big yell
   gfx_rect(b, x - 3 * s / 2, hy + 4 * s, 3 * s, 5 * s, C_SKIN); gfx_rect(b, x + s / 2, hy + 4 * s, s, 5 * s, C_SKIN2);                  /* neck, shaded on one side */
   gfx_tri(b, x - 8 * s, fy - 8 * s + bob, x + 8 * s, fy - 8 * s + bob, x, fy - 22 * s + bob, C_PINK);                         /* skirt */
   gfx_rect(b, x - 6 * s, fy - 12 * s + bob, 12 * s, 3 * s, C_PINK); gfx_rect(b, x - 6 * s, fy - 13 * s + bob, 12 * s, s, C_RED);   /* hem, belt */
-  gfx_rect(b, x - 5 * s, fy - 21 * s + bob, 10 * s, 8 * s, C_PINK); gfx_tri(b, x - 2 * s, fy - 21 * s + bob, x + 2 * s, fy - 21 * s + bob, x, fy - 18 * s + bob, C_SKIN);   /* bodice, neckline */
+  gfx_rect(b,x-5*s,fy-21*s+bob,10*s,8*s,C_PINK);
+  gfx_tri(b,x-2*s,fy-21*s+bob,x+2*s,fy-21*s+bob,x,fy-18*s+bob,C_SKIN);
+  if(flirt){ /* sweetheart neckline and satin side-slit, no nudity */
+    gfx_tline(b,x-5*s,fy-20*s+bob,x,fy-18*s+bob,1,C_RED2);
+    gfx_tline(b,x,fy-18*s+bob,x+5*s,fy-20*s+bob,1,C_RED2);
+    gfx_line(b,x+4*s,fy-11*s+bob,x+7*s,fy-8*s+bob,C_RED);
+    gfx_line(b,x+5*s,fy-13*s+bob,x+7*s,fy-10*s+bob,C_WHITE);
+    gfx_ell(b,x-4*s,fy-15*s+bob,s,s,C_WHITE);
+  }
   for(int i = 0; i < 4; i++) gfx_rect(b, x - 7 * s + i * 4 * s + (i & 1) * s, fy - 11 * s + bob + (i & 1) * s, s, s, C_WHITE);        /* polka dots on the hem */
   int wave = wv(t, 24, 1);
   gfx_rect(b, x - 7 * s, fy - 20 * s + bob, 2 * s, 7 * s, C_SKIN); gfx_rect(b, x + 5 * s, fy - 20 * s + bob - (wave > 0 ? s : 0), 2 * s, 7 * s, C_SKIN);   /* arms, one waving */
@@ -593,22 +604,36 @@ static void brenda(u8 *b, int x, int fy, int s, int t){      /* Brenda: big yell
   gfx_ell(b, x, hy + s, 5 * s + s / 2, 6 * s, C_SKIN);                                                                       /* face (no chin shadow: it read as a beard) */
   gfx_ell(b, x, hy - 4 * s, 7 * s, 3 * s, C_GOLD); gfx_tri(b, x - 6 * s, hy - 3 * s, x, hy - 3 * s, x - 5 * s, hy + 2 * s, C_GOLD); gfx_tri(b, x + 6 * s, hy - 3 * s, x, hy - 3 * s, x + 5 * s, hy + 2 * s, C_GOLD);   /* fringe */
   gfx_rect(b, x - 3 * s, hy - 5 * s, s, s, C_WHITE);                                                                         /* a shine on the hair */
-  int blink = (t % 90) > 86;
-  gfx_rect(b, x - 3 * s, hy - s, 2 * s, blink ? 1 : s + 1, blink ? C_BLACK : C_WHITE); gfx_rect(b, x + s, hy - s, 2 * s, blink ? 1 : s + 1, blink ? C_BLACK : C_WHITE);
-  if(!blink){ gfx_rect(b, x - 2 * s, hy - s, s, s, C_BLACK); gfx_rect(b, x + s, hy - s, s, s, C_BLACK); }
+  int blink=(t%90)>86,wink=flirt&&(t%108)>64&&(t%108)<84;
+  gfx_rect(b,x-3*s,hy-s,2*s,(blink||wink)?1:s+1,(blink||wink)?C_BLACK:C_WHITE); gfx_rect(b, x + s, hy - s, 2 * s, blink ? 1 : s + 1, blink ? C_BLACK : C_WHITE);
+  if(!blink){if(!wink)gfx_rect(b,x-2*s,hy-s,s,s,C_BLACK);gfx_rect(b,x+s,hy-s,s,s,C_BLACK);}
   gfx_line(b, x - 3 * s, hy - s, x - 4 * s, hy - 2 * s, C_BLACK); gfx_line(b, x + 3 * s, hy - s, x + 4 * s, hy - 2 * s, C_BLACK);    /* lashes */
   gfx_rect(b, x - 3 * s, hy - 2 * s, 2 * s, 1, C_HAIR); gfx_rect(b, x + s, hy - 2 * s, 2 * s, 1, C_HAIR);                      /* brows */
   gfx_ell(b, x - 4 * s, hy + 2 * s, s, s / 2 + 1, C_PINK); gfx_ell(b, x + 4 * s, hy + 2 * s, s, s / 2 + 1, C_PINK);            /* blush */
   gfx_rect(b, x - 2 * s, hy + 3 * s, 4 * s, s, C_RED); gfx_rect(b, x - s, hy + 3 * s, s, 1, C_WHITE);                         /* lipstick, with a highlight */
-  gfx_rect(b, x - 3 * s, hy + 3 * s - 1, s, 1, C_RED); gfx_rect(b, x + 2 * s, hy + 3 * s - 1, s, 1, C_RED);                  /* the corners of the smile */
+  gfx_rect(b,x-3*s,hy+3*s-1,s,1,C_RED);gfx_rect(b,x+2*s,hy+3*s-1,s,1,C_RED);
+  if(flirt){gfx_ell(b,x-5*s,hy+2*s,s+1,s,C_PINK);gfx_ell(b,x+5*s,hy+2*s,s+1,s,C_PINK);
+    if(t%90<45)gfx_text(b,x+7*s,hy-8*s+wv(t,36,2),"<3",C_PINK,1);
+  }
 }
 static void w_visit(u8 *b, int k, int tt){
   if(k == 0){ stars_night(b); night_hills(b, 150); gfx_rect(b, 150, 70, 60, 82, C_WALL3); gfx_rect(b, 164, 100, 32, 52, C_DIRT); gfx_ell(b, 192, 126, 2, 2, C_GOLD);
-    brenda(b, 90, 176, 3, tt); gerald(b, 196, 176, 2, GF_FUR | GF_EARS | GF_SNOUT | GF_TAIL | GF_COOL); bubble(b, 70, 40, "HI, GERALD.", 0); }
-  else if(k == 1){ gfx_rect(b, 0, 0, 256, 192, C_UIBG); for(int i = 0; i < 6; i++) gfx_text(b, 100 + i * 20 + wv(tt + i * 9, 50, 6), 150 - ((tt * 2 + i * 26) % 110), "<3", C_PINK, 2);
-    brenda(b, 60, 186, 4, tt); gerald(b, 190, 186, 3, GF_FUR | GF_EARS | GF_SNOUT | GF_TAIL | GF_COOL); bubble(b, 60, 20, "YOU'VE BEEN WORKING OUT.", 0); if(tt > 90) bubble(b, 200, 60, "IT'S FUR.", 0); }
+    brenda(b, 90, 176, 3, tt, 0); gerald(b, 196, 176, 2, GF_FUR | GF_EARS | GF_SNOUT | GF_TAIL | GF_COOL); bubble(b, 70, 40, "HI, GERALD.", 0); }
+  else if(k==1){
+    gfx_rect(b,0,0,256,192,C_RED2);
+    gfx_ell(b,126,100,118,88,C_RED);gfx_ell(b,130,94,80,68,C_PINK);
+    for(int i=0;i<9;i++){
+      int xx=24+i*26+wv(tt+i*9,38,4),yy=110-((tt*2+i*24)%125);
+      gfx_text(b,xx,yy,"<3",i&1?C_WHITE:C_RED2,1+(i%3==0));
+    }
+    brenda(b,60,186,4,tt,1);
+    gerald(b,190,186,3,GF_FUR|GF_EARS|GF_SNOUT|GF_TAIL|GF_COOL|GF_FLIRT);
+    bubble(b,62,20,"THAT TAIL'S TROUBLE.",0);
+    if(tt>90)bubble(b,196,60,"WANNA FIND OUT?",0);
+    if(tt>130)gfx_text_c(b,128,154,"TOO HOT FOR THIS CAMERA",C_GOLD,C_RED2,1);
+  }
   else { gfx_rect(b, 0, 0, 256, 192, C_UIBG); moon(b, 128, 90, 52); int c = tt < 40 ? tt : 40; gfx_rect(b, 0, 0, c * 128 / 40, 192, C_DARK); gfx_rect(b, 256 - c * 128 / 40, 0, c * 128 / 40, 192, C_DARK);
-    if(tt > 80) gfx_text_c(b, 128, 168, "...THE MOON IS VERY INTERESTING.", C_GOLD, C_BLACK, 1); }
+    if(tt > 80) gfx_text_c(b, 128, 168, "THE CAMERA PREFERS THE MOON.", C_GOLD, C_BLACK, 1); }
 }
 static void w_title(u8 *b, int k, int tt){
   (void)k; stars_night(b); moon(b, 128, 80, 50 + wv(tt, 120, 3)); night_hills(b, 150);
@@ -646,9 +671,9 @@ static void e1_street(u8 *b, int k, int tt){
   sky(b, 0, 150, 1); sun(b, 40, 80, 18); hills(b, 140, 0); ground(b, 150); gfx_rect(b, 0, 164, 256, 20, C_SKIN3);
   for(int i = 0; i < 7; i++) folk(b, 18 + i * 36, 172 + (i & 1) * 8, tt + i * 7, col[i % 5], i & 1);
   confetti(b, tt, 30);
-  if(k == 0){ brenda(b, 100, 176, 3, tt); spr_man(b, 190, 130, 6, 1, POSE_FLEX, tt >> 3); bubble(b, 90, 16, "YOU DID IT, GERALD!", 0); }
-  else if(k == 1){ brenda(b, 60, 186, 4, tt); spr_man(b, 170, 140, 8, 1, POSE_IDLE, tt >> 3); for(int i = 0; i < 4; i++) gfx_text(b, 100 + i * 20 + wv(tt + i * 9, 50, 6), 70 - ((tt + i * 26) % 60), "<3", C_PINK, 2);
-    bubble(b, 60, 14, "FOR THE NEIGHBOURHOOD.", 0); if(tt > 80) bubble(b, 190, 56, "FOR THE BELLY.", 0); }
+  if(k == 0){ brenda(b, 100, 176, 3, tt, 0); spr_man(b, 190, 130, 6, 1, POSE_FLEX, tt >> 3); bubble(b, 90, 16, "YOU DID IT, GERALD!", 0); }
+  else if(k == 1){ brenda(b, 60, 186, 4, tt, 1); spr_man(b, 170, 140, 8, 1, POSE_IDLE, tt >> 3); for(int i = 0; i < 4; i++) gfx_text(b, 100 + i * 20 + wv(tt + i * 9, 50, 6), 70 - ((tt + i * 26) % 60), "<3", C_PINK, 2);
+    bubble(b,60,14,"NICE PACKAGE, GERALD.",0);if(tt>80)bubble(b,190,56,"THE BELLY, I MEAN.",0);}
   else { spr_man(b, 128, 136, 8, 1, POSE_FLEX, tt >> 3); bubble(b, 128, 12, "RENT IS CANCELLED!", 0); }
 }
 static void e1_letter(u8 *b, int k, int tt){
