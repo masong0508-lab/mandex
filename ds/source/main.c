@@ -273,7 +273,14 @@ static void on_events(void){
       spawn_ring(e->x, e->y, 4, C_WHITE); popup(e->x, e->y - RI(6), "+HP", C_WHITE); sfx_play(SFX_TARGET, pan);
       break;
     case EV_THROW: case EV_SWING: sfx_play(SFX_WHOOSH, pan); break;
-    case EV_THUD:   if(e->b > R(0.3)) sfx_play(SFX_THUD, pan); break;
+    case EV_THUD:
+      if(e->a > R(0.3)) sfx_play(SFX_THUD, pan);
+      if(e->a > R(0.6)){                        /* capped two-frame-sized impact dust puff */
+        for(int k = 0; k < 3; k++)
+          spawn(PT_DUST, e->x + RI(rnd(5) - 2), e->y,
+                rnd(11) - 5, -rnd(7) - 2, 0, 18 + rnd(10));
+      }
+      break;
     case EV_LAND:                                           /* ground touch: a puff of dust, and a hard landing adds a ring */
       for(int k = 0, n = e->m ? 8 : 5; k < n; k++) spawn(PT_DUST, e->x + RI(rnd(5) - 2) / 4, e->y - R(0.5), rnd(15) - 7, -rnd(5) - 1, 0, 22 + rnd(10));
       if(e->m) spawn_ring(e->x, e->y - R(0.5), 4, C_SMOKE);       /* browser: 30 px at 8 px a cell */
