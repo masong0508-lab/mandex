@@ -434,14 +434,50 @@ static void draw_aim_dots(const View *v){
   }
 }
 
+#ifndef MX_DS_WALL_DIRECT_RUNS
+#define MX_DS_WALL_DIRECT_RUNS 1
+/* Long intact wallpaper spans: one clipped row-fill per tile row instead of
+   repeating a 4x4 tile blit for every cell. Accent pixels are identical.
+   Short/edge-clipped spans use the exact legacy gfx_wall path. Can A/B with
+   -DMX_DS_WALL_DIRECT_RUNS=0 (no changes to rooms, physics or assets). */
+#endif
 #ifndef MX_DS_WALL_RUNS
-#define MX_DS_WALL_RUNS 0 /* pixel-identical, but slower in all eight CI benchmarks */
+#define MX_DS_WALL_RUNS 0 /* older gfx_rect-based run prototype was slower */
 #endif
 static void draw_rooms(const View *v){
   int ppc = v->ppc;
   int x0 = v->cx > 0 ? v->cx / ppc : 0, x1 = (v->cx + 256) / ppc + 1; if(x1 > MX_COLS) x1 = MX_COLS;
   int y0 = v->cy > 0 ? v->cy / ppc : 0, y1 = (v->cy + 192) / ppc + 1; if(y1 > MX_ROWS) y1 = MX_ROWS;
-#if MX_DS_WALL_RUNS
+#if MX_DS_WALL_DIRECT_RUNS
+  /* Built from the CURRENT destructible cell arrays each draw: no stale
+     cached scenery after an explosion, district swap or collapsed room.
+     Only long fully visible spans take this path, so clipping and edge
+     pixels retain the original tile blitter. */
+  for(int y=y0;y<y1;y++){
+    int base=y*MX_COLS,x=x0,sy=y*ppc-v->cy;
+    while(x<x1){
+      int idx=base+x,paper=world.paper[idx];
+      if(!paper || world.grid[idx]){x++;continue;}
+      int pal=(paper-1)&3,first=x++;
+      while(x<x1){
+        int q=base+x,p=world.paper[q];
+        if(!p||world.grid[q]||((p-1)&3)!=pal)break;
+        x++;
+      }
+      int n=x-first,sx=first*ppc-v->cx;
+      if(n<5||sx<0||sy<0||sx+n*ppc>256||sy+ppc>192){
+        for(int k=0;k<n;k++)gfx_wall(v,pal,sx+k*ppc,sy);
+        continue;
+      }
+      u8 col=(u8)(C_WALL0+pal),dot=(u8)(C_WALLD0+pal);
+      u8 *row=v->buf+(size_t)sy*256+sx;
+      for(int j=0;j<ppc;j++,row+=256)memset(row,col,(size_t)n*ppc);
+      int off=ppc==2?0:ppc-1;
+      u8 *accent=v->buf+(size_t)(sy+off)*256+sx+off;
+      for(int k=0;k<n;k++)accent[k*ppc]=dot;
+    }
+  }
+#elif MX_DS_WALL_RUNS
   /* The wallpaper tile is a solid flat shade with exactly ONE darker
      accent pixel (see make_tiles in gfx.c). Batch contiguous intact cells
      of the same palette into 2-4 horizontal spans rather than calling
