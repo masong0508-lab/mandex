@@ -12,7 +12,7 @@ echo "--- libnds hardware-math hooks vs software fixed point (must be bit-identi
 gcc -std=gnu99 -O2 -DMX_FIXED -DMX_LIBNDS_MATH -Istubs -I../core ../core/mx.c host_test.c -lm -o test_fixed_hw && ./test_fixed_hw > fixed_hw.txt && cmp fixed.txt fixed_hw.txt && echo "identical"
 echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
 if command -v node >/dev/null 2>&1; then
-  node -e 'const fs=require("fs");const h=fs.readFileSync("../web/index.html","utf8");const m=h.match(/<script>([\\s\\S]*?)<\\/script>/);if(!m)throw Error("game script missing");new Function(m[1]);for(const sym of ["function cgRearPanel","function cgHotTake","function cgMoonlitKiss"])if(!m[1].includes(sym))throw Error(sym+" missing");console.log("ok: browser script parses and cutscene effects are present")'
+  node -e 'const fs=require("fs");const h=fs.readFileSync("../web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<a)throw Error("game script missing");const s=h.slice(a+8,b);new Function(s);for(const sym of ["function cgRearPanel","function cgHotTake","function cgMoonlitKiss"])if(!s.includes(sym))throw Error(sym+" missing");console.log("ok: browser script parses and cutscene effects are present")'
 fi
 echo "--- eviction streak: capped score, fixed/float parity, timer expiry and armored targets ---"
 gcc -std=gnu99 -O2 -Wno-unused-function -I../core combo_test.c -lm -o combo_float && ./combo_float
