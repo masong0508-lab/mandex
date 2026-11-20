@@ -435,7 +435,7 @@ static void draw_aim_dots(const View *v){
 }
 
 #ifndef MX_DS_WALL_DIRECT_RUNS
-#define MX_DS_WALL_DIRECT_RUNS 1
+#define MX_DS_WALL_DIRECT_RUNS 0 /* A/B: longer spans are still slower on x86; not enabled by default */
 /* Long intact wallpaper spans: one clipped row-fill per tile row instead of
    repeating a 4x4 tile blit for every cell. Accent pixels are identical.
    Short/edge-clipped spans use the exact legacy gfx_wall path. Can A/B with
