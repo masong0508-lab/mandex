@@ -20,6 +20,7 @@
 #include "gfx.h"
 #include "sfx.h"
 #include "intro.h"
+#include "cut_art.h"
 
 static const char *TXT8[INTRO_SCENES][3] = {
   { "GERALD FITZGERALD.", "Regional Assistant Manager of Paper Clip Compliance. One good tie.", "A house. A wife named Brenda. A fence so white it hurt." },
@@ -145,9 +146,17 @@ static int isq(int n){ int r = 0; while((r + 1) * (r + 1) <= n) r++; return r; }
 
 static void sky(u8 *b, int y0, int y1, int dusk){
   static const u8 DUSK[8] = { C_RED2, C_RED, C_PINK, C_GOLD2, C_GOLD, C_SKIN, C_SKIN3, C_SKIN3 };
+  int span = y1 > y0 ? y1-y0 : 1;
   for(int y = y0; y < y1; y++){
-    int u = (y - y0) * 16 / (y1 - y0 > 0 ? y1 - y0 : 1); if(u > 15) u = 15;
-    gfx_rect(b, 0, y, 256, 1, dusk ? DUSK[u >> 1] : (u8)(C_SKY0 + u));
+    int u = (y-y0)*16/span; if(u>15) u=15;
+    gfx_rect(b,0,y,256,1,dusk?DUSK[u>>1]:(u8)(C_SKY0+u));
+  }
+  /* Painted cloud-bank strata and refracted horizon light: thin strokes, not a texture upload. */
+  for(int i=0;i<5;i++){
+    int y=y0+span*(8+i)/16;
+    if(y>=y1) break;
+    gfx_rect(b, (i*47+13)%110, y, 100+(i&1)*35,1,dusk?C_GOLD2:C_CLOUD2);
+    gfx_rect(b, (i*31+152)%236, y+3, 42,1,dusk?C_PINK:C_CLOUD);
   }
 }
 static void hills(u8 *b, int gy, int sx){
@@ -160,11 +169,39 @@ static void fence(u8 *b, int x0, int x1, int gy, int s){
   gfx_rect(b, x0, gy - 7 * s, x1 - x0, s, C_WHITE); gfx_rect(b, x0, gy - 3 * s, x1 - x0, s, C_WHITE);
   for(int x = x0; x < x1; x += 4 * s){ gfx_rect(b, x, gy - 10 * s, 3 * s, 11 * s, C_WHITE); gfx_rect(b, x + 2 * s, gy - 10 * s, s > 1 ? s : 1, 11 * s, C_CLOUD2); gfx_tri(b, x, gy - 10 * s, x + 3 * s, gy - 10 * s, x + 3 * s / 2, gy - 12 * s, C_WHITE); }
 }
-static void house(u8 *b, int x, int gy, int s, int roof){      /* x = left edge, 40 units wide */
-  gfx_rect(b, x, gy - 22 * s, 40 * s, 22 * s, C_WALL0);
-  if(roof){ gfx_rect(b, x + 30 * s, gy - 38 * s, 4 * s, 10 * s, C_DIRT2); gfx_tri(b, x - 3 * s, gy - 22 * s, x + 43 * s, gy - 22 * s, x + 20 * s, gy - 38 * s, C_RED2); }
-  gfx_rect(b, x + 16 * s, gy - 14 * s, 8 * s, 14 * s, C_RED2); gfx_rect(b, x + 22 * s, gy - 7 * s, s, s, C_GOLD);
-  for(int k = 0; k < 2; k++){ int wx = x + (k ? 28 : 4) * s; gfx_rect(b, wx, gy - 18 * s, 8 * s, 8 * s, C_WHITE); gfx_rect(b, wx + s, gy - 17 * s, 6 * s, 6 * s, C_SKY0 + 5); gfx_rect(b, wx + 3 * s, gy - 17 * s, s, 6 * s, C_WHITE); }
+static void house(u8 *b, int x, int gy, int s, int roof){
+  /* Layered suburban house illustration: chimney, brick foundation, shingled gable,
+     siding, real window mullions, door surround, front path and flowerboxes. */
+  gfx_rect(b,x+2*s,gy-23*s,38*s,23*s,C_HAIR);
+  gfx_rect(b,x+3*s,gy-22*s,36*s,20*s,C_WALL0);
+  gfx_rect(b,x+3*s,gy-3*s,36*s,3*s,C_DIRT2);
+  for(int i=0;i<5;i++) gfx_rect(b,x+4*s,gy-(6+i*3)*s,34*s,s>1?s/2:1,C_WALL1);
+  if(roof){
+    gfx_rect(b,x+30*s,gy-40*s,5*s,15*s,C_HAIR);
+    gfx_rect(b,x+31*s,gy-39*s,3*s,12*s,C_DIRT2);
+    gfx_rect(b,x+31*s,gy-39*s,3*s,s,C_RED2);
+    gfx_tri(b,x-4*s,gy-21*s,x+44*s,gy-21*s,x+20*s,gy-40*s,C_HAIR);
+    gfx_tri(b,x-2*s,gy-23*s,x+42*s,gy-23*s,x+20*s,gy-38*s,C_RED2);
+    gfx_tline(b,x-2*s,gy-22*s,x+42*s,gy-22*s,s>1?s:1,C_RED);
+    for(int i=0;i<3;i++)gfx_tline(b,x+(9-i*5)*s,gy-(29+i*3)*s,x+(31+i*5)*s,gy-(29+i*3)*s,1,C_RED);
+    gfx_ell(b,x+20*s,gy-28*s,3*s,3*s,C_WHITE);gfx_ell(b,x+20*s,gy-28*s,2*s,2*s,C_SKY0+5);
+  }
+  gfx_rect(b,x+15*s,gy-16*s,10*s,16*s,C_WHITE);
+  gfx_rect(b,x+16*s,gy-15*s,8*s,15*s,C_RED2);
+  gfx_rect(b,x+16*s,gy-15*s,8*s,2*s,C_RED);
+  gfx_rect(b,x+22*s,gy-7*s,s,s,C_GOLD);
+  for(int k=0;k<2;k++){
+    int wx=x+(k?28:4)*s;
+    gfx_rect(b,wx,gy-19*s,9*s,10*s,C_HAIR);
+    gfx_rect(b,wx+s,gy-18*s,7*s,8*s,C_WHITE);
+    gfx_rect(b,wx+2*s,gy-17*s,5*s,6*s,C_SKY0+5);
+    gfx_rect(b,wx+4*s,gy-17*s,s,6*s,C_WHITE);
+    gfx_rect(b,wx+2*s,gy-15*s,5*s,s,C_WHITE);
+    gfx_rect(b,wx-s,gy-10*s,11*s,2*s,C_DIRT2);
+    for(int j=0;j<4;j++){ gfx_rect(b,wx+j*2*s,gy-12*s-(j&1)*s,s,2*s,(j&1)?C_PINK:C_GOO2); }
+  }
+  gfx_rect(b,x+13*s,gy-s,14*s,2*s,C_GRAY);
+  gfx_tri(b,x+15*s,gy+s,x+25*s,gy+s,x+27*s,gy+10*s,C_CLOUD2);
 }
 static void bubble(u8 *b, int x, int y, const char *s, int tail){      /* speech bubble, text centred at x */
   int w = gfx_text_w(s, 1) + 10;
@@ -234,10 +271,34 @@ static void towel(u8 *b, int x, int y, int w, int h, int ph, int th){         /*
 static void rain(u8 *b, int tt, int n){
   for(int i = 0; i < n; i++){ int x = (int)(hs(i) % 270), y = (int)((hs(i + 99) + tt * (7 + (i & 3))) % 200); gfx_line(b, x, y - 8, x - 2, y, C_UILINE); }
 }
-static void stars_night(u8 *b){ gfx_rect(b, 0, 0, 256, 192, C_UIBG); for(int i = 0; i < 30; i++) gfx_px(b, (int)(hs(i + 5) % 256), (int)(hs(i + 7) % 100), C_UILINE); }
+static void stars_night(u8 *b){
+  gfx_rect(b,0,0,256,192,C_UIBG);
+  for(int i=0;i<42;i++){int x=(int)(hs(i+5)%256),y=(int)(hs(i+7)%112);
+    gfx_px(b,x,y,(i%6==0)?C_CLOUD2:C_UILINE);
+    if(i%11==0){gfx_rect(b,x-2,y,5,1,C_UILINE);gfx_rect(b,x,y-2,1,5,C_UILINE);}
+  }
+  /* Rooftops in two ink layers; lit windows tell us the neighbourhood is awake. */
+  for(int i=0;i<13;i++){
+    int x=i*23-10,h=13+(int)(hs(i+19)%21);
+    gfx_rect(b,x,145-h,24,h+48,C_DARK);
+    gfx_rect(b,x+2,145-h,20,1,C_UIHI);
+    for(int k=0;k<3;k++){int wx=x+4+(k%2)*8,wy=151-h+k*8;
+      if((hs(i*11+k)&3)==0)gfx_rect(b,wx,wy,3,4,C_GOLD2);
+    }
+  }
+}
 static void lamp(u8 *b, int x, int gy){ gfx_rect(b, x, gy - 80, 3, 80, C_DARK); gfx_rect(b, x - 8, gy - 84, 14, 5, C_DARK); gfx_ell(b, x - 1, gy - 78, 5, 3, C_GOLD); gfx_tri(b, x - 22, gy, x + 20, gy, x - 1, gy - 76, C_UIHI); gfx_dither(b, x - 18, gy - 40, 38, 40, C_UIBG); }
-static void couch_back(u8 *b, int x, int gy){ gfx_rect(b, x, gy - 40, 110, 40, C_RED2); gfx_rect(b, x + 3, gy - 38, 104, 6, C_RED); gfx_rect(b, x - 8, gy - 30, 12, 30, C_RED2); gfx_rect(b, x + 106, gy - 30, 12, 30, C_RED2); }
-static void couch_front(u8 *b, int x, int gy){ gfx_rect(b, x - 8, gy - 20, 126, 22, C_RED); gfx_rect(b, x - 8, gy - 4, 126, 6, C_RED2); gfx_rect(b, x + 54, gy - 20, 1, 18, C_RED2); }
+static void couch_back(u8 *b,int x,int gy){
+  gfx_rect(b,x,gy-40,110,40,C_RED2);gfx_rect(b,x+3,gy-38,104,6,C_RED);
+  gfx_rect(b,x-8,gy-30,12,30,C_RED2);gfx_rect(b,x+106,gy-30,12,30,C_RED2);
+  for(int i=0;i<3;i++){gfx_rect(b,x+8+i*34,gy-30,29,23,C_RED);gfx_rect(b,x+9+i*34,gy-29,27,2,C_PINK);gfx_ell(b,x+22+i*34,gy-19,2,2,C_RED2);}
+  gfx_rect(b,x-6,gy-30,8,4,C_RED);gfx_rect(b,x+108,gy-30,8,4,C_RED);
+}
+static void couch_front(u8 *b,int x,int gy){
+  gfx_rect(b,x-8,gy-20,126,22,C_RED);gfx_rect(b,x-8,gy-4,126,6,C_RED2);
+  gfx_rect(b,x+54,gy-20,2,18,C_RED2);gfx_rect(b,x-8,gy-20,126,2,C_PINK);
+  gfx_rect(b,x-4,gy+2,9,5,C_HAIR);gfx_rect(b,x+106,gy+2,9,5,C_HAIR);
+}
 static void pizza(u8 *b, int x, int gy, int n){ for(int i = 0; i < n; i++){ gfx_rect(b, x + (i & 1) * 2, gy - 4 - i * 5, 26, 5, C_WHITE); gfx_rect(b, x + (i & 1) * 2, gy - 4 - i * 5, 26, 1, C_FIRE); gfx_rect(b, x + 9 + (i & 1) * 2, gy - 3 - i * 5, 8, 3, C_RED); } }
 static void can(u8 *b, int x, int gy){ gfx_rect(b, x, gy - 7, 4, 7, C_GRAY); gfx_rect(b, x, gy - 7, 4, 1, C_WHITE); }
 static void landlord(u8 *b, int x, int y, int ppc, int tt, int scared){ spr_landlord(b, x, y, ppc, tt, scared); }
@@ -427,7 +488,15 @@ static void sc_mission(u8 *b, int k, int tt){
 }
 
 /* ---- chapter 3 scenes ---- */
-static void moon(u8 *b, int x, int y, int r){ gfx_ell(b, x, y, r + 8, r + 8, C_SUNHALO); gfx_ell(b, x, y, r, r, C_CLOUD); gfx_ell(b, x - r / 3, y - r / 4, r / 4 + 1, r / 5 + 1, C_CLOUD2); gfx_ell(b, x + r / 3, y + r / 3, r / 5 + 1, r / 6 + 1, C_CLOUD2); }
+static void moon(u8 *b,int x,int y,int r){
+  gfx_ell(b,x,y,r+9,r+9,C_SUNHALO);gfx_ell(b,x,y,r+4,r+4,C_UIHI);
+  gfx_ell(b,x,y,r,r,C_CLOUD);gfx_ell(b,x-r/3,y-r/4,r/4+1,r/5+1,C_CLOUD2);
+  gfx_ell(b,x+r/3,y+r/3,r/5+1,r/6+1,C_CLOUD2);
+  gfx_ell(b,x+r/4,y-r/3,r/8+1,r/8+1,C_WHITE);
+  gfx_ell(b,x-r/4,y+r/3,r/10+1,r/12+1,C_CLOUD2);
+  /* Glossy crescent edge rather than a featureless disk. */
+  gfx_line(b,x-r/2,y-r/2,x-r/3,y-r*3/4,C_WHITE);
+}
 static void night_hills(u8 *b, int gy){ gfx_ell(b, 60, gy + 12, 120, 30, C_UIHI); gfx_ell(b, 210, gy + 16, 130, 28, C_UIBG); gfx_rect(b, 0, gy + 8, 256, 192 - gy, C_DARK); }
 static void w_walk(u8 *b, int k, int tt){
   stars_night(b);
@@ -631,6 +700,83 @@ static void shake(u8 *b, int amp){
   for(int y = 0; y < 192 && dx; y++){ u8 *r = b + y * 256; if(dx > 0){ memmove(r + dx, r, (size_t)(256 - dx)); memset(r, C_BLACK, (size_t)dx); } else { memmove(r, r - dx, (size_t)(256 + dx)); memset(r + 256 + dx, C_BLACK, (size_t)(-dx)); } }
 }
 
+
+/* Per-shot art direction: movement belongs to props and layers, never a
+   full-frame software zoom. All motifs are 16x16 ROM sprites. */
+static const char *const CUT_LABEL[4][8] = {
+  { "THE PERFECT LIFE", "THE PAPERS", "LEGAL ADVICE", "DAY NINE",
+    "THE RENT", "THE SNAP", "THE REBIRTH", "THE MISSION" },
+  { "A STRANGE MOON", "MOON CHEESE", "SOMETHING WRONG", "THE CHANGE",
+    "FREE AT LAST", "AWOOOO", "BRENDA RETURNS", "THE WOLFMAN" },
+  { "THE MANOR FALLS", "MAPLE STREET", "THE LETTER", "CHAPTER ONE" },
+  { "HEAD OFFICE", "THE BOSS", "THE AFTER PARTY", "CHAPTER TWO" }
+};
+static const unsigned char CUT_SYMBOL[4][8] = {
+  { MX_CUT_HOME, MX_CUT_PAPERS, MX_CUT_CASH, MX_CUT_COUCH,
+    MX_CUT_KEY, MX_CUT_BOLT, MX_CUT_CAPE, MX_CUT_TARGET },
+  { MX_CUT_MOON, MX_CUT_CHEESE, MX_CUT_BOLT, MX_CUT_WOLF,
+    MX_CUT_CAPE, MX_CUT_MOON, MX_CUT_HEART, MX_CUT_WOLF },
+  { MX_CUT_RUBBLE, MX_CUT_HEART, MX_CUT_PAPERS, MX_CUT_STAR },
+  { MX_CUT_TOWER, MX_CUT_CASH, MX_CUT_MOON, MX_CUT_STAR }
+};
+static void cut_icon(u8 *b,int x,int y,int which,u8 ink){
+  if(which<0||which>=MX_CUT_ICON_COUNT) return;
+  for(int r=0;r<16;r++){
+    unsigned short bits=mx_cut_icons[which][r];
+    for(int c=0;c<16;c++) if(bits & (0x8000u>>c)) gfx_px(b,x+c,y+r,ink);
+  }
+}
+static void cut_motion(u8 *b,int k,int tt){
+  /* A little illustrated motion in every shot: leaves, rain/papers, sparks,
+     fireflies, falling confetti or fur, according to the narrative beat. */
+  int mood=mode==0 ? (sc==1||sc==2||sc==4?1:sc==5?2:sc>=6?3:0)
+            : mode==1 ? (sc==3||sc==4?2:sc==6?3:4)
+            : mode==2 ? (sc==1||sc==3?3:sc==2?1:2)
+            : (sc==0?2:sc==2||sc==3?3:1);
+  for(int i=0;i<14;i++){
+    u32 seed=hs((u32)(sc*401+mode*187+i*53+k*7));
+    int x=(int)(seed&255u), y=(int)((seed>>10)%160u)+14;
+    if(mood==0){ x=(x+tt/(5+(i&3)))&255; y=(y+((tt*2+i*19)%170))%170+6;
+      gfx_rect(b,x,y,2+(i&1),1,(i&1)?C_GRASS2:C_GOLD2); }
+    else if(mood==1){ y=(y+tt*(2+(i&1)))%178+4; x=(x+tt/10)&255;
+      gfx_line(b,x,y,x-2,y+6,(i&2)?C_WHITE:C_CLOUD2); }
+    else if(mood==2){ int life=(tt+i*17)%65; x+=((i&1)?life:-life)/3;
+      y-=life/2; gfx_rect(b,x,y,(i&1)?2:1,1,(i&1)?C_GOLD:C_WHITE);
+      if(life<11)gfx_line(b,x-2,y,x+2,y,C_GOLD2); }
+    else if(mood==3){ y=(y+tt*(1+(i&1)))%180; x=(x+wv(tt+i*19,40,6))&255;
+      gfx_rect(b,x,y,(i&2)?3:2,(i&1)?2:1,(i&1)?C_PINK:C_GOLD); }
+    else {int tw=(tt+i*19)%90;
+      gfx_px(b,x+wv(tt+i*9,90,4),y+wv(tt+i*11,70,2),tw<12?C_WHITE:C_GOLD2); }
+  }
+  /* Focus lines respond to the actual impact shots, not arbitrary noise. */
+  if((mode==0&&(sc==5||sc==6))||(mode==1&&(sc==3||sc==5))||(mode==3&&sc==0&&k==2)){
+    if(tt<26){
+      for(int i=0;i<10;i++){
+        int from=(i*37+sc*29)%256, dx=from<128?-1:1;
+        int len=(26-tt)*(2+(i&1));
+        gfx_tline(b,from,12+(i*47)%164,from+dx*len,12+(i*47)%164,1,(i&1)?C_WHITE:C_GOLD2);
+      }
+    }
+  }
+  /* Light etching at the edges suggests a printed comic panel. */
+  for(int j=0;j<3;j++){
+    gfx_rect(b,3+j*2,20+j*4,1,137-j*8,C_UIHI);
+    gfx_rect(b,252-j*2,20+j*4,1,137-j*8,C_UIHI);
+  }
+}
+static void cut_title_bug(u8 *b){
+  /* Fast slide-in title is visible at each scene opening; then clears faces. */
+  if(t>=62) return;
+  int travel=t<12?(12-t)*8:t>48?(t-48)*8:0;
+  int x=11-travel, w=115;
+  gfx_rect(b,x+3,18+3,w+5,18,C_BLACK);
+  gfx_rect(b,x,18,w+5,18,C_UIBG);
+  gfx_rect(b,x,18,4,18,mode==1?C_PINK:C_GOLD);
+  gfx_text(b,x+9,22,CUT_LABEL[mode][sc],C_WHITE,1);
+  gfx_text(b,x+9,30,gfx_int(sc+1),C_GOLD,1);
+  gfx_rect(b,x+24,32,74,1,C_UILINE);
+}
+
 /* ------------------------------------------------------------------ the narration (bottom screen) */
 #define ROW_CH 30
 #define MAX_ROWS 10
@@ -648,12 +794,24 @@ static int wrap(const char *s, const char **rows, int *len, int n0){
 int intro_text_rows(int s){  const char *r[MAX_ROWS + 4]; int l[MAX_ROWS + 4]; int n = 0; for(int i = 0; i < 3; i++) n = wrap(TXT(s)[i], r, l, n); return n; }
 
 static void narration(u8 *b){
-  gfx_rect(b, 0, 0, 256, 192, C_UIBG);
-  for(int i = 0; i < NSC(); i++) gfx_rect(b, 8 + i * 12, 8, 8, 4, i == sc ? C_GOLD : i < sc ? C_UILINE : C_UIHI);
+  gfx_rect(b,0,0,256,192,C_UIBG);
+  /* Inked screenplay card: polished header, tracked scene number, emblem. */
+  gfx_rect(b,0,0,256,19,C_DARK);
+  gfx_rect(b,0,19,256,2,mode==1?C_PINK:C_GOLD2);
+  gfx_text(b,8,4,mode==0?"MANDEX: ORIGIN":mode==1?"THE WOLFMAN":mode==2?"MANDEX: ACT I":"MANDEX: ACT II",C_GOLD,1);
+  gfx_text(b,8,11,CUT_LABEL[mode][sc],C_WHITE,1);
+  cut_icon(b,230,2,CUT_SYMBOL[mode][sc],mode==1?C_PINK:C_GOLD);
+  gfx_rect(b,8,22,240,1,C_UILINE);
+  for(int i=0;i<NSC();i++){
+    int w=NSC()>4?25:52;
+    gfx_rect(b,8+i*(w+4),158,w,3,i==sc?C_GOLD:i<sc?C_UIHI:C_DARK);
+  }
+  gfx_rect(b,3,23,2,132,C_UILINE);
+  gfx_rect(b,251,23,2,132,C_UILINE);
   const char *rows[MAX_ROWS + 4]; int len[MAX_ROWS + 4]; int line_of[MAX_ROWS + 4]; int n = 0;
   for(int i = 0; i < 3; i++){ int n1 = wrap(TXT(sc)[i], rows, len, n); for(int j = n; j < n1; j++) line_of[j] = i; n = n1; }
   int shown = t * CPS / 60; if(shown > total_chars(sc)) shown = total_chars(sc);
-  int y = 24 + (n < 8 ? (8 - n) * 3 : 0);
+  int y = 27 + (n < 8 ? (8 - n) * 2 : 0);
   for(int j = 0; j < n; j++){
     int cnt = shown < len[j] ? shown : len[j]; shown -= cnt;
     if(cnt > 0){ char tmp[ROW_CH + 1]; memcpy(tmp, rows[j], (size_t)cnt); tmp[cnt] = 0;
@@ -682,10 +840,12 @@ void intro_draw(u8 *top, u8 *bot){
   case 0: sc_suburb(top, k, tt); break;   case 1: sc_divorce(top, k, tt); break;  case 2: sc_dennis(top, k, tt); break;  case 3: sc_couch(top, k, tt); break;
   case 4: sc_landlord(top, k, tt); break; case 5: sc_snap(top, k, tt); break;     case 6: sc_born(top, k, tt); break;    default: sc_mission(top, k, tt); break;
   }
+  cut_motion(top,k,tt);
   trans(top);
   /* Impact shake now falls off on each shot rather than jittering through every line of dialogue. */
   { int amp = SHAKE(sc, k > 2 ? 2 : k); if(tt >= 24) amp = 0; else amp = amp * (24 - tt) / 24; shake(top, amp); }
   film_fx(top, k, tt);
+  cut_title_bug(top);
   /* letterbox bars sliding in, like the browser version */
   int bar = t * 3 > 12 ? 12 : t * 3; gfx_rect(top, 0, 0, 256, bar, C_BLACK); gfx_rect(top, 0, 192 - bar, 256, bar, C_BLACK);
   narration(bot);
