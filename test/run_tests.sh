@@ -28,6 +28,13 @@ gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c stars
 echo "--- level unlock order (rules on / default off) ---"
 gcc -std=c99 -O2 -Wall -DMX_LEVEL_LOCKS -I../core ../core/mx.c ../core/mx_meta.c meta_test.c -lm -o meta_locks && ./meta_locks | tail -n 1
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c meta_test.c -lm -o meta_open && ./meta_open | tail -n 1
+echo "--- event-driven landlord structural-shock reactions (float, fixed, fallback-off) ---"
+gcc -std=gnu99 -O2 -Wno-unused-function -I../core landlord_shock_test.c -lm -o landlord_shock_float && ./landlord_shock_float
+gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -I../core landlord_shock_test.c -lm -o landlord_shock_fixed && ./landlord_shock_fixed
+gcc -std=gnu99 -O2 -Wno-unused-function -DMX_LORD_SHOCK_REACT=0 -I../core landlord_shock_test.c -lm -o landlord_shock_old && ./landlord_shock_old
+echo "--- dual-slot progress journal: CRC, truncation, generation wrap (float and fixed) ---"
+gcc -std=gnu99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c journal_test.c -lm -o journal_float && ./journal_float
+gcc -std=gnu99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c journal_test.c -lm -o journal_fixed && ./journal_fixed
 echo "--- save blob: layout, round trip, corruption, truncation, other level counts (float and fixed) ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c save_test.c -lm -o save_float && ./save_float | grep -v "^ok:"
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c save_test.c -lm -o save_fixed && ./save_fixed | grep -v "^ok:"
