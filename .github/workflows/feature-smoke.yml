@@ -1,0 +1,68 @@
+name: Focused feature smoke tests
+# Fast failure detection alongside the longer all-60-level renderer checks.
+# Host parity and simulated storage are NOT console hardware FPS measurements.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "core/**"
+      - "ds/source/**"
+      - "3ds/**"
+      - "dreamcast/**"
+      - "web/index.html"
+      - "test/vmu_save_test.c"
+      - "test/journal_test.c"
+      - "test/landlord_shock_test.c"
+      - "test/n3ds_render.c"
+      - "test/dc_render.c"
+      - ".github/workflows/feature-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate VMU crash recovery and shared progress journal in both numeric modes
+        run: |
+          cd test
+          for mode in float fixed; do
+            flags=""
+            if test "$mode" = fixed; then flags="-DMX_FIXED"; fi
+            gcc -std=gnu99 -O2 -Wall -Wno-unused-function $flags -I../core ../core/mx.c ../core/mx_meta.c vmu_save_test.c -lm -o /tmp/vmu_$mode
+            /tmp/vmu_$mode
+            gcc -std=gnu99 -O2 -Wall $flags -I../core ../core/mx.c ../core/mx_meta.c journal_test.c -lm -o /tmp/journal_$mode
+            /tmp/journal_$mode
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core landlord_shock_test.c -lm -o /tmp/shock_$mode
+            /tmp/shock_$mode
+          done
+      - name: Validate browser script and Eco FX controls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path('web/index.html').read_text()
+          a=source.rfind('<script>'); b=source.rfind('</script>')
+          assert a>=0 and b>a
+          script=source[a+len('<script>'):b]
+          assert 'webEcoFX' in script and "e.code==='F4'" in script
+          assert 'function fxLimit()' in script
+          Path('/tmp/mandex_game_smoke.js').write_text(script)
+          PY
+          node --check /tmp/mandex_game_smoke.js
+      - name: Check representative DS frame hashes with old/new particle allocator
+        run: |
+          for fast in 0 1; do
+            gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST \
+              -DMX_DS_AIM_CACHE=$fast -DMX_DS_PARTICLE_HINT=$fast \
+              -Itest/stubs -Icore -Iart -Ids/source \
+              test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+              core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fx_$fast
+          done
+          for l in 0 19 39 59; do
+            DS_PERF_BENCH=1 /tmp/ds_fx_0 /tmp/ds_fx_ref 520 "$l" | grep '^DS_FRAME_HASH ' > /tmp/ds_fx_old.txt
+            DS_PERF_BENCH=1 /tmp/ds_fx_1 /tmp/ds_fx_new 520 "$l" | grep '^DS_FRAME_HASH ' > /tmp/ds_fx_new.txt
+            test -s /tmp/ds_fx_old.txt
+            diff -u /tmp/ds_fx_old.txt /tmp/ds_fx_new.txt
+            echo "Level $((l+1)) DS particle and aim pixels identical"
+          done
