@@ -76,6 +76,8 @@ rm -f /tmp/mx_opt.sav; MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_TEST=1 ./ds_render /
 MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_LOAD=1 ./ds_render /tmp/dsopt2 400 0
 echo "--- DS title cheat: L+R+SELECT unlocks every level for the session, in any key order ---"
 CHEAT_TEST=1 ./ds_render /tmp/dscheat 400 0 | grep -v "^ok:"
+echo "--- packed cutscene artwork: 15 unique readable silhouettes, no allocations ---"
+gcc -std=c99 -O2 -Wall -I../ds/source cut_art_test.c -o cut_art_test && ./cut_art_test
 echo "--- DS opening cutscene: plays once per power-on before level 1; all 8 scenes run and hand over to level 1; A finishes the typing then goes on; SKIP and START jump to level 1; the worn outfit comes back ---"
 INTRO_TEST=1 ./ds_render /tmp/dsintro 9000 0 | grep -v "^ok:"
 INTRO_SKIP=1 ./ds_render /tmp/dsintro2 600 0 | grep -v "^ok:"
