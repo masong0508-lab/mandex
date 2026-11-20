@@ -33,20 +33,39 @@ void gfx_rect(u8 *b, int x, int y, int w, int h, u8 c){
 #ifndef MX_DS_FAST_RECT
 #define MX_DS_FAST_RECT 1
 #endif
+#ifndef MX_DS_RECT_WIDTH_HOIST
+#define MX_DS_RECT_WIDTH_HOIST 1
+/* Select a 1-4px stroke once, outside the per-scanline drawing loop.
+   This changes no clipping, pixels, palette or memory usage. */
+#endif
 #if MX_DS_FAST_RECT
-  /* A large share of scene façade/UI decorations are 1-4px-wide strokes.
-     Direct byte stores avoid a libc memset call for every individual row,
-     especially the tall 1px lamp/window edges. Clip BEFORE entering here,
-     so the output is identical even for partially offscreen rectangles. */
+  /* Most small façade accents and outline strokes are only 1-4px wide. */
   const int width=x1-x;
   if(width<=4){
     u8 *row=b+(size_t)y*256+x;
+#if MX_DS_RECT_WIDTH_HOIST
+    switch(width){
+      case 1:
+        for(int j=y;j<y1;j++,row+=256)row[0]=c;
+        break;
+      case 2:
+        for(int j=y;j<y1;j++,row+=256){row[0]=c;row[1]=c;}
+        break;
+      case 3:
+        for(int j=y;j<y1;j++,row+=256){row[0]=c;row[1]=c;row[2]=c;}
+        break;
+      case 4:
+        for(int j=y;j<y1;j++,row+=256){row[0]=c;row[1]=c;row[2]=c;row[3]=c;}
+        break;
+    }
+#else
     for(int j=y;j<y1;j++,row+=256){
       row[0]=c;
       if(width>1)row[1]=c;
       if(width>2)row[2]=c;
       if(width>3)row[3]=c;
     }
+#endif
     return;
   }
 #endif
