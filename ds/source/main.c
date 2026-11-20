@@ -1451,7 +1451,10 @@ static void title_bottom(View *v){
 /* ---------------------------------------------------------------------- main */
 static void present(int bot_dirty){
   DC_FlushRange(buf_top, sizeof buf_top);
-  DC_FlushRange(buf_bot, sizeof buf_bot);
+  /* Keep the idle lower-screen saving all the way through presentation:
+     do not walk/flush 48 KiB of unchanged cache lines on skipped frames.
+     Its DMA is already gated by bot_dirty below. */
+  if(bot_dirty) DC_FlushRange(buf_bot, sizeof buf_bot);
   cpuStartTiming(0);
   swiWaitForVBlank();
   ds_vblank_ticks=(int)cpuEndTiming();
