@@ -38,7 +38,8 @@ static int wob_budget = DS_WOB_MAX;
 #define DT R(1.0 / 60.0)
 
 static MxWorld world;                         /* ~320 KB, lives in main RAM */
-static u8 buf_top[256 * 192], buf_bot[256 * 192];
+static u8 buf_top[256 * 192] __attribute__((aligned(4)));
+static u8 buf_bot[256 * 192] __attribute__((aligned(4)));
 
 enum { ST_TITLE, ST_PLAY, ST_PAUSE, ST_INTRO };
 static int app = ST_TITLE, frame, sel_level, music_pref = 1, debug_on;
@@ -355,9 +356,12 @@ static void draw_rooms(const View *v){
    wallpaper removes windows and furniture automatically. No sprites or heap. */
 static void draw_facades(const View *v){
   int p = v->ppc;
+  if(p <= 2) return;  /* overview is only 2 pixels per cell: avoid costly unreadable microdetails */
   for(int r = 0; r < world.nrooms; r++){
     const MxRoom *rm = &world.rooms[r];
     if(rm->w < 6 || rm->h < 5) continue;
+    if((rm->x + rm->w)*p - v->cx < -4 || rm->x*p - v->cx > 260 ||
+       (rm->y + rm->h)*p - v->cy < -4 || rm->y*p - v->cy > 196) continue;
     int n = rm->w >= 18 ? 3 : rm->w >= 11 ? 2 : 1;
     for(int k = 0; k < n; k++){
       int wx = rm->x + rm->w * (2*k + 1) / (2*n);
@@ -397,6 +401,7 @@ static void draw_facades(const View *v){
    The bevel requires an actual surviving roof voxel and so disappears on collapse. */
 static void draw_roof_trim(const View *v){
   int p = v->ppc;
+  if(p <= 2) return;  /* the thin bevel is invisible on the distant overview */
   for(int r = 0; r < world.nrooms; r++){
     const MxRoom *rm = &world.rooms[r];
     int roof = rm->y - 3;
@@ -1312,7 +1317,7 @@ int main(void){
          the reverse when there is headroom (the preference in `opt` is never touched, so it comes back by itself) */
       /* a hit wakes the wobble lattice, which is what costs time: the core caps the cells it walks (wob_budget) and this loop moves that cap with the measured cost,
          at once (one slow frame is enough) and back up slowly.  Only when the cap is already at its floor are the other quality switches touched. */
-      { int load = phys_ticks + draw_ticks; lite = load > 520000 ? 1 : load < 390000 ? 0 : lite; }      /* a 60 Hz frame is ~560 000 ticks: what counts is physics + drawing, not physics alone */
+      { int load = phys_ticks + draw_ticks; lite = load > 460000 ? 1 : load < 330000 ? 0 : lite; }      /* a 60 Hz frame is ~560 000 ticks: what counts is physics + drawing, not physics alone */
       if(phys_ticks > 330000){ fast_frames = 0;
         if(wob_budget > DS_WOB_MIN){ wob_budget = wob_budget * 2 / 3; if(wob_budget < DS_WOB_MIN) wob_budget = DS_WOB_MIN; mx_set_wobble_budget(&world, wob_budget); slow_frames = 0; }
         else if(++slow_frames >= 2){ slow_frames = 0;
@@ -1341,7 +1346,20 @@ int main(void){
     } else if(app == ST_TITLE){
       update_parts();
     }
-    sfx_tick();
+#ifdef MX_BARE_NDS_H
+    /* The independent ARM7 increments 'alive' each VBlank even if ARM9
+       takes more than 1/60 s in physics/drawing. Recover missed music beats
+       without coupling music speed to game FPS (16-bit wrap is intentional). */
+    { static u16 last_vblank; static int primed;
+      u16 now = MX_IPC->alive;
+      if(!primed){last_vblank=now;primed=1;}
+      unsigned elapsed=(u16)(now-last_vblank);
+      last_vblank=now;
+      sfx_tick_steps(elapsed ? (int)elapsed : 1);
+    }
+#else
+    sfx_tick();     /* host/older libnds builds step once per scripted frame */
+#endif
 
     if(!(held & (KEY_L | KEY_R | KEY_SELECT))) combo_held = 0;
     if(cheat_t > 0) cheat_t--;
@@ -1378,7 +1396,7 @@ int main(void){
       top_hud(buf_top);
       banner(buf_top);
       end_panel(buf_top);
-      if(!(lite && (frame & 1) && app == ST_PLAY)){                     /* overloaded: the touch screen keeps last frame's picture every other frame */
+      if(!(lite && (frame & 1) && app == ST_PLAY && !dragging)){       /* keep stylus aiming at 60Hz; throttle only noninteractive bottom redraws */
       if(world.man.mode == MAN_AIM && world.state == MX_PLAY){
         bot = (View){ buf_bot, 4, 0, 56 };
         bot.cx += sx; bot.cy += sy;

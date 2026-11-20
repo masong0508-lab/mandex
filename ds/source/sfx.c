@@ -74,7 +74,7 @@ void music_set(int on){
 }
 int music_on(void){ return mus_on; }
 
-void sfx_tick(void){
+static void sfx_step(void){
   for(int i = 0; i < SFX_COUNT; i++) if(cool[i] > 0) cool[i]--;
   for(int i = 0; i < NV; i++){
     if(!vo[i].active) continue;
@@ -99,3 +99,11 @@ void sfx_tick(void){
     if(++mus_t >= MUS_STEP_FRAMES){ mus_t = 0; mus_step = (mus_step + 1) % (MUS_BARS * 8); }
   }
 }
+/* Clamp extreme catch-up after a pause; eight steps cover 133ms and avoid
+   flooding the ARM7 command ring or monopolising an already-slow frame. */
+void sfx_tick_steps(int elapsed){
+  if(elapsed < 1) elapsed = 1;
+  if(elapsed > 8) elapsed = 8;
+  for(int i=0; i<elapsed; i++) sfx_step();
+}
+void sfx_tick(void){ sfx_tick_steps(1); }

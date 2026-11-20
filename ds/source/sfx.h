@@ -6,7 +6,8 @@ enum { SFX_CRUNCH, SFX_LAUNCH, SFX_DIVE, SFX_THUD, SFX_BOOM, SFX_SPLAT, SFX_TARG
 
 void sfx_init(void);
 void sfx_play(int id, int pan);        /* pan 0..127 (64 = centre) */
-void sfx_tick(void);                   /* call once per frame */
+void sfx_tick(void);                   /* one 60 Hz step; kept for test/libnds compatibility */
+void sfx_tick_steps(int elapsed);      /* advance real-time sound clock, bounded after a missed VBlank */
 void music_set(int on);                /* start/stop the loop */
 int  music_on(void);
 

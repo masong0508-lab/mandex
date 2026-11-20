@@ -31,8 +31,20 @@ void swiWaitForVBlank(void){
 }
 
 void dmaCopy(const void *src, void *dst, u32 bytes){
-  const u16 *s = src; u16 *d = dst;
-  for(u32 i = 0; i < bytes / 2; i++) d[i] = s[i];  /* VRAM wants 16-bit writes */
+  if(!bytes) return;
+  if((((u32)src | (u32)dst | bytes) & 3u) == 0){
+    /* DMA channel 3: ARM9 main RAM -> bitmap VRAM, 32-bit, immediate.
+       Wait for completion before the caller reuses its software buffer. */
+    R32(0x040000DC) = 0;
+    R32(0x040000D4) = (u32)src;    /* DMA3SAD */
+    R32(0x040000D8) = (u32)dst;    /* DMA3DAD */
+    R32(0x040000DC) = 0x84000000u | (bytes >> 2);
+    while(R32(0x040000DC) & 0x80000000u) ;
+  } else {
+    /* Rare unaligned caller: retain safe 16-bit writes for VRAM. */
+    const u16 *s=src; volatile u16 *d=dst;
+    for(u32 i=0;i<bytes/2;i++) d[i]=s[i];
+  }
 }
 
 /* ------------------------------------------------------------- input */

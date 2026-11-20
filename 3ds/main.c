@@ -284,16 +284,29 @@ static void star(Scr *s, int cx, int cy, int r, u32 c);
 static unsigned hsh_(int a, int b){ unsigned h = (unsigned)a * 374761393u + (unsigned)b * 668265263u; h = (h ^ (h >> 13)) * 1274126177u; return h ^ (h >> 16); }
 /* world px (web: 8 per cell) -> screen */
 #define WXS(v, wx) ((v)->ox + (int)floorf(((wx) / 8.0f - (v)->cx) * (v)->ppc))
-static void ridge(const View *v, int gy, int dx, int kind, u32 top, u32 bot){      /* a hill line from the web's sine sums, two-tone */
-  Scr *s = v->s; float k = v->ppc / 8.0f;
-  for(int x = 0; x < s->w; x += 2){
-    float wx = ((x - dx - v->ox) / k) + v->cx * 8, h;
-    if(kind == 0) h = 120 + sinf(wx * .007f + 1) * 55 + sinf(wx * .021f) * 18;
-    else if(kind == 1) h = 70 + sinf(wx * .011f + 3) * 38 + sinf(wx * .04f) * 8;
-    else h = 30 + sinf(wx * .013f) * 18;
-    int y0 = gy - (int)(h * k); if(y0 < 0) y0 = 0;
-    int mid = y0 + (gy - y0) * 2 / 5;
-    rect(s, x, y0, 2, mid - y0, top); rect(s, x, mid, 2, gy - mid, bot);
+/* Precompute 4096 world pixels of hills at 4-px granularity, once.
+   6 KB BSS instead of dozens of floating-point sinf calls per eye, per frame. */
+static short ridge_height[3][1024];
+static int ridge_ready;
+static void ridge_prepare(void){
+  if(ridge_ready) return;
+  for(int j=0;j<1024;j++){
+    float wx=(float)j*4.0f;
+    ridge_height[0][j]=(short)(120+sinf(wx*.007f+1)*55+sinf(wx*.021f)*18);
+    ridge_height[1][j]=(short)(70+sinf(wx*.011f+3)*38+sinf(wx*.04f)*8);
+    ridge_height[2][j]=(short)(30+sinf(wx*.013f)*18);
+  }
+  ridge_ready=1;
+}
+static void ridge(const View *v, int gy, int dx, int kind, u32 top, u32 bot){
+  Scr *s=v->s; float k=v->ppc/8.0f;
+  ridge_prepare();
+  for(int x=0;x<s->w;x+=2){
+    float wx=((x-dx-v->ox)/k)+v->cx*8;
+    int h=ridge_height[kind][((int)floorf(wx*.25f)) & 1023];
+    int y0=gy-(int)(h*k); if(y0<0)y0=0;
+    int mid=y0+(gy-y0)*2/5;
+    rect(s,x,y0,2,mid-y0,top);rect(s,x,mid,2,gy-mid,bot);
   }
 }
 static void draw_sky(const View *v){
@@ -397,7 +410,13 @@ static void draw_cells(const View *v){
   static float minv[MX_NMAT]; static int mready;
   if(!mready){ for(int m = 1; m < MX_NMAT; m++) minv[m] = 1.0f / (float)mx_material_hp(m); mready = 1; }
   const int sw = v->s->w, sh = v->s->h;
-  for(int y = 0; y < MX_ROWS; y++) for(int x = 0; x < MX_COLS; x++){
+  int x0=(int)floorf(v->cx-v->ox/(float)p)-2;
+  int x1=(int)ceilf(v->cx+(sw-v->ox)/(float)p)+2;
+  int y0=(int)floorf(v->cy-v->oy/(float)p)-2;
+  int y1=(int)ceilf(v->cy+(sh-v->oy)/(float)p)+2;
+  if(x0<0)x0=0; if(x1>MX_COLS)x1=MX_COLS;
+  if(y0<0)y0=0; if(y1>MX_ROWS)y1=MX_ROWS;
+  for(int y=y0;y<y1;y++) for(int x=x0;x<x1;x++){
     int i = y * MX_COLS + x, m = world.grid[i];
     if(!m) continue;
     float fx = x, fy = y;
@@ -421,13 +440,19 @@ static void draw_cells(const View *v){
 static void draw_rooms(const View *v){                  /* the wallpaper behind the voxels; only where nothing has knocked it out */
   static const unsigned char PAP[4][3] = { { 238, 214, 170 }, { 200, 225, 205 }, { 225, 190, 205 }, { 190, 205, 235 } };
   int p = v->ppc;
-  for(int y = 0; y < MX_ROWS; y++){
-    int sy = VY(v, (float)y); if(sy + p < 0 || sy >= v->s->h) continue;
-    int x = 0;
-    while(x < MX_COLS){
+  int x0=(int)floorf(v->cx-v->ox/(float)p)-2;
+  int x1=(int)ceilf(v->cx+(v->s->w-v->ox)/(float)p)+2;
+  int y0=(int)floorf(v->cy-v->oy/(float)p)-2;
+  int y1=(int)ceilf(v->cy+(v->s->h-v->oy)/(float)p)+2;
+  if(x0<0)x0=0; if(x1>MX_COLS)x1=MX_COLS;
+  if(y0<0)y0=0; if(y1>MX_ROWS)y1=MX_ROWS;
+  for(int y=y0;y<y1;y++){
+    int sy=VY(v,(float)y);
+    int x=x0;
+    while(x<x1){
       int i = y * MX_COLS + x, n = world.paper[i];
       if(!n || world.grid[i]){ x++; continue; }
-      int x2 = x; while(x2 < MX_COLS && world.paper[y * MX_COLS + x2] == n && !world.grid[y * MX_COLS + x2]) x2++;
+      int x2 = x; while(x2 < x1 && world.paper[y * MX_COLS + x2] == n && !world.grid[y * MX_COLS + x2]) x2++;
       int sx = VX(v, (float)x), w = VX(v, (float)x2) - sx; const unsigned char *c = PAP[(n - 1) & 3]; float g = g_dim;
       rect(v->s, sx, sy, w, p, RGB((int)(c[0] * g), (int)(c[1] * g), (int)(c[2] * g)));
       if(p >= 3) for(int k = 0; k < w; k += 5) rect(v->s, sx + k, sy, 2, p, RGB((int)(c[0] * g * .93f), (int)(c[1] * g * .93f), (int)(c[2] * g * .93f)));   /* wallpaper stripes */
@@ -447,6 +472,8 @@ static void draw_facades(const View *v){
   for(int r=0;r<world.nrooms;r++){
     const MxRoom *rm=&world.rooms[r];
     if(rm->w<6 || rm->h<5) continue;
+    if(VX(v,(float)(rm->x+rm->w))<-4 || VX(v,(float)rm->x)>v->s->w+4 ||
+       VY(v,(float)(rm->y+rm->h))<-4 || VY(v,(float)rm->y)>v->s->h+4) continue;
     int n=rm->w>=18 ? 3 : rm->w>=11 ? 2 : 1;
     for(int k=0;k<n;k++){
       int wx=rm->x + rm->w*(2*k+1)/(2*n), wy=rm->y+rm->h/2;
@@ -679,7 +706,7 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
   int stereo = sl > 0.03f;
   const MxMan *m = &world.man; float mxc = RTOF(m->x);
   float tp = (m->mode == MAN_FLY || m->mode == MAN_STUCK) ? (mxc - 20.0f) * 6.0f : 0.0f;   /* camera drift follows the flying man */
-  g_pan += (tp - g_pan) * .08f;
+  if(sgn < 0) g_pan += (tp - g_pan) * .08f; /* one camera update per frame, not twice with stereoscopy */
   int fly = (m->mode == MAN_FLY) ? 1 : 0, dv = m->dive ? 3 : 0;
   a.ox = vt->ox + DX(14); draw_sky(&a); draw_street_dressing(&a);                                                   /* far plane (hills/clouds inside carry their own parallax) */
   a.ox = vt->ox + DX(8); draw_rooms(&a); draw_facades(&a);                               /* dressed interiors sit behind destructible front walls */
