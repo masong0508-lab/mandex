@@ -274,8 +274,23 @@ static void itoa_(int v, char *o){ sprintf(o, "%d", v); }
 typedef struct { float x, y, vx, vy; int life; u32 c; int kind; } Part;     /* kind 0 = dust/debris, 1 = heart, 2 = sparkle (the last two float: no gravity) */
 #define NP 160
 static Part parts[NP];
+#ifndef MX_N3DS_PARTICLE_HINT
+#define MX_N3DS_PARTICLE_HINT 1
+#endif
+/* Lowest available particle slot. A burst of 24+ sparks no longer rescans
+   all previously occupied entries for each new particle. The cursor moves
+   backward on expiration, so allocation order remains pixel-identical. */
+#if MX_N3DS_PARTICLE_HINT
+static int part_free_hint;
+#endif
 static void spawn_k(float x, float y, float vx, float vy, int life, u32 c, int kind){
+#if MX_N3DS_PARTICLE_HINT
+  for(int i = part_free_hint; i < NP; i++) if(parts[i].life <= 0){
+    parts[i] = (Part){x, y, vx, vy, life, c, kind}; part_free_hint = i + 1; return;
+  }
+#else
   for(int i = 0; i < NP; i++) if(parts[i].life <= 0){ parts[i] = (Part){x, y, vx, vy, life, c, kind}; return; }
+#endif
 }
 static void spawn(float x, float y, float vx, float vy, int life, u32 c){ spawn_k(x, y, vx, vy, life, c, 0); }
 static void popup(float x, float y, const char *s, u32 c);
@@ -307,7 +322,10 @@ static void on_events(void){
     case EV_HURT: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, "OUCH!", RGB(255, 107, 107)); if(!e->m){ dragging = 0; pad_used = 0; } break;
     case EV_OOF: for(int k = 0; k < 6; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, e->m ? "CRACK!" : "OOF!", RGB(255, 210, 63)); break;
     case EV_HEAL: popup(x, y - 6, "+HP", RGB(255, 255, 255)); break;
-    case EV_DISTRICT: cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1; dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts);   /* Landlord HQ: next district, fresh men */
+    case EV_DISTRICT: cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1; dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts);
+#if MX_N3DS_PARTICLE_HINT
+      part_free_hint = 0;
+#endif   /* Landlord HQ: next district, fresh men */
       popup(60, 20, world.district == 1 ? "DISTRICT 2 OF 3!" : "DISTRICT 3 OF 3!", RGB(255, 210, 63)); break;
     case EV_BONK: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, "BONK!", RGB(255, 210, 63)); break;
     default: break;
@@ -321,7 +339,13 @@ static void popup(float x, float y, const char *s, u32 c){
   for(int i = 0; i < 4; i++) if(pops[i].life <= 0){ pops[i] = (Pop){x, y, 70, s, c}; return; }
 }
 static void tick_parts(void){
-  for(int i = 0; i < NP; i++) if(parts[i].life > 0){ Part *p = &parts[i]; if(!p->kind) p->vy += .06f; p->x += p->vx * .1f; p->y += p->vy * .1f; p->life--; }
+  for(int i = 0; i < NP; i++) if(parts[i].life > 0){
+    Part *p = &parts[i]; if(!p->kind) p->vy += .06f;
+    p->x += p->vx * .1f; p->y += p->vy * .1f; p->life--;
+#if MX_N3DS_PARTICLE_HINT
+    if(p->life <= 0 && i < part_free_hint) part_free_hint = i;
+#endif
+  }
   for(int i = 0; i < 4; i++) if(pops[i].life > 0){ pops[i].y -= .05f; pops[i].life--; }
 }
 
@@ -978,6 +1002,9 @@ static int walk_btn_at(int tx, int ty){ if(ty < 196 || ty >= 236) return -1; for
 static void load_level(int l){
   mx_load(&world, l); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); world.valve_ok = mx_valve_unlocked(&stats);
   memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); mi_reset(&mi);
+#if MX_N3DS_PARTICLE_HINT
+  part_free_hint = 0;
+#endif
   cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1;
   dragging = 0; pad_used = 0; pad_dx = pad_dy = 0; new_best = 0;
 }
