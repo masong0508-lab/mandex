@@ -29,6 +29,15 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Test destructible back walls and room collapse across console/browser
+        run: |
+          for mode in float fixed; do
+            flags=""
+            if test "$mode" = fixed; then flags="-DMX_FIXED"; fi
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/room_backdrop_test.c -lm -o /tmp/room_backdrop_$mode
+            /tmp/room_backdrop_$mode
+          done
+          node test/room_backdrop_web_test.js
       - name: Validate VMU crash recovery and shared progress journal in both numeric modes
         run: |
           cd test

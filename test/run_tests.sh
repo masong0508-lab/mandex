@@ -10,6 +10,10 @@ echo "float vs fixed per-shot comparison:"
 paste -d'|' float.txt fixed.txt | grep " L[0-9]" | sed 's/score=[0-9]*//g' | awk -F'|' '{print $1 "  ||  fixed: " substr($2, index($2,"destroyed"))}'
 echo "--- libnds hardware-math hooks vs software fixed point (must be bit-identical) ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DMX_LIBNDS_MATH -Istubs -I../core ../core/mx.c host_test.c -lm -o test_fixed_hw && ./test_fixed_hw > fixed_hw.txt && cmp fixed.txt fixed_hw.txt && echo "identical"
+echo "--- back-wall impacts and floating room collapse (shared core fixed/float, web) ---"
+gcc -std=gnu99 -O2 -Wno-unused-function -I../core room_backdrop_test.c -lm -o room_backdrop_float && ./room_backdrop_float
+gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -I../core room_backdrop_test.c -lm -o room_backdrop_fixed && ./room_backdrop_fixed
+if command -v node >/dev/null 2>&1;then node room_backdrop_web_test.js;fi
 echo "--- real-time frame meter: rendered FPS vs simulation steps/s ---"
 gcc -std=gnu99 -O2 -I../core fps_meter_test.c -o fps_meter_test && ./fps_meter_test
 echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
