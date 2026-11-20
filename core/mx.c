@@ -363,7 +363,7 @@ static void wob_blast(MxWorld *w, int cx, int cy, int r, real speed){
 #define MX_WOB_STEPS WOB_STEPS
 #endif
 #ifndef MX_WOB_CACHE_DAMP
-#define MX_WOB_CACHE_DAMP 1
+#define MX_WOB_CACHE_DAMP 0 /* A/B marginal or regressed on float; keep optional */
 #endif
 #ifdef MX_STATS
 int mx_stat_wob;
@@ -382,36 +382,78 @@ static real KK[MX_NMAT][MX_NMAT];                       /* joint stiffness of ev
 #ifndef MX_WOB_COLD_O
 #define MX_WOB_COLD_O R(0.004)     /* |ox| + |oy|, cells */
 #endif
-static uint8_t wob_hot[MX_ROWS * MX_COLS];             /* by cell index; only read for listed (standing) cells */
-static uint16_t occ_i[MX_ROWS * MX_COLS];              /* every standing cell of this frame, row by row */
+#ifndef MX_WOB_HOT_PROPAGATE
+#define MX_WOB_HOT_PROPAGATE 1
+#endif
+#if !MX_WOB_HOT_PROPAGATE
+static uint8_t wob_hot[MX_ROWS * MX_COLS];
+#endif
+static uint16_t occ_i[MX_ROWS * MX_COLS];
+/* In the new path the existing scratch bytes are by-grid candidate flags,
+   not the old per-occupied neighbor list: NO additional memory allocation. */
 static uint8_t occ_nb[MX_ROWS * MX_COLS];
 static void wob_list(MxWorld *w){
   int no = 0;
-  const real cv = MX_WOB_COLD_V * (1 << w->wob_shift), co = MX_WOB_COLD_O * (1 << w->wob_shift);   /* over budget: only clearly moving cells are walked, the rest keep their tiny offsets */
-  for(int y = 0; y < MX_ROWS - 1; y++){
-    wob_lean[y] = rmul(LEANK, RI(MX_ROWS - 1 - y)) - HOMEK;
-    const uint8_t *row = &w->grid[y * MX_COLS];
-    for(int x0 = 0; x0 < MX_COLS; x0 += 4){                /* most of the grid is air: look at four cells at a time (MX_COLS is a multiple of 4, grid is 4-aligned) */
-      uint32_t q; memcpy(&q, __builtin_assume_aligned(row + x0, 4), 4);
-      if(!q) continue;
-      for(int x = x0; x < x0 + 4; x++){
-        if(!row[x]) continue;
-        int i = y * MX_COLS + x;
-        uint8_t bk = w->brk[i], nb = 0;                    /* the joints do not change during the sub-steps (wobble_check runs after them), so look them up once */
-        if(x + 1 < MX_COLS && !(bk & 1) && w->grid[i + 1]) nb |= 1;
-        if(x > 0 && !(bk & 2) && w->grid[i - 1]) nb |= 2;
-        if(!(bk & 4) && w->grid[i + MX_COLS]) nb |= 4;
-        if(y > 0 && !(bk & 8) && w->grid[i - MX_COLS]) nb |= 8;
-        wob_hot[i] = (rabs(w->ovx[i]) + rabs(w->ovy[i]) > cv) || (rabs(w->ox[i]) + rabs(w->oy[i]) > co);
-        occ_i[no] = (uint16_t)i; occ_nb[no] = nb; no++;
+  const real cv = MX_WOB_COLD_V * (1 << w->wob_shift), co = MX_WOB_COLD_O * (1 << w->wob_shift);
+#if MX_WOB_HOT_PROPAGATE
+  memset(occ_nb,0,sizeof occ_nb);
+#endif
+  for(int y=0;y<MX_ROWS-1;y++){
+    wob_lean[y]=rmul(LEANK,RI(MX_ROWS-1-y))-HOMEK;
+    const uint8_t *row=&w->grid[y*MX_COLS];
+    for(int x0=0;x0<MX_COLS;x0+=4){
+      uint32_t q;memcpy(&q,__builtin_assume_aligned(row+x0,4),4);
+      if(!q)continue;
+      for(int x=x0;x<x0+4;x++){
+        if(!row[x])continue;
+        int i=y*MX_COLS+x;
+#if MX_WOB_HOT_PROPAGATE
+        /* Mark ACTIVE neighbors from hot voxels. The candidate neighbor's
+           own unbroken joint bit is checked, exactly as the original code.
+           This defers 4 expensive material/link tests on EVERY cold voxel
+           until the much smaller active-candidate list is known. */
+        int hot=(rabs(w->ovx[i])+rabs(w->ovy[i])>cv)||
+                (rabs(w->ox[i])+rabs(w->oy[i])>co);
+        if(hot){
+          occ_nb[i]=1;
+          if(x+1<MX_COLS&&w->grid[i+1]&&!(w->brk[i+1]&2))occ_nb[i+1]=1;
+          if(x>0&&w->grid[i-1]&&!(w->brk[i-1]&1))occ_nb[i-1]=1;
+          if(y+1<MX_ROWS-1&&w->grid[i+MX_COLS]&&!(w->brk[i+MX_COLS]&8))occ_nb[i+MX_COLS]=1;
+          if(y>0&&w->grid[i-MX_COLS]&&!(w->brk[i-MX_COLS]&4))occ_nb[i-MX_COLS]=1;
+        }
+        occ_i[no++]=(uint16_t)i;
+#else
+        uint8_t bk=w->brk[i],nb=0;
+        if(x+1<MX_COLS&&!(bk&1)&&w->grid[i+1])nb|=1;
+        if(x>0&&!(bk&2)&&w->grid[i-1])nb|=2;
+        if(!(bk&4)&&w->grid[i+MX_COLS])nb|=4;
+        if(y>0&&!(bk&8)&&w->grid[i-MX_COLS])nb|=8;
+        wob_hot[i]=(rabs(w->ovx[i])+rabs(w->ovy[i])>cv)||
+                   (rabs(w->ox[i])+rabs(w->oy[i])>co);
+        occ_i[no]=(uint16_t)i;occ_nb[no]=nb;no++;
+#endif
       }
     }
   }
-  int n = 0;
-  for(int k = 0; k < no; k++){
-    int i = occ_i[k], nb = occ_nb[k];
-    if(!(wob_hot[i] || ((nb & 1) && wob_hot[i + 1]) || ((nb & 2) && wob_hot[i - 1]) || ((nb & 4) && wob_hot[i + MX_COLS]) || ((nb & 8) && wob_hot[i - MX_COLS]))) continue;
-    wob_act[n] = (uint16_t)i; wob_nb[n] = (uint8_t)nb; wob_cx[n] = (uint8_t)(i % MX_COLS); wob_cy[n] = (uint8_t)(i / MX_COLS); n++;
+  int n=0;
+  for(int k=0;k<no;k++){
+    int i=occ_i[k],nb;
+#if MX_WOB_HOT_PROPAGATE
+    if(!occ_nb[i])continue;
+    int x=i%MX_COLS,y=i/MX_COLS;
+    uint8_t bk=w->brk[i];nb=0;
+    if(x+1<MX_COLS&&!(bk&1)&&w->grid[i+1])nb|=1;
+    if(x>0&&!(bk&2)&&w->grid[i-1])nb|=2;
+    if(!(bk&4)&&w->grid[i+MX_COLS])nb|=4;
+    if(y>0&&!(bk&8)&&w->grid[i-MX_COLS])nb|=8;
+#else
+    nb=occ_nb[k];
+    if(!(wob_hot[i]||((nb&1)&&wob_hot[i+1])||
+       ((nb&2)&&wob_hot[i-1])||((nb&4)&&wob_hot[i+MX_COLS])||
+       ((nb&8)&&wob_hot[i-MX_COLS])))continue;
+#endif
+    wob_act[n]=(uint16_t)i;wob_nb[n]=(uint8_t)nb;
+    wob_cx[n]=(uint8_t)(i%MX_COLS);wob_cy[n]=(uint8_t)(i/MX_COLS);n++;
   }
   if(w->wob_budget){                                   /* closed loop on the cell count: tighten at once when over, relax slowly when well under */
     if(n > 2 * w->wob_budget && w->wob_shift < 5) w->wob_shift += 2; else if(n > w->wob_budget && w->wob_shift < 6) w->wob_shift++; else if(n < w->wob_budget / 2 && w->wob_shift > 0 && (w->sand_t & 7) == 0) w->wob_shift--;

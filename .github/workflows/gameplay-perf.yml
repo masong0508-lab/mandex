@@ -23,6 +23,8 @@ jobs:
         run: |
           gcc -std=gnu99 -O2 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float
           gcc -std=gnu99 -O2 -DMX_FIXED -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed
+          gcc -std=gnu99 -O2 -DMX_WOB_HOT_PROPAGATE=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_hot_ref
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_HOT_PROPAGATE=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_hot_ref
           gcc -std=gnu99 -O2 -DMX_WOB_CACHE_DAMP=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_damp_ref
           gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_CACHE_DAMP=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_damp_ref
           gcc -std=gnu99 -O2 -DMX_WOB_UNROLL_NB=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_ref
@@ -36,6 +38,18 @@ jobs:
           tail -n 1 out/gameplay-profiles/physics-float.txt
           printf '\nFixed mode:\n'
           tail -n 1 out/gameplay-profiles/physics-fixed.txt
+      - name: Validate all 60 complete game worlds are byte-for-byte identical after wobble changes
+        run: |
+          for MODE in fixed float; do
+            DEF=""
+            [ "$MODE" = fixed ] && DEF="-DMX_FIXED"
+            gcc -std=gnu99 -O2 $DEF -DMX_WOB_HOT_PROPAGATE=0 -Icore core/mx.c test/wob_state_digest.c -lm -o /tmp/mandex_world_before
+            gcc -std=gnu99 -O2 $DEF -DMX_WOB_HOT_PROPAGATE=1 -Icore core/mx.c test/wob_state_digest.c -lm -o /tmp/mandex_world_after
+            /tmp/mandex_world_before > "out/gameplay-profiles/world-$MODE-before.txt"
+            /tmp/mandex_world_after > "out/gameplay-profiles/world-$MODE-after.txt"
+            diff -u "out/gameplay-profiles/world-$MODE-before.txt" "out/gameplay-profiles/world-$MODE-after.txt"
+            echo "$MODE byte-for-byte state parity: $(cat out/gameplay-profiles/world-$MODE-after.txt)"
+          done
       - name: Compare exact fixed/float gameplay outcomes and CPU time across 60 levels
         run: |
           python3 - <<'PY'
@@ -53,6 +67,13 @@ jobs:
               op=float(old.group(1));np=float(new.group(1))
               line=f'{mode} {frames} frames/level reference_ms={op:.1f} optimized_ms={np:.1f} gain_pct={100*(op-np)/op:.1f} checksum={new.group(2)}'
               print(line);report.append(line)
+              hot_text=subprocess.check_output([f'/tmp/mandex_physics_{mode}_hot_ref','--quiet',str(frames)],text=True)
+              hot=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',hot_text)
+              if not hot or hot.group(2)!=new.group(2):
+                raise SystemExit(f'{mode}/{frames}: hot candidate changes diverged')
+              hv=float(hot.group(1))
+              hot_line=f'{mode} {frames} hot_scan_old_ms={hv:.1f} new_ms={np:.1f} gain_pct={100*(hv-np)/hv:.1f}'
+              print(hot_line);report.append(hot_line)
               d=subprocess.check_output([f'/tmp/mandex_physics_{mode}_damp_ref','--quiet',str(frames)],text=True)
               damp=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',d)
               if not damp or damp.group(2)!=new.group(2):
