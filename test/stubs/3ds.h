@@ -2,6 +2,8 @@
    It models no GPU, no timing and no real hid behaviour (see PORTING.md). */
 #ifndef STUB_3DS_H
 #define STUB_3DS_H
+/* Host front-end harnesses never touch SDMC; journal I/O has dedicated tests. */
+#define MX_N3DS_NO_SAVE 1
 #include <stdint.h>
 #include <stdbool.h>
 typedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32; typedef uint64_t u64;
