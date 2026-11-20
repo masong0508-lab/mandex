@@ -578,6 +578,12 @@ static void draw_rooms(const View *v){
 #endif
 }
 
+#ifndef MX_DS_RIP_VIEW_CLIP
+#define MX_DS_RIP_VIEW_CLIP 1
+/* Only visit camera-visible tiles after a room wall is torn. Keep the old
+   full-room walk for matched framebuffer/performance A/B regression tests. */
+#endif
+
 /* Damage-only paper edge pass, AFTER any wallpaper drawing path.
    Iterates known room rectangles rather than scanning the entire 120x60
    world; the reference and inlined renderers retain identical pixels.
@@ -587,6 +593,19 @@ static void draw_room_rips(const View *v){
   for(int r=0;r<world.nrooms;r++){
     const MxRoom *rm=&world.rooms[r];
     int y0=rm->y,y1=y0+rm->h,x0=rm->x,x1=x0+rm->w;
+#if MX_DS_RIP_VIEW_CLIP
+    /* A 4px tile is fully drawable only at screen x=0..252, y=0..188.
+       The normal camera may shake a few pixels past zero. C's truncation
+       toward zero gives ceil(cx/4) for negative cx. */
+    int bx0=v->cx>0?(v->cx+3)/4:v->cx/4;
+    int by0=v->cy>0?(v->cy+3)/4:v->cy/4;
+    int bx1=(v->cx+252)/4+1,by1=(v->cy+188)/4+1;
+    if(x0<bx0)x0=bx0;
+    if(x1>bx1)x1=bx1;
+    if(y0<by0)y0=by0;
+    if(y1>by1)y1=by1;
+    if(x0>=x1||y0>=y1)continue;
+#endif
     for(int y=y0;y<y1;y++){
       int sy=y*4-v->cy;
       if((unsigned)sy>188u)continue;

@@ -1,0 +1,52 @@
+name: DS damaged-wall visibility A-B
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ds/source/main.c"
+      - "test/ds_render.c"
+      - ".github/workflows/ds-rip-view.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the actual DS renderer with/without damaged-room clipping
+        run: |
+          for MODE in 0 1; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST \
+              -DMX_DS_RIP_VIEW_CLIP=$MODE -Itest/stubs -Icore -Iart -Ids/source \
+              test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+              core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex-rip-$MODE
+          done
+      - name: Compare damaged-wall pixels across four levels and six camera positions
+        run: |
+          DS_RIP_CLIP_PROBE=1 /tmp/mandex-rip-0 > /tmp/rip-old.txt
+          DS_RIP_CLIP_PROBE=1 /tmp/mandex-rip-1 > /tmp/rip-new.txt
+          diff -u /tmp/rip-old.txt /tmp/rip-new.txt
+          tail -n 1 /tmp/rip-new.txt
+      - name: Compare complete gameplay frames and report paired host CPU costs
+        run: |
+          for LEVEL in 0 39 59; do
+            for MODE in 0 1; do
+              DS_PERF_BENCH=1 /tmp/mandex-rip-$MODE /tmp/mandex-rip-$MODE-$LEVEL 520 "$LEVEL" > "/tmp/rip-$MODE-$LEVEL.txt"
+            done
+          done
+          python3 - <<'PY'
+          import pathlib,re
+          for level in (0,39,59):
+              old=pathlib.Path(f'/tmp/rip-0-{level}.txt').read_text()
+              new=pathlib.Path(f'/tmp/rip-1-{level}.txt').read_text()
+              pat=r'DS_FRAME_HASH checksum=([0-9a-f]+) screen_samples=(\d+)'
+              a=re.search(pat,old); b=re.search(pat,new)
+              assert a and b and a.groups()==b.groups(),f'Frame hash mismatch at level {level+1}'
+              def cost(s):
+                  return float(re.search(r'cpu_frame_mean_us=([0-9.]+)',s).group(1))
+              x,y=cost(old),cost(new)
+              print(f'level={level+1} equal=YES old_cpu_us={x:.1f} clipped_cpu_us={y:.1f} host_gain={(x-y)*100/x:.1f}%')
+          PY

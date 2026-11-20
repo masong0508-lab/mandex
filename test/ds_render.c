@@ -531,7 +531,39 @@ static int facade_district_probe(void){
   }
   return 0;
 }
+/* Deterministic damage-edge camera sweep: run against original and clipped
+   DS rip renderer, comparing every visible pixel and non-empty torn edges. */
+static int rip_clip_probe(void){
+  static const int levels[]={0,9,39,59};
+  static const int cameras[][2]={{-3,-5},{0,0},{80,24},{160,40},{252,48},{400,52}};
+  unsigned any=0;
+  gfx_init();mx_meta_init(&stats);mx_options_default(&opt);
+  for(unsigned l=0;l<sizeof levels/sizeof levels[0];l++){
+    load_level(levels[l]);
+    for(int y=0;y<MX_ROWS;y++)for(int x=0;x<MX_COLS;x++){
+      int i=y*MX_COLS+x;
+      if(world.paper[i]&&((x+5*y)%11==0))world.paper[i]=0;
+    }
+    world.paper_torn=1;
+    for(unsigned k=0;k<sizeof cameras/sizeof cameras[0];k++){
+      View v={buf_top,4,cameras[k][0],cameras[k][1]};
+      memset(buf_top,0,sizeof buf_top);
+      draw_room_rips(&v);
+      unsigned hash=2166136261u,lit=0;
+      for(size_t p=0;p<sizeof buf_top;p++){
+        hash=(hash^buf_top[p])*16777619u;
+        lit+=(buf_top[p]!=0);
+      }
+      any+=lit;
+      printf("DS_RIP_HASH level=%d camera=%u hash=%08x pixels=%u\n",levels[l]+1,k,hash,lit);
+    }
+  }
+  if(!any){fputs("FAIL: rip probe drew no damage edges\n",stderr);return 1;}
+  printf("DS_RIP_PASS visible_pixels=%u\n",any);
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("DS_RIP_CLIP_PROBE"))return rip_clip_probe();
   if(getenv("DS_FACADE_DISTRICT_PROBE"))return facade_district_probe();
   if(argc > 1) OUT = argv[1];
   if(argc > 2) max_frames = atoi(argv[2]);
