@@ -97,13 +97,37 @@ static void outfit_scan(int quiet){ for(int i = 0; i < MX_NUM_OUTFITS; i++){ if(
 /* ---------------------------------------------------------------- pixels */
 typedef struct { u8 *fb; int w, h; } Scr;
 /* palette buffer (256x192) -> screen, scaled 1.25x with nearest pixels (320x240), centred in x; the framebuffer is column-major, bottom row first, 3 bytes per pixel (BGR) */
+#ifndef MX_N3DS_FAST_PALETTE
+#define MX_N3DS_FAST_PALETTE 1
+#endif
 static void blit_pal(Scr *s, const u8 *src){
   int x0 = (s->w - 320) / 2;
+#if MX_N3DS_FAST_PALETTE
+  /* Preserve palette animation, but convert 256 colors once per call
+     instead of converting 76,800 pixels per screen. */
+  u8 rgb[256][3], src_y[240];
+  for(int i = 0; i < 256; i++){
+    u16 c = gfx_pal[i];
+    rgb[i][0] = (u8)(((c >> 10) & 31) * 255 / 31);
+    rgb[i][1] = (u8)(((c >> 5) & 31) * 255 / 31);
+    rgb[i][2] = (u8)((c & 31) * 255 / 31);
+  }
+  for(int Y = 0; Y < 240; Y++) src_y[Y] = (u8)((239 - Y) * 4 / 5);
   for(int X = 0; X < 320; X++){
     const u8 *col = src + (X * 4 / 5);
     u8 *p = s->fb + ((x0 + X) * s->h) * 3;
-    for(int Y = 0; Y < 240; Y++, p += 3){ u16 c = gfx_pal[col[(239 - Y) * 4 / 5 * 256]]; p[0] = (u8)(((c >> 10) & 31) * 255 / 31); p[1] = (u8)(((c >> 5) & 31) * 255 / 31); p[2] = (u8)((c & 31) * 255 / 31);   /* RGB15: red in the low bits; byte 0 of the pixel is blue */ }
+    for(int Y = 0; Y < 240; Y++, p += 3){
+      const u8 *q = rgb[col[src_y[Y] * 256]];
+      p[0] = q[0]; p[1] = q[1]; p[2] = q[2];
+    }
   }
+#else
+  for(int X = 0; X < 320; X++){
+    const u8 *col = src + (X * 4 / 5);
+    u8 *p = s->fb + ((x0 + X) * s->h) * 3;
+    for(int Y = 0; Y < 240; Y++, p += 3){ u16 c = gfx_pal[col[(239 - Y) * 4 / 5 * 256]]; p[0] = (u8)(((c >> 10) & 31) * 255 / 31); p[1] = (u8)(((c >> 5) & 31) * 255 / 31); p[2] = (u8)((c & 31) * 255 / 31); }
+  }
+#endif
 }                       /* w x h in screen terms (400x240 or 320x240) */
 static Scr top, bot;
 static inline void px(Scr *s, int x, int y, u32 rgb){
@@ -685,15 +709,43 @@ static void draw_sling(const View *v){
     line(v->s, sx - p, sy, mx_, my, RGB(42, 22, 10)); line(v->s, sx + p, sy, mx_, my, RGB(42, 22, 10));
   }
 }
+/* The left eye, right eye and touch screen share a ballistic trajectory.
+   Reuse its world-space points without changing any projection or physics. */
+#ifndef MX_N3DS_AIM_CACHE
+#define MX_N3DS_AIM_CACHE 1
+#endif
+#if MX_N3DS_AIM_CACHE
+static real n3_aim_x[39], n3_aim_y[39];
+static int n3_aim_frame = -1, n3_aim_count;
+#endif
 static void draw_aim(const View *v){
   if(world.man.mode != MAN_AIM || !dragging) return;
+#if MX_N3DS_AIM_CACHE
+  if(n3_aim_frame != frame){
+    n3_aim_frame = frame; n3_aim_count = 0;
+    for(int k = 1; k < 40; k++){
+      real ox, oy; mx_preview_point(&world, R(0.075) * k, &ox, &oy);
+      float fx = RTOF(ox), fy = RTOF(oy);
+      int gx = (int)fx, gy = (int)fy;
+      if(gx < 0 || gx >= MX_COLS || gy >= MX_ROWS) break;
+      if(gy >= 0 && world.grid[gy * MX_COLS + gx]) break;
+      n3_aim_x[n3_aim_count] = ox; n3_aim_y[n3_aim_count] = oy; n3_aim_count++;
+    }
+  }
+#endif
   for(int k = 1; k < 40; k++){
-    real ox, oy; mx_preview_point(&world, R(0.075) * k, &ox, &oy);
+    real ox, oy;
+#if MX_N3DS_AIM_CACHE
+    if(k > n3_aim_count) break;
+    ox = n3_aim_x[k - 1]; oy = n3_aim_y[k - 1];
+#else
+    mx_preview_point(&world, R(0.075) * k, &ox, &oy);
     float fx = RTOF(ox), fy = RTOF(oy);
     int gx = (int)fx, gy = (int)fy;
     if(gx < 0 || gx >= MX_COLS || gy >= MX_ROWS) break;
     if(gy >= 0 && world.grid[gy * MX_COLS + gx]) break;
-    rect(v->s, VX(v, fx) - 1, VY(v, fy) - 1, 3, 3, RGB(255, 255, 255));
+#endif
+    rect(v->s, VX(v, RTOF(ox)) - 1, VY(v, RTOF(oy)) - 1, 3, 3, RGB(255, 255, 255));
   }
 }
 static void draw_parts(const View *v){
