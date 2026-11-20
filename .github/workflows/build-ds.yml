@@ -10,6 +10,11 @@ on:
     paths: ["ds/**", "core/**", "art/**", ".github/workflows/build-ds.yml"]
   workflow_dispatch:
 
+# Only the newest commit should occupy heavy build/emulator resources.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ds:
     runs-on: ubuntu-latest

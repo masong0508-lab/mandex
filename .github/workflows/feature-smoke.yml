@@ -18,6 +18,11 @@ on:
       - ".github/workflows/feature-smoke.yml"
   workflow_dispatch:
 
+# Only the newest commit should occupy heavy build/emulator resources.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   smoke:
     runs-on: ubuntu-latest

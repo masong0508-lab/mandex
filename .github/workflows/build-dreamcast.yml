@@ -13,6 +13,11 @@ on:
         description: Docker image with a built KallistiOS toolchain
         default: kazade/dreamcast-sdk:latest
 
+# Only the newest commit should occupy heavy build/emulator resources.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   dreamcast:
     runs-on: ubuntu-latest
