@@ -105,8 +105,22 @@ static unsigned short ic_rgb[256 * 256];
 static pvr_ptr_t tx_ic_top, tx_ic_bot;
 static pvr_poly_hdr_t hdr_ic_top, hdr_ic_bot;
 static int in_intro, intro_seen, wolf_seen, intro_level, end_seen;
+#ifndef MX_DC_FAST_PALETTE
+#define MX_DC_FAST_PALETTE 1
+#endif
 static void ic_upload(pvr_ptr_t tx, const unsigned char *src){                 /* palette index -> RGB565, 256 texels wide, 192 of 256 rows used */
+#if MX_DC_FAST_PALETTE
+  /* Palette conversion stays exact, including animation, but move the
+     RGB15 unpacking out of the 49,152-texel inner loop on the SH-4. */
+  unsigned short lut[256];
+  for(int i = 0; i < 256; i++){
+    unsigned c = gfx_pal[i], r = c & 31, g = (c >> 5) & 31, b = (c >> 10) & 31;
+    lut[i] = (unsigned short)((r << 11) | (g << 6 << 0) | b);
+  }
+  for(int i = 0; i < 256 * 192; i++) ic_rgb[i] = lut[src[i]];
+#else
   for(int y = 0; y < 192; y++) for(int x = 0; x < 256; x++){ unsigned c = gfx_pal[src[y * 256 + x]]; unsigned r = c & 31, g = (c >> 5) & 31, b = (c >> 10) & 31; ic_rgb[y * 256 + x] = (unsigned short)((r << 11) | (g << 6 << 0) | b); }
+#endif
   pvr_txr_load(ic_rgb, tx, 256 * 256 * 2);
 }
 
