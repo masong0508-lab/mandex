@@ -200,6 +200,12 @@ void swiWaitForVBlank(void){
   g_keys = 0; /* default: nothing held; script sets below */
 #ifdef MX_DS_PROFILE_HOST
   if(getenv("DS_PERF_BENCH")){
+    /* Optional screenshot taps for art review only: the normal timed host
+       probe remains untouched and no extra work enters console ROMs. */
+    if(getenv("DS_ART_REVIEW")){
+      if(vf==180)shot("aim");
+      if(vf==330)shot("post_launch");
+    }
     if(vf==1){intro_seen=1;wolf_seen=1;end_seen=6;}
     for(int k=0;k<start_clicks;k++)if(vf==8+k*2)g_keys|=KEY_RIGHT;
     if(vf==8+start_clicks*2+8)g_keys|=KEY_A;

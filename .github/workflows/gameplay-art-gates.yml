@@ -33,11 +33,11 @@ jobs:
       - name: Render Nintendo DS gameplay and movement review screenshots
         run: |
           mkdir -p out/art-review
-          gcc -std=gnu99 -O2 -DMX_FIXED -Wno-unused-function \
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_PROFILE_HOST -Wno-unused-function \
             -Itest/stubs -Icore -Iart -Ids/source \
             test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
             core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_art_review
-          INTRO_SKIP=1 /tmp/mandex_art_review out/art-review/gameplay 520 > out/art-review/host-report.txt
+          DS_PERF_BENCH=1 DS_ART_REVIEW=1 /tmp/mandex_art_review out/art-review/gameplay 520 0 > out/art-review/host-report.txt
           find out/art-review -name '*.ppm' -print | head -24
           find out/art-review -name '*.ppm' -print0 | xargs -0 -r python3 tools/ppm_to_png.py
           test -n "$(find out/art-review -name '*.png' -print -quit)"
