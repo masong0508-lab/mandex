@@ -33,10 +33,10 @@ jobs:
           PY
           node --check /tmp/mandex_game.js
 
-      - name: Build baseline and cached DS two-screen aiming paths
+      - name: Build baseline and optimized DS aim/particle paths
         run: |
           for fast in 0 1; do
-            gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_AIM_CACHE=$fast \
+            gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_AIM_CACHE=$fast -DMX_DS_PARTICLE_HINT=$fast \
               -Itest/stubs -Icore -Iart -Ids/source \
               test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
               core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_aim_$fast
@@ -74,7 +74,7 @@ jobs:
           path: out/fastpath-profiles/ds-aim-host-ab.txt
           if-no-files-found: error
 
-      - name: Build 3DS reference and fast-path host probes
+      - name: Build 3DS reference and fast-path host probes (aim/palette/circles/particles)
         run: |
           for f in gfx intro; do
             gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -D__3DS__ \
@@ -83,12 +83,12 @@ jobs:
           done
           for fast in 0 1; do
             gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ \
-              -DMX_N3DS_AIM_CACHE=$fast -DMX_N3DS_FAST_PALETTE=$fast -DMX_N3DS_INT_CIRCLE=$fast \
+              -DMX_N3DS_AIM_CACHE=$fast -DMX_N3DS_FAST_PALETTE=$fast -DMX_N3DS_INT_CIRCLE=$fast -DMX_N3DS_PARTICLE_HINT=$fast \
               -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source \
               test/n3ds_render.c /tmp/n3d_gfx.o /tmp/n3d_intro.o \
               core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c -lm -o /tmp/n3d_fast_$fast
           done
-      - name: Compare 3DS stereo aiming and animated cutscene palette pixels
+      - name: Compare 3DS stereo aiming, palette, circles and particle pool reuse
         run: |
           N3DS_FASTPATH_PROBE=1 /tmp/n3d_fast_0 > /tmp/n3d_reference.txt
           N3DS_FASTPATH_PROBE=1 /tmp/n3d_fast_1 > /tmp/n3d_optimized.txt
@@ -104,11 +104,11 @@ jobs:
           done
           for fast in 0 1; do
             gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation \
-              -DMX_DC_FAST_PALETTE=$fast -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
+              -DMX_DC_FAST_PALETTE=$fast -DMX_DC_PARTICLE_HINT=$fast -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
               /tmp/dc_gfx.o /tmp/dc_intro.o core/mx.c core/mx_meta.c \
               core/cloth.c core/mx_snd.c test/dc_render.c -lm -o /tmp/dc_fast_$fast
           done
-      - name: Compare exact Dreamcast RGB565 upload bytes including palette changes
+      - name: Compare Dreamcast texture bytes and particle pool order
         run: |
           DC_FASTPATH_PROBE=1 /tmp/dc_fast_0 > /tmp/dc_reference.txt
           DC_FASTPATH_PROBE=1 /tmp/dc_fast_1 > /tmp/dc_optimized.txt
