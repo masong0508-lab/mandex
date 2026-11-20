@@ -114,6 +114,8 @@ echo "--- 3DS cutscenes (shared with the DS) ---"
 gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_intro.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_intro && ./n3ds_intro | grep -v "^ok:"
 echo "--- Landlord HQ: three districts in turn (float and fixed core) ---"
 for m in "" "-DMX_FIXED"; do gcc -std=c99 -O2 -Wall $m -I../core ../core/mx.c hq_test.c -lm -o hq_test && ./hq_test | grep -v "^ok:"; done
+echo "--- offscreen art culling: ellipses / triangles / dither match reference pixels ---"
+gcc -std=gnu99 -O2 -DMX_FIXED -Istubs -I../core -I../ds/source -I../art gfx_clip_test.c ../ds/source/gfx.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o gfx_clip_test && ./gfx_clip_test
 echo "--- text drawing is pixel-identical to the reference ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -Istubs -I../core -I../ds/source -I../art text_hash.c ../ds/source/gfx.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o text_hash && [ "$(./text_hash)" = "dbd2d34c803f756e" ] && echo "ok: gfx_text / gfx_text_o / gfx_text_c unchanged"
 echo "--- sound effect synth (3DS + Dreamcast) ---"

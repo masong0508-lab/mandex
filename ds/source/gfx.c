@@ -42,9 +42,16 @@ static void hspan(u8 *b, int x0, int x1, int y, u8 c){
 
 void gfx_ell(u8 *b, int cx, int cy, int rx, int ry, u8 c){
   if(rx <= 0 || ry <= 0){ if(rx > 0 || ry > 0) gfx_px(b, cx, cy, c); return; }
+  /* Drawing huge moons or actors half out of frame should never pay for the
+     hidden scanlines or their integer square roots. This is pixel-identical
+     to the original inclusive ellipse loop on all visible rows. */
+  if(cx + rx < 0 || cx - rx >= 256 || cy + ry < 0 || cy - ry >= 192) return;
+  int j0 = -ry, j1 = ry;
+  if(j0 < -cy) j0 = -cy;
+  if(j1 > 191 - cy) j1 = 191 - cy;
   int D = ry * ry + ry;
   int den = 8 * ry;
-  for(int j = -ry; j <= ry; j++){
+  for(int j = j0; j <= j1; j++){
     int e = (int)(((unsigned)rx * isq((unsigned)(D - j * j) * 64u)) / (unsigned)den);
     if(e > rx) e = rx;
     hspan(b, cx - e, cx + e, cy + j, c);
@@ -75,7 +82,10 @@ void gfx_tri(u8 *b, int x0, int y0, int x1, int y1, int x2, int y2, u8 c){
     gfx_rect(b, a, y0, e - a + 1, 1, c);
     return;
   }
-  for(int y = y0; y <= y2; y++){
+  /* Skip triangle scanlines outside the framebuffer, preserving the exact
+     original vertex interpolation at every visible y. */
+  int ya = y0 < 0 ? 0 : y0, yb = y2 > 191 ? 191 : y2;
+  for(int y = ya; y <= yb; y++){
     int xa = x0 + (x2 - x0) * (y - y0) / (y2 - y0), xb;
     if(y < y1) xb = x0 + (x1 - x0) * (y - y0) / (y1 - y0);
     else xb = y2 == y1 ? x1 : x1 + (x2 - x1) * (y - y1) / (y2 - y1);
@@ -98,7 +108,19 @@ void gfx_tline(u8 *b, int x0, int y0, int x1, int y1, int th, u8 c){
 }
 
 void gfx_dither(u8 *b, int x, int y, int w, int h, u8 c){
-  for(int j = y; j < y + h; j++) for(int i = x + ((j ^ x) & 1); i < x + w; i += 2) gfx_px(b, i, j, c);
+  /* Preserve checkerboard phase relative to the original, possibly negative
+     origin. Clip first and use direct row writes: removes ~25,000 pixel
+     bounds checks from an ordinary full-screen dither on the DS. */
+  int y0 = y < 0 ? 0 : y, y1 = y + h, x1 = x + w;
+  if(y1 > 192) y1 = 192;
+  if(x1 > 256) x1 = 256;
+  if(y0 >= y1 || x1 <= 0) return;
+  for(int j = y0; j < y1; j++){
+    int i = x + ((j ^ x) & 1);
+    if(i < 0) i += 2 * ((1 - i) / 2);
+    u8 *row = b + j * 256;
+    for(; i < x1; i += 2) row[i] = c;
+  }
 }
 
 /* --------------------------------------------------------------------- font */
