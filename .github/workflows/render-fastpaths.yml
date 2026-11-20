@@ -1,0 +1,96 @@
+name: Cross-port render fast-path parity
+
+# These are host pixel/texture checks, NOT proof of console FPS. Compile
+# reference and fast paths from the same commit and require matching hashes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ds/source/**"
+      - "3ds/**"
+      - "dreamcast/**"
+      - "web/index.html"
+      - "test/n3ds_render.c"
+      - "test/dc_render.c"
+      - "core/**"
+      - ".github/workflows/render-fastpaths.yml"
+  workflow_dispatch:
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the browser game JavaScript parses
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html=Path('web/index.html').read_text()
+          a=html.rfind('<script>');b=html.rfind('</script>')
+          assert a>=0 and b>a, "Could not find game inline JavaScript"
+          Path('/tmp/mandex_game.js').write_text(html[a+len('<script>'):b])
+          PY
+          node --check /tmp/mandex_game.js
+
+      - name: Build baseline and cached DS two-screen aiming paths
+        run: |
+          for fast in 0 1; do
+            gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_AIM_CACHE=$fast \
+              -Itest/stubs -Icore -Iart -Ids/source \
+              test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+              core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_aim_$fast
+          done
+      - name: Verify DS reference/cached frame hashes across representative levels
+        run: |
+          for level in 0 9 29 39 59; do
+            DS_PERF_BENCH=1 /tmp/ds_aim_0 /tmp/ds_aim_ref 520 "$level" > /tmp/ds_aim_old.txt
+            DS_PERF_BENCH=1 /tmp/ds_aim_1 /tmp/ds_aim_fast 520 "$level" > /tmp/ds_aim_new.txt
+            grep '^DS_FRAME_HASH ' /tmp/ds_aim_old.txt > /tmp/aim_before_hash.txt
+            grep '^DS_FRAME_HASH ' /tmp/ds_aim_new.txt > /tmp/aim_after_hash.txt
+            test -s /tmp/aim_before_hash.txt
+            diff -u /tmp/aim_before_hash.txt /tmp/aim_after_hash.txt
+            echo "DS level $((level+1)) pixel hash identical"
+            grep '^DS_HOST_PROFILE ' /tmp/ds_aim_new.txt | head -n 1 || true
+          done
+
+      - name: Build 3DS reference and fast-path host probes
+        run: |
+          for f in gfx intro; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -D__3DS__ \
+              -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source \
+              -c ds/source/$f.c -o /tmp/n3d_$f.o
+          done
+          for fast in 0 1; do
+            gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ \
+              -DMX_N3DS_AIM_CACHE=$fast -DMX_N3DS_FAST_PALETTE=$fast \
+              -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source \
+              test/n3ds_render.c /tmp/n3d_gfx.o /tmp/n3d_intro.o \
+              core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c -lm -o /tmp/n3d_fast_$fast
+          done
+      - name: Compare 3DS stereo aiming and animated cutscene palette pixels
+        run: |
+          N3DS_FASTPATH_PROBE=1 /tmp/n3d_fast_0 > /tmp/n3d_reference.txt
+          N3DS_FASTPATH_PROBE=1 /tmp/n3d_fast_1 > /tmp/n3d_optimized.txt
+          cat /tmp/n3d_optimized.txt
+          diff -u /tmp/n3d_reference.txt /tmp/n3d_optimized.txt
+
+      - name: Build Dreamcast reference and palette-upload host probes
+        run: |
+          for f in gfx intro; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_SHARED_CUTSCENE \
+              -Dgfx_init=ds_gfx_init -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
+              -c ds/source/$f.c -o /tmp/dc_$f.o
+          done
+          for fast in 0 1; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation \
+              -DMX_DC_FAST_PALETTE=$fast -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
+              /tmp/dc_gfx.o /tmp/dc_intro.o core/mx.c core/mx_meta.c \
+              core/cloth.c core/mx_snd.c test/dc_render.c -lm -o /tmp/dc_fast_$fast
+          done
+      - name: Compare exact Dreamcast RGB565 upload bytes including palette changes
+        run: |
+          DC_FASTPATH_PROBE=1 /tmp/dc_fast_0 > /tmp/dc_reference.txt
+          DC_FASTPATH_PROBE=1 /tmp/dc_fast_1 > /tmp/dc_optimized.txt
+          cat /tmp/dc_optimized.txt
+          diff -u /tmp/dc_reference.txt /tmp/dc_optimized.txt
