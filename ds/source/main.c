@@ -451,6 +451,13 @@ static void draw_aim_dots(const View *v){
   }
 }
 
+#ifndef MX_DS_WALL_INLINED
+#define MX_DS_WALL_INLINED 1
+/* The hot DS camera zooms are 4px and 2px per cell. Write the exact opaque
+   wallpaper tile directly for entirely visible cells, avoiding hundreds of
+   calls to gfx_wall() and its repeated size/clipping dispatch every frame.
+   Damaged rooms and edges still obey the SAME world arrays and tile rules. */
+#endif
 #ifndef MX_DS_WALL_DIRECT_RUNS
 #define MX_DS_WALL_DIRECT_RUNS 0 /* A/B: longer spans are still slower on x86; not enabled by default */
 /* Long intact wallpaper spans: one clipped row-fill per tile row instead of
@@ -521,6 +528,46 @@ static void draw_rooms(const View *v){
       int dark_y=sy+(ppc==2?0:ppc-1);
       int dark_x=sx+(ppc==2?0:ppc-1);
       for(int k=0;k<n;k++)gfx_px(v->buf,dark_x+k*ppc,dark_y,(u8)(C_WALLD0+pal));
+    }
+  }
+#elif MX_DS_WALL_INLINED
+  if(ppc==4){
+    for(int y=y0;y<y1;y++){
+      int i=y*MX_COLS+x0,sy=y*4-v->cy,sx=x0*4-v->cx;
+      for(int x=x0;x<x1;x++,i++,sx+=4){
+        int p=world.paper[i];
+        if(!p||world.grid[i])continue;
+        if((unsigned)sx<=252u&&(unsigned)sy<=188u){
+          int pal=(p-1)&3;
+          u8 base=(u8)(C_WALL0+pal),accent=(u8)(C_WALLD0+pal);
+          u8 *d=v->buf+(size_t)sy*256+sx;
+          d[0]=base;d[1]=base;d[2]=base;d[3]=base;
+          d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=base;
+          d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=base;
+          d+=256;d[0]=base;d[1]=base;d[2]=base;d[3]=accent;
+        }else gfx_wall(v,p-1,sx,sy);
+      }
+    }
+  }else if(ppc==2){
+    for(int y=y0;y<y1;y++){
+      int i=y*MX_COLS+x0,sy=y*2-v->cy,sx=x0*2-v->cx;
+      for(int x=x0;x<x1;x++,i++,sx+=2){
+        int p=world.paper[i];
+        if(!p||world.grid[i])continue;
+        if((unsigned)sx<=254u&&(unsigned)sy<=190u){
+          int pal=(p-1)&3;
+          u8 base=(u8)(C_WALL0+pal);
+          u8 *d=v->buf+(size_t)sy*256+sx;
+          d[0]=(u8)(C_WALLD0+pal);d[1]=base;
+          d+=256;d[0]=base;d[1]=base;
+        }else gfx_wall(v,p-1,sx,sy);
+      }
+    }
+  }else{
+    for(int y=y0;y<y1;y++)for(int x=x0;x<x1;x++){
+      int i=y*MX_COLS+x;
+      if(world.paper[i]&&!world.grid[i])
+        gfx_wall(v,world.paper[i]-1,x*ppc-v->cx,y*ppc-v->cy);
     }
   }
 #else
