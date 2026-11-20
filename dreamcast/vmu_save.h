@@ -18,6 +18,13 @@ static int dc_saved_len;
 
 static void dc_save_load(void){
   uint8_t record[MX_JOURNAL_MAX];
+  /* Track the newest VALID record separately from the generation high-water
+     mark. An interrupted replacement of an older, corrupt slot must never
+     reuse its generation: a short write could otherwise accidentally repair
+     the old checksum and resurrect that stale slot on the next reboot. */
+  uint32_t valid_generation=0, seen_generation=0;
+  int any_seen=0;
+  dc_save_slot=-1; dc_save_generation=0;
   for(int i = 0; i < 2; i++){
     file_t fd=fs_open(dc_save_paths[i],O_RDONLY);
     if(fd == FILEHND_INVALID)continue;
@@ -25,16 +32,23 @@ static void dc_save_load(void){
     int got=sz >= MX_JOURNAL_MAX ? fs_read(fd,record,sizeof record) : 0;
     fs_close(fd);
     if(got != (int)sizeof record)continue;
+    if(record[0]=='M' && record[1]=='X' && record[2]=='J' && record[3]=='1'){
+      uint32_t g=mx_journal_get32(record+4);
+      if(!any_seen || mx_journal_newer(g,seen_generation)){
+        seen_generation=g; any_seen=1;
+      }
+    }
     MxStats trial; mx_meta_init(&trial);
     MxOptions opt; int outf=0; uint32_t generation=0;
     if(!mx_journal_unpack(&trial,&outf,&opt,&generation,record,sizeof record))
       continue;
-    if(dc_save_slot>=0 && !mx_journal_newer(generation,dc_save_generation))
+    if(dc_save_slot>=0 && !mx_journal_newer(generation,valid_generation))
       continue;
-    dc_save_generation=generation;dc_save_slot=i;dc_save_status=1;
+    valid_generation=generation;dc_save_slot=i;dc_save_status=1;
     stats=trial;outfit_sel=outf;nofight=opt.nofight;
   }
   if(dc_save_slot>=0){
+    dc_save_generation=any_seen ? seen_generation : valid_generation;
     MxOptions opt; mx_options_default(&opt);opt.nofight=(uint8_t)nofight;
     dc_saved_len=mx_meta_pack_opt(&stats,outfit_sel,&opt,
                                  dc_saved_payload,sizeof dc_saved_payload);
