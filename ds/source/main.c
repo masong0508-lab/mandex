@@ -43,6 +43,12 @@ static int wob_budget = DS_WOB_MAX;
 #ifndef MX_DS_BOTTOM30
 #define MX_DS_BOTTOM30 1
 #endif
+/* Over budget? Prefer 15 Hz redraw of the noninteractive *secondary* world
+   rather than starving the upper gameplay picture. Still use full-speed
+   touch/drag/active D-pad frames. Can A/B on emulator with =0. */
+#ifndef MX_DS_OVERLOAD_BOTTOM15
+#define MX_DS_OVERLOAD_BOTTOM15 1
+#endif
 
 static MxWorld world;                         /* ~320 KB, lives in main RAM */
 static u8 buf_top[256 * 192] __attribute__((aligned(4)));
@@ -1477,9 +1483,12 @@ int main(void){
       /* Previously the expensive second renderer ran at 60 Hz by default.
          Keep full-rate pointer/drag feedback, but share the CPU frame budget
          with physics when the lower screen is only an overview. */
-      int bottom_half_rate = MX_DS_BOTTOM30 && app==ST_PLAY &&
-          !dragging && !pad_used && !(held&KEY_TOUCH) && (frame&1);
-      bot_dirty=!(bottom_half_rate ||
+      int quiet_bottom=app==ST_PLAY && !dragging && !pad_used &&
+                        !(held&KEY_TOUCH);
+      int bottom_half_rate=MX_DS_BOTTOM30 && quiet_bottom && (frame&1);
+      int bottom_overload_rate=MX_DS_OVERLOAD_BOTTOM15 && lite &&
+                               quiet_bottom && (frame&3);
+      bot_dirty=!(bottom_half_rate || bottom_overload_rate ||
                   (lite && (frame&1) && app==ST_PLAY && !dragging));
       if(bot_dirty){       /* keep stylus aiming at 60Hz; throttle only noninteractive bottom redraws */
       if(world.man.mode == MAN_AIM && world.state == MX_PLAY){
