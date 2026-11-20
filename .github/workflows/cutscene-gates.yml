@@ -1,0 +1,44 @@
+name: Cutscene gates
+
+# Fast, independent sanity suite. The complete host sweep takes much longer;
+# this detects new broken browser scripts and console framebuffer changes quickly.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/index.html"
+      - "ds/source/**"
+      - "test/gfx_clip_test.c"
+      - "test/cutscene_guard_test.c"
+      - "test/run_tests.sh"
+      - ".github/workflows/cutscene-gates.yml"
+  workflow_dispatch:
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Browser cutscene JavaScript parses
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const page = fs.readFileSync('web/index.html','utf8');
+          const a = page.indexOf('<script>'), b = page.indexOf('</script>',a);
+          if (a < 0 || b < a) throw Error('Game script not found');
+          const source = page.slice(a + 8, b);
+          new Function(source);
+          for (const name of ['cgRearPanel','cgHotTake','cgMoonlitKiss','cutGraphicDirection']) {
+            if (!source.includes('function '+name+'(')) throw Error(name+' missing');
+          }
+          console.log('Browser cutscene JavaScript syntax: OK');
+          NODE
+      - name: Pixel-perfect console drawing regressions
+        run: |
+          gcc -std=gnu99 -O2 -DMX_FIXED -Itest/stubs -Icore -Ids/source -Iart test/gfx_clip_test.c ds/source/gfx.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_gfx_clip_test
+          /tmp/mandex_gfx_clip_test
+      - name: All shared story cutscenes and framebuffer canaries
+        run: |
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source test/cutscene_guard_test.c ds/source/gfx.c ds/source/intro.c -lm -o /tmp/mandex_cutscene_guard_test
+          /tmp/mandex_cutscene_guard_test
