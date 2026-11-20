@@ -708,29 +708,45 @@ static void draw_popups(const View *v, int sc){
   }
 }
 
+#ifdef MX_DS_PROFILE_HOST
+extern void ds_perf_layer(int stage);
+#define DS_LAYER(v,stage) do{if((v)->buf==buf_top)ds_perf_layer(stage);}while(0)
+#else
+#define DS_LAYER(v,stage) ((void)0)
+#endif
 static void draw_world(const View *v, int parallax){
+  DS_LAYER(v,0);
   gfx_bg(v, parallax);
+  DS_LAYER(v,1);
   gfx_ground(v);
   draw_street_dressing(v);
   draw_prong_post(v);
   draw_band(v, 0);
+  DS_LAYER(v,2);
   draw_rooms(v);
   draw_facades(v);
+  DS_LAYER(v,3);
   draw_voxels(v);
+  DS_LAYER(v,4);
   draw_roof_trim(v);
+  DS_LAYER(v,5);
   draw_chunks(v);
+  DS_LAYER(v,6);
   draw_targets(v);
   if(world.ntubes) draw_tubes(v);
   if(world.npads) draw_pads(v);
   draw_cases(v);
   if(opt.tool == MX_TOOL_VALVE) draw_valve(v);
+  DS_LAYER(v,7);
   { const MxMan *m = &world.man;                                   /* his shadow on the ground, smaller the higher he is */
     if(m->mode == MAN_AIM || m->mode == MAN_FLY){ int hgt = gfx_clamp((int)((RI(MX_ROWS) - m->y) >> 12), 0, 40), rw = (v->ppc * (5 * (80 - hgt))) / 80;
       gfx_dither(v->buf, vx(v, m->x) - rw, vy(v, RI(MX_ROWS)) + 1, rw * 2, v->ppc > 2 ? 2 : 1, C_BLACK); } }
   draw_man(v);
   draw_band(v, 1);
   draw_aim_dots(v);
+  DS_LAYER(v,8);
   draw_parts(v);
+  DS_LAYER(v,9);
 }
 
 /* ------------------------------------------------------------------- UI bits */

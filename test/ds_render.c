@@ -72,6 +72,21 @@ void cpuStartTiming(int t){(void)t;} u32 cpuEndTiming(void){ return g_ticks; }
 /* Actual host CPU microseconds, never DS clock cycles or hardware FPS.
    These functions instrument the shared game loop but are built out of ROMs. */
 static uint64_t ds_marks[7],ds_phase_sum[6],ds_phase_max[6];
+static uint64_t ds_perf_nsec(void);
+static uint64_t ds_layer_stamp,ds_layer_sum[9],ds_layer_max[9];
+static unsigned ds_layer_frames;
+static int ds_layer_prev=-1;
+void ds_perf_layer(int stage){
+  uint64_t now=ds_perf_nsec();
+  if(stage==0){ds_layer_prev=0;ds_layer_stamp=now;return;}
+  if(stage>0&&stage<=9&&ds_layer_prev==stage-1){
+    uint64_t dt=now-ds_layer_stamp;
+    ds_layer_sum[stage-1]+=dt;
+    if(dt>ds_layer_max[stage-1])ds_layer_max[stage-1]=dt;
+    if(stage==9)ds_layer_frames++;
+  }
+  ds_layer_stamp=now;ds_layer_prev=stage;
+}
 static unsigned ds_phase_frames;
 static uint64_t ds_perf_nsec(void){
   struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);
@@ -100,6 +115,17 @@ static void ds_perf_report(void){
   for(int k=0;k<6;k++)printf("DS_PHASE phase=%s mean_us=%.1f peak_us=%.1f share_pct=%.1f\n",
        labels[k],(double)ds_phase_sum[k]/ds_phase_frames/1000.0,
        (double)ds_phase_max[k]/1000.0,total?100.*(double)ds_phase_sum[k]/total:0.);
+  if(ds_layer_frames){
+    static const char*const layers[9]={
+      "background","ground_props","wallpaper_facades","masonry_voxels",
+      "roof_trim","rubble_chunks","targets_props","man_and_aim","particles"};
+    uint64_t total_layers=0;for(int k=0;k<9;k++)total_layers+=ds_layer_sum[k];
+    for(int k=0;k<9;k++)
+      printf("DS_TOP_LAYER name=%s mean_us=%.2f max_us=%.2f share_pct=%.1f\n",
+         layers[k],(double)ds_layer_sum[k]/ds_layer_frames/1000.,
+         (double)ds_layer_max[k]/1000.,
+         total_layers?100.*(double)ds_layer_sum[k]/total_layers:0.);
+  }
   puts("DS_HOST_PROFILE measured_on=linux_x86_64 NOT_DS_HARDWARE_FPS");
 }
 #endif

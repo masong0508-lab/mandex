@@ -39,7 +39,7 @@ jobs:
           for L in 0 9 21 29 39 40 50 59; do
             DS_PERF_BENCH=1 /tmp/ds_fps_before /tmp/mandex-before 520 "$L" > "out/ds-fps-phases/baseline-level-$L.txt"
             DS_PERF_BENCH=1 /tmp/ds_fps_bench /tmp/mandex-fps 520 "$L" > "out/ds-fps-phases/level-$L.txt"
-            grep -E '^(DS_HOST_PROFILE|DS_PHASE)' "out/ds-fps-phases/level-$L.txt"
+            grep -E '^(DS_HOST_PROFILE|DS_PHASE|DS_TOP_LAYER)' "out/ds-fps-phases/level-$L.txt"
           done
       - name: Compare actual host CPU frame costs (same job, both variants)
         run: |
