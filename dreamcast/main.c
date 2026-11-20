@@ -207,11 +207,27 @@ static void text(const char *s, float x, float y, float size, uint32 col, int al
 enum { PK_BIT, PK_STINK, PK_FLY, PK_ZZZ, PK_SWEAT, PK_HEART, PK_GLINT };
 typedef struct { float x, y, vx, vy, life, max; uint32 c; int kind; } Part;
 static Part parts[256];
+#ifndef MX_DC_PARTICLE_HINT
+#define MX_DC_PARTICLE_HINT 1
+#endif
+#if MX_DC_PARTICLE_HINT
+/* The first vacant slot. Updated on expiry so rendered particle order is
+   unchanged, but an explosion no longer rescans the 256-slot pool for
+   each flying spark or collapse chip. */
+static int part_free_hint;
+#endif
 static float frand(void){ return (float)rand() / (float)RAND_MAX; }
 static void spawn_k(int kind, float x, float y, float vx, float vy, float life, uint32 c){      /* x,y in cells, vx,vy in px/s */
+#if MX_DC_PARTICLE_HINT
+  for(int i = part_free_hint; i < 256; i++) if(parts[i].life <= 0){
+    parts[i].x = XB(x); parts[i].y = YB(y); parts[i].vx = vx; parts[i].vy = vy; parts[i].life = parts[i].max = life; parts[i].c = c; parts[i].kind = kind;
+    part_free_hint = i + 1; return;
+  }
+#else
   for(int i = 0; i < 256; i++) if(parts[i].life <= 0){
     parts[i].x = XB(x); parts[i].y = YB(y); parts[i].vx = vx; parts[i].vy = vy; parts[i].life = parts[i].max = life; parts[i].c = c; parts[i].kind = kind; return;
   }
+#endif
 }
 static void spawn(float x, float y, uint32 c, float spd){
   spawn_k(PK_BIT, x, y, (frand() - 0.5f) * spd, -frand() * spd, 0.7f + frand() * 0.8f, c);
@@ -266,7 +282,11 @@ static void handle_events(void){
     case EV_BOOM:   for(int k = 0; k < 30; k++) spawn(e->x, e->y, k & 1 ? argb(255, 160, 40, 255) : argb(255, 220, 90, 255), 600); break;
     case EV_SPLAT:  for(int k = 0; k < 20; k++) spawn(e->x, e->y, argb(125, 255, 90, 255), 380); break;
     case EV_CRACK:  for(int k = 0; k < 3; k++) spawn(e->x, e->y, e->m == MX_GLASS ? argb(235, 250, 255, 255) : argb(200, 190, 170, 255), 120);
-                    break;                                          /* TODO: creak sound on the AICA */
+                    break;
+    case EV_THUD: if(e->a > R(0.6)) for(int k = 0; k < 4; k++)
+      spawn(e->x, e->y, argb(175, 165, 145, 235), 190); break;
+    case EV_CRUMBLE: for(int k = 0; k < 10; k++)
+      spawn(e->x, e->y, k & 1 ? argb(191, 181, 162, 240) : argb(140, 134, 127, 240), 280); break;
     case EV_BOUNCE: for(int k = 0; k < 10; k++) spawn(e->x, e->y, k & 1 ? argb(255, 126, 176, 255) : argb(255, 255, 255, 255), 420); break;
     case EV_TARGET: for(int k = 0; k < 14; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 360); break;
     case EV_AIR:     spawn_k(PK_SWEAT, MX_VALVE_X + (frand() - 0.5f) * 2, MX_VALVE_Y + 3, (frand() - 0.5f) * 40, -40 - frand() * 40, 0.5f, argb(220, 235, 255, 255)); break;
@@ -285,7 +305,7 @@ static void handle_events(void){
     case EV_HEAL:  for(int k = 0; k < 8; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 520); break;
     case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), 520); break;
     case EV_THROW: case EV_SWING: for(int k = 0; k < 4; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 160); break;
-    default: break;   /* TODO: AICA sound for EV_CRUNCH / EV_LAUNCH / EV_THUD / ... */
+    default: break;   /* AICA sounds are routed through mx_event_sfx above. */
     }
   }
 }
@@ -419,6 +439,9 @@ static void fx_step(int calm, int strain){
     case PK_SWEAT: p->vy += 700.0f * DT; if(p->y > 452) p->life = 0; break;
     default:       p->vy += 900.0f * DT; if(p->y > 452){ p->y = 452; p->vy *= -0.3f; p->vx *= 0.6f; }
     }
+#if MX_DC_PARTICLE_HINT
+    if(p->life <= 0 && i < part_free_hint) part_free_hint = i;
+#endif
   }
 }
 
