@@ -59,7 +59,7 @@ jobs:
         run: |
           for fast in 0 1; do
             gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST \
-              -DMX_DS_AIM_CACHE=$fast -DMX_DS_PARTICLE_HINT=$fast -DMX_DS_WALL_DIRECT_RUNS=$fast -DMX_DS_FACADE_CACHE=$fast \
+              -DMX_DS_AIM_CACHE=$fast -DMX_DS_PARTICLE_HINT=$fast -DMX_DS_WALL_DIRECT_RUNS=0 -DMX_DS_FACADE_CACHE=$fast -DMX_DS_WALL_INLINED=$fast \
               -Itest/stubs -Icore -Iart -Ids/source \
               test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
               core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fx_$fast
