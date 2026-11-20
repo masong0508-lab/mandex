@@ -1,4 +1,4 @@
-/* Contact sheets of the shared cutscenes:  ./intro_shot out.ppm  W S [T ...]   (W = 0 origin story / 1 wolfman, S = scene, T = ticks into the scene; several T make a row)
+/* Contact sheets of the shared cutscenes:  ./intro_shot out.ppm  W S [T ...]   (W = 0 origin story / 1 wolfman / 2 chapter 1 ending / 3 chapter 2 ending, S = scene, T = ticks into the scene; several T make a row)
    build: gcc -std=gnu99 -O1 -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -I../dreamcast/shim -Istubs -I../core -I../ds/source intro_shot.c dc_gfx.o dc_intro.o -lm -o intro_shot */
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,9 +10,9 @@ void ds_gfx_init(void);
 void sfx_play(int id, int pan){ (void)id; (void)pan; }
 static unsigned char top[256 * 192], bot[256 * 192];
 int main(int argc, char **argv){
-  if(argc < 5) return 1;
+  if(argc < 5 || argc > 9) return 1;  /* max five stills in the fixed preview buffer */
   int w = atoi(argv[2]), s = atoi(argv[3]), n = argc - 4;
-  ds_gfx_init(); if(w) intro_start_wolf(); else intro_start();
+  ds_gfx_init(); if(w == 1) intro_start_wolf(); else if(w == 2 || w == 3) intro_start_end(w - 1); else intro_start();
   static unsigned char img[256 * 5 * 192 * 2 * 3]; memset(img, 0, sizeof img);
   int tk = 0, in = -1, ti[16]; for(int i = 0; i < n; i++) ti[i] = atoi(argv[4 + i]);
   for(int f = 0; f < 20000; f++){
