@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
+#include <stdint.h>
 #include "nds.h"
 
 u16 BG_PALETTE[256], BG_PALETTE_SUB[256]; u8 BG_GFX[65536], BG_GFX_SUB[65536];
@@ -65,6 +67,42 @@ void cpuStartTiming(int t){(void)t;} u32 cpuEndTiming(void){ return g_ticks; }
 #define main ds_main
 #include "../ds/source/main.c"
 #undef main
+
+#ifdef MX_DS_PROFILE_HOST
+/* Actual host CPU microseconds, never DS clock cycles or hardware FPS.
+   These functions instrument the shared game loop but are built out of ROMs. */
+static uint64_t ds_marks[7],ds_phase_sum[6],ds_phase_max[6];
+static unsigned ds_phase_frames;
+static uint64_t ds_perf_nsec(void){
+  struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);
+  return (uint64_t)t.tv_sec*1000000000ull+t.tv_nsec;
+}
+void ds_perf_mark(int stage){
+  ds_marks[stage]=ds_perf_nsec();
+  if(stage==6&&app==ST_PLAY&&ds_marks[1]>=ds_marks[0]&&ds_marks[2]>=ds_marks[1]&&
+     ds_marks[3]>=ds_marks[2]&&ds_marks[4]>=ds_marks[3]&&
+     ds_marks[5]>=ds_marks[4]&&ds_marks[6]>=ds_marks[5]){
+    uint64_t spans[6]={
+      ds_marks[1]-ds_marks[0],ds_marks[2]-ds_marks[1],
+      ds_marks[3]-ds_marks[2],ds_marks[4]-ds_marks[3],
+      ds_marks[5]-ds_marks[4],ds_marks[6]-ds_marks[5]};
+    for(int k=0;k<6;k++){ds_phase_sum[k]+=spans[k];if(spans[k]>ds_phase_max[k])ds_phase_max[k]=spans[k];}
+    ds_phase_frames++;
+  }
+}
+static void ds_perf_report(void){
+  if(!ds_phase_frames){fputs("DS_HOST_PROFILE no play frames\n",stderr);exit(1);}
+  static const char*const labels[6]={"input","physics","events","top_draw","bottom_draw","vblank_dma"};
+  uint64_t total=0;for(int k=0;k<6;k++)total+=ds_phase_sum[k];
+  printf("DS_HOST_PROFILE level=%d name=%s samples=%u cpu_frame_mean_us=%.1f sim_updates=%u\n",
+         world.level+1,mx_level_name(world.level),ds_phase_frames,
+         (double)total/ds_phase_frames/1000.0,ds_phase_frames);
+  for(int k=0;k<6;k++)printf("DS_PHASE phase=%s mean_us=%.1f peak_us=%.1f share_pct=%.1f\n",
+       labels[k],(double)ds_phase_sum[k]/ds_phase_frames/1000.0,
+       (double)ds_phase_max[k]/1000.0,total?100.*(double)ds_phase_sum[k]/total:0.);
+  puts("DS_HOST_PROFILE measured_on=linux_x86_64 NOT_DS_HARDWARE_FPS");
+}
+#endif
 #include "intro.h"
 
 static void dump(const u8 *buf, const u16 *pal, const char *fn){
@@ -118,6 +156,18 @@ static void summary(void){
 void swiWaitForVBlank(void){
   vf++;
   g_keys = 0; /* default: nothing held; script sets below */
+#ifdef MX_DS_PROFILE_HOST
+  if(getenv("DS_PERF_BENCH")){
+    if(vf==1){intro_seen=1;wolf_seen=1;end_seen=6;}
+    for(int k=0;k<start_clicks;k++)if(vf==8+k*2)g_keys|=KEY_RIGHT;
+    if(vf==8+start_clicks*2+8)g_keys|=KEY_A;
+    if(vf==48+start_clicks*2&&app==ST_PLAY){
+      world.banner=0;mx_set_pull(&world,R(-9),R(5));mx_release(&world);
+    }
+    if(vf>=max_frames){ds_perf_report();exit(0);}
+    return;
+  }
+#endif
   int mode = world.man.mode;
   if(vf == 1 && !getenv("INTRO_TEST") && !getenv("INTRO_SKIP")) intro_seen = 1;
   if(vf == 1 && !getenv("END_TEST")) end_seen = 6;                  /* the other scripted runs press A on the title and expect level 1 at once */

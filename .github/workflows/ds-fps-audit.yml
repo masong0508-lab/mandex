@@ -1,0 +1,38 @@
+name: DS FPS bottleneck audit
+
+# Host traces measure CPU phase cost, not actual ARM9 timings.
+# For true hardware FPS/SPS use the ROM L overlay backed by ARM7 VBlank.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ds/**"
+      - "core/**"
+      - "test/ds_render.c"
+      - ".github/workflows/ds-fps-audit.yml"
+  workflow_dispatch:
+
+jobs:
+  ds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile real DS game loop with host-only phase taps
+        run: |
+          gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_bench
+          gcc -std=gnu99 -O2 -Icore test/fps_meter_test.c -o /tmp/ds_fps_meter_test
+          /tmp/ds_fps_meter_test
+      - name: Measure simulation, upper/lower rendering and presentation for eight levels
+        run: |
+          mkdir -p out/ds-fps-phases
+          for L in 0 9 21 29 39 40 50 59; do
+            DS_PERF_BENCH=1 /tmp/ds_fps_bench /tmp/mandex-fps 520 "$L" > "out/ds-fps-phases/level-$L.txt"
+            grep -E '^(DS_HOST_PROFILE|DS_PHASE)' "out/ds-fps-phases/level-$L.txt"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-ds-bottleneck-host-phase-times
+          path: out/ds-fps-phases/*.txt
+          retention-days: 7
+          if-no-files-found: error
