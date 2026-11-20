@@ -21,6 +21,13 @@ static void ref_hspan(u8 *b,int x0,int x1,int y,u8 c){
   if(x0<0)x0=0;if(x1>255)x1=255;
   if(x1>=x0)memset(&b[y*256+x0],c,(size_t)(x1-x0+1));
 }
+static void ref_rect(u8 *b,int x,int y,int w,int h,u8 c){
+  int x1=x+w,y1=y+h;
+  if(x<0)x=0;if(y<0)y=0;
+  if(x1>256)x1=256;if(y1>192)y1=192;
+  if(x1<=x||y1<=y)return;
+  for(int j=y;j<y1;j++)memset(&b[j*256+x],c,(size_t)(x1-x));
+}
 static void ref_ell(u8 *b,int cx,int cy,int rx,int ry,u8 c){
   if(rx<=0||ry<=0){if(rx>0||ry>0)gfx_px(b,cx,cy,c);return;}
   int D=ry*ry+ry,den=8*ry;
@@ -65,6 +72,14 @@ static int check(const char *name,int case_no){
 int main(void){
   for(int k=0;k<480;k++){
     int x=pick(-320,550),y=pick(-320,490);
+    int w=pick(-10,600),h=pick(-10,480);
+    if(k%7==0){x=0;y=pick(-30,100);w=256;h=pick(20,220);}
+    if(k%29==0){x=-22;y=-15;w=300;h=220;}
+    reset();ref_rect(want+32,x,y,w,h,40);gfx_rect(have+32,x,y,w,h,40);
+    if(check("rectangle",k))return 1;
+  }
+  for(int k=0;k<480;k++){
+    int x=pick(-320,550),y=pick(-320,490);
     int rx=pick(0,210),ry=pick(0,210);
     if((k&15)==0){x=pick(-5,260);y=pick(-5,200);rx=pick(50,180);ry=pick(50,170);}
     reset();ref_ell(want+32,x,y,rx,ry,77);gfx_ell(have+32,x,y,rx,ry,77);
@@ -86,6 +101,6 @@ int main(void){
     gfx_dither(have+32,x,y,w,h,121);
     if(check("dither",k))return 1;
   }
-  puts("ok: clipped ellipses, triangles and dither are pixel-identical on 1,440 random/offscreen cases");
+  puts("ok: clipped ellipses, triangles and dither are pixel-identical on 1,920 random/offscreen cases");
   return 0;
 }

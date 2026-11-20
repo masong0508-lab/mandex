@@ -30,6 +30,12 @@ void gfx_rect(u8 *b, int x, int y, int w, int h, u8 c){
   if(x1 > 256) x1 = 256;
   if(y1 > 192) y1 = 192;
   if(x1 <= x || y1 <= y) return;
+  /* The entire framebuffer and every full-width skyline/letterbox rectangle
+     can be filled in one contiguous memset, not one memset per scanline. */
+  if(x == 0 && x1 == 256){
+    memset(b + (size_t)y * 256, c, (size_t)(y1 - y) * 256);
+    return;
+  }
   for(int j = y; j < y1; j++) memset(&b[j * 256 + x], c, (size_t)(x1 - x));
 }
 
