@@ -74,7 +74,7 @@ jobs:
           python3 - <<'PY'
           import re,pathlib
           lines=['level framebuffer_equal old_us new_us cpu_reduction_pct old_man_layer_us new_man_layer_us']
-          p=r'DS_FRAME_HASH checksum=([0-9a-f]+) screen_samples=(\\d+)'
+          p=r'DS_FRAME_HASH checksum=([0-9a-f]+) screen_samples=(\d+)'
           for L in (0,9,21,29,39,40,50,59):
             old=pathlib.Path(f'out/ds-fps-phases/sprite-before-level-{L}.txt').read_text()
             new=pathlib.Path(f'out/ds-fps-phases/level-{L}.txt').read_text()
@@ -88,7 +88,7 @@ jobs:
             a1=metric(old,layer);b1=metric(new,layer)
             row=f'{L+1} YES {a0:.2f} {b0:.2f} {(a0-b0)/a0*100:.1f}% {a1:.2f} {b1:.2f}'
             print(row);lines.append(row)
-          pathlib.Path('out/ds-fps-phases/sprite-ab-summary.txt').write_text('\\n'.join(lines)+'\\n')
+          pathlib.Path('out/ds-fps-phases/sprite-ab-summary.txt').write_text('\n'.join(lines)+'\n')
           PY
       - name: Verify landlord visibility culling frame parity and host CPU speed
         run: |
