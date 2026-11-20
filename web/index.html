@@ -3387,7 +3387,7 @@ function cgLordBig(t,o){o=o||{};const kind=o.kind||'',game=!!o.game,mvg=game?(o.
 function cgLord(x,y,s,t,o){cgShadow(x,y+2,30*s/2.8,6,.4);ctx.save();ctx.translate(x,y);ctx.scale(-s*.6,s*.6);cgLordBig(t+o);ctx.restore()}
 function cgBrenda(x,y,t,flirt=false){ctx.save();ctx.translate(x,y);ctx.lineJoin='round';ctx.lineCap='round';
   if(flirt){ctx.translate(Math.sin(t*2.2)*1.7,0);ctx.rotate(Math.sin(t*1.8)*.032)}
-  const br=Math.sin(t*2.2)*.5,hs=Math.sin(t*1.3)*.9,bl=(t%3.3)>3.18||(flirt&&(t%3.4)>2.65&&(t%3.4)<2.95),wv=Math.sin(t*5);
+  const br=Math.sin(t*2.2)*.5,hs=Math.sin(t*1.3)*.9,bl=(t%3.3)>3.18,wink=flirt&&(t%3.4)>2.65&&(t%3.4)<2.95,wv=Math.sin(t*5);
   ctx.translate(0,br);
   // hair behind the head: a swinging bob
   cgP([-14,-6,-15,6,-9,12,9,12,15,6,14,-6,10,-17,-10,-17].map((v,i)=>i%2===0&&Math.abs(v)>8?v+hs*.7:v),'#d9a336',1.6);
@@ -3416,7 +3416,7 @@ function cgBrenda(x,y,t,flirt=false){ctx.save();ctx.translate(x,y);ctx.lineJoin=
   cgE(0,-4,10.2,11.2,cgLG(-10,0,10,0,[0,'#f8d2ae',1,'#e8b48a']),1.8);
   cgE(-6,0,2.6,1.7,'rgba(255,110,120,.35)');cgE(6,0,2.6,1.7,'rgba(255,110,120,.35)');
   // eyes: white, iris, lashes, lid on blink; brows arched, one higher
-  for(const q of[-1,1]){const ex=q*4.2,ey=-4;if(bl){ctx.strokeStyle=CO;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ex-2.6,ey+.6);ctx.quadraticCurveTo(ex,ey+2,ex+2.6,ey+.6);ctx.stroke()}
+  for(const q of[-1,1]){const ex=q*4.2,ey=-4;if(bl||(wink&&q<0)){ctx.strokeStyle=CO;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ex-2.6,ey+.6);ctx.quadraticCurveTo(ex,ey+2,ex+2.6,ey+.6);ctx.stroke()}
     else{cgE(ex,ey,2.7,2.9,'#fff',1.1);cgE(ex+q*.2+hs*.15,ey+.2,1.5,1.7,'#3a7ac0');cgE(ex+q*.2+hs*.15,ey+.2,.75,.85,'#111');cgE(ex-.4,ey-.6,.5,.5,'#fff');ctx.strokeStyle=CO;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(ex+q*2.5,ey-1.4);ctx.lineTo(ex+q*4,ey-2.6);ctx.stroke()}
     ctx.strokeStyle='#8a5a1e';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(ex-2.8,ey-4.2+(q>0?-1.2:0));ctx.quadraticCurveTo(ex,ey-6.4+(q>0?-1.2:0),ex+2.8,ey-4+(q>0?-1.2:0));ctx.stroke()}
   cgE(0,-1,.9,1.1,'#d99a78');
@@ -3704,7 +3704,10 @@ function cgHotTake(t,x=480,y=290){
   light.addColorStop(0,'rgba(255,96,150,.28)');
   light.addColorStop(.55,'rgba(255,120,120,.12)');
   light.addColorStop(1,'rgba(255,70,140,0)');
-  ctx.fillStyle=light;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=light;
+  // Limit the gradient fill to its real radius instead of full canvas fill.
+  const x0=Math.max(0,x-380),y0=Math.max(0,y-380);
+  ctx.fillRect(x0,y0,Math.max(0,Math.min(W,x+380)-x0),Math.max(0,Math.min(H,y+380)-y0));
   for(let i=0;i<10;i++){
     const ph=(t*.22+i/10)%1,yy=y+85-ph*300,xx=x+Math.sin(t*1.6+i*2.7)*(80+ph*250);
     ctx.save();ctx.translate(xx,yy);ctx.rotate(Math.sin(t+i)*.18);
@@ -3743,12 +3746,37 @@ function cgMoonlitKiss(t){
   ctx.globalAlpha=1;ctx.restore();
 }
 
+function cgNightTown(t){
+  // Shared visual vocabulary with the handheld cinematic skyline.
+  ctx.save();
+  for(let j=0;j<4;j++){
+    const bx=18+j*238-(t*5%45),height=114+(j*47)%92;
+    cgR(bx,395-height,190,height,'#14152d',2);
+    cgR(bx+5,395-height+5,178,height-8,'#252940',1);
+    cgLine(bx-10,395-height,bx+200,395-height,'#3b3552',4);
+    for(let i=0;i<6;i++){
+      const wx=bx+24+(i%3)*50,wy=395-height+24+Math.floor(i/3)*54;
+      cgR(wx,wy,24,27,'#111626',1.2);
+      cgR(wx+3,wy+3,18,21,(j+i+Math.floor(t/8))%5?'#bda065':'#394762',1);
+      cgLine(wx+12,wy,wx+12,wy+27,'#141728',2);
+    }
+  }
+  for(const lx of [155,790]){
+    cgLine(lx,395,lx,225,'#626678',5);
+    cgLine(lx-42,225,lx+3,225,'#626678',5);
+    cgE(lx-40,238,20,8,'rgba(255,213,106,.45)');
+    cgE(lx-40,232,14,7,'#fce39b');
+    for(let q=0;q<3;q++)cgLine(lx-48-q*13,396-q*2,lx-12-q*17,396-q*2,'rgba(255,219,139,.15)',2);
+  }
+  ctx.restore();
+}
+
 const CUT3=[
  // 1. the walk: the moon is doing something unreasonable
  {shirt:2,lines:["One week after Landlord HQ. Mandex took the night off.","Gerald took a walk. In a shirt. Brenda would have wept.","Above him, the moon was doing something unreasonable."],hl:2,cuts:[0,2.8],tr:'fade',hold:3.6,shake:[0,3],draw(t){const k=cgK(this.cuts,t);
    cgSky('#0a0d24','#2a3060',395);for(let i=0;i<46;i++)cgE(cgRnd(i)*W,cgRnd(i+50)*320,1+cgRnd(i+9)*1.3*(.6+.4*Math.sin(t*3+i)),1.4,'#fff');
    const mr=k===0?58+t*8:120+(t-2.8)*14;cgMoon(k===0?760:500,k===0?140:170,mr,t);
-   cgHills(395,'#14183a','#10132e','#0c0e24');
+   cgHills(395,'#14183a','#10132e','#0c0e24');cgNightTown(t);
    if(k===0){ctx.fillStyle='#1a1d33';ctx.fillRect(0,395,W,H-395);cgGrass(395,145,'#1d3a2c','#0f2218');
      const wx=-80+t*150;cgShadow(wx,396,50,7,.4);cutGerald(wx,395,1.7,{walk:t*9,dy:-Math.abs(Math.sin(t*9))*4,face:'cool',pose:'up'});
      if(t>1.9)cutBubble(Math.min(wx+170,820),230,"Nice night.",0)}
@@ -3813,6 +3841,7 @@ const CUT3=[
      for(let i=0;i<6;i++){const ph=(t*.5+i*.17)%1;cgSpark(430+Math.sin(i*2+t*3)*70+i*14,330-ph*230,8+i%3*3,'#ff6fa8')}
      cgHotTake(u,480,290);
      cutBubble(300,120,"That tail's trouble.",1);if(u>1.5)cutBubble(800,150,"Want to find out?",0);
+     if(u>1.8)cutFlag(19,()=>SFX.thud(.35));
      if(u>2.05){ctx.save();ctx.translate(480,450);ctx.rotate(-.045);
        ctx.fillStyle='rgba(45,8,32,.86)';ctx.fillRect(-224,-22,448,44);
        txt('TOO HOT FOR THE CAMERA',0,8,24,'#ffe0a8','center','#3d1026');

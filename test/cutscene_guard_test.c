@@ -7,11 +7,12 @@
 #include "nds.h"
 #include "../ds/source/intro.h"
 #include "../ds/source/gfx.h"
+#include "../ds/source/sfx.h"
 #define LEN (256*192)
 #define PAD 64
 static unsigned char top[LEN+2*PAD],bot[LEN+2*PAD];
-static int played;
-void sfx_play(int id,int pan){(void)id;(void)pan;played++;}
+static int played,by_id[SFX_COUNT];
+void sfx_play(int id,int pan){(void)pan;played++;if(id>=0&&id<SFX_COUNT)by_id[id]++;}
 static int protected_buffers(void){
   for(int i=0;i<PAD;i++){
     if(top[i]!=0xa5||top[PAD+LEN+i]!=0x5a)return 0;
@@ -66,7 +67,9 @@ int main(void){
     printf("ok: cutscene mode %d, %d scenes, %d frames, %d guarded render samples\n",
            mode,count,frames,samples);
   }
-  if(played<25){fprintf(stderr,"too few cinematic audio cues: %d\n",played);return 1;}
+  if(played<25||by_id[SFX_BOOM]<3||by_id[SFX_POP]<3){
+    fprintf(stderr,"too few cinematic audio cues total=%d boom=%d pop=%d\n",played,by_id[SFX_BOOM],by_id[SFX_POP]);return 1;
+  }
   puts("ok: all shared cutscenes preserve framebuffer guards and produce visible art");
   return 0;
 }
