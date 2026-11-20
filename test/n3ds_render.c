@@ -92,7 +92,47 @@ bool aptMainLoop(void){
   return true;
 }
 
+/* Frame/palette checksum used by CI to prove both optimized 3DS paths
+   produce the exact same pixels as the compile-time reference variants. */
+static unsigned n3_hash(const u8 *p, size_t n){
+  unsigned h=2166136261u;
+  for(size_t i=0;i<n;i++){h^=p[i];h*=16777619u;}
+  return h;
+}
+static int n3_fastpath_probe(void){
+  static u8 indices[256*192];
+  gfx_init();
+  for(int i=0;i<256*192;i++)indices[i]=(u8)((i*29u+(i>>4)*7u)&255);
+  top.fb=fb_top[0];top.w=400;top.h=240;
+  bot.fb=fb_bot;bot.w=320;bot.h=240;
+  blit_pal(&top,indices);blit_pal(&bot,indices);
+  printf("N3_FAST_PALETTE top=%08x bottom=%08x\n",
+         n3_hash(fb_top[0],sizeof fb_top[0]),n3_hash(fb_bot,sizeof fb_bot));
+  /* Explicitly exercise an animated palette change, not only init colors. */
+  gfx_pal[29]^=0x1f;
+  blit_pal(&top,indices);
+  printf("N3_FAST_PALETTE_ANIM=%08x\n",n3_hash(fb_top[0],sizeof fb_top[0]));
+  load_level(0);
+  mx_set_pull(&world,R(-9),R(5));
+  dragging=1;
+  View vt={&top,3,20,28,0,0},vb={&bot,4,0,0,-24,0};
+  for(int f=0;f<3;f++){
+    frame=200+f;
+    if(f==2)mx_set_pull(&world,R(-7),R(6));
+    memset(fb_top,0,sizeof fb_top);
+    memset(fb_bot,0,sizeof fb_bot);
+    draw_aim(&vt);
+    /* Right-eye and lower-screen projections reuse world points. */
+    top.fb=fb_top[1];draw_aim(&vt);top.fb=fb_top[0];
+    draw_aim(&vb);
+    printf("N3_FAST_AIM frame=%d left=%08x right=%08x bottom=%08x\n",
+           f,n3_hash(fb_top[0],sizeof fb_top[0]),
+           n3_hash(fb_top[1],sizeof fb_top[1]),n3_hash(fb_bot,sizeof fb_bot));
+  }
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("N3DS_FASTPATH_PROBE"))return n3_fastpath_probe();
   if(argc > 1) OUT = argv[1];
   g_slider = argc > 2 ? (float)atof(argv[2]) : 0.f;
   n3ds_main();
