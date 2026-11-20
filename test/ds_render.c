@@ -508,7 +508,31 @@ void swiWaitForVBlank(void){
   if(vf > max_frames){ printf("max frames reached\n"); shot("final"); summary(); exit(0); }
 }
 
+/* Verify dynamic Landlord HQ districts ALSO invalidate the facade cache.
+   This is more stringent than the normal per-level sampled framebuffer test:
+   levels remain 39 while all rooms are replaced twice. */
+static int facade_district_probe(void){
+  gfx_init(); mx_meta_init(&stats); mx_options_default(&opt);
+  load_level(39);
+  for(int d=0;d<3;d++){
+    if(world.district!=d){fprintf(stderr,"District advance failed %d != %d\n",world.district,d);return 1;}
+    memset(buf_top,0,sizeof buf_top);
+    View v={buf_top,4,200,18};
+    draw_rooms(&v);draw_facades(&v);
+    unsigned h=2166136261u;
+    for(size_t i=0;i<sizeof buf_top;i++)h=(h^buf_top[i])*16777619u;
+    printf("DS_FACADE_DISTRICT district=%d hash=%08x rooms=%d\n",d,h,world.nrooms);
+    if(d<2){
+      for(int k=0;k<world.ntargets;k++)world.targets[k].alive=0;
+      world.winT=RI(2);
+      mx_update(&world,DT);
+      on_events(); /* EV_DISTRICT must rebuild the facade descriptors */
+    }
+  }
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("DS_FACADE_DISTRICT_PROBE"))return facade_district_probe();
   if(argc > 1) OUT = argv[1];
   if(argc > 2) max_frames = atoi(argv[2]);
   if(argc > 3) start_clicks = atoi(argv[3]);
