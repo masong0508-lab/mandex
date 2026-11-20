@@ -71,3 +71,41 @@ jobs:
             diff -u /tmp/ds_fx_old.txt /tmp/ds_fx_new.txt
             echo "Level $((l+1)) DS particle and aim pixels identical"
           done
+      - name: Check 3DS circles, stereo aiming and particle slots against reference
+        run: |
+          for src in gfx intro; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -D__3DS__ \
+              -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source \
+              -c ds/source/$src.c -o /tmp/n3d_smoke_$src.o
+          done
+          for fast in 0 1; do
+            gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ \
+              -DMX_N3DS_AIM_CACHE=$fast -DMX_N3DS_FAST_PALETTE=$fast \
+              -DMX_N3DS_INT_CIRCLE=$fast -DMX_N3DS_PARTICLE_HINT=$fast \
+              -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source \
+              test/n3ds_render.c /tmp/n3d_smoke_gfx.o /tmp/n3d_smoke_intro.o \
+              core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c -lm -o /tmp/n3d_smoke_$fast
+          done
+          N3DS_FASTPATH_PROBE=1 /tmp/n3d_smoke_0 > /tmp/n3d_smoke_old.txt
+          N3DS_FASTPATH_PROBE=1 /tmp/n3d_smoke_1 > /tmp/n3d_smoke_new.txt
+          diff -u /tmp/n3d_smoke_old.txt /tmp/n3d_smoke_new.txt
+          cat /tmp/n3d_smoke_new.txt
+      - name: Check Dreamcast RGB565 palette bytes and identical particle slots
+        run: |
+          for src in gfx intro; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_SHARED_CUTSCENE \
+              -Dgfx_init=ds_gfx_init -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
+              -c ds/source/$src.c -o /tmp/dc_smoke_$src.o
+          done
+          for fast in 0 1; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation \
+              -DMX_DC_FAST_PALETTE=$fast -DMX_DC_PARTICLE_HINT=$fast \
+              -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
+              /tmp/dc_smoke_gfx.o /tmp/dc_smoke_intro.o \
+              core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c \
+              test/dc_render.c -lm -o /tmp/dc_smoke_$fast
+          done
+          DC_FASTPATH_PROBE=1 /tmp/dc_smoke_0 > /tmp/dc_smoke_old.txt
+          DC_FASTPATH_PROBE=1 /tmp/dc_smoke_1 > /tmp/dc_smoke_new.txt
+          diff -u /tmp/dc_smoke_old.txt /tmp/dc_smoke_new.txt
+          cat /tmp/dc_smoke_new.txt
