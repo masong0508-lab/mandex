@@ -3764,7 +3764,7 @@ const CUT=[
      cgFridge(t);cutGerald(400,520,3.4,Object.assign({},G,{face:'bliss'}));
      cgRearPanel(t,790,244,.62,false,'PANTS ON STRIKE');
    }
-   txt('DAY '+day,60,70,54,'#ffd23f','left','#4a2a00')}},
+   txt('DAY '+day,W-36,88,38,'#ffd23f','right','#4a2a00')}},
  // 5. landlords: wide / from behind Gerald / his face
  {lines:["Then the landlord. \"Rent's due, Gerald.\"","Then all of them. Every hike. Every \"no refunds.\" The fee for the pigeon.","Something in Gerald snapped. Also his waistband."],hl:2,cuts:[0,1.6,4.0],draw(t){const k=cgK(this.cuts,t);
    if(k===0){cgSunsetStreet(700,300);cutCloud(230+t*3,100,1,'#ffd2a6');cutCloud(640,70,.8,'#ffc79a');cgPole(300,395);cgDoor(60,395,t);cgNotice(135,262,t);cgHydrant(300,396);
@@ -4183,9 +4183,9 @@ function cutGraphicDirection(sc,t){
   ctx.fillStyle=accent;ctx.fillRect(18,26,3,25);
   ctx.fillStyle='#f7eede';ctx.textAlign='left';ctx.font='bold 13px sans-serif';
   ctx.fillText(info[0],29,43);
-  ctx.fillStyle='rgba(8,12,22,.72)';ctx.fillRect(W-133,26,115,25);
+  ctx.fillStyle='rgba(8,12,22,.72)';ctx.fillRect(W-260,26,115,25);
   ctx.fillStyle=accent;ctx.font='bold 11px monospace';
-  ctx.fillText('SHOT '+(shot+1)+' / '+cuts.length,W-121,43);
+  ctx.fillText('SHOT '+(shot+1)+' / '+cuts.length,W-248,43);
   const impact=(sc.shake||[])[shot]||0;
   if(shot>0&&impact>=6&&age<.12){
     ctx.fillStyle='rgba(255,236,194,'+(.13*(1-age/.12))+')';

@@ -34,6 +34,8 @@ for(let i=0;i<cases.length;i++){
     }
   }
 }
+assert(h.includes('ctx.fillRect(W-260,26,115,25);'),'shot counter must clear the SKIP control');
+assert(h.includes("txt('DAY '+day,W-36,88,38"),'day counter must clear the left scene heading');
 assert(h.includes('Costume follows physical body anchors'),'costume placement lost its body anchoring');
 assert(h.includes('short ballistic arc'),'transformation buttons lost physical trajectories');
 assert(h.includes('On wide shots, the feet share a real contact shadow'),'grounding was removed');
