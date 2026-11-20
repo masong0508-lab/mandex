@@ -1188,6 +1188,13 @@ int main(void){
 
   mx_meta_init(&stats); mx_options_default(&opt); save_load(); outfit_scan(1); apply_outfit(outfit_sel); outfit_swatches();   /* load before the first load_level(), as mx_meta_unpack asks */
   load_level(sel_level);
+#ifdef MX_FPS_DEMO_LEVEL
+  /* Test-only automatic scenario; normal release builds never define it. */
+  if(MX_FPS_DEMO_LEVEL>=0&&MX_FPS_DEMO_LEVEL<MX_NUM_LEVELS){
+    sel_level=MX_FPS_DEMO_LEVEL;load_level(sel_level);
+    app=ST_PLAY;intro_seen=wolf_seen=1;end_seen=6;debug_on=1;
+  }
+#endif
   STAGE(4, RGB15(31,31,0));                            /* yellow */
   int slow_frames = 0, fast_frames = 0, phys_ticks = 0, draw_ticks = 0, lite = 0;   /* draw_ticks: last frame's drawing time; lite: the touch screen redraws every other frame while the DS is overloaded */
 
@@ -1333,6 +1340,11 @@ int main(void){
 
     /* ---------------- simulation ---------------- */
     int sim_steps_done=0;
+#ifdef MX_FPS_DEMO_LEVEL
+    if(frame==180&&app==ST_PLAY&&world.man.mode==MAN_AIM){
+      world.banner=0;mx_set_pull(&world,R(-9),R(5));mx_release(&world);
+    }
+#endif
     if(app == ST_PLAY){
       /* idle gags: only while he waits in the sling and nobody is touching anything */
       if(world.man.mode == MAN_AIM && !dragging && !pad_used && world.banner <= 0 && world.state == MX_PLAY && !(down | held)){

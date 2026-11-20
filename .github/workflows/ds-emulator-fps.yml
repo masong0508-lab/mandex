@@ -1,0 +1,66 @@
+name: DS emulated FPS capture
+
+# DeSmuME emulation is not physical DS FPS. Capture VBlank-derived HUDs.
+on:
+  push:
+    branches: [main]
+    paths: ["ds/**", "core/**", ".github/workflows/ds-emulator-fps.yml"]
+  workflow_dispatch:
+
+jobs:
+  probe-roms:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build test-only auto-start diagnostic ROMs
+        run: |
+          export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
+          mkdir -p out
+          for V in "0:suburb" "39:landlord_hq" "59:alpha_landlord"; do
+            L=${V%%:*}; N=${V#*:}
+            sh tools/build_ds_bare.sh "out/$N.nds" -DMX_FPS_DEMO_LEVEL=$L -DMX_NOSOUND
+            python3 tools/ntr_patch.py "out/$N.nds" "out/$N.tmp.nds"
+            mv "out/$N.tmp.nds" "out/$N.nds"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-ds-fps-autoboot-roms
+          path: out/*.nds
+          retention-days: 7
+
+  emulator:
+    needs: probe-roms
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {name: mandex-ds-fps-autoboot-roms, path: out}
+      - name: Run DeSmuME and capture HUD FPS/SIM
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq desmume xvfb imagemagick x11-utils >/dev/null
+          mkdir -p captures
+          export LIBGL_ALWAYS_SOFTWARE=1
+          for N in suburb landlord_hq alpha_landlord; do
+            export ROM="$PWD/out/$N.nds" LEVEL="$N"
+            xvfb-run -a -s "-screen 0 1024x768x24" bash -c '
+              desmume-cli --disable-sound "$ROM" > "captures/$LEVEL.log" 2>&1 &
+              P=$!
+              sleep 6
+              import -window root "captures/$LEVEL-first.png" 2>/dev/null || true
+              sleep 9
+              import -window root "captures/$LEVEL-last.png" 2>/dev/null || true
+              kill $P 2>/dev/null || true
+            '
+          done
+          ls -lh captures/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mandex-ds-emulator-fps-screenshots
+          path: captures/*
+          retention-days: 7
+          if-no-files-found: ignore
