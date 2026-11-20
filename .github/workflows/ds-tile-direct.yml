@@ -1,0 +1,52 @@
+name: DS voxel tile direct-copy A-B
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ds/source/gfx.c"
+      - ".github/workflows/ds-tile-direct.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile identical DS hosts with legacy versus direct voxel copy
+        run: |
+          for MODE in 0 1; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST \
+              -DMX_DS_TILE_DIRECT=$MODE -Itest/stubs -Icore -Iart -Ids/source \
+              test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+              core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex-tile-$MODE
+          done
+      - name: Verify complete two-screen frame hashes for all 60 levels
+        run: |
+          mkdir -p /tmp/mandex-tile-reports
+          for LEVEL in $(seq 0 59); do
+            for MODE in 0 1; do
+              DS_PERF_BENCH=1 /tmp/mandex-tile-$MODE "/tmp/tile-$LEVEL-$MODE" 300 "$LEVEL" > "/tmp/mandex-tile-reports/$LEVEL-$MODE.txt"
+            done
+          done
+          python3 - <<'PY'
+          import pathlib,re,statistics
+          results=[]
+          for level in range(60):
+              a=pathlib.Path(f'/tmp/mandex-tile-reports/{level}-0.txt').read_text()
+              b=pathlib.Path(f'/tmp/mandex-tile-reports/{level}-1.txt').read_text()
+              pat=r'DS_FRAME_HASH checksum=([0-9a-f]+) screen_samples=(\d+)'
+              m=re.search(pat,a);n=re.search(pat,b)
+              assert m and n and m.groups()==n.groups(),f'PIXEL REGRESSION at level {level+1}'
+              def cost(s):return float(re.search(r'cpu_frame_mean_us=([0-9.]+)',s).group(1))
+              old,new=cost(a),cost(b)
+              results.append((level+1,old,new,(old-new)*100/old))
+          for level,old,new,gain in results:
+              if level in (1,10,22,30,40,41,51,60):
+                  print(f'level={level} pixels=EQUAL old_host_us={old:.1f} direct_host_us={new:.1f} change={gain:.1f}%')
+          print('all_level_hashes=PASS 60/60')
+          print(f'median_host_change={statistics.median(r[3] for r in results):.1f}%')
+          print(f'levels_faster={sum(r[3]>0 for r in results)}/60')
+          PY

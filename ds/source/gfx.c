@@ -448,15 +448,34 @@ static inline void opaque_row(u8 *d,const u8 *t,int n){
 #endif
   for(int i=0;i<n;i++)d[i]=t[i];
 }
+#ifndef MX_DS_TILE_DIRECT
+#define MX_DS_TILE_DIRECT 1
+/* Direct copies of native 4x4 and overview 2x2 material tiles. The edge
+   clipping path is untouched; A/B against the prior row helper with =0. */
+#endif
 void gfx_tile(const View *v, int mat, int dmg, int var, int px, int py){
-  int n = v->ppc;
-  if(px + n <= 0 || py + n <= 0 || px >= 256 || py >= 192) return;
-  const u8 *t = tiles[n - 2][mat][dmg][var & 1];
-  u8 *d = &v->buf[py * 256 + px];
-  if(px >= 0 && py >= 0 && px + n <= 256 && py + n <= 192){
+  int n=v->ppc;
+  if(px+n<=0 || py+n<=0 || px>=256 || py>=192)return;
+  const u8 *t=tiles[n-2][mat][dmg][var&1];
+  if(px>=0 && py>=0 && px+n<=256 && py+n<=192){
+    u8 *d=&v->buf[py*256+px];
+#if MX_DS_TILE_DIRECT && MX_DS_FAST_TILES
+    if(n==4){
+      d[0]=t[0];d[1]=t[1];d[2]=t[2];d[3]=t[3];d+=256;t+=4;
+      d[0]=t[0];d[1]=t[1];d[2]=t[2];d[3]=t[3];d+=256;t+=4;
+      d[0]=t[0];d[1]=t[1];d[2]=t[2];d[3]=t[3];d+=256;t+=4;
+      d[0]=t[0];d[1]=t[1];d[2]=t[2];d[3]=t[3];
+      return;
+    }
+    if(n==2){
+      d[0]=t[0];d[1]=t[1];d+=256;t+=2;
+      d[0]=t[0];d[1]=t[1];
+      return;
+    }
+#endif
     for(int j=0;j<n;j++,d+=256,t+=n)opaque_row(d,t,n);
-  } else {
-    for(int j = 0; j < n; j++) for(int i = 0; i < n; i++) gfx_px(v->buf, px + i, py + j, t[j * n + i]);
+  }else{
+    for(int j=0;j<n;j++)for(int i=0;i<n;i++)gfx_px(v->buf,px+i,py+j,t[j*n+i]);
   }
 }
 
