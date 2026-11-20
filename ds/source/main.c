@@ -540,7 +540,7 @@ static void draw_chunks(const View *v){
 }
 
 #ifndef MX_DS_CULL_TARGETS
-#define MX_DS_CULL_TARGETS 1
+#define MX_DS_CULL_TARGETS 0 /* enabled only if proven fast on the target */
 #endif
 static void draw_targets(const View *v){
   const MxMan *m = &world.man;

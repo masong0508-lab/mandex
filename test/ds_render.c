@@ -139,6 +139,9 @@ static void ds_perf_report(void){
          (double)ds_layer_max[k]/1000.,
          total_layers?100.*(double)ds_layer_sum[k]/total_layers:0.);
   }
+#ifdef MX_HOST_PHYS_PROFILE
+  { extern void mx_profile_dump(void); mx_profile_dump(); }
+#endif
   puts("DS_HOST_PROFILE measured_on=linux_x86_64 NOT_DS_HARDWARE_FPS");
 }
 #endif

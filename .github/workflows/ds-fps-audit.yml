@@ -24,6 +24,7 @@ jobs:
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_bench
           gcc -std=gnu99 -O2 -Icore test/fps_meter_test.c -o /tmp/ds_fps_meter_test
           /tmp/ds_fps_meter_test
+          gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_HOST_PHYS_PROFILE -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_physics_detail
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_CULL_TARGETS=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_targets_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_WALL_RUNS=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_wall_before
           gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_FAST_RECT=0 -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_fps_rect_before
@@ -87,6 +88,13 @@ jobs:
             print(row);rows.append(row)
           pathlib.Path('out/ds-fps-phases/targets-ab-summary.txt').write_text('\n'.join(rows)+'\n')
           PY
+      - name: Dissect actual core physics update into seven hot phases
+        run: |
+          for L in 0 9 39 50 59; do
+            DS_PERF_BENCH=1 /tmp/ds_physics_detail /tmp/mandex-phys 520 "$L" > "out/ds-fps-phases/physics-level-$L.txt"
+            echo "Core physics phases level $((L+1))"
+            grep '^CORE_PHASE' "out/ds-fps-phases/physics-level-$L.txt"
+          done
       - name: Compare exact two-screen gameplay frames and wall batching CPU cost
         run: |
           python3 - <<'PY'

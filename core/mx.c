@@ -1,6 +1,43 @@
 #include "mx.h"
 #include <string.h>
 #include <math.h>
+#ifdef MX_HOST_PHYS_PROFILE
+/* Host-only cumulative inner-physics timings. Not linked into ANY ROM.
+   No allocations, and every section maintains its own sample denominator to
+   handle freeze/early return frames without skewing the result. */
+#include <time.h>
+#include <stdio.h>
+#include <stdint.h>
+static uint64_t mx_ptick_prev,mx_ph_sum[7],mx_ph_max[7];
+static unsigned mx_ph_count[7];
+static uint64_t mx_ph_now(void){
+  struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);
+  return (uint64_t)t.tv_sec*1000000000ull+(uint64_t)t.tv_nsec;
+}
+static void mx_ph_mark(int stage){
+  uint64_t now=mx_ph_now();
+  if(stage==0){mx_ptick_prev=now;return;}
+  if(stage<1||stage>7)return;
+  uint64_t d=now-mx_ptick_prev;
+  mx_ptick_prev=now;
+  mx_ph_sum[stage-1]+=d;
+  if(d>mx_ph_max[stage-1])mx_ph_max[stage-1]=d;
+  mx_ph_count[stage-1]++;
+}
+void mx_profile_dump(void){
+  static const char*const names[7]={
+    "man_explosion","support_scan","chunk_solver","wobble_lattice",
+    "sand_support","target_ai","pose_outcomes"};
+  for(int i=0;i<7;i++)if(mx_ph_count[i])
+    printf("CORE_PHASE name=%s samples=%u mean_us=%.3f peak_us=%.3f\n",
+           names[i],mx_ph_count[i],
+           (double)mx_ph_sum[i]/mx_ph_count[i]/1000.,
+           (double)mx_ph_max[i]/1000.);
+}
+#define MX_PH_MARK(i) mx_ph_mark(i)
+#else
+#define MX_PH_MARK(i) ((void)0)
+#endif
 
 #define IDX(x, y) ((y) * MX_COLS + (x))
 #define INB(x, y) ((x) >= 0 && (x) < MX_COLS && (y) >= 0 && (y) < MX_ROWS)
@@ -2049,6 +2086,7 @@ static void man_pose(MxMan *m, real dt){
 
 /* ============================================================== update */
 void mx_update(MxWorld *w, real dt){
+  MX_PH_MARK(0);
   w->nev = 0; w->crack_ev = 0; w->time += dt;
   if(w->support_cd > 0) w->support_cd--;
   if(w->freeze > 0){ w->freeze--; return; }
@@ -2111,7 +2149,9 @@ void mx_update(MxWorld *w, real dt){
 
   if(w->retry_cd > 0 && --w->retry_cd == 0) w->need_support = 1;
   process_expl(w);
+  MX_PH_MARK(1);
   if(w->need_support && w->support_cd <= 0){ support_pass(w); w->support_cd = MX_SUPPORT_INTERVAL; }
+  MX_PH_MARK(2);
   int ns = w->substeps < 2 ? 2 : w->substeps > 4 ? 4 : w->substeps;
   for(int i = 0; i < ns; i++){
 #ifdef MX_FIXED
@@ -2122,6 +2162,7 @@ void mx_update(MxWorld *w, real dt){
     step_chunks(w, sdt);
   }
   clean_chunks(w, dt);
+  MX_PH_MARK(3);
   if(w->wob_on){
     wob_list(w);
 #ifdef MX_STATS
@@ -2130,11 +2171,14 @@ void mx_update(MxWorld *w, real dt){
     for(int i = 0; i < MX_WOB_STEPS; i++) wobble_step(w, dt / MX_WOB_STEPS);
     wobble_check(w);
   }
+  MX_PH_MARK(4);
   w->sand_t++;
   if(w->sand_on && (w->sand_t % 3) == 0) sand_step(w);
   if(w->need_support && w->support_cd <= 0){ support_pass(w); w->support_cd = MX_SUPPORT_INTERVAL; }
+  MX_PH_MARK(5);
   upd_targets(w, dt);
   upd_cases(w, dt);
+  MX_PH_MARK(6);
   man_jiggle(w, dt);
   man_pose(m, dt);
 
@@ -2159,4 +2203,5 @@ void mx_update(MxWorld *w, real dt){
       }
     }
   }
+  MX_PH_MARK(7);
 }
