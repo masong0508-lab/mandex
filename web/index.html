@@ -536,11 +536,17 @@ const aliveTargets=()=>targets.reduce((n,t)=>n+(t.alive?1:0),0);
 // =====================================================================
 //  DESTRUCTION CORE
 // =====================================================================
-function chip(x,y,col,vx,vy){if(parts.length>1400)return;parts.push({k:0,x,y,vx,vy,l:1+rnd()*1.2,l0:2,c:col,s:2+rnd()*2})}
-function dust(x,y,n,sz){for(let i=0;i<n&&parts.length<1400;i++)parts.push({k:1,x:x+(rnd()-.5)*V,y:y+(rnd()-.5)*V,vx:(rnd()-.5)*60,vy:-rnd()*45-8,l:.7+rnd()*.8,l0:1.5,s:sz*(.6+rnd()*.8)})}
-function spark(x,y,n,sp){for(let i=0;i<n&&parts.length<1400;i++){const a=rnd()*6.28,s=rnd()*sp;parts.push({k:2,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,l:.25+rnd()*.35,l0:.5})}}
-function goo(x,y,n,sp){for(let i=0;i<n&&parts.length<1400;i++){const a=rnd()*6.28,s=rnd()*sp;parts.push({k:3,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-80,l:.8+rnd()*.6,l0:1.4,s:2+rnd()*3})}}
-function ring(x,y,r,col){parts.push({k:5,x,y,vx:0,vy:0,l:.45,l0:.45,s:r,c:col||'#fff'})}
+/* F4: eco effects keeps physics, destruction and audio unchanged while
+   reducing ONLY decorative particle overdraw.  Extra particle objects are
+   created transiently but not retained, so random-number consumption and
+   gameplay difficulty remain independent of this graphics-only setting. */
+let webEcoFX=false;
+function fxLimit(){return webEcoFX?360:1400}
+function chip(x,y,col,vx,vy){if(parts.length>fxLimit())return;P({k:0,x,y,vx,vy,l:1+rnd()*1.2,l0:2,c:col,s:2+rnd()*2})}
+function dust(x,y,n,sz){for(let i=0;i<n&&parts.length<fxLimit();i++)P({k:1,x:x+(rnd()-.5)*V,y:y+(rnd()-.5)*V,vx:(rnd()-.5)*60,vy:-rnd()*45-8,l:.7+rnd()*.8,l0:1.5,s:sz*(.6+rnd()*.8)})}
+function spark(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd()*6.28,s=rnd()*sp;P({k:2,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,l:.25+rnd()*.35,l0:.5})}}
+function goo(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd()*6.28,s=rnd()*sp;P({k:3,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-80,l:.8+rnd()*.6,l0:1.4,s:2+rnd()*3})}}
+function ring(x,y,r,col){P({k:5,x,y,vx:0,vy:0,l:.45,l0:.45,s:r,c:col||'#fff'})}
 function popText(x,y,s,c,size){texts.push({x,y,s,c:c||'#fff',t:0,l:1.3,z:size||22})}
 let paper=new Uint16Array(COLS*ROWS);   // wallpaper per cell (index into interiors + 1): knocked out around every lost voxel, so rooms are destructible
 function paperHit(x,y){for(let j=y-1;j<=y+1;j++)for(let i=x-1;i<=x+1;i++)if(inb(i,j))paper[idx(i,j)]=0}
@@ -604,8 +610,8 @@ function processExpl(){let n=0;
   while(explQ.length&&n++<80){const[x,y]=explQ.shift(),px=x*V+V/2,py=y*V+V/2;onBoom();
     blast(x,y,7,95);wobBlast(x,y,14,26);shockwave(px,py,7*V,5200);lordShock(px,py,14*V,.8);shake=Math.max(shake,9);slow=Math.max(slow,.35);freeze=Math.max(freeze,3);flash=.35;SFX.boom();
     ring(px,py,90,'#ffcf6b');
-    for(let k=0;k<30;k++)parts.push({k:2,x:px,y:py,vx:(rnd()-.5)*620,vy:-rnd()*520,l:.5+rnd()*.5,l0:1});
-    for(let k=0;k<8;k++)parts.push({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}}
+    for(let k=0;k<30;k++)P({k:2,x:px,y:py,vx:(rnd()-.5)*620,vy:-rnd()*520,l:.5+rnd()*.5,l0:1});
+    for(let k=0;k<8;k++)P({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}}
 
 // ---------- wobble lattice (mirrors core/mx.c): every voxel is a mass on springs to its 4 neighbours ----------
 // offsets ox/oy are in cells, velocities in cells/s.  Hits inject velocity that travels as a wave; a joint that
@@ -1134,7 +1140,7 @@ function killTarget(t,hard){if(!t.alive)return;
   const comboWords=['EVICTED!','DOUBLE TROUBLE!','THREESOME OF DOOM!','FOURCLOSED!','RENTAL ORGY!'];
   popText(t.x,t.y-52,comboWords[combo-1],combo>1?'#ff9ec8':'#ffd23f',combo>1?20:16);
   popText(t.x,t.y-14,'+'+(5000+bonus),'#ffd23f',24);
-  for(let i=0;i<14;i++)parts.push({k:4,x:t.x,y:t.y,vx:(rnd()-.5)*300,vy:-rnd()*300-60,l:1.6,l0:1.6,s:3+rnd()*3,r:rnd()*6});
+  for(let i=0;i<14;i++)P({k:4,x:t.x,y:t.y,vx:(rnd()-.5)*300,vy:-rnd()*300-60,l:1.6,l0:1.6,s:3+rnd()*3,r:rnd()*6});
   for(let i=0;i<10;i++)chip(t.x,t.y,['#4a5568','#f2c7a1','#111'][i%3],(rnd()-.5)*260,-rnd()*260);dust(t.x,t.y,4,9)}
 // ---------- landlords fight back ----------
 const BAT_BREAK=560,fightOn=()=>OPT().fight!==false&&state==='play';
@@ -1208,7 +1214,7 @@ function updCases(dt){for(let i=cases.length-1;i>=0;i--){const c=cases[i];c.vy+=
     const m=man;let dead=c.l<=0||c.y>GY-4||c.x<-20||c.x>WW+20;
     if(!dead&&solidAt(c.x,c.y)){dead=true;SFX.thud(.4)}
     if(!dead&&m&&(m.mode==='aim'||m.mode==='walk')&&Math.hypot(m.x-c.x,m.y-c.y)<(m.mode==='walk'?22:m.R+6)&&hurtMan(Math.sign(c.vx)||1))dead=true;
-    if(dead){for(let k=0;k<7;k++)parts.push({k:4,x:c.x,y:c.y,vx:(rnd()-.5)*160,vy:-rnd()*140,l:1.3,l0:1.3,s:2.5+rnd()*2,r:rnd()*6});cases.splice(i,1)}}}
+    if(dead){for(let k=0;k<7;k++)P({k:4,x:c.x,y:c.y,vx:(rnd()-.5)*160,vy:-rnd()*140,l:1.3,l0:1.3,s:2.5+rnd()*2,r:rnd()*6});cases.splice(i,1)}}}
 function updTargets(dt){
   for(const t of targets){if(!t.alive)continue;t.t+=dt;if(t.inv>0)t.inv-=dt;lordAI(t,dt);
     const gr=solidAt(t.x,t.y+t.r+1)||solidAt(t.x-4,t.y+t.r+1)||solidAt(t.x+4,t.y+t.r+1);
@@ -2530,7 +2536,7 @@ const MAN_FRAMES={
   NAV_A:_F(.36,[0,-44]),NAV_A2:_F(.36,[0,-44]),NAV_B:_F(.36,[0,-44]),NAV_C:_F(.36,[0,-44]),NAV_D:_F(.36,[0,-44]),NAV_E:_F(.36,[0,-44]),KISS_A:_F(.36,[0,-44]),KISS_A2:_F(.36,[0,-44]),KISS_B:_F(.36,[0,-44]),KISS_C:_F(.36,[0,-44]),
   SLEEP_A:_F(.36,[1.7,-40.9]),SLEEP_B:_F(.36,[2,-39.9]),SAD:_F(.36,[0,-39]),
   CAPE_A:_F(.36,[0,-44]),SPIN_0:_F(.36,[0,-44]),SPIN_1:_F(.36,[0,-44]),SPIN_2:_F(.36,[0,-44]),SPIN_3:_F(.36,[0,-44]),SPIN_4:_F(.36,[0,-44]),SPIN_5:_F(.36,[0,-44]),SPIN_6:_F(.36,[0,-44]),SPIN_7:_F(.36,[0,-44]),SPIN_8:_F(.36,[0,-44]),SPIN_9:_F(.36,[0,-44]),SPIN_10:_F(.36,[0,-44]),SPIN_11:_F(.36,[0,-44]),SPIN_12:_F(.36,[0,-44]),SPIN_R1:_F(.36,[0,-44]),SPIN_R2:_F(.36,[0,-44]),SPIN_R3:_F(.36,[0,-44]),SPIN_R4:_F(.36,[0,-44]),SPIN_R5:_F(.36,[0,-44]),SPIN_R6:_F(.36,[0,-44]),SPIN_R7:_F(.36,[0,-44]),SPIN_R8:_F(.36,[0,-44]),SPIN_R9:_F(.36,[0,-44]),SPIN_R10:_F(.36,[0,-44]),SPIN_R11:_F(.36,[0,-44]),SPIN_BL:_F(.36,[0,-44]),SPIN_BR:_F(.36,[0,-44]),OOPS_A:_F(.36,[0,-44]),OOPS_B:_F(.36,[0,-44]),OOPS_C:_F(.36,[0,-44]),OOPS_D:_F(.36,[0,-44]),OOPS_E:_F(.36,[0,-44]),OOPS_F:_F(.36,[0,-44]),OOPS_G:_F(.36,[0,-44]),OOPS_H:_F(.36,[0,-44]),BACK_C:_F(.36,null),BACK_L:_F(.36,null),BACK_R:_F(.36,null),FART_A:_F(.36,null),FART_B:_F(.36,null)};
-function P(o){if(parts.length<1400)parts.push(o)}
+function P(o){if(parts.length<fxLimit())parts.push(o)}
 function sweat(x,y){P({k:7,g:1,x:x+(rnd()-.5)*10,y:y+(rnd()-.5)*4,vx:(rnd()-.5)*6,vy:0,l:1.1,l0:1.1,s:1.6+rnd()*.9,c:'#bfe8ff'})}   // a bead forms on the skin, swells, then trickles down
 function updParts(dt){
   for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0){parts.splice(i,1);continue}
@@ -4315,6 +4321,7 @@ let frameMeterVisible=false,frameMeterClock=0,frameMeterDraws=0,frameMeterSims=0
 let frameMeterFps=0,frameMeterSps=0,frameMeterSpeed=0;
 addEventListener('keydown',e=>{
   if(e.code==='F3'&&!e.repeat){frameMeterVisible=!frameMeterVisible;e.preventDefault()}
+  if(e.code==='F4'&&!e.repeat){webEcoFX=!webEcoFX;e.preventDefault()}
 });
 function drawFrameMeter(){
   ctx.save();ctx.setTransform(1,0,0,1,0,0);
@@ -4322,7 +4329,7 @@ function drawFrameMeter(){
   ctx.font='bold 13px monospace';ctx.textAlign='left';ctx.fillStyle='#ffdc81';
   ctx.fillText('RENDER '+frameMeterFps+' FPS   SIM '+frameMeterSps+' SPS',16,27);
   ctx.fillStyle='#eee';
-  ctx.fillText('GAME TIME '+frameMeterSpeed+'% of real time  [F3]',16,46);
+  ctx.fillText('GAME TIME '+frameMeterSpeed+'%  FX '+(webEcoFX?'ECO':'FULL')+' [F4]',16,46);
   ctx.restore();
 }
 let last=performance.now(),frameDt=.016;
