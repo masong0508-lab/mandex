@@ -3077,6 +3077,7 @@ function pdSave(){pdDirty=false;try{localStorage.setItem(SAVE_KEY,JSON.stringify
 function pdTouch(){pdDirty=true}
 pdLoad();
 const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'valve'});
+webEcoFX=!!OPT().ecoFX;             // load saved touch-friendly effects preference
 muted=!!OPT().muted;
 const ST=()=>PD.st;
 const totalStars=()=>{let n=0;for(const k in PD.stars)if(+k>=0&&+k<CH1)n+=PD.stars[k]||0;return n};
@@ -4092,7 +4093,7 @@ function drawMenu(){
 let sliderDrag=false,sliX=0,sliW=1,armReset=0,armProg=0;
 function setVolFromX(x){const o=OPT();o.vol=clamp(Math.round((x-sliX)/sliW*20)/20,0,1);applyVol();pdTouch()}
 const GUIDES=['OFF','SHORT','FULL'],SHAKES=[['OFF',0],['LOW',.5],['FULL',1]];
-function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight'])delete o[k];o.tool='valve';muted=false;applyVol();pdTouch();pdSave()}
+function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX'])delete o[k];o.tool='valve';muted=false;webEcoFX=false;applyVol();pdTouch();pdSave()}
 function progReset(){PD.stars={};PD.best={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
 function drawOptions(){
   ctx.fillStyle='rgba(10,14,30,.62)';ctx.fillRect(0,0,W,H);
@@ -4121,7 +4122,8 @@ function drawOptions(){
   btn(rx,ry+8,bw2,rh-8,'-',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol();pdTouch();pdSave();SFX.boing()},{size:22});
   btn(rx+cw-bw2,ry+8,bw2,rh-8,'+',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol();pdTouch();pdSave();SFX.boing()},{size:22});
   ry+=rh+gap+4;
-  row(rx,ry,'SCREEN SHAKE',(SHAKES.find(a=>a[1]===(o.shake==null?1:o.shake))||SHAKES[2])[0],()=>{const i=SHAKES.findIndex(a=>a[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1];shake=Math.max(shake,8);pdTouch();pdSave();SFX.pop()},'#9fd8ff',(o.shake==null?1:o.shake)>0);ry+=rh+gap+10;
+  row(rx,ry,'SCREEN SHAKE',(SHAKES.find(a=>a[1]===(o.shake==null?1:o.shake))||SHAKES[2])[0],()=>{const i=SHAKES.findIndex(a=>a[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1];shake=Math.max(shake,8);pdTouch();pdSave();SFX.pop()},'#9fd8ff',(o.shake==null?1:o.shake)>0);ry+=rh+gap;
+  row(rx,ry,'DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX;pdTouch();pdSave();SFX.pop()},'#9fd8ff',!webEcoFX);ry+=rh+gap+10;
   head(rx,ry,'DATA');ry+=26;
   const a1=now<armReset,a2=now<armProg;
   btn(rx,ry,cw,rh-6,a1?'TAP AGAIN: RESET ALL OPTIONS':'RESET OPTIONS TO DEFAULT',()=>{if(a1){optsReset();armReset=0;toast('ach','Options reset','')}else{armReset=performance.now()+3000;armProg=0}},{size:15,on:a1,col:'#ffb03a'});ry+=rh-6+gap;
@@ -4321,7 +4323,7 @@ let frameMeterVisible=false,frameMeterClock=0,frameMeterDraws=0,frameMeterSims=0
 let frameMeterFps=0,frameMeterSps=0,frameMeterSpeed=0;
 addEventListener('keydown',e=>{
   if(e.code==='F3'&&!e.repeat){frameMeterVisible=!frameMeterVisible;e.preventDefault()}
-  if(e.code==='F4'&&!e.repeat){webEcoFX=!webEcoFX;e.preventDefault()}
+  if(e.code==='F4'&&!e.repeat){webEcoFX=!webEcoFX;OPT().ecoFX=webEcoFX;pdTouch();pdSave();e.preventDefault()}
 });
 function drawFrameMeter(){
   ctx.save();ctx.setTransform(1,0,0,1,0,0);
