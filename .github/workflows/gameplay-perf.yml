@@ -23,6 +23,8 @@ jobs:
         run: |
           gcc -std=gnu99 -O2 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float
           gcc -std=gnu99 -O2 -DMX_FIXED -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed
+          gcc -std=gnu99 -O2 -DMX_WOB_UNROLL_NB=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float_ref
+          gcc -std=gnu99 -O2 -DMX_FIXED -DMX_WOB_UNROLL_NB=0 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_fixed_ref
       - name: Measure every level with a deterministic 120-frame shot
         run: |
           mkdir -p out/gameplay-profiles
@@ -32,6 +34,25 @@ jobs:
           tail -n 1 out/gameplay-profiles/physics-float.txt
           printf '\nFixed mode:\n'
           tail -n 1 out/gameplay-profiles/physics-fixed.txt
+      - name: Compare exact fixed/float gameplay outcomes and CPU time across 60 levels
+        run: |
+          python3 - <<'PY'
+          import pathlib,re,subprocess
+          out=pathlib.Path('out/gameplay-profiles')
+          report=[]
+          for mode in ('fixed','float'):
+            for frames in (120,360):
+              a=subprocess.check_output([f'/tmp/mandex_physics_{mode}_ref','--quiet',str(frames)],text=True)
+              b=subprocess.check_output([f'/tmp/mandex_physics_{mode}','--quiet',str(frames)],text=True)
+              old=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',a)
+              new=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',b)
+              if not old or not new or old.group(2)!=new.group(2):
+                raise SystemExit(f'{mode}/{frames}: physics simulation diverged: {a} vs {b}')
+              op=float(old.group(1));np=float(new.group(1))
+              line=f'{mode} {frames} frames/level reference_ms={op:.1f} optimized_ms={np:.1f} gain_pct={100*(op-np)/op:.1f} checksum={new.group(2)}'
+              print(line);report.append(line)
+          (out/'wobble-reference-ab.txt').write_text('\n'.join(report)+'\n')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: mandex-gameplay-host-profiles

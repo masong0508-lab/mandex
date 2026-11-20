@@ -408,13 +408,27 @@ static MX_HOT void wobble_step(MxWorld *w, real dt){
     real lean = wob_lean[wob_cy[n]];
     real ax = 0, ay = 0, oxi = w->ox[i], oyi = w->oy[i];
     const real *Km = KK[m];
+#ifndef MX_WOB_UNROLL_NB
+#define MX_WOB_UNROLL_NB 1
+#endif
+#if MX_WOB_UNROLL_NB
+    /* Preserve the exact +x,-x,+y,-y force summation order, while avoiding
+       four loop trips / bit shifts / jump-table loads per active voxel.
+       No change to forces, substep counts or joint breaking thresholds. */
+#define MX_WOB_PULL(J) do{int j=(J);real K=Km[w->grid[j]];      ax+=rmul(K,rclamp(w->ox[j]-oxi,-RI(2),RI(2)));      ay+=rmul(K,rclamp(w->oy[j]-oyi,-RI(2),RI(2)));}while(0)
+    if(nb&1)MX_WOB_PULL(i+1);
+    if(nb&2)MX_WOB_PULL(i-1);
+    if(nb&4)MX_WOB_PULL(i+MX_COLS);
+    if(nb&8)MX_WOB_PULL(i-MX_COLS);
+#undef MX_WOB_PULL
+#else
     static const int JD[4] = { 1, -1, MX_COLS, -MX_COLS };
-    for(int d = 0; d < 4; d++){                         /* every neighbour pulls in both axes (shear carries the sway up) */
+    for(int d = 0; d < 4; d++){
       if(!(nb & (1 << d))) continue;
-      int j = i + JD[d];
-      real K = Km[w->grid[j]];
+      int j = i + JD[d]; real K = Km[w->grid[j]];
       ax += rmul(K, rclamp(w->ox[j] - oxi, -RI(2), RI(2))); ay += rmul(K, rclamp(w->oy[j] - oyi, -RI(2), RI(2)));
     }
+#endif
     real a = invd[m];
     real vx = w->ovx[i] + rmul(rmul(ax, a) + rmul(lean, oxi), dt);
     real vy = w->ovy[i] + rmul(rmul(ay, a) - rmul(HOMEK, oyi), dt);
