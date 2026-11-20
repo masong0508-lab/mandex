@@ -161,10 +161,39 @@ real ratan2(real y, real x){
 }
 
 /* ============================================================== events */
+/* Event-driven landlord reactions: work is paid ONLY when a structural hazard happens.
+   No per-frame target x event scan, allocation, or save-format change.  Set
+   MX_LORD_SHOCK_REACT=0 to compare old deterministic behavior in CI. */
+#ifndef MX_LORD_SHOCK_REACT
+#define MX_LORD_SHOCK_REACT 1
+#endif
 static void ev(MxWorld *w, int type, real x, real y, int m, real a, real b){
   if(w->nev >= MX_MAX_EVENTS) return;
   MxEvent *e = &w->ev[w->nev++];
   e->type = (uint8_t)type; e->m = (uint8_t)m; e->x = x; e->y = y; e->a = a; e->b = b;
+#if MX_LORD_SHOCK_REACT
+  /* A nearby explosion, snapping girder, or severe rubble impact spooks
+     the landlords.  Walkers, sprinters, shields and healers attempt to
+     retreat; stationary kinds flinch without changing their attack timers.
+     A simple rectangular proximity check avoids square roots or full-grid
+     collision searches on the ARM9. */
+  if(w->state == MX_PLAY && (type == EV_BOOM || type == EV_CRACK ||
+                             (type == EV_THUD && a >= R(0.5)))){
+    real reach = type == EV_BOOM ? RI(14) : type == EV_THUD ? RI(8) : RI(5);
+    for(int i = 0; i < w->ntargets; i++){
+      MxTarget *t = &w->targets[i];
+      if(!t->alive) continue;
+      real dx = t->x - x, dy = t->y - y;
+      if(rabs(dx) > reach || rabs(dy) > R(7)) continue;
+      if(t->pan < R(0.65)) t->pan = R(0.65);
+      if(t->dodge <= 0 && (t->kind == LK_WALKER || t->kind == LK_SPRINTER ||
+                           t->kind == LK_SHIELD || t->kind == LK_HEALER)){
+        t->dd = (int8_t)(dx >= 0 ? 1 : -1);
+        t->dodge = type == EV_BOOM ? R(0.8) : R(0.45);
+      }
+    }
+  }
+#endif
 }
 
 /* ===================================================== destruction core */
