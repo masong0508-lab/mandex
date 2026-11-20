@@ -515,6 +515,7 @@ function load(l,custom){
   tubes=[];pads=[];CL.build();paper.fill(0);interiors.forEach((r,n)=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(inb(x,y))paper[idx(x,y)]=n+1});unclipTargets();
   zonePaid=[];if(CL.slings){const zb=CL.zones||[];for(const t of targets){t.zone=0;for(let k=0;k<zb.length;k++)if(t.x>=zb[k]*V)t.zone=k+1}setSling(0)}else{SX=128;SY=GY-118;VX=36;VY=SY+58;slingK=0}
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
+  paperFrameInit=interiors.map(roomFrameSupport);paperDirty=false;
   man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};nextMan();
 }
 // ---- the wide finale: three slings along a 360-cell world.  Clear the landlords of the sling you are at and you are resupplied and moved to the next one.
@@ -549,9 +550,33 @@ function goo(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd(
 function ring(x,y,r,col){P({k:5,x,y,vx:0,vy:0,l:.45,l0:.45,s:r,c:col||'#fff'})}
 function popText(x,y,s,c,size){texts.push({x,y,s,c:c||'#fff',t:0,l:1.3,z:size||22})}
 let paper=new Uint16Array(COLS*ROWS);   // wallpaper per cell (index into interiors + 1): knocked out around every lost voxel, so rooms are destructible
+let paperFrameInit=[],paperDirty=false;
+function roomFrameSupport(r){
+  const x0=r.x,x1=r.x+r.w,y0=r.y,y1=r.y+r.h;let n=0;
+  for(let x=x0;x<x1;x++){
+    if(inb(x,y0-1)&&grid[idx(x,y0-1)])n++;
+    if(inb(x,y1)&&grid[idx(x,y1)])n++;
+  }
+  for(let y=y0;y<y1;y++){
+    if(inb(x0-1,y)&&grid[idx(x0-1,y)])n++;
+    if(inb(x1,y)&&grid[idx(x1,y)])n++;
+  }
+  return n;
+}
+function paperRoomUpdate(){
+  if(!paperDirty)return;paperDirty=false;
+  for(let n=0;n<interiors.length;n++){
+    const r=interiors[n],initial=paperFrameInit[n];
+    if(initial<6||roomFrameSupport(r)*5>initial*2)continue;
+    // A room has lost >=60% of its roof/floor/posts: no hanging back wall.
+    for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)
+      if(inb(x,y))paper[idx(x,y)]=0;
+    paperFrameInit[n]=0;
+  }
+}
 function paperHit(x,y){for(let j=y-1;j<=y+1;j++)for(let i=x-1;i<=x+1;i++)if(inb(i,j))paper[idx(i,j)]=0}
 function kill(x,y,bvx,bvy){
-  const i=idx(x,y),m=grid[i];if(!m)return 0;const h=hp[i];grid[i]=0;hp[i]=0;anch[i]=0;paperHit(x,y);needSupport=true;markDmg(x,y);if(chunks.length)wakeAt(x*V+V/2,y*V+V/2,V*3);score+=10;onCell();wobZero(i);clearLinks(i);sandOn=true;
+  const i=idx(x,y),m=grid[i];if(!m)return 0;const h=hp[i];grid[i]=0;hp[i]=0;anch[i]=0;paperHit(x,y);paperDirty=true;needSupport=true;markDmg(x,y);if(chunks.length)wakeAt(x*V+V/2,y*V+V/2,V*3);score+=10;onCell();wobZero(i);clearLinks(i);sandOn=true;
   const px=x*V+V/2,py=y*V+V/2,c=MAT[m].c;bvx=(bvx||0)*.25;bvy=(bvy||0)*.25;
   const nc=m===4?6:2;for(let k=0;k<nc;k++)chip(px,py,m===4&&k>1?'#ffffff':k%2?c:shade(c,-30),bvx+(rnd()-.5)*220,bvy-rnd()*200);
   if(rnd()<.55)dust(px,py,1,7);if(m===4)SFX.glass();if(m===5)explQ.push([x,y]);return h}
@@ -584,7 +609,9 @@ function aftershock(){
     sx+=x;sy+=y;n++}
   needSupport=true;
   if(n){shake=Math.max(shake,3);SFX.thud(.5);popText(sx/n*V+V/2,sy/n*V-30,'CRUMBLE!','#ffd23f',26)}}
-function damageCell(x,y,d){if(!inb(x,y))return 0;const i=idx(x,y);if(!grid[i])return 0;if(hp[i]<=d)return kill(x,y,0,0);hp[i]-=d;return d}
+function damageCell(x,y,d){if(!inb(x,y))return 0;const i=idx(x,y);
+  if(!grid[i]){if(paper[i]&&d>=4)paperHit(x,y);return 0}
+  if(hp[i]<=d)return kill(x,y,0,0);hp[i]-=d;return d}
 function blast(cx,cy,r,power){let spent=0;const R=Math.ceil(r);
   for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){const d=Math.hypot(i,j);if(d>r)continue;spent+=damageCell(cx+i,cy+j,power*(1-d/r)+(d<1?power*.25:0))}return spent}
 function applyImpulse(ch,px,py,jx,jy){ch.vx+=jx/ch.m;ch.vy+=jy/ch.m;ch.w+=((px-ch.x)*jy-(py-ch.y)*jx)/ch.I;ch.sleep=0}
@@ -682,7 +709,7 @@ function supportPass(){
       comp.push({x,y,m:grid[a],h:hp[a],px:(x+.5+ox[a])*V,py:(y+.5+oy[a])*V,vx:ovx[a]*V,vy:ovy[a]*V});   // leaves from where the wobble has it, with its velocity
       for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(!inb(nx,ny))continue;const j=idx(nx,ny);if(grid[j]&&grid[j]!==SAND&&hb[j]===255&&!vis[j]&&!((brk[a]>>d)&1)){vis[j]=1;st.push(j)}}}
     for(const c of comp){const k=idx(c.x,c.y);grid[k]=0;hp[k]=0;anch[k]=0;paperHit(c.x,c.y);wobZero(k);clearLinks(k)}
-    newChunk(comp);
+    paperDirty=true;newChunk(comp);
   }
 }
 function recompute(ch){let M=0,I=0;for(const a of ch.cells){const d=MAT[a.m].d;M+=d;I+=d*(a.lx*a.lx+a.ly*a.ly+V*V/6)}ch.m=Math.max(.2,M);ch.I=Math.max(1,I)}
@@ -934,6 +961,10 @@ function drawWalkHUD(){const m=man;if(state!=='play'||m.mode!=='walk')return;
 function manStep(dt){
   const m=man;m.vy+=G*dt*(m.pwr==='towel'&&m.gt<1.8&&!m.dive?.3:1)*(m.tubeT>0?.1:1);m.x+=m.vx*dt;m.y+=m.vy*dt;m.gt+=dt;if(m.hitCd>0)m.hitCd-=dt;
   if(tubes.length)tubeStep(m,dt);
+  // A flying character also hits the exposed room backdrop, without
+  // introducing new physics bodies, scenery particles or per-frame scans.
+  {const x=Math.floor(m.x/V),y=Math.floor(m.y/V);
+    if(inb(x,y)&&paper[idx(x,y)])paperHit(x,y)}
   if(m.y+m.R>=GY){m.y=GY-m.R;const s=Math.hypot(m.vx,m.vy);dust(m.x,GY-2,5,10);if(s>260)shake=Math.max(shake,4);
     if(s>420&&m.vy>120&&(m.bounces|0)<2){m.bounces=(m.bounces|0)+1;m.vy*=-.34;m.vx*=.72;SFX.thud&&SFX.thud(.5);dust(m.x,GY-2,8,14);ring(m.x,GY-4,30,'#d9c9a0');if(m.jg){m.jg.sq=1;m.jg.sa=Math.PI/2;m.jg.st=0}return}   // a hard landing skips once or twice before he sticks
     stick();return}
@@ -1273,6 +1304,7 @@ function update(dt){
   if(wobOn){const n=Math.max(1,Math.min(8,Math.ceil(dt*180-.05)));for(let i=0;i<n;i++)wobStep(dt/n)}
   sandT++;if(sandOn&&sandT%3===0)sandStep();
   if(needSupport)supportPass();
+  paperRoomUpdate();
   updTargets(dt);updCases(dt);
   updParts(dt);
   updTexts(dt);
