@@ -598,14 +598,32 @@ static void blit_frame_rot(u8 *b, const MsFrame *fr, int x, int y, int ppc, int 
   int rcx = (rdx * cs - rdy * sn) >> 12, rcy = (rdx * sn + rdy * cs) >> 12;
   int binv = 65536 / (br * br), rinv = 65536 / (rr * rr), b2 = br * br, r2 = rr * rr;
   int inv = 16384 / ppc;                                                             /* dest px -> source px: * 4 / ppc as a multiply (scaled 4096) */
-  for(int j = -rad; j <= rad; j++){
-    int py = y + j;
-    if((unsigned)py >= 192u) continue;
-    u8 *d = &b[py * 256];
-    for(int i = -rad; i <= rad; i++){
-      int px = x + i;
-      if((unsigned)px >= 256u) continue;
-      int dx = i, dy = j;
+  /* Clip the rotation's candidate square just ONCE instead of testing
+     the exact same screen bounds for tens of thousands of pixels. */
+#ifndef MX_DS_CLIP_ROT
+#define MX_DS_CLIP_ROT 1
+#endif
+#if MX_DS_CLIP_ROT
+  int row0=-rad,row1=rad,col0=-rad,col1=rad;
+  if(row0 < -y) row0=-y;
+  if(row1 > 191-y) row1=191-y;
+  if(col0 < -x) col0=-x;
+  if(col1 > 255-x) col1=255-x;
+#else
+  int row0=-rad,row1=rad,col0=-rad,col1=rad;
+#endif
+  for(int j=row0;j<=row1;j++){
+    int py=y+j;
+#if !MX_DS_CLIP_ROT
+    if((unsigned)py>=192u)continue;
+#endif
+    u8 *d=&b[py*256];
+    for(int i=col0;i<=col1;i++){
+      int px=x+i;
+#if !MX_DS_CLIP_ROT
+      if((unsigned)px>=256u)continue;
+#endif
+      int dx=i,dy=j;
       if(jl){
         int ex = dx - bcx, ey = dy - bcy, d2 = ex * ex + ey * ey;
         if(d2 < b2){ int wg = 256 - ((d2 * binv) >> 8); dx -= (jg->bx * wg) >> 8; dy -= (jg->by * wg) >> 8; }
