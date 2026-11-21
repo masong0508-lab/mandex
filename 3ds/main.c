@@ -468,6 +468,11 @@ static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
 #ifndef MX_N3DS_ROT_FAST_SAMPLE
 #define MX_N3DS_ROT_FAST_SAMPLE 1
 #endif
+/* Four covered samples need no background reads (source is fully opaque).
+   Preserve the original +2 rounding for byte-identical BGR8 colors. */
+#ifndef MX_N3DS_ROT_OPAQUE_SHORTCUT
+#define MX_N3DS_ROT_OPAQUE_SHORTCUT 1
+#endif
 #ifdef MX_N3DS_ROT_WORK_COUNT
 static unsigned man_rot_candidate_pixels,man_rot_sampled_pixels;
 #endif
@@ -548,9 +553,20 @@ static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, fl
       }
       if(!n)continue;
       u8 *dst=s->fb+(x*s->h+(s->h-1-y))*3;
-      dst[0]=(u8)((b+(4-n)*dst[0]+2)>>2);
-      dst[1]=(u8)((g+(4-n)*dst[1]+2)>>2);
-      dst[2]=(u8)((r+(4-n)*dst[2]+2)>>2);
+#if MX_N3DS_ROT_OPAQUE_SHORTCUT
+      if(n==4){
+        /* Interior of the silhouette: the original compositing weights
+           the background by ZERO; avoid reading it on slow BGR8 VRAM. */
+        dst[0]=(u8)((b+2)>>2);
+        dst[1]=(u8)((g+2)>>2);
+        dst[2]=(u8)((r+2)>>2);
+      }else
+#endif
+      {
+        dst[0]=(u8)((b+(4-n)*dst[0]+2)>>2);
+        dst[1]=(u8)((g+(4-n)*dst[1]+2)>>2);
+        dst[2]=(u8)((r+(4-n)*dst[2]+2)>>2);
+      }
     }
   }
 #else
