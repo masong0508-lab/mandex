@@ -22,6 +22,7 @@ on:
       - "test/bank_shot_test.c"
       - "test/landlord_shock_test.c"
       - "test/n3ds_render.c"
+      - "test/n3ds_walk.c"
       - "test/dc_render.c"
       - ".github/workflows/feature-smoke.yml"
   workflow_dispatch:
@@ -138,6 +139,21 @@ jobs:
           N3DS_FASTPATH_PROBE=1 /tmp/n3d_smoke_1 > /tmp/n3d_smoke_new.txt
           diff -u /tmp/n3d_smoke_old.txt /tmp/n3d_smoke_new.txt
           cat /tmp/n3d_smoke_new.txt
+      - name: Exercise real 3DS pad/touch pause, restart and music controls
+        run: |
+          set -eu
+          gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ \
+            -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source \
+            test/n3ds_walk.c /tmp/n3d_smoke_gfx.o /tmp/n3d_smoke_intro.o \
+            core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c -lm -o /tmp/n3d_input_smoke
+          /tmp/n3d_input_smoke > /tmp/n3d_input_smoke.log
+          grep -q '3DS SELECT restarts without accidentally toggling music' /tmp/n3d_input_smoke.log
+          grep -q 'pausing a 3DS pull safely resets aim without spending a life' /tmp/n3d_input_smoke.log
+          grep -q '3DS touch RESUME preserves the current level' /tmp/n3d_input_smoke.log
+          grep -q '3DS touch RESTART resets the world and resumes' /tmp/n3d_input_smoke.log
+          grep -q '3DS touch MENU safely exits to the title' /tmp/n3d_input_smoke.log
+          grep -q '3DS walking/pause/input test: all passed' /tmp/n3d_input_smoke.log
+          tail -n 15 /tmp/n3d_input_smoke.log
       - name: Check Dreamcast RGB565 palette bytes and identical particle slots
         run: |
           for src in gfx intro; do
