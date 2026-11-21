@@ -1166,6 +1166,8 @@ static int was_state;
 /* Real wall-clock frame completion, sampled after VBlank. */
 static MxFpsMeter n3_fps;
 static unsigned long long n3_prev_ms;
+/* CPU drawing duration for top stereo eyes + touch screen, excluding VBlank. */
+static unsigned n3_draw_ms_last,n3_draw_ms_peak,n3_draw_ms_window,n3_draw_frames;
 static void n3_frame_complete(int simulated){
   unsigned long long now=osGetTime();
   if(n3_prev_ms && now>=n3_prev_ms)
@@ -1346,6 +1348,7 @@ int main(void){
     }
 
     /* ---- draw ---- */
+    unsigned long long n3_draw_begin=osGetTime();
     bot.fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL); bot.w = 320; bot.h = 240;
     float sl = osGet3DSliderState();                   /* the 3D slider: 0 = flat, 1 = full depth */
     gfxSet3D(sl > 0.03f);
@@ -1389,8 +1392,10 @@ int main(void){
       snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d",
         (int)n3_fps.render_x10/10,(int)n3_fps.render_x10%10,
         (int)n3_fps.sim_x10/10,(int)n3_fps.sim_x10%10);
-      rect(&top,2,2,168,13,RGB(15,18,30));
+      rect(&top,2,2,168,26,RGB(15,18,30));
       text(&top,5,4,stats_line,1,RGB(255,220,120));
+      snprintf(stats_line,sizeof stats_line,"DRAW %uMS  PEAK %uMS",n3_draw_ms_last,n3_draw_ms_peak);
+      text(&top,5,16,stats_line,1,RGB(255,220,120));
     }
     }
     vb.cx = world.man.mode == MAN_WALK ? fminf(fmaxf(RTOF(world.man.x) - 40.0f, 0.0f), 40.0f) : -24.0f;        /* on foot the touch screen follows him, above the buttons */
@@ -1428,6 +1433,14 @@ int main(void){
       }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
     } else if(app == ST_TITLE) textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));
+    { unsigned long long end=osGetTime();
+      n3_draw_ms_last=end>=n3_draw_begin?(unsigned)(end-n3_draw_begin):0;
+      if(n3_draw_ms_last>n3_draw_ms_window)n3_draw_ms_window=n3_draw_ms_last;
+      if(++n3_draw_frames>=60){
+        n3_draw_ms_peak=n3_draw_ms_window;
+        n3_draw_ms_window=n3_draw_frames=0;
+      }
+    }
     gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();
     n3_frame_complete(app==ST_PLAY);
   }
