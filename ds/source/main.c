@@ -1355,6 +1355,25 @@ static void draw_hats(u8 *b, int x, int y){
 }
 static int demolished_pct(void){ return gfx_clamp(100 - mx_cells_left(&world) * 100 / (cells0 ? cells0 : 1), 0, 100); }
 
+/* One projected locator on the top camera, ONLY for the final landlord
+   when the actor has left the usable view. Top 64px contain objective/header
+   labels; bottom 12px are kept clear of camera and gameplay affordances. */
+static void draw_objective_edge(const View *v){
+  if(world.state!=MX_PLAY)return;
+  MxObjective obj=mx_objective_snapshot(&world);
+  if(obj.phase!=MX_OBJ_LAST||obj.target_index<0)return;
+  const MxTarget *t=&world.targets[obj.target_index];
+  real ox,oy;mx_target_offset(&world,t,&ox,&oy);
+  MxObjectiveEdge edge=mx_objective_edge(vx(v,t->x+ox),vy(v,t->y+oy),
+                                         256,192,64,12);
+  if(!edge.dir)return;
+  const char *label=edge.dir==MX_EDGE_LEFT?"< LAST":
+                    edge.dir==MX_EDGE_RIGHT?"LAST >":
+                    edge.dir==MX_EDGE_UP?"LAST UP":"LAST DN";
+  gfx_rect(v->buf,edge.x-21,edge.y-8,42,13,C_UIBG);
+  gfx_rect(v->buf,edge.x-21,edge.y-8,42,1,C_PINK);
+  gfx_text_c(v->buf,edge.x,edge.y-5,label,C_PINK,C_BLACK,1);
+}
 static void top_hud(u8 *b){
   const char *nm = mx_level_name(world.level);
   gfx_rect(b, 0, 0, 256, 11, C_UIBG); gfx_rect(b, 0, 11, 256, 1, C_UILINE);
@@ -2204,6 +2223,7 @@ int main(void){
       draw_world(&top, 1);
       draw_popups(&top, 2);
       top_hud(buf_top);
+      draw_objective_edge(&top);
       banner(buf_top);
       end_panel(buf_top);
       ds_draw_top_ticks=(int)cpuEndTiming();
