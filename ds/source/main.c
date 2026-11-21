@@ -871,8 +871,11 @@ static void draw_targets(const View *v){
     int scared=((m->mode==MAN_FLY||m->mode==MAN_STUCK)&&rabs(t->x-m->x)<RI(26))||t->pan>0;
     int st=(t->stun>0?1:0)|(t->wind>0?2:0)|(t->swing>0?4:0)|
            (t->mv==1?8:0)|(t->mv==2?16:0)|(t->armor?32:0);
-    if(t->kind||st)spr_landlord_k(v->buf,sx,sy,v->ppc,frame+i*11,scared,t->kind,t->face<0?-1:1,st);
-    else spr_landlord(v->buf,sx,sy,v->ppc,frame+i*11,scared);
+    /* The shared AI accumulates actual walking distance in t->wk.
+       Grounded gait freezes when motion stops or a route is blocked. */
+    int phase=t->mv?(int)(RTOF(t->wk)*14.0f):frame+i*11;
+    if(t->kind||st)spr_landlord_k(v->buf,sx,sy,v->ppc,phase,scared,t->kind,t->face<0?-1:1,st);
+    else spr_landlord(v->buf,sx,sy,v->ppc,phase,scared);
     if(t->hpmax>1)spr_hpbar(v->buf,sx,sy,v->ppc,t->hp,t->hpmax);
   }
 }

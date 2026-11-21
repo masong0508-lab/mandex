@@ -764,13 +764,17 @@ void spr_man_bust(u8 *b, int x, int y, int ppc){         /* head + shoulders onl
   blit_frame(b, &MS_FRAMES[MSF_IDLE_B], x, y, ppc, 1, 20, 0);
 }
 
-void spr_landlord(u8 *b, int x, int y, int ppc, int ph, int scared){
-  int bob = (ph >> 4) & 1 && ppc >= 4 ? 1 : 0;
+/* Original painter, with legs keyed to accumulated distance when moving:
+   no extra overlay rectangles and no dynamic sprite heap allocations. */
+static void spr_landlord_impl(u8 *b, int x, int y, int ppc, int ph, int scared, int moving){
+  int bob = !moving && ((ph >> 4) & 1) && ppc >= 4 ? 1 : 0;
+  int step = moving ? (((ph>>2)&1) ? SM(2) : -SM(2)) : 0;
+  int lift = moving ? ((ph>>3)&1) : 0;
   y += bob;
-  gfx_rect(b, x - S(8), y + S(10), SM(6), SM(7), C_SUIT2);                  /* legs */
-  gfx_rect(b, x + S(2), y + S(10), SM(6), SM(7), C_SUIT2);
-  gfx_rect(b, x - S(10), y + S(16), SM(9), SM(2), C_BLACK);                 /* shoes */
-  gfx_rect(b, x + S(1), y + S(16), SM(9), SM(2), C_BLACK);
+  gfx_rect(b, x - S(8) + step, y + S(10) - lift, SM(6), SM(7), C_SUIT2);
+  gfx_rect(b, x + S(2) - step, y + S(10) - (moving ? 1-lift : 0), SM(6), SM(7), C_SUIT2);
+  gfx_rect(b, x - S(10) + step, y + S(16) - lift, SM(9), SM(2), C_BLACK);
+  gfx_rect(b, x + S(1) - step, y + S(16) - (moving ? 1-lift : 0), SM(9), SM(2), C_BLACK);
   gfx_ell(b, x, y + S(3), S(14), S(12), C_SUIT2);                           /* plump suit */
   gfx_ell(b, x - S(1), y + S(2), S(12), S(11), C_SUIT);
   gfx_rect(b, x - S(3), y - S(8), SM(6), S(11), C_WHITE);                   /* shirt */
@@ -801,21 +805,16 @@ void spr_landlord(u8 *b, int x, int y, int ppc, int ph, int scared){
   gfx_rect(b, x - S(7), hy - S(23), SM(2), S(8), C_SUIT2);                   /* hat sheen */
 }
 
+void spr_landlord(u8 *b, int x, int y, int ppc, int ph, int scared){
+  spr_landlord_impl(b,x,y,ppc,ph,scared,0);
+}
+
 /* chapter 2 landlords: the plain landlord plus what makes his kind.  face = -1/1, st bits: 1 dazed, 2 winding up, 4 swinging, 8 strolling, 16 running.
    bat (kind 3): green hat band and a club;  thrower (2): blue band, the briefcase goes up over his head to throw;  walker (1): strolls with a clipboard. */
 void spr_landlord_k(u8 *b, int x, int y, int ppc, int ph, int scared, int kind, int face, int st){
-  /* A planted marching gait is more grounded than lifting the entire
-     landlord one pixel. The feet and case remain attached to the actor. */
-  spr_landlord(b, x, y, ppc, ph, scared);
-  if(st & 24){
-    int step=((ph>>2)&1)?SM(2):-SM(2);
-    int gy=y+S(16);
-    gfx_rect(b,x-S(9)+step,gy,SM(8),SM(3),C_BLACK);
-    gfx_rect(b,x+S(1)-step,gy,SM(8),SM(3),C_BLACK);
-    gfx_rect(b,x-S(8)+step,gy,SM(4),1,C_GRAY);
-    gfx_rect(b,x+S(2)-step,gy,SM(4),1,C_GRAY);
-  }
-  int by = y + ((ph >> 4) & 1 && ppc >= 4 ? 1 : 0), hy = by - S(16);
+  /* Walking feet replace the idle feet in the original sprite pass. */
+  spr_landlord_impl(b,x,y,ppc,ph,scared,(st&24)!=0);
+  int by = y + (!(st&24) && ((ph>>4)&1) && ppc>=4 ? 1 : 0), hy = by - S(16);
   if(kind >= 2) gfx_rect(b, x - S(8), hy - S(15), S(16), SM(5), kind == 3 ? C_GRASS : (kind == 5 || kind == 6) ? C_GOLD : kind == 4 ? C_UIHI : kind == 7 ? C_GRASS : C_UILINE);   /* hat band: bat green, thrower blue, sprinter/boss gold, shield grey, healer green */
   if(kind == 7){ gfx_rect(b, x - S(4), by - S(6), S(8), SM(8), C_WHITE); gfx_rect(b, x - 1, by - S(5), 2, SM(6), C_GRASS); gfx_rect(b, x - S(2), by - S(3), SM(4), 2, C_GRASS); }   /* healer: white coat, green cross */
   if(kind == 6) gfx_rect(b, x - 1, by - S(8), 2, SM(10), C_GOLD);                                           /* boss: gold tie */
@@ -831,6 +830,12 @@ void spr_landlord_k(u8 *b, int x, int y, int ppc, int ph, int scared, int kind, 
   } else if(kind == 1 || kind == 4 || kind == 5){                             /* walker, shield, sprinter: papers in his hand */
     int px = x + face * S(14); if(st & 4) px = x + face * S(24);
     gfx_rect(b, px - SM(3), by + S(4), SM(6), SM(8), C_WHITE); gfx_rect(b, px - SM(3), by + S(6), SM(6), 1, C_GRASS);
+  }
+  if((st & 2) && kind != 2 && kind != 6){
+    /* A brief warning belongs to the actual attack windup, not walking. */
+    gfx_rect(b,x-S(5),hy-S(31),S(10),SM(2),C_GOLD);
+    gfx_rect(b,x-S(5),hy-S(31),S(4),SM(2),C_RED);
+    gfx_text_c(b,x,hy-S(43),"!",C_GOLD,C_BLACK,1);
   }
   if(st & 1){                                                                 /* dazed: X eyes and stars going round */
     gfx_rect(b, x - S(5), hy - S(3), S(10), SM(3), C_SKIN);

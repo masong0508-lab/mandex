@@ -2977,11 +2977,17 @@ function renderMan(){
   else{ctx.rotate(m.ang);ctx.scale(.64,.64);JIG=jigOpts(j,.64,.64,m.ang);ragOpts(JIG,m);INF=bgrow(stom(m));drawSide(time,'scream');INF=0;JIG=null}
   ctx.restore()}
 const LORD_NEW=true;
+/* Offline-style caching: a single 56x56 halo replaces a radial gradient
+   allocation for every live landlord on every render tick. */
+const LORD_GLOW=mkCanvas(56,56);
+{const lx=LORD_GLOW.getContext('2d'),g=lx.createRadialGradient(28,28,2,28,28,26);
+ g.addColorStop(0,'rgba(255,255,255,.42)');g.addColorStop(1,'rgba(255,255,255,0)');
+ lx.fillStyle=g;lx.fillRect(0,0,56,56)}
 function drawLandlord(t){
-  const kind=t.kind||'',pan=t.pan>0,wind=t.wind>0,sw=t.swing>0,hop=pan?-Math.abs(Math.sin(t.t*18))*3:0,bob=pan?0:Math.sin(t.t*5)*.8,fc=t.face||1;
+  const kind=t.kind||'',pan=t.pan>0,wind=t.wind>0,sw=t.swing>0,hop=pan?-Math.abs(Math.sin(t.t*18))*3:0,bob=pan||t.mv?0:Math.sin(t.t*5)*.8,fc=t.face||1;
   const step=t.mv?Math.sin(t.wk*2.2)*(t.mv>1?3.4:2.4):0,lean=t.mv>1?.12*fc:0;
   ctx.save();ctx.translate(t.x,t.y+bob+hop);const SZ=kind==='boss'?1.38:1.14;ctx.scale(SZ*fc,SZ);if(lean)ctx.rotate(lean);
-  if(LORD_NEW){ctx.save();{const g=ctx.createRadialGradient(0,-4,2,0,-4,26);g.addColorStop(0,'rgba(255,255,255,.42)');g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.fillRect(-28,-32,56,56)}   // a soft light behind the dark suit so he reads against walls and hills
+  if(LORD_NEW){ctx.save();ctx.drawImage(LORD_GLOW,-28,-32);   // cached glow, no per-actor gradient allocation
   ctx.translate(0,15);ctx.scale(-.27,.27);LWM=2.8;try{cgLordBig(t.t||0,{game:1,kind,mv:t.mv,wk:t.wk,pan,wind,swing:sw?Math.max(t.swing,.001):0,stun:t.stun>0,blink:t.blink})}finally{LWM=1}ctx.restore()}
   else{
   // little shoes (they only show when he is on the move)

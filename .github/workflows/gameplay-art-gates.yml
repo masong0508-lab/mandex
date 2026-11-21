@@ -13,6 +13,8 @@ on:
       - "dreamcast/main.c"
       - "test/sprite_surface_test.py"
       - "test/room_facade_web_test.js"
+      - "test/landlord_motion_regression.c"
+      - "test/landlord_motion_regression.py"
       - ".github/workflows/gameplay-art-gates.yml"
   workflow_dispatch:
 jobs:
@@ -23,6 +25,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Sprite geometry, material shading, zero-heap and gait invariants
         run: python3 test/sprite_surface_test.py
+      - name: Landlord art animation and zero-frame-allocation invariants
+        run: |
+          python3 test/landlord_motion_regression.py
+          gcc -std=gnu99 -O2 -DMX_FIXED -Itest/stubs -Icore -Ids/source -Iart \
+            test/landlord_motion_regression.c ds/source/gfx.c \
+            core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/landlord_motion_regression
+          /tmp/landlord_motion_regression
       - name: Validate browser script
         run: |
           python3 - <<'PY'
@@ -43,6 +52,7 @@ jobs:
             test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
             core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_art_review
           DS_PERF_BENCH=1 DS_ART_REVIEW=1 /tmp/mandex_art_review out/art-review/gameplay 520 0 > out/art-review/host-report.txt
+          WALK_TEST=3 /tmp/mandex_art_review out/art-review/landlords 900 25 > out/art-review/landlords-report.txt
           find out/art-review -name '*.ppm' -print | head -24
           find out/art-review -name '*.ppm' -print0 | xargs -0 -r python3 tools/ppm_to_png.py
           test -n "$(find out/art-review -name '*.png' -print -quit)"
@@ -52,5 +62,6 @@ jobs:
           path: |
             out/art-review/*.png
             out/art-review/host-report.txt
+            out/art-review/landlords-report.txt
           retention-days: 7
           if-no-files-found: error

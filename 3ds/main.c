@@ -726,19 +726,39 @@ static void draw_landlords(const View *v){
     if(!t->alive) continue;
     real ox, oy; mx_target_offset(&world, t, &ox, &oy);
     int p = v->ppc, fc = t->face < 0 ? -1 : 1, stun = t->stun > 0, wind = t->wind > 0, swing = t->swing > 0;
-    int x = VX(v, RTOF(t->x + ox)), y = VY(v, RTOF(t->y + oy)) - (t->mv && ((frame >> 2) & 1) ? 1 : 0);
+    int x = VX(v, RTOF(t->x + ox)), y = VY(v, RTOF(t->y + oy));
+    /* Covers the extended club, health bar and hats in both stereo eyes. */
+    if(x < -p*12 || x >= v->s->w+p*12 || y < -p*10 || y >= v->s->h+p*7)continue;
     /* Each suited landlord has planted legs, a contact shadow and a short
        alternating stride while patrolling. No sprite buffers or textures. */
     const int walking=t->mv && !stun;
-    const int stride=walking?((frame>>2)&1 ? 1 : -1)*((p+1)/2):0;
+    const int gait=(int)(RTOF(t->wk)*14.0f);
+    const int stride=walking?((gait>>2)&1 ? 1 : -1)*((p+1)/2):0;
+    const int lift=walking ? ((gait>>3)&1):0;
     const int base=y+p*3/2;
     rect(v->s,x-p,base+1,p*2+2,2,RGB(40,64,30));
-    rect(v->s,x-p/2-1+stride,base-p/2,p/2+2,p,RGB(36,39,54));
-    rect(v->s,x+p/2-1-stride,base-p/2,p/2+2,p,RGB(29,31,45));
-    rect(v->s,x-p/2-2+stride,base+p/2,p/2+3,2,RGB(18,20,29));
-    rect(v->s,x+p/2-2-stride,base+p/2,p/2+3,2,RGB(18,20,29));
+    rect(v->s,x-p/2-1+stride,base-p/2-lift,p/2+2,p,RGB(36,39,54));
+    rect(v->s,x+p/2-1-stride,base-p/2-(walking?1-lift:0),p/2+2,p,RGB(29,31,45));
+    rect(v->s,x-p/2-2+stride,base+p/2-lift,p/2+3,2,RGB(18,20,29));
+    rect(v->s,x+p/2-2-stride,base+p/2-(walking?1-lift:0),p/2+3,2,RGB(18,20,29));
+    /* Two separate jacket sleeves, with the near elbow/hand connected
+       to the windup or strike. All geometry stays behind the suit. */
+    int reach=wind?-p*3:swing?-p/3:p;
+    int elbowx=x+fc*(p*3/2+1),elbowy=y+p/3;
+    int handx=x+fc*(wind?p*2:swing?p*4:p*2),handy=y+reach;
+    line(v->s,x-fc*p,y,x-fc*p*2,y+p,RGB(29,34,47));
+    line(v->s,x-fc*p*2,y+p,x-fc*p*2,y+p*2,RGB(76,88,107));
+    line(v->s,x+fc*p,y,elbowx,elbowy,RGB(25,30,43));
+    line(v->s,elbowx,elbowy,handx,handy,RGB(75,84,106));
+    rect(v->s,handx-1,handy-1,3,3,RGB(245,197,155));
     rect(v->s, x - p - 1, y - p / 2 - 1, p * 2 + 2, p * 2 + 2, RGB(14, 14, 22));   /* suit outline */
     rect(v->s, x - p, y - p / 2, p * 2, p * 2, t->kind == LK_BAT ? RGB(47, 93, 58) : t->kind == LK_THROWER ? RGB(58, 74, 122) : t->kind == LK_BOSS ? RGB(28, 28, 36) : t->kind == LK_SPRINTER ? RGB(122, 90, 28) : t->kind == LK_HEALER ? RGB(244, 244, 244) : t->kind == LK_SHIELD ? RGB(51, 65, 63) : RGB(60, 70, 90));   /* suit */
+    if(p>=3){
+      /* Tailored coat edges and pocket; no texture atlas allocations. */
+      rect(v->s,x-p,y-p/2+1,1,p+1,RGB(104,117,140));
+      rect(v->s,x+p-2,y+p/2,2,p/2,RGB(34,38,53));
+      rect(v->s,x-p+2,y+p/2,p/2,1,RGB(115,91,87));
+    }
     rect(v->s, x - p / 3, y - p / 2, p * 2 / 3 + 1, p, RGB(255, 255, 255)); rect(v->s, x - 1 + 0, y - p / 2, 1, p + 1, RGB(209, 43, 43));   /* shirt + tie */
     rect(v->s, x - p / 3 - 1, y - p / 2, 1, p, RGB(34, 40, 56)); rect(v->s, x + p / 3 + 1, y - p / 2, 1, p, RGB(34, 40, 56));                 /* lapels */
     rect(v->s, x - p, y + p * 3 / 2 - 1, p * 2, 1, RGB(20, 22, 32)); rect(v->s, x - p, y - p / 2, 1, p * 2, RGB(86, 96, 120));                  /* trouser hem, lit sleeve edge */
@@ -767,6 +787,9 @@ static void draw_landlords(const View *v){
     } else if(t->kind == LK_WALKER || t->kind == LK_SHIELD || t->kind == LK_SPRINTER){   /* papers in his hand */
       int bx = swing ? x + fc * p * 3 : x + fc * p * 2; rect(v->s, bx - p / 2, y, p, p + 1, RGB(255, 255, 255)); rect(v->s, bx - p / 2, y + 1, p, 1, RGB(42, 138, 42));
     }
+    /* Walkers and sprinters get the same readable pre-hit tell as throwers. */
+    if(wind && t->kind != LK_THROWER && t->kind != LK_BOSS)
+      textc(v->s,x,y-p*6,"!",2,RGB(255,210,63));
   }
 }
 /* briefcases in the air (Batter Up), and the pink bounce pads of walk levels: chevrons float up from each */

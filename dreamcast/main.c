@@ -504,6 +504,16 @@ static void draw_landlord(float x, float y, float z, const MxTarget *t){
   int k = t ? t->kind : LK_NONE, fc = t && t->face < 0 ? -1 : 1, stun = t && t->stun > 0, wind = t && t->wind > 0, swing = t && t->swing > 0;
   uint32 c = k == LK_BAT ? argb(200, 255, 200, 255) : k == LK_THROWER ? argb(205, 220, 255, 255) : k == LK_BOSS ? argb(120, 120, 140, 255) : k == LK_SPRINTER ? argb(255, 225, 160, 255) : k == LK_HEALER ? argb(235, 255, 235, 255) : k == LK_SHIELD ? argb(170, 190, 190, 255) : WHITE;   /* tints: bat green, thrower blue, boss dark, sprinter tan, healer white-green, shield grey */
   float w = r[2] * 0.5f, h = r[3] * 0.5f, lx = x - r[4] * 0.5f;
+  /* The atlas remains one textured quad. Separate shoe layers are tied to
+     real distance traveled, which avoids speed-dependent walk jitter. */
+  float step=(t&&t->mv)?(((int)(t->wk*14.0f)>>2)&1?2.5f:-2.5f):0.0f;
+  if(t&&t->mv){
+    quad(x-10,y+12,20,2,z-.02f,argb(28,42,36,95));
+    quad(x-9+step,y+8,8,4,z+.02f,argb(28,29,38,255));
+    quad(x+1-step,y+8,8,4,z+.02f,argb(26,27,35,255));
+    quad(x-8+step,y+8,4,1,z+.025f,argb(126,132,146,255));
+    quad(x+2-step,y+8,4,1,z+.025f,argb(126,132,146,255));
+  }
   if(k == LK_NONE) tquad(&hdr_atl, 512, 512, lx, y - r[5] * 0.5f, w, h, r[0], r[1], r[2], r[3], z, c);
   else if(fc > 0) tquad(&hdr_atl, 512, 512, lx, y - r[5] * 0.5f, w, h, r[0], r[1], r[2], r[3], z, c);
   else tquad(&hdr_atl, 512, 512, x + r[4] * 0.5f - w, y - r[5] * 0.5f, w, h, r[0] + r[2], r[1], -r[2], r[3], z, c);
@@ -520,12 +530,17 @@ static void draw_landlord(float x, float y, float z, const MxTarget *t){
     float bx = wind ? x + fc * 5 : swing ? x + fc * 16 : x + fc * 11, by = wind ? y - 24 : swing ? y : y + 3;
     quad(bx - 7, by - 4.5f, 14, 9, zz, argb(58, 34, 12, 255)); quad(bx - 6, by - 3.5f, 12, 7, zz + 0.01f, argb(122, 74, 34, 255)); quad(bx - 1, by - 1, 2, 2, zz + 0.02f, argb(255, 210, 63, 255));
     quad(x - 4, top + 2, 8, 2.5f, zz, k == LK_BOSS ? argb(255, 210, 63, 255) : argb(58, 106, 209, 255));
-    if(wind) text("!", x, y - 32, 14, argb(255, 210, 63, 255), 1, Z_HUD);
   } else if(k == LK_WALKER || k == LK_SHIELD || k == LK_SPRINTER){      /* papers in his hand */
     float bx = swing ? x + fc * 16 : x + fc * 11; quad(bx - 3, y, 6, 7, zz, WHITE); quad(bx - 3, y + 1, 6, 1.2f, zz + 0.01f, argb(42, 138, 42, 255));
     quad(x - 4, top + 2, 8, 2.5f, zz, k == LK_SPRINTER ? argb(255, 210, 63, 255) : argb(138, 143, 153, 255));
   } else if(k == LK_HEALER){                                            /* green cross and cap band */
     quad(x - 1, y - 4, 2, 9, zz, argb(47, 191, 74, 255)); quad(x - 4.5f, y - 0.5f, 9, 2, zz, argb(47, 191, 74, 255)); quad(x - 4, top + 2, 8, 2.5f, zz, argb(47, 191, 74, 255));
+  }
+  /* Every enemy class shares a short-lived, gameplay-accurate windup
+     tell. It is only drawn while the AI really is about to attack. */
+  if(wind){
+    quad(x-8,top-13,16,2,zz,argb(255,210,63,255));
+    text("!",x,top-15,14,argb(255,210,63,255),1,Z_HUD);
   }
   if(t->armor){ float sx = x + fc * 14; quad(sx - 3, y - 12, 6, 24, zz, argb(20, 20, 20, 255)); quad(sx - 2, y - 11, 4, 22, zz + 0.01f, argb(154, 164, 178, 255)); quad(sx - 0.8f, y - 4, 1.6f, 6, zz + 0.02f, argb(255, 210, 63, 255)); }   /* riot shield */
   if(t->hpmax > 1){ float bw = t->hpmax * 7.0f, bx0 = x - bw * 0.5f; quad(bx0 - 1, top - 9, bw + 2, 6, zz, argb(0, 0, 0, 255)); for(int i = 0; i < t->hpmax; i++) quad(bx0 + i * 7, top - 8, 6, 4, zz + 0.01f, i < t->hp ? argb(232, 64, 64, 255) : argb(85, 85, 34, 255)); }   /* health bar */
@@ -647,7 +662,7 @@ static void draw_all(void){
     const MxTarget *t = &world.targets[i];
     if(!t->alive) continue;
     float wx, wy; mx_target_offset(&world, t, &wx, &wy);
-    draw_landlord(X(t->x + wx), Y(t->y + wy) + sinf(world.time * 5 + t->t) * 0.5f - (t->mv && ((int)(world.time * 14) & 1) ? 1 : 0), Z_TARGET, t);
+    draw_landlord(X(t->x + wx), Y(t->y + wy) + (t->mv ? 0.0f : sinf(world.time * 5 + t->t) * 0.5f), Z_TARGET, t);
   }
   /* briefcases in the air (Batter Up) and the pink bounce pads of the walk levels */
   for(int i = 0; i < MX_MAX_CASES; i++){
