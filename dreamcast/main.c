@@ -900,8 +900,12 @@ static void draw_all(void){
                                    phase == 0 ? -1 : phase == 2 ? 1 : 0);
         int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
         const short *f = DCM_FR[wf + (man_fur ? MSF_NBASE : 0)]; float zm = man_zoom; man_zoom = zm * 0.75f;
-        float foot = Y(m->y + 2.375f) - RTOF(mx_walk_foot_lift(m))*PXC;
-        /* Keep the physical foot plane still while upper-body art lunges. */
+        float ground_y = Y(m->y + 2.375f);
+        float foot = ground_y - RTOF(mx_walk_foot_lift(m))*PXC;
+        /* Keep the translucent floor contact beneath the character while
+           its animated sprite lifts or lunges; no added texture storage. */
+        if(m->gr) quad(x - 13.0f, ground_y + 1.0f, 26.0f, 3.0f,
+                       Z_MAN - 0.15f, argb(0, 0, 0, 85));
         float lunge = RTOF(mx_walk_punch_lunge(m)) * PXC;
         draw_frame(wf, x + fc*lunge, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
         man_zoom = zm;
