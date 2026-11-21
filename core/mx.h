@@ -175,6 +175,7 @@ typedef struct {
      stun: in the sling, a briefcase hit leaves him dazed (aim is locked) for this long. */
   int8_t face; uint8_t gr, stomp, walked;
   real wt, pT, pCd, padCd, hurtCd, stun;
+  real gait;            /* cosmetic ground distance, modulo 4 cells; no renderer memory or save data */
   int8_t in_ax; uint8_t in_jump, in_punch, in_stomp;
   real tubeT, tubeCd;  /* just posted out of a tube: gravity is 10 % for tubeT seconds, no second tube for tubeCd seconds */
   uint8_t dive;
@@ -193,6 +194,15 @@ typedef struct {
   real spin;
   real j_px, j_py, j_vx, j_vy;       /* previous position / estimated velocity */
 } MxMan;
+
+/* Shared contact-correct walk cycle for DS, 3DS and Dreamcast.
+   -1 = stationary/airborne (hold the actual side-on pose); 0..3 are
+   the successive 1-cell phases of a grounded 4-cell stride. The core
+   advances gait only by actual, collision-resolved horizontal motion. */
+static inline int mx_walk_anim_phase(const MxMan *m){
+  if(m->mode != MAN_WALK || !m->gr || rabs(m->vx) <= R(3)) return -1;
+  return rfloor(m->gait) & 3;
+}
 
 typedef struct {
   /* world */
