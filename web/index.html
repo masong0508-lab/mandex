@@ -1,9 +1,10 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MANDEX</title>
 <style>
-html,body{margin:0;background:#0d0d14;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-canvas{max-width:100vw;max-height:100vh;touch-action:none;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.7);cursor:crosshair}
+html,body{margin:0;background:#0d0d14;width:100%;height:100%;height:100dvh;overflow:hidden}
+body{display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+canvas{display:block;max-width:100%;max-height:100%;touch-action:none;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.7);cursor:crosshair;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
 </style></head><body>
 <canvas id="c" width="960" height="540"></canvas>
 <script>
@@ -3272,19 +3273,54 @@ function drawSling1(back){
   ctx.strokeStyle='#7a5230';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(SX,GY);ctx.lineTo(SX,SY+44);ctx.stroke();
   ctx.strokeStyle='#4a2e14';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(SX,SY+44);ctx.lineTo(SX-12,SY+22);ctx.stroke();
   ctx.strokeStyle='#8f6238';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX,SY+44);ctx.lineTo(SX-12,SY+22);ctx.stroke()}
-// ---------- portrait play: a zoomed camera ----------
+// ---------- portrait play and responsive UI ----------
 // Landscape is untouched (zoom 1, camera at 0,0).  In portrait the screen is a tall 540xN canvas, the world is drawn zoomed in,
 // the ground sits at the bottom, and the camera slides sideways: to the buildings while you pull back, with the man in flight,
 // and to the wreckage between throws.  Aiming works in SCREEN distance, so the moving camera never fights your finger.
 const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0};
+/* UI state never changes physics/world dimensions. The portrait virtual
+   canvas is 540px wide and fills the available display at its real ratio;
+   landscapes retain the original 960x540 artwork and screen geometry. */
+const WEB_UI={portrait:false,viewportW:0,viewportH:0,
+  page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0,editorScale:1,
+  editorHeight:480,gesture:null};
+const isPortrait=()=>WEB_UI.portrait;
+const mobilePage=(kind,n,size)=>Math.max(0,Math.min(Math.max(0,Math.ceil(n/size)-1),WEB_UI.page[kind]||0));
 function layoutTick(){
-  const por=innerHeight>innerWidth*1.1&&(state==='play'||state==='win'||state==='lose');
-  const w=por?540:960,h=por?Math.max(780,Math.min(1240,Math.round(540*innerHeight/innerWidth))):540;
-  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;
-    if(por){cv.style.width='min(100vw,'+(100*w/h).toFixed(2)+'vh)';cv.style.height='auto'}else{cv.style.width='';cv.style.height=''}
-    CAM.snap=true}
-  if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);   // menus, cut scenes and the editor are always the normal 120 wide
-  CAM.on=por||!!(CL&&CL.cols>120&&(state==='play'||state==='win'||state==='lose'))}
+  const vp=window.visualViewport;
+  const vw=Math.max(1,vp&&vp.width||window.innerWidth||960),
+        vh=Math.max(1,vp&&vp.height||window.innerHeight||540);
+  /* visualViewport shrinks when the on-screen keyboard opens. It should
+     resize the CSS drawing area, NOT falsely rotate the entire game. */
+  const stableW=Math.max(1,window.innerWidth||vw),
+        stableH=Math.max(1,window.innerHeight||vh),
+        por=stableH>stableW*1.08;
+  const w=por?540:960,h=por?Math.max(720,Math.min(1240,Math.round(w*stableH/stableW))):540;
+  const changed=por!==WEB_UI.portrait;
+  if(changed){
+    WEB_UI.portrait=por;WEB_UI.gesture=null;
+    if(typeof dragging!=='undefined')dragging=false;
+    if(typeof sliderDrag!=='undefined')sliderDrag=false;
+    if(typeof E!=='undefined'&&E)E.drag=null;
+    for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
+    CAM.reset=true;CAM.snap=true;hits=[];
+  }
+  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
+  if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed){
+    WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
+    const rect=document.body.getBoundingClientRect(),
+      css=window.getComputedStyle?window.getComputedStyle(document.body):null,
+      insetW=css?(parseFloat(css.paddingLeft)||0)+(parseFloat(css.paddingRight)||0):0,
+      insetH=css?(parseFloat(css.paddingTop)||0)+(parseFloat(css.paddingBottom)||0):0,
+      availW=Math.max(1,(rect.width||vw)-insetW),
+      availH=Math.max(1,(rect.height||vh)-insetH),
+      scale=Math.max(.01,Math.min(availW/w,availH/h));
+    cv.style.width=Math.floor(w*scale)+'px';cv.style.height=Math.floor(h*scale)+'px';
+  }
+  if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);
+  CAM.on=(por&&(state==='play'||state==='win'||state==='lose'))||
+    !!(CL&&CL.cols>120&&(state==='play'||state==='win'||state==='lose'));
+}
 function camTick(dt){
   if(!CAM.on){CAM.z=1;CAM.x=0;CAM.y=0;return}
   // fit the sling and every standing landlord across the screen (a tall phone shows the whole fight at once instead of an empty sky), ground at 80% of the height
@@ -3355,11 +3391,13 @@ function draw(){
   if(camOn&&CAM.y<0){ctx.drawImage(bgA,0,0,WW,GY,0,CAM.y,WW,GY-CAM.y);ctx.drawImage(bgA,0,GY,WW,WH-GY,0,GY,WW,WH-GY)}else ctx.drawImage(bgA,0,0);
   if(camOn){const dh=Math.max(0,(CAM.y+H/CAM.z)-WH);if(dh>0){const g=ctx.createLinearGradient(0,WH,0,WH+dh);g.addColorStop(0,'#4d311d');g.addColorStop(1,'#2a1a10');ctx.fillStyle=g;ctx.fillRect(CAM.x-2,WH-1,W/CAM.z+4,dh+2)}}   // portrait: the earth continues below the ground line   // sky stretches up so the sun is never cut off
   for(const c of clouds)drawCloud(c);ctx.drawImage(bgB,0,0);
-  if(state==='cutscene'){drawCutscene();return}
-  if(state==='title'){drawTitle();return}
+  if(state==='cutscene'){if(isPortrait())drawMobileCutscene();else drawCutscene();return}
+  if(state==='title'){if(isPortrait())drawMobileTitle();else drawTitle();return}
   if(state==='ending'){drawEnding();drawToasts(frameDt);return}
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='edit'){
-    (state==='menu'?drawMenu:state==='options'?drawOptions:state==='select'?drawSelect:state==='ach'?drawAch:state==='outfit'?drawOutfits:drawEditor)();drawToasts(frameDt);return}
+    if(isPortrait())drawMobileScreen();
+    else (state==='menu'?drawMenu:state==='options'?drawOptions:state==='select'?drawSelect:state==='ach'?drawAch:state==='outfit'?drawOutfits:drawEditor)();
+    drawToasts(frameDt);return}
   ctx.save();ctx.translate((Math.random()-.5)*shake*shakeScale(),(Math.random()-.5)*shake*shakeScale());
   // During a zoom, thousands of interior wall strips may be fully outside
   // the canvas. Preserve each original run's start (stripe phase) while
@@ -3552,8 +3590,22 @@ cv.addEventListener('pointerdown',e=>{
   audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
   if(state==='cutscene'){cutClick(x,y);return}
   if(state==='title'){goMenu();return}
+  if(isPortrait()&&['menu','select','ach','outfit','options'].includes(state)){
+    /* Defer activation until release: a swipe must change pages without
+       accidentally opening a level or erasing a custom project. */
+    WEB_UI.gesture={id:e.pointerId,x,y,screen:state};
+    try{cv.setPointerCapture(e.pointerId)}catch(_){}
+    return;
+  }
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending'){hitTest(x,y);return}
-  if(state==='edit'){if(!hitTest(x,y)){eDown(x,y);try{cv.setPointerCapture(e.pointerId)}catch(_){}}return}
+  if(state==='edit'){
+    if(hitTest(x,y))return;
+    if(isPortrait()&&y>=0&&y<WEB_UI.editorHeight){
+      const p=mobileEditorToWorld(x,y);eDown(p[0],p[1]);
+    }else if(!isPortrait())eDown(x,y);
+    try{cv.setPointerCapture(e.pointerId)}catch(_){}
+    return;
+  }
   if(hitTest(x,y))return;
   if(state==='play'&&man.mode==='walk'){walkTouch(x,y,e.pointerId);return}
   if(state==='win'){nextAfterWin();return}
@@ -3563,11 +3615,47 @@ cv.addEventListener('pointerdown',e=>{
   if(man.mode==='aim'&&!man.chug&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(wx-VX,wy-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}   // tap the valve: he sits and fills; drag him off to fire
   if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
-cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
+cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
+  if(state==='edit'){
+    if(!isPortrait())eMove(mx,my);
+    else if(E.drag&&my>=0&&my<WEB_UI.editorHeight){
+      /* Leaving the world area for the toolbar must never paint the last
+         building row or carry a rectangle selection into a control. */
+      const pos=mobileEditorToWorld(mx,my);eMove(pos[0],pos[1]);
+    }
+    return;
+  }
+  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
   if(vOn&&dv<VPULL){const k=.9*(VPULL-dv)/(VPULL-VGRAB);man.x+=(VX-man.x)*k;man.y+=(VY-man.y)*k}});   // nearing the valve the sling stretches on back toward it (power stays a full pull), then he drops onto it
-cv.addEventListener('pointerup',()=>{sodaHold=false;if(sliderDrag){sliderDrag=false;pdSave();SFX.boing()}if(state==='edit'){eUp();return}if(dragging){dragging=false;if(man.mode==='aim'){if(man.vlv){man.seated=true;return}man.seated=false;launch()}}});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
+cv.addEventListener('pointerup',e=>{
+  if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId){
+    const g=WEB_UI.gesture;WEB_UI.gesture=null;
+    const p=pt(e),dy=p[1]-g.y;
+    if(g.screen===state&&Math.abs(dy)>65){
+      /* A swipe never activates a button, even on the non-paginated home
+         screen. On paginated menus it changes exactly one page. */
+      if(state==='select'||state==='ach'||state==='outfit'||state==='options'){
+        const key=state;
+        WEB_UI.page[key]=Math.max(0,(WEB_UI.page[key]||0)+(dy<0?1:-1));
+      }
+    }else if(g.screen===state)hitTest(p[0],p[1]);
+    return;
+  }
+  sodaHold=false;if(sliderDrag){sliderDrag=false;pdSave();SFX.boing()}
+  if(state==='edit'){eUp();return}
+  if(dragging){dragging=false;if(man.mode==='aim'){
+    if(man.vlv){man.seated=true;return}man.seated=false;launch()
+  }}
+});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keyup',e=>{KEYS[e.code]=false});addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false});
-for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{const k=TID[e.pointerId];if(k){KEYS[k]=false;delete TID[e.pointerId]}});
+for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
+  const k=TID[e.pointerId];if(k){KEYS[k]=false;delete TID[e.pointerId]}
+  if(ev==='pointercancel'){
+    if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
+    if(state==='edit'&&E.drag)eUp();
+    if(dragging){dragging=false;man.seated=false}
+  }
+});
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
   if(e.code==='Space'){dive();e.preventDefault()}
@@ -4585,6 +4673,278 @@ function drawCutscene(){
 const ch2Unlocked=i=>PD.unlockAll||i===CH1||(PD.stars[i-1]||0)>0;
 const ch3Unlocked=i=>PD.unlockAll||(i===CH2?(PD.stars[CH2-1]||0)>0:(PD.stars[i-1]||0)>0);   // the first chapter 2 level is open; the rest unlock in order
 function storyUnlocked(i){return PD.unlockAll||i<3||(PD.stars[i-1]||0)>0}
+/* Portrait pages are deliberately drawn in the existing 2D canvas (and
+   share the same btn()/hitTest(), game actions and save model). These are
+   readable tap targets, not a 960x540 menu squashed into a phone. */
+function mobileHeader(title,detail,back){
+  ctx.fillStyle='rgba(10,14,30,.92)';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(255,210,63,.16)';ctx.fillRect(0,0,W,7);
+  txt(title,W/2,59,36,'#ffd23f','center','#7a1a1a');
+  if(detail)txt(detail,W/2,85,15,'#cfd','center');
+  if(back)btn(12,14,92,42,'< BACK',back,{size:16});
+}
+function mobilePager(kind,number,size,atY){
+  const pages=Math.max(1,Math.ceil(number/size));
+  const page=mobilePage(kind,number,size);
+  WEB_UI.page[kind]=page;
+  if(pages>1){
+    const y=atY==null?H-58:atY;
+    btn(12,y,116,46,'< PREV',()=>{WEB_UI.page[kind]=Math.max(0,page-1)},{size:16,disabled:page===0});
+    txt('PAGE '+(page+1)+' / '+pages,W/2,y+29,18,'#fff','center');
+    btn(W-128,y,116,46,'NEXT >',()=>{WEB_UI.page[kind]=Math.min(pages-1,page+1)},{size:16,disabled:page===pages-1});
+  }
+  return page;
+}
+function mobileTab(x,y,w,label,fn,on){
+  btn(x,y,w,43,label,fn,{on,size:14,col:'#ffd23f'});
+}
+function drawMobileTitle(){
+  ctx.fillStyle='rgba(10,14,30,.44)';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.translate(W/2,H*.63);ctx.scale(1.8,1.8);drawSlamScene(time);ctx.restore();
+  txt('MANDEX',W/2,H*.24,78,'#ffd23f','center','#7a1a1a');
+  txt('THE LANDLORD SMASHER',W/2,H*.31,20,'#fff','center');
+  ctx.globalAlpha=.72+.28*Math.sin(time*4);
+  txt('TAP ANYWHERE TO START',W/2,H-95,23,'#fff','center');
+  ctx.globalAlpha=1;
+}
+function drawMobileCutscene(){
+  const sc=CUTS[cutI],cs=cutCam(cutI,cutT);
+  const frameH=Math.min(H*.47,420),scale=W/960;
+  ctx.fillStyle='#0b101e';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.beginPath();ctx.rect(0,108,W,frameH);ctx.clip();
+  ctx.translate(0,108);ctx.scale(scale,scale);
+  ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);
+  ctx.translate(-cs.x,-cs.y);
+  /* Existing cutscene staging is authored at 960x540. Keep that virtual
+     stage even on a portrait canvas, instead of letting W=540 crop sky,
+     actors and cinematic effects before the frame is scaled to fit. */
+  const portraitW=W,portraitH=H;
+  try{W=960;H=540;sc.draw(cutT)}
+  finally{W=portraitW;H=portraitH;ctx.restore()}
+  txt('SCENE '+(cutI+1)+' / '+CUTS.length,W/2,45,20,'#ffd23f','center');
+  btn(W-118,12,106,42,'SKIP >>',endCut,{size:15});
+  const boxY=frameH+128,read=Math.max(0,Math.min(1,(cutT-.4)*CPS/Math.max(1,cutTotal())));
+  panel(18,boxY,W-36,Math.min(210,H-boxY-100));
+  ctx.fillStyle='#ffd23f';ctx.fillRect(34,boxY+9,(W-68)*read,4);
+  let left=Math.floor(Math.max(0,cutT-.4)*CPS);
+  for(let i=0;i<sc.lines.length;i++){
+    const words=sc.lines[i],visible=words.slice(0,Math.max(0,Math.min(words.length,left)));left-=words.length;
+    let fs=18;ctx.font='bold 18px sans-serif';
+    while(fs>12&&ctx.measureText(visible).width>W-82){fs--;ctx.font='bold '+fs+'px sans-serif'}
+    txt(visible,W/2,boxY+43+i*48,fs,i===sc.hl?'#ffd23f':'#fff','center');
+  }
+  btn(W/2-134,H-66,268,52,'TAP TO CONTINUE >',()=>cutClick(W/2,H-50),{size:18,on:true});
+}
+function drawMobileMenu(){
+  mobileHeader('MANDEX','THE LANDLORD SMASHER');
+  ctx.save();ctx.globalAlpha=.24;ctx.translate(W*.8,H*.72);ctx.scale(2,2);drawSlamScene(time);ctx.restore();
+  const y=H*.19,w=W-76,x=38,h=62,g=13;
+  btn(x,y,w,h,'PLAY',goSelect,{size:28,on:true,col:'#7dff5a'});
+  btn(x,y+(h+g),w,h,'LEVEL CREATOR',()=>openEditor(false),{size:24});
+  btn(x,y+2*(h+g),w,h,'ACHIEVEMENTS '+achCount()+'/'+ACH.length,()=>{state='ach';WEB_UI.page.ach=0},{size:19});
+  btn(x,y+3*(h+g),w,h,'OUTFITS '+ownedCount()+'/'+OUTFITS.length,()=>{state='outfit';WEB_UI.page.outfit=0},{size:21});
+  btn(x,y+4*(h+g),w,h,'OPTIONS',()=>{state='options';WEB_UI.page.options=0},{size:21});
+  btn(x,H-130,w,52,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();setMuted(!muted)},{size:18});
+  txt(totalStars()+' ★ EARNED',W/2,H-28,18,'#ffd23f','center');
+}
+function mobileSelectItems(){
+  if(selTab===0)return LEVELS.slice(0,CH1).map((q,i)=>({label:(i+1)+'. '+q.name,stars:PD.stars[i]||0,locked:!storyUnlocked(i),fn:()=>startStory(i)}));
+  if(selTab===2)return LEVELS.slice(CH1,CH2).map((q,i)=>({label:(CH1+i+1)+'. '+q.name,stars:PD.stars[CH1+i]||0,locked:!ch2Unlocked(CH1+i),fn:()=>startStory(CH1+i)}));
+  if(selTab===3)return LEVELS.slice(CH2).map((q,i)=>({label:(CH2+i+1)+'. '+q.name,stars:PD.stars[CH2+i]||0,locked:!ch3Unlocked(CH2+i),fn:()=>startStory(CH2+i)}));
+  const items=[{label:'+ CREATE NEW LEVEL',fn:()=>openEditor(false)},
+    {label:'IMPORT LEVEL CODE',fn:importCode}];
+  PD.custom.forEach((q,i)=>items.push({label:(i+1)+'. '+q.n,custom:true,i,fn:()=>startCustom(i)}));
+  return items;
+}
+function drawMobileSelect(){
+  mobileHeader('SELECT LEVEL',selTab===1?'YOUR CUSTOM LEVELS':'CHOOSE A DISTRICT',goMenu);
+  const labels=['STORY','MY LEVELS','CHAPTER 2','CHAPTER 3'],tabs=[0,1,2,3];
+  for(let i=0;i<4;i++)mobileTab(12+(i%2)*264,101,252,labels[i],
+    ()=>{selTab=tabs[i];WEB_UI.page.select=0},selTab===tabs[i]);
+  const items=mobileSelectItems(),top=208,rh=94,rowGap=8,cols=2,
+    visibleRows=Math.max(2,Math.floor((H-top-94)/(rh+rowGap))),size=visibleRows*cols,
+    page=mobilePage('select',items.length,size),start=page*size;
+  for(let j=start;j<Math.min(items.length,start+size);j++){
+    const it=items[j],k=j-start,x=12+(k%2)*264,y=top+Math.floor(k/2)*(rh+rowGap);
+    const label=it.locked?'LOCKED':it.label;
+    btn(x,y,252,rh,label,()=>{if(!it.locked)it.fn();else SFX.pop()},
+        {size:it.label.length>19?12:15,on:!it.locked&&it.stars>=2});
+    if(!it.locked&&it.stars)txt('★'.repeat(it.stars),x+126,y+rh-8,15,'#ffd23f','center');
+    if(it.custom&&it.i!=null){
+      btn(x+4,y+rh-44,76,40,'EDIT',()=>openEditor(false,it.i),{size:12});
+      btn(x+86,y+rh-44,70,40,'SHARE',()=>exportCode(PD.custom[it.i]),{size:12});
+      btn(x+162,y+rh-44,84,40,'DELETE',()=>{if(confirmDel(PD.custom[it.i])){PD.custom.splice(it.i,1);pdTouch();pdSave()}},{size:11});
+    }
+  }
+  mobilePager('select',items.length,size);
+}
+function drawMobileAchievements(){
+  mobileHeader('ACHIEVEMENTS',achCount()+' / '+ACH.length+' COMPLETE',goMenu);
+  const top=111,rh=60,size=Math.max(3,Math.floor((H-top-88)/rh)),page=mobilePage('ach',ACH.length,size);
+  ACH.slice(page*size,(page+1)*size).forEach((a,i)=>{
+    const y=top+i*rh,got=PD.ach[a.id];
+    panel(14,y,W-28,rh-6);
+    txt(got?'★':'?',43,y+36,28,got?'#ffd23f':'#889','center');
+    txt(a.n,77,y+25,17,got?'#fff':'#cbd','left');
+    txt(a.d,77,y+44,12,'#aab','left');
+    if(!got&&a.p){const[p,n]=a.p();txt(Math.min(p,n)+'/'+n,W-25,y+24,13,'#ffd23f','right')}
+  });
+  mobilePager('ach',ACH.length,size);
+}
+function drawMobileOutfits(){
+  mobileHeader('OUTFITS',ownedCount()+' / '+OUTFITS.length+' UNLOCKED',goMenu);
+  ctx.save();ctx.translate(W/2,198);ctx.scale(1.1,1.1);
+  if(outfitCur.rainbow)applyOutfit(outfitCur,time);
+  const sw=Math.sin(time*5);drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');
+  ctx.restore();txt(outfitCur.n,W/2,285,22,'#fff','center');
+  const top=310,rh=75,cols=2,size=Math.max(2,Math.floor((H-top-90)/(rh+9)))*cols;
+  const page=mobilePage('outfit',OUTFITS.length,size);
+  OUTFITS.slice(page*size,(page+1)*size).forEach((o,k)=>{
+    const x=12+(k%2)*264,y=top+Math.floor(k/2)*(rh+9),
+      own=!!PD.own[o.id],sel=outfitCur===o;
+    btn(x,y,252,rh,o.n,()=>{if(own){equip(o);SFX.ding()}else SFX.pop()},
+      {size:o.n.length>17?13:17,on:sel,disabled:!own});
+    txt(own?(sel?'WEARING':'TAP TO WEAR'):'LOCKED',x+126,y+rh-8,12,own?'#fff':'#889','center');
+  });
+  mobilePager('outfit',OUTFITS.length,size);
+}
+function drawMobileOptions(){
+  const page=WEB_UI.page.options?1:0,o=OPT();
+  mobileHeader('OPTIONS',page?'SOUND, SCREEN & DATA':'GAMEPLAY',goMenu);
+  mobileTab(12,108,252,'GAMEPLAY',()=>{WEB_UI.page.options=0},page===0);
+  mobileTab(276,108,252,'SOUND & DATA',()=>{WEB_UI.page.options=1},page===1);
+  let y=169;const rh=58,gap=8;
+  function row(label,value,fn,on){
+    btn(20,y,W-40,rh,label+': '+value,()=>{fn();pdTouch();pdSave();SFX.pop()},
+        {size:label.length>20?15:17,on:!!on});
+    y+=rh+gap;
+  }
+  if(!page){
+    row('COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',()=>{o.collapse=!o.collapse},o.collapse);
+    row('START TOOL',toolName(),toolCycle,toolName()!=='NONE');
+    row('AIM GUIDE',GUIDES[o.guide==null?2:o.guide],()=>{o.guide=((o.guide==null?2:o.guide)+1)%3},(o.guide==null?2:o.guide)>0);
+    row('BURP CHARGE',o.burpCharge?'ON':'OFF',()=>{o.burpCharge=!o.burpCharge},o.burpCharge);
+    row('STOMACH NEVER BURSTS',o.noBurst?'ON':'OFF',()=>{o.noBurst=!o.noBurst},o.noBurst);
+    row('LANDLORDS FIGHT BACK',o.fight===false?'OFF':'ON',()=>{o.fight=o.fight===false?true:false},o.fight!==false);
+  }else{
+    row('SOUND',muted?'OFF':'ON',()=>{audioInit();setMuted(!muted)},!muted);
+    const val=Math.round(optVol()*100);
+    row('VOLUME',val+'%',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol()},val>0);
+    row('VOLUME DOWN',val+'%',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol()},false);
+    row('SCREEN SHAKE',SHAKES.find(s=>s[1]===(o.shake==null?1:o.shake))?.[0]||'FULL',()=>{let i=SHAKES.findIndex(s=>s[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1]},(o.shake==null?1:o.shake)>0);
+    row('DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX},!webEcoFX);
+    if(y+rh<H-72)row('RESET OPTIONS','DEFAULT',()=>{if(performance.now()<armReset){optsReset();armReset=0}else armReset=performance.now()+3000},false);
+    if(y+rh<H-68)row('ERASE PROGRESS','CONFIRM',()=>{if(performance.now()<armProg){progReset();armProg=0}else armProg=performance.now()+3000},false);
+  }
+  if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{WEB_UI.page.options=1},{size:18});
+  else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{WEB_UI.page.options=0},{size:18});
+}
+/* Portrait creator: a genuine 120-column editing surface with horizontal
+   panning, unclipped world-cell touch mapping and a separate tool/action tray.
+   No copy of E.g, no second offscreen canvas and no changed save encoding. */
+function mobileEditorSurface(){
+  const h=Math.min(GY,Math.max(300,H-320));
+  WEB_UI.editorHeight=h;WEB_UI.editorScale=h/GY;
+  WEB_UI.editorX=clamp(WEB_UI.editorX,0,Math.max(0,WW-W/WEB_UI.editorScale));
+  return h;
+}
+function mobileEditorToWorld(x,y){
+  return [x/WEB_UI.editorScale+WEB_UI.editorX,y/WEB_UI.editorScale];
+}
+function drawMobileEditor(){
+  const surface=mobileEditorSurface(),sc=WEB_UI.editorScale;
+  ctx.fillStyle='#24344e';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W,surface);ctx.clip();
+  ctx.scale(sc,sc);ctx.translate(-WEB_UI.editorX,0);
+  ctx.drawImage(bgA,0,0);
+  const first=Math.max(0,Math.floor(WEB_UI.editorX/V)-1),
+    last=Math.min(COLS,Math.ceil((WEB_UI.editorX+W/sc)/V)+1);
+  for(let y=0;y<ROWS;y++)for(let x=first;x<last;x++){
+    const mat=E.g[idx(x,y)];if(mat)ctx.drawImage(SPR[mat][hsh(x,y)&3][0],x*V,y*V);
+  }
+  ctx.fillStyle='rgba(255,60,60,.13)';ctx.fillRect(0,0,EMIN*V,GY);
+  ctx.strokeStyle='rgba(255,255,255,.11)';ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let x=first;x<last;x+=5){ctx.moveTo(x*V,0);ctx.lineTo(x*V,GY)}
+  for(let y=0;y<=ROWS;y+=5){ctx.moveTo(first*V,y*V);ctx.lineTo(last*V,y*V)}
+  ctx.stroke();
+  for(const p of E.t){
+    ctx.save();ctx.translate(p[0]*V+V/2,p[1]*V-7);drawLandlord({t:time,x:0,y:0});ctx.restore();
+  }
+  if(E.drag&&!E.drag.pen){
+    const a=E.drag.a,b=E.drag.b;ctx.fillStyle=E.drag.m?MATCOL[E.drag.m]:'rgba(255,255,255,.4)';
+    ctx.globalAlpha=.5;ctx.fillRect(Math.min(a[0],b[0])*V,Math.min(a[1],b[1])*V,
+      (Math.abs(a[0]-b[0])+1)*V,(Math.abs(a[1]-b[1])+1)*V);ctx.globalAlpha=1;
+  }
+  if(mouseX>=0&&mouseY>=0&&mouseY<surface){
+    const w=mobileEditorToWorld(mouseX,mouseY),pos=eCell(w[0],w[1]),B=brushDims(),
+      ox=pos[0]-((B.w-1)>>1),oy=pos[1]-((B.h-1)>>1);
+    ctx.strokeStyle='#fff';ctx.lineWidth=2/sc;
+    if(E.tool==='lord')ctx.strokeRect(pos[0]*V,pos[1]*V,V*2,V*2);
+    else if(B.r){ctx.beginPath();ctx.arc(pos[0]*V+V/2,pos[1]*V+V/2,(B.r+.5)*V,0,7);ctx.stroke()}
+    else ctx.strokeRect(ox*V,oy*V,B.w*V,B.h*V);
+  }
+  ctx.restore();
+  ctx.fillStyle='rgba(12,17,34,.92)';ctx.fillRect(0,surface,W,H-surface);
+  btn(10,surface+8,120,48,'< PAN',()=>{WEB_UI.editorX=Math.max(0,WEB_UI.editorX-150)},{size:18});
+  txt('COL '+(Math.floor(WEB_UI.editorX/V)+1)+'–'+
+    Math.min(COLS,Math.ceil((WEB_UI.editorX+W/sc)/V)),
+    W/2,surface+38,16,'#ffd23f','center');
+  btn(W-130,surface+8,120,48,'PAN >',()=>{
+    WEB_UI.editorX=Math.min(Math.max(0,WW-W/sc),WEB_UI.editorX+150)
+  },{size:18});
+  const y=surface+66,p=!!WEB_UI.page.edit,cols=5,cw=(W-24-4*6)/cols;
+  if(!p){
+    const mats=['ERASE',...MAT.slice(1).map(m=>m.n.toUpperCase()),'LANDLORD'];
+    mats.forEach((name,i)=>{
+      const x=12+(i%cols)*(cw+6),yy=y+Math.floor(i/cols)*48;
+      btn(x,yy,cw,42,name,()=>{
+        if(i===0)E.tool='erase';
+        else if(i===mats.length-1)E.tool='lord';
+        else{E.tool='mat';E.mat=i}
+      },{size:name.length>6?11:14,on:i===0?E.tool==='erase':i===mats.length-1?E.tool==='lord':E.tool==='mat'&&E.mat===i});
+    });
+    const labels=BR_KIND;
+    labels.forEach((name,i)=>btn(12+i*132,y+104,120,43,name,()=>eKind(i-E.bk),
+      {size:14,on:E.bk===i}));
+    btn(12,y+154,120,42,'SIZE -',()=>eSize(-1),{size:16});
+    btn(144,y+154,120,42,'SIZE +',()=>eSize(1),{size:16});
+    btn(276,y+154,120,42,'THICK '+E.bt,eThick,{size:15});
+    btn(408,y+154,120,42,E.shape==='pen'?'PEN':'RECT',()=>{
+      E.shape=E.shape==='pen'?'rect':'pen'
+    },{size:16});
+    txt('BRUSH '+brushLabel()+'  •  '+(E.tool==='mat'?MAT[E.mat].n:E.tool).toUpperCase(),
+      W/2,Math.min(H-80,y+225),14,'#cfd','center');
+  }else{
+    const actions=[
+      ['MEN -',()=>{E.men=Math.max(1,E.men-1)}],
+      ['MEN +',()=>{E.men=Math.min(12,E.men+1)}],
+      ['UNDO',eUndo],
+      ['CLEAR',()=>{eSnap();E.g=new Uint8Array(COLS*ROWS);E.t=[]}],
+      ['TEST PLAY',eTest],['SAVE',eSave],
+      ['SHARE',()=>{if(!E.t.length){toast('ach','Add a landlord first','');return}
+        exportCode({n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t})}],
+      ['EXIT',()=>{selTab=1;goSelect()}]
+    ];
+    actions.forEach((a,i)=>btn(12+(i%4)*132,y+Math.floor(i/4)*59,120,52,a[0],a[1],
+        {size:15,on:i===4}));
+    txt('MEN '+E.men+'  •  '+(E.name||'UNSAVED LEVEL'),
+      W/2,Math.min(H-76,y+164),17,'#ffd23f','center');
+  }
+  btn(30,H-57,W-60,50,p?'< BRUSH TOOLS':'LEVEL ACTIONS >',()=>{
+    WEB_UI.page.edit=p?0:1
+  },{size:18,on:!p,col:'#7dff5a'});
+}
+function drawMobileScreen(){
+  switch(state){
+    case 'menu':drawMobileMenu();break;
+    case 'select':drawMobileSelect();break;
+    case 'ach':drawMobileAchievements();break;
+    case 'outfit':drawMobileOutfits();break;
+    case 'options':drawMobileOptions();break;
+    case 'edit':drawMobileEditor();break;
+  }
+}
 function drawMenu(){
   ctx.fillStyle='rgba(10,14,30,.45)';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate(745,GY-4);ctx.scale(1.7,1.7);drawSlamScene(time);ctx.restore();
