@@ -1313,7 +1313,7 @@ function lordAI(t,dt){
       if(dir){if(lordStep(t,dir,sp,dt))moving=sp>50?2:1
         else if(!flying&&!foot){t.pdir=-dir;dir=-dir}
         t.face=dir}}
-    else if(t.kind==='bat'&&t.stun<=0&&m.mode==='fly'&&tm<150&&t.swing<=0){t.swing=.35}}
+    else if(t.kind==='bat'&&t.stun<=0&&m.mode==='fly'&&tm2<150*150&&t.swing<=0){t.swing=.35}}
   if(!moving&&!(t.swing>0)&&t.wind<=0)t.face=(Math.sign(m.x-t.x)||t.face);
   t.mv=moving}
 function batBlock(t,m){const sh=t.armor>0&&Math.sign(m.x-t.x)===t.face;if((t.kind!=='bat'&&!sh)||!fightOn()||t.stun>0)return false;const sp=Math.hypot(m.vx,m.vy);if(sp>=BAT_BREAK){if(sh){t.armor=0;popText(t.x,t.y-40,'SHIELD SMASHED!','#ffd23f',16);SFX.crunch(.9)}return false}
