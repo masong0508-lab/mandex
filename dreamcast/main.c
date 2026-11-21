@@ -734,6 +734,39 @@ static void draw_rubble_chunks(void){
     }
   }
 }
+#ifndef MX_DC_PARTICLE_VIEW_CULL
+#define MX_DC_PARTICLE_VIEW_CULL 1
+#endif
+#ifdef MX_DC_PARTICLE_BENCH
+static unsigned dc_particles_rasterized; /* host-only work counter */
+#endif
+static void draw_particles(void){
+  for(int i = 0; i < 256; i++) if(parts[i].life > 0){
+    const Part *p = &parts[i];
+#if MX_DC_PARTICLE_VIEW_CULL
+    /* Each effect is contained within 32px of its anchor. The 64px pad
+       safely covers text, heart arcs and oscillating sprite trails. */
+    if(p->x < -64.0f || p->x >= 704.0f ||
+       p->y < -64.0f || p->y >= 544.0f)continue;
+#endif
+#ifdef MX_DC_PARTICLE_BENCH
+    dc_particles_rasterized++;
+#endif
+    float age = 1.0f - p->life / p->max;
+    uint32 c = p->c & 0x00ffffff;
+    switch(p->kind){
+    case PK_STINK: { float r = 7 + age * 20; int a = (int)(150 * (1.0f - age * age)); puff(p->x, p->y, r, Z_FX, c | ((uint32)(a > 20 ? a : 20) << 24)); break; }   /* green cloud: swells, then thins out */
+    case PK_FLY: { float t = world.time * 18.0f + i; quad(p->x + sinf(t * 1.3f) * 9, p->y + cosf(t) * 7, 3, 3, Z_FX, p->c); break; }
+    case PK_ZZZ: { text("Z", p->x, p->y, 16 + age * 8, argb(255, 255, 255, (int)(255 * (1.0f - age))), 1, Z_FX); break; }
+    case PK_SWEAT: puff(p->x, p->y, 3.0f, Z_FX, p->c); break;
+    case PK_HEART: { float r = 7 + 2 * sinf(world.time * 9 + i), hx = p->x + sinf(world.time * 4 + i) * 5;      /* two blobs and a point: a heart */
+      puff(hx - r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c); puff(hx + r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c);
+      { float xs[4] = { hx - r * 1.1f, hx, hx, hx + r * 1.1f }, ys[4] = { p->y, p->y - 0.1f, p->y + r * 1.3f, p->y }; quad4(xs, ys, Z_FX, p->c); } break; }
+    case PK_GLINT: { float r = 10 * sinf(age * 3.14159f); if(r > 0){ quad(p->x - r, p->y - 1, r * 2, 2, Z_FX, p->c); quad(p->x - 1, p->y - r, 2, r * 2, Z_FX, p->c); } break; }
+    default: { float a = 1.0f - age; puff(p->x, p->y, 3.4f + a * 1.6f, Z_FX, c | ((uint32)((int)(255 * (a > 0.3f ? 1.0f : a / 0.3f))) << 24)); }
+    }
+  }
+}
 static void draw_all(void){
   shx = shy = 0;
   if(world.shake > 0.05f){ shx = (frand() - 0.5f) * world.shake * 0.6f; shy = (frand() - 0.5f) * world.shake * 0.6f; }
@@ -867,21 +900,7 @@ static void draw_all(void){
   }
   if(m->mode == MAN_AIM)
     seg(XB(MX_ANCHOR_X) - 6.0f, YB(MX_ANCHOR_Y) + 13.8f, X(m->x) - 1.0f, Y(m->y) + 3.8f, 2.8f, Z_MAN + 1.0f, argb(42, 22, 10, 255));
-  for(int i = 0; i < 256; i++) if(parts[i].life > 0){
-    const Part *p = &parts[i]; float age = 1.0f - p->life / p->max;
-    uint32 c = p->c & 0x00ffffff;
-    switch(p->kind){
-    case PK_STINK: { float r = 7 + age * 20; int a = (int)(150 * (1.0f - age * age)); puff(p->x, p->y, r, Z_FX, c | ((uint32)(a > 20 ? a : 20) << 24)); break; }   /* green cloud: swells, then thins out */
-    case PK_FLY: { float t = world.time * 18.0f + i; quad(p->x + sinf(t * 1.3f) * 9, p->y + cosf(t) * 7, 3, 3, Z_FX, p->c); break; }
-    case PK_ZZZ: { text("Z", p->x, p->y, 16 + age * 8, argb(255, 255, 255, (int)(255 * (1.0f - age))), 1, Z_FX); break; }
-    case PK_SWEAT: puff(p->x, p->y, 3.0f, Z_FX, p->c); break;
-    case PK_HEART: { float r = 7 + 2 * sinf(world.time * 9 + i), hx = p->x + sinf(world.time * 4 + i) * 5;      /* two blobs and a point: a heart */
-      puff(hx - r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c); puff(hx + r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c);
-      { float xs[4] = { hx - r * 1.1f, hx, hx, hx + r * 1.1f }, ys[4] = { p->y, p->y - 0.1f, p->y + r * 1.3f, p->y }; quad4(xs, ys, Z_FX, p->c); } break; }
-    case PK_GLINT: { float r = 10 * sinf(age * 3.14159f); if(r > 0){ quad(p->x - r, p->y - 1, r * 2, 2, Z_FX, p->c); quad(p->x - 1, p->y - r, 2, r * 2, Z_FX, p->c); } break; }
-    default: { float a = 1.0f - age; puff(p->x, p->y, 3.4f + a * 1.6f, Z_FX, c | ((uint32)((int)(255 * (a > 0.3f ? 1.0f : a / 0.3f))) << 24)); }
-    }
-  }
+  draw_particles();
   if(world.flash > 0){ int a = (int)(world.flash * 400); if(a > 255) a = 255; quad(0, 0, 640, 480, Z_HUD - 0.5f, argb(255, 240, 200, a)); }
 
   /* HUD */
