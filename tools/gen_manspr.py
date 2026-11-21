@@ -251,15 +251,18 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
         th, ld = spin_th(name); a = abs(th + ld)
         if a < 125:
             hk = {k: PI[v] for k, v in manhead.KEY.items()}
-            if a < 22: rows, ox = manhead.head("open", "grin"), 9
-            elif a < 40: rows = manhead.scaled(manhead.head("open", "grin"), 17, 19); ox = 8
-            elif a < 56: rows = manhead.scaled(manhead.head("open", "grin"), 14, 19); ox = 7
-            else: rows = manhead.side_head("dive"); ox = 8
-            top = 11 if a < 56 else 7
+            # Every view is 19 high and the head width moves smoothly
+            # 19 -> 17 -> 14 pixels.  The old side switch at 56 degrees
+            # was a 14-high head with a different chin/head pivot, which
+            # made the hairline and mouth visibly snap up during a turn.
+            rows = manhead.turn_head(a, "dive")
             wipe_head(idx, hx, hy, ppu)
-            if WOLFMODE and a >= 56:                                  # a wolf profile in the middle of the turn
-                WSIDE = True; stamp(idx, manhead.wolf_side_head("snarl"), hx - ox, hy - top - 2, hk); WSIDE = False
-            else: stamp(idx, rows, hx - ox, hy - top, hk)
+            if WOLFMODE and a >= 56:                  # wolf muzzle uses its own profile
+                WSIDE = True
+                stamp(idx, manhead.wolf_side_head("snarl"), hx - 8, hy - 9, hk)
+                WSIDE = False
+            else:
+                stamp(idx, rows, hx - len(rows[0]) // 2, hy - 11, hk)
             return
     if name.startswith("BACK") or name.startswith("FART") or spiny(name):          # the back of a proper head, replacing the muddy generated one
         if spiny(name) and head:
@@ -281,7 +284,7 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
                     if ch != '.': put(idx, l + w_ - 3 + i, t + h_ // 2 - 1 + j, hk[ch])
         return
     if name in ("FLY_A", "FLY_B", "DIVE"):                         # side-view big head, facing right, pixelled over the head only (the web head sits at (31,-17) / (18,-14))
-        rows = manhead.side_head("fly")                              # the dive is the same pose, tumbling
+        rows = manhead.side_head("dive" if name == "DIVE" else "fly")  # profile silhouette stays fixed; expression changes
         hk = {k: PI[v] for k, v in manhead.KEY.items()}
         cx, cy = 31, -17
         hx, hy = ax + int(round(cx * ppu)), ay + int(round(cy * ppu))
