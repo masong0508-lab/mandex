@@ -1512,10 +1512,24 @@ static int lord_danger(MxWorld *w, const MxTarget *t){
     const MxChunk *ch = &w->chunks[c];
     if(!ch->active) continue;
     real dx = t->x - ch->x, dy = t->y - ch->y;
-    if(rmul(ch->vx, ch->vx) + rmul(ch->vy, ch->vy) < R(31.6)) continue;            /* slower than 5.6 cells/s */
+    /* Landlords examine moving rubble every update. Reject remote chunks
+       before the two 64-bit fixed-point speed multiplications; no changes
+       to the tested danger range, movement or hazard thresholds. Toggle
+       exists for exact A/B simulation-state and CPU comparisons. */
+#ifndef MX_LORD_DANGER_SPATIAL_FIRST
+#define MX_LORD_DANGER_SPATIAL_FIRST 1
+#endif
+#if MX_LORD_DANGER_SPATIAL_FIRST
     if(rabs(dx) > ch->rad + R(5.75) || dy < -ch->rad - R(2.25)) continue;
     if(dy > ch->rad + RI(15) && ch->vy <= 0) continue;
     if(ch->vy < -R(2.5) && dy > 0) continue;
+    if(rmul(ch->vx, ch->vx) + rmul(ch->vy, ch->vy) < R(31.6)) continue;            /* slower than 5.6 cells/s */
+#else
+    if(rmul(ch->vx, ch->vx) + rmul(ch->vy, ch->vy) < R(31.6)) continue;
+    if(rabs(dx) > ch->rad + R(5.75) || dy < -ch->rad - R(2.25)) continue;
+    if(dy > ch->rad + RI(15) && ch->vy <= 0) continue;
+    if(ch->vy < -R(2.5) && dy > 0) continue;
+#endif
     { real lim = ch->rad + R(8.75); if(rmul(dx, dx) + rmul(dy, dy) < rmul(lim, lim)) return sgn(dx) ? sgn(dx) : (t->face ? t->face : 1); }
   }
   return 0;
