@@ -227,12 +227,33 @@ static int n3_rubble_damage_probe(void){
   return 0;
 }
 #ifdef MX_N3DS_PARTICLE_BENCH
+static int n3_particle_bounds_probe(void){
+  gfx_init();top.fb=fb_top[0];top.w=400;top.h=240;
+  memset(parts,0,sizeof parts);memset(pops,0,sizeof pops);part_high_water=0;
+#if MX_N3DS_PARTICLE_HINT
+  part_free_hint=0;
+#endif
+  for(int k=0;k<8;k++)spawn_k(20.f+k,15.f,.1f,0.f,14,RGB(206,165,120),0);
+  if(part_high_water!=8){fputs("FAIL: 3DS highwater allocation\n",stderr);return 1;}
+  for(int k=5;k<8;k++)parts[k].life=1;
+  tick_parts();
+  if(part_high_water!=5){fputs("FAIL: 3DS highwater tail expiry\n",stderr);return 1;}
+  spawn_k(27.f,16.f,.1f,0.f,14,RGB(206,165,120),0);
+  if(part_high_water!=6){fputs("FAIL: 3DS highwater reuse\n",stderr);return 1;}
+  View v={&top,3,50,22,30,10};
+  memset(fb_top[0],0,sizeof fb_top[0]);
+  draw_parts(&v);
+  printf("N3_PARTICLE_BOUNDS_HASH %08x\n",n3_hash(fb_top[0],sizeof fb_top[0]));
+  printf("N3_PARTICLE_BOUNDS_SCANNED %d\n",MX_N3DS_PARTICLE_BOUNDS?part_high_water:NP);
+  return 0;
+}
 /* Exercise the real sprite painter on both stereoscopic top-eye projections
  * and on the bottom screen, including deliberately offscreen effects. */
 static int n3_particle_view_probe(void){
   gfx_init();top.fb=fb_top[0];top.w=400;top.h=240;
   bot.fb=fb_bot;bot.w=320;bot.h=240;
   memset(parts,0,sizeof parts);
+  part_high_water=NP; /* generated positions are written without spawn_k() */
   for(int i=0;i<NP;i++){
     Part *p=&parts[i];
     p->x=(float)((i*37)%210)-42.0f;
@@ -252,6 +273,7 @@ static int n3_particle_view_probe(void){
 #endif
 int main(int argc, char **argv){
 #ifdef MX_N3DS_PARTICLE_BENCH
+  if(getenv("N3DS_PARTICLE_BOUNDS_PROBE"))return n3_particle_bounds_probe();
   if(getenv("N3DS_PARTICLE_VIEW_PROBE"))return n3_particle_view_probe();
 #endif
   if(getenv("N3DS_RUBBLE_DAMAGE_PROBE"))return n3_rubble_damage_probe();
