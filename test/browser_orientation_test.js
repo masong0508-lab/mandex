@@ -88,6 +88,7 @@ const env={
   openEditor:()=>{},importCode:()=>{},exportCode:()=>{},confirmDel:()=>true,
   pdSave:()=>{},pdTouch:()=>{},equip:()=>{},setMuted:()=>{},audioInit:()=>{},
   toolName:()=> 'NONE',toolCycle:()=>{},ownedCount:()=>4,achCount:()=>2,totalStars:()=>3,
+  mobilePage:(kind,n,size)=>Math.max(0,Math.min(Math.max(0,Math.ceil(n/size)-1),env.WEB_UI.page[kind]||0)),
   storyUnlocked:()=>true,ch2Unlocked:()=>true,ch3Unlocked:()=>true,
   SFX:{pop:()=>{},ding:()=>{}},performance:{now:()=>0}
 };
