@@ -134,14 +134,14 @@ void mx_meta_events(MxStats *s, const MxWorld *w){
   /* A counter reset (e.g. level restart) is a new baseline, not negative
    * progress. Use widened subtraction to avoid signed overflow. */
   int64_t delta = (int64_t)w->st_inflated - s->seen_st_inflated;
-  s->inflated = count_plus(s->inflated, delta > INT_MAX ? INT_MAX : (int)delta);
+  s->inflated = count_plus(s->inflated, delta <= 0 ? 0 : delta > INT_MAX ? INT_MAX : (int)delta);
   s->seen_st_inflated = w->st_inflated;
   delta = (int64_t)w->st_pops - s->seen_st_pops;
-  s->pops = count_plus(s->pops, delta > INT_MAX ? INT_MAX : (int)delta);
+  s->pops = count_plus(s->pops, delta <= 0 ? 0 : delta > INT_MAX ? INT_MAX : (int)delta);
   s->seen_st_pops = w->st_pops;
   for(int i = 1; i < 4; i++){
     delta = (int64_t)w->st_pw[i] - s->seen_pw[i];
-    s->pw[i] = count_plus(s->pw[i], delta > INT_MAX ? INT_MAX : (int)delta);
+    s->pw[i] = count_plus(s->pw[i], delta <= 0 ? 0 : delta > INT_MAX ? INT_MAX : (int)delta);
     s->seen_pw[i] = w->st_pw[i];
   }
 }
