@@ -68,10 +68,10 @@ assert.deepStrictEqual(points,before,'canonical detailed art positions unchanged
 assert(html.includes('const WISP=SPIN_WISP;'),'renderer reuses the static points');
 const buttons=between('const WALK_BUTTONS=', 'function drawWalkHUD(');
 const dims={w:960,h:540};
-const factory=new Function('dims',`let W=dims.w,H=dims.h;\n${buttons}\nreturn {get:walkBtns,resize:(w,h)=>{W=w;H=h}};`);
+const factory=new Function('dims',`let W=dims.w,H=dims.h,WEB_UI={portrait:false};const isPortrait=()=>WEB_UI.portrait;\n${buttons}\nreturn {get:walkBtns,resize:(w,h)=>{W=w;H=h},portrait:v=>{WEB_UI.portrait=v}};`);
 const b=factory(dims),prior=b.get(),identities=prior.slice();
 for(const [w,h] of [[960,540],[540,960],[320,568],[1280,720],[960,540]]){
-  b.resize(w,h);const arr=b.get(),y=h-64,rr=w-12;
+  b.resize(w,h);b.portrait(false);const arr=b.get(),y=h-64,rr=w-12;
   assert.strictEqual(arr,prior,'touch bar array is stable across frames and resizes');
   arr.forEach((v,i)=>assert.strictEqual(v,identities[i],'touch region reused '+i));
   assert.deepStrictEqual(arr.map(x=>[x.x,x.y,x.w,x.h]),[
@@ -79,6 +79,12 @@ for(const [w,h] of [[960,540],[540,960],[320,568],[1280,720],[960,540]]){
     [rr-202,y,62,54],[rr-132,y,62,54],[rr-62,y,62,54]
   ],'same responsive walk input hitboxes');
 }
+b.resize(540,960);b.portrait(true);
+assert.strictEqual(b.get(),prior,'portrait and landscape reuse the five hitbox objects');
+assert.deepStrictEqual(b.get().map(v=>[v.x,v.y,v.w,v.h]),[
+  [8,854,80,80],[96,854,80,80],[274,854,80,80],
+  [362,854,80,80],[450,854,80,80]
+],'portrait walking buttons are 80px, separated and inside the screen');
 const rawScript=between('<script>','</script>');
 new Function(rawScript.slice('<script>'.length)); // Syntax of whole bundled browser game.
 console.log('ok: '+cases+' walk-collision cases, '+hits+' hits / '+misses+' misses, '+hypotCalls+' narrow-phase distances');
