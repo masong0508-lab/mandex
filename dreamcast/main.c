@@ -471,6 +471,12 @@ static void fx_step(int calm, int strain){
 static int on_title = 1, title_t, paused, title_lv;
 static MxFpsMeter dc_fps;
 static unsigned long long dc_prev_ms;
+/* The PVR cutscene is a separate timeline. Never tick world physics,
+   landlord attacks, or achievement/save state behind the intro/end film.
+   Title and pause likewise freeze the world; only live gameplay advances. */
+static int dc_world_tick_allowed(void){
+  return !on_title && !paused && !in_intro;
+}
 static void dc_frame_complete(int simulated){
   unsigned long long now=timer_ms_gettime64();
   if(dc_prev_ms&&now>=dc_prev_ms)
@@ -1058,7 +1064,7 @@ int main(int argc, char **argv){
       prev=0;prev_trig=0;
     }
     if(on_title){ title_t++; }
-    else if(!paused){
+    else if(dc_world_tick_allowed()){
       mx_update(&world, DT);
       handle_events();
       mx_meta_events(&stats, &world);
@@ -1092,7 +1098,7 @@ int main(int argc, char **argv){
     }
     pvr_list_finish();
     pvr_scene_finish();
-    dc_frame_complete(!on_title&&!paused&&!in_intro);
+    dc_frame_complete(dc_world_tick_allowed());
   }
   return 0;
 }
