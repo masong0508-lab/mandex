@@ -620,7 +620,13 @@ static void draw_fore(const View *v){               /* grass blades and a fence 
   for(int x = -((int)g_pan % 18) - 18; x < s->w + 18; x += 18){ int h = 6 + ((x * 7 + 3) & 7), sw = (int)(sinf(frame * .05f + x) * 1.5f);
     rect(s, x + sw, gy - h + 6, 2, h, RGB(48, 140, 52)); rect(s, x + 4 + sw, gy - h / 2 + 6, 2, h / 2, RGB(70, 170, 70)); }
 }
-static void draw_shadow(const View *v, int cx, int cy_ground, int w){ rect(v->s, cx - w / 2, cy_ground, w, 3, RGB(60, 90, 40)); }
+/* Tight three-band contact shadow, not a solid rectangular sticker. */
+static void draw_shadow(const View *v,int cx,int cy_ground,int w){
+  if(w<2)w=2;
+  rect(v->s,cx-w/2,cy_ground,w,1,RGB(37,55,43));
+  rect(v->s,cx-w*2/5,cy_ground+1,w*4/5,1,RGB(24,38,35));
+  rect(v->s,cx-w/3,cy_ground+2,w*2/3,1,RGB(47,64,48));
+}
 
 /* ---- the web's 8x8 voxel sprites (paintCell), ported: built once per zoom level, box-filtered down to ppc x ppc, drawn per voxel */
 /* Two fixed zooms (top=3, bottom=4 px/cell): each texture is generated ONCE.
@@ -1115,7 +1121,12 @@ static void draw_valve(const View *v){
   if(m->mode == MAN_AIM && f > 0){ rect(v->s, x - p * 5, y - p * 9, p * 10, p, RGB(20, 24, 40)); rect(v->s, x - p * 5 + 1, y - p * 9 + 1, f * (p * 10 - 2) / 100, p - 2, f < 50 ? RGB(125, 255, 90) : f < 80 ? RGB(255, 210, 63) : RGB(255, 70, 70)); }
 }
 static void draw_world(const View *v){
-  draw_sky(v); draw_street_dressing(v); draw_rooms(v); draw_facades(v); draw_cells(v); draw_roof_trim(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
+  draw_sky(v); draw_street_dressing(v); draw_rooms(v); draw_facades(v); draw_cells(v); draw_roof_trim(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v);
+  /* Bottom touch-screen camera: ground the sprite on the ledge he is
+     standing on, including elevated debris, not only street level. */
+  if(world.man.mode==MAN_WALK && world.man.gr)
+    draw_shadow(v,VX(v,RTOF(world.man.x)),VY(v,RTOF(world.man.y)+2.375f)+1,v->ppc*5);
+  draw_man(v); draw_parts(v);
 }
 
 /* Stereoscopic top screen.  The slider sets how strong the depth is; each layer gets a horizontal disparity D (px at full slider):
@@ -1137,7 +1148,13 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
   a.ox = vt->ox + DX(-4); draw_sling(&a); draw_valve(&a);
   a.ox = vt->ox + DX(-5); draw_aim(&a);
   if(m->mode != MAN_NONE && m->mode != MAN_WAIT){                                         /* ground shadow stays on the ground plane, man lifts off it */
-    int sh = VX(&a, mxc); a.ox = vt->ox; draw_shadow(&a, VX(&a, mxc), VY(&a, (float)MX_ROWS) - 1, 26 - (int)(fabsf(RTOF(m->y) - MX_ROWS) * .3f > 14 ? 14 : fabsf(RTOF(m->y) - MX_ROWS) * .3f)); (void)sh; }
+    a.ox=vt->ox;
+    float foot=(m->mode==MAN_WALK && m->gr)?RTOF(m->y)+2.375f:(float)MX_ROWS;
+    float height=fabsf(foot-RTOF(m->y));
+    int width=(m->mode==MAN_WALK && m->gr)?vt->ppc*5:
+      26-(int)(height*.3f>14.f?14.f:height*.3f);
+    draw_shadow(&a,VX(&a,mxc),VY(&a,foot)-1,width);
+  }
   a.ox = vt->ox + DX(-7 - fly * 2 - dv); draw_man(&a);                                    /* he comes out of the screen when flying, further when diving */
   a.ox = vt->ox + DX(-10); draw_parts(&a);
   a.ox = vt->ox + DX(-16); draw_fore(&a);                                                 /* grass in the face */
