@@ -173,3 +173,13 @@ jobs:
           DC_FASTPATH_PROBE=1 /tmp/dc_smoke_1 > /tmp/dc_smoke_new.txt
           diff -u /tmp/dc_smoke_old.txt /tmp/dc_smoke_new.txt
           cat /tmp/dc_smoke_new.txt
+      - name: Dreamcast title/PVR memory and final-level navigation regression
+        run: |
+          set -eu
+          DC_MENU_FLOW_TEST=1 /tmp/dc_smoke_1 > /tmp/dc_menu_flow.log
+          grep -q 'returning to title reacquires the freed PVR texture' /tmp/dc_menu_flow.log
+          grep -q 'restored title image is byte-identical' /tmp/dc_menu_flow.log
+          grep -q 'winning final level returns to playable title' /tmp/dc_menu_flow.log
+          grep -q 'losing a level retries that same valid level' /tmp/dc_menu_flow.log
+          grep -q 'Dreamcast menu flow: all passed' /tmp/dc_menu_flow.log
+          cat /tmp/dc_menu_flow.log
