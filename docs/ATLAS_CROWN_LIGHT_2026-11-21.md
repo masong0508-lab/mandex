@@ -3,15 +3,18 @@
 ## What actually changed
 
 - Polished **94 existing palette pixels** in the **27 shipped human turn, reverse-turn, flight and dive sprites** inside `art/manspr.h`. No render-time procedural highlights are required.
+- Added **1,085 palette shading adjustments across 70 Wolfman bodies** below the skull pivot, restoring front-facing highlights and rear-edge shadows without painting over the canonical eyes, muzzle or ears.
+- Closed **48 tiny enclosed alpha pinholes across 39 sprites** around the upper body and hands. The conservative four-connected filter deliberately leaves larger transparent arm/elbow gaps and the spaces between legs untouched.
 - A restrained highlight now follows a consistent position across the changing crown width as the human character turns. Uses the existing palette entry `HAIRL` (index 23), replacing a few `HAIR` entries (index 11) without changing any opacity or the source image dimensions. Wolfman frames are untouched.
-- `tools/turn_hair_finish.py` implements the same offline algorithm with an idempotence check. `tools/gen_manspr.py` invokes it during future art bakes to preserve these edits if the whole atlas is regenerated.
-- `test/run_tests.sh` validates the **actual checked-in atlas** with `python3 ../tools/turn_hair_finish.py --check`, alongside the existing canonical turnaround geometry tests.
+- `tools/turn_hair_finish.py` and `tools/sprite_pinhole_cleanup.py` provide idempotent offline finishes. `tools/gen_manspr.py` invokes both during future art bakes. Its existing cel shading now includes Wolfman torsos, without touching the canonical face region.
+- `test/run_tests.sh` validates the **actual checked-in atlas** with both finishers' `--check` modes and `test/sprite_volume_continuity_test.py`, alongside the existing canonical turnaround geometry tests.
 
 ## Invariants
 
-- Same 142 atlas frames (71 human + 71 Wolfman), same palette (39 entries), same sprite widths/heights and anchor pivots, same transparent pixel mask.
-- No change to physics, hitboxes, footprints, RAM use, framebuffer or per-frame drawing cost. The generated C source retains the exact same length in bytes (94 substitutions from palette number 11 to 23).
-- Existing artistic identity, eyebrows, moustache, nose and chin landmarks stay in place.
+- Same 142 atlas frames (71 human + 71 Wolfman), same palette (39 entries), and same sprite widths/heights and anchor pivots. Only 48 specifically identified internal transparent holes are intentionally made opaque; all other alpha pixels and all larger cutouts are preserved.
+- The first crown-light pass was palette-only and replaced 94 indices 11→23, preserving transparency. The subsequent sprite-quality pass also seals 48 tiny *enclosed* transparent pinholes and pre-shades 1,085 Wolfman torso/rear pixels using existing palette indices. These intentional transparency fixes do not enlarge frames or alter the game-world hitboxes. The textual C header may grow slightly where an index changes from one to two decimal digits; compiled 8-bit pixel storage is still unchanged.
+- No changes to physics, runtime RAM budgets, framebuffer allocations, sprite dimensions/anchors, frame index order or per-frame rendering work.
+- Existing artistic identity, eyebrows, moustache, nose and chin landmarks stay in place. The Wolfman's muzzle/ears remain unpainted by torso-volume shading.
 
 ## Review
 
