@@ -1921,6 +1921,15 @@ static void upd_targets(MxWorld *w, real dt){
         MxCell *a = &ch->cells[k];
         if(a->dead)continue; /* shattered rubble has no collision body or invisible attacks */
         real ddx = a->wx - t->x, ddy = a->wy - t->y;
+#ifdef MX_FIXED
+        /* Both variants must reject enormous outlying rubble before
+           squaring fixed-point distances. With +/-256 cells on both axes,
+           dx*dx + dy*dy is safely below signed 20.12's 32-bit limit.
+           Without this guard, long-flung cells can wrap into a negative
+           contact distance and strike landlords from miles away. */
+        if(ddx<=-RI(256) || ddx>=RI(256) ||
+           ddy<=-RI(256) || ddy>=RI(256))continue;
+#endif
 #if MX_LORD_RUBBLE_AABB
         if(rabs(ddx)>=touch_lim || rabs(ddy)>=touch_lim)continue;
 #endif
