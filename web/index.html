@@ -1055,7 +1055,20 @@ function drawWalkMan(m){
     ctx.beginPath();ctx.arc(30,0,38,-.9,.9);ctx.stroke()}
   ctx.restore();
 }
-function walkTouch(x,y,id){for(const b of walkBtns())if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){KEYS[b.k]=true;TID[id]=b.k;return true}return false}
+/* Multiple touch IDs may press the same walk button. Release only the
+   last finger assigned to it, so a second finger never cancels the first. */
+function releaseWalkTouch(id){
+  const key=TID[id];if(!key)return;
+  delete TID[id];
+  KEYS[key]=Object.values(TID).includes(key);
+}
+function walkTouch(x,y,id){
+  for(const b of walkBtns())if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){
+    if(TID[id]&&TID[id]!==b.k)releaseWalkTouch(id);
+    KEYS[b.k]=true;TID[id]=b.k;return true;
+  }
+  return false;
+}
 /* The touch HUD is drawn every frame. Reuse the five hit-test objects,
  * updating only their positions when canvas dimensions change. */
 const WALK_BUTTONS=[{k:'TL',t:'<',x:10,y:0,w:62,h:54},{k:'TR',t:'>',x:82,y:0,w:62,h:54},
@@ -3501,7 +3514,11 @@ cv.addEventListener('pointerdown',e=>{
   if(man.mode==='aim'&&!man.chug&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(wx-VX,wy-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}   // tap the valve: he sits and fills; drag him off to fire
   if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
-cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
+cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
+  if(state==='play'&&man.mode==='walk'&&TID[e.pointerId]){
+    walkTouch(mx,my,e.pointerId);return;
+  }
+  if(state==='edit'){eMove(mx,my);return}if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
   if(vOn&&dv<VPULL){const k=.9*(VPULL-dv)/(VPULL-VGRAB);man.x+=(VX-man.x)*k;man.y+=(VY-man.y)*k}});   // nearing the valve the sling stretches on back toward it (power stays a full pull), then he drops onto it
 cv.addEventListener('pointerup',()=>{sodaHold=false;if(sliderDrag){sliderDrag=false;pdSave();SFX.boing()}if(state==='edit'){eUp();return}if(dragging){dragging=false;if(man.mode==='aim'){if(man.vlv){man.seated=true;return}man.seated=false;launch()}}});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keyup',e=>{KEYS[e.code]=false});
@@ -3513,7 +3530,7 @@ addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false;clearTouchState()
 addEventListener('orientationchange',clearTouchState);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTouchState()});
 for(const ev of['pointerup','pointercancel','lostpointercapture'])cv.addEventListener(ev,e=>{
-  const k=TID[e.pointerId];if(k){KEYS[k]=false;delete TID[e.pointerId]}
+  releaseWalkTouch(e.pointerId);
 });
 cv.addEventListener('pointercancel',()=>{dragging=false;sodaHold=false;sliderDrag=false});
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
