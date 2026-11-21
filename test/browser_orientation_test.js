@@ -109,4 +109,23 @@ assert.deepStrictEqual(cells.get(80,144),[10,18],
   'returning to landscape preserves the original world coordinates');
 assert(html.includes('function drawMobileEditor()'),'phone-native editor must exist');
 assert(html.includes('ctx.translate(-mobileEditorPan,0)'),'world drawing and inputs share the same pan offset');
-console.log('WEB_ORIENTATION_PASS viewport=portrait+landscape states=10 menu=touch select=paged editor=worldpan');
+/* Multitouch gameplay must not accidentally release a shared key, and
+   sliding a captured finger to the opposite direction switches cleanly. */
+const touchCode=between('function releaseWalkTouch(', 'function drawWalkHUD(');
+const touchFactory=new Function(
+  'let W=540,H=960,mobilePortrait=true;const KEYS={},TID={};'+touchCode+
+  '\nreturn {tap:walkTouch,release:releaseWalkTouch,keys:KEYS,tids:TID,buttons:walkBtns};'
+);
+const touch=touchFactory(),press=(i,id)=>{
+  const b=touch.buttons()[i];return touch.tap(b.x+b.w/2,b.y+b.h/2,id);
+};
+assert(press(0,101)&&press(0,102),'two fingers can hold LEFT');
+touch.release(101);assert(touch.keys.TL,'first release cannot cancel remaining finger');
+assert(press(1,102),'captured thumb slides from LEFT to RIGHT');
+assert(!touch.keys.TL&&touch.keys.TR,'opposing directions switch without sticking');
+touch.release(102);assert(!touch.keys.TR,'last release clears movement');
+assert(press(3,103)&&press(4,104),'PUNCH and JUMP support independent fingers');
+touch.release(103);assert(!touch.keys.TP&&touch.keys.TJ,'releasing punch preserves jump');
+touch.release(104);assert(!touch.keys.TJ&&Object.keys(touch.tids).length===0,
+  'all touch state is cleaned on release');
+console.log('WEB_ORIENTATION_PASS viewport=portrait+landscape states=10 menu=touch select=paged editor=worldpan multitouch=held');
