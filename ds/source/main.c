@@ -893,6 +893,20 @@ static void draw_chunks(const View *v){
 #ifndef MX_DS_CULL_TARGETS
 #define MX_DS_CULL_TARGETS 0 /* enabled only if proven fast on the target */
 #endif
+#ifndef MX_DS_INTEGER_WALK_PHASE
+#define MX_DS_INTEGER_WALK_PHASE 1
+#endif
+/* The DS ARM9 has no FPU. Walking distance is a positive 20.12 fixed-point
+   accumulator; multiplying its whole and fractional parts by 14 avoids
+   float conversion and software floating-point multiplication per landlord.
+   Both terms stay in 32 bits even at the representable distance limit.
+   Keep the original path as a compile-time A/B reference. */
+static int ds_target_walk_phase(real wk){
+#if MX_DS_INTEGER_WALK_PHASE
+  if(wk >= 0) return (wk >> 12)*14 + (((wk & 4095)*14) >> 12);
+#endif
+  return (int)(RTOF(wk)*14.0f);
+}
 static void draw_targets(const View *v){
   const MxMan *m = &world.man;
   for(int i=0;i<world.ntargets;i++){
@@ -919,7 +933,7 @@ static void draw_targets(const View *v){
            (t->mv==1?8:0)|(t->mv==2?16:0)|(t->armor?32:0);
     /* The shared AI accumulates actual walking distance in t->wk.
        Grounded gait freezes when motion stops or a route is blocked. */
-    int phase=t->mv?(int)(RTOF(t->wk)*14.0f):frame+i*11;
+    int phase=t->mv?ds_target_walk_phase(t->wk):frame+i*11;
     if(t->kind||st)spr_landlord_k(v->buf,sx,sy,v->ppc,phase,scared,t->kind,t->face<0?-1:1,st);
     else spr_landlord(v->buf,sx,sy,v->ppc,phase,scared);
     if(t->hpmax>1)spr_hpbar(v->buf,sx,sy,v->ppc,t->hp,t->hpmax);
