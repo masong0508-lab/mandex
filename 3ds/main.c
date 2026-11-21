@@ -322,9 +322,17 @@ static void on_events(void){
     case EV_CRACK: for(int k = 0; k < 2; k++) spawn(x, y, (rand() % 9 - 4) * .1f, -(.2f + (rand() % 5) * .1f), 17, RGB(185, 170, 148)); break;
     case EV_THUD: if(e->a > R(0.6)) for(int k = 0; k < 4; k++)
       spawn(x, y, (rand() % 11 - 5) * .22f, -(rand() % 8) * .12f, 20, RGB(178, 165, 139)); break;
-    case EV_CRUMBLE:
-      for(int k = 0; k < 8; k++) spawn(x + (rand() % 9 - 4), y, (rand() % 11 - 5) * .14f, -(rand() % 8) * .14f, 22, RGB(178, 165, 139));
-      popup(x, y - 4, "CRUMBLE!", RGB(255, 210, 63)); break;
+    case EV_CRUMBLE: {
+      const int tier=mx_crumble_tier(e->a), n=8+2*tier;
+      for(int k=0;k<n;k++)
+        spawn(x+(rand()%9-4),y,(rand()%11-5)*.14f,-(rand()%8)*.14f,22,RGB(178,165,139));
+      /* Two starbursts at the centre read as a falling facade, without a
+         second particle array or added framebuffer/stereo allocations. */
+      if(tier>=2)
+        for(int k=0;k<2*tier;k++)
+          spawn_k(x+(k-tier)*2,y-3,(float)(k-tier)*.17f,-.4f,18,RGB(255,210,63),2);
+      popup(x,y-4,tier>=2?"BUILDING DOWN!":"CRUMBLE!",RGB(255,210,63));
+      break; }
     case EV_SPLAT: for(int k = 0; k < 12; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 30, RGB(110, 255, 90)); break;
     case EV_TUBE: { static const u32 TC[3] = { RGB(255, 154, 60), RGB(79, 208, 255), RGB(140, 255, 90) };        /* posted through a pneumatic tube */
       for(int k = 0; k < 16; k++){ float an = k * .39f; spawn(x, y, cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); spawn(RTOF(e->a), RTOF(e->b), cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); }
@@ -893,15 +901,16 @@ static void draw_man(const View *v){
   if(m->mode == MAN_WALK){                                                   /* on his own feet: the turning frames step him along, three quarters of the sling size */
     if(m->hurtCd > 0 && (frame & 2)) return;
     int q = (p * 3 + 2) / 4, phase = mx_walk_anim_phase(m);
-    int wf = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
-    int fc = m->face < 0 ? -1 : 1;
+    int wf = MSF_SPIN_6 + (m->turn_ticks ? mx_walk_turn_offset(m) :
+                              phase == 0 ? -1 : phase == 2 ? 1 : 0);
+    int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
     const MsFrame *f = &MS_FRAMES[wf + (man_fur ? MSF_NBASE : 0)];
-    int fy = VY(v, RTOF(m->y) + 2.375f) - (phase == 1 || phase == 3 ? 1 : 0);
+    int fy = VY(v, RTOF(m->y) + 2.375f) - (int)lroundf(RTOF(mx_walk_foot_lift(m)) * p);
     blit_frame(v->s, wf, x, fy - fdiv4((f->h - f->ay) * q), q, fc);
     if(m->pT > 0){ for(int k = -3; k <= 3; k++) px(v->s, x + fc * (p * 5 - k * k * p * 5 / 18) + fc * p * 4, y + k * p * 3 / 4, RGB(255, 255, 255)); }
     return;
   }
-  if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : (((frame >> 2) & 1) ? MSF_FLY_A : MSF_FLY_B); }
+  if(m->mode == MAN_FLY){ face = m->face < 0 ? -1 : 1; fr = m->dive ? MSF_DIVE : (((frame >> 2) & 1) ? MSF_FLY_A : MSF_FLY_B); }
   else if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); fr = ((frame >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
   else if(dragging) fr = MSF_DRAG;
   else fr = mi_frame(&mi, frame);                                            /* idle gags */
@@ -987,9 +996,23 @@ static void draw_aim(const View *v){
     rect(v->s, VX(v, RTOF(ox)) - 1, VY(v, RTOF(oy)) - 1, 3, 3, RGB(255, 255, 255));
   }
 }
+#ifndef MX_N3DS_PARTICLE_VIEW_CULL
+#define MX_N3DS_PARTICLE_VIEW_CULL 1
+#endif
+#ifdef MX_N3DS_PARTICLE_BENCH
+static unsigned n3_particles_rasterized; /* host diagnostic; zero runtime cost */
+#endif
 static void draw_parts(const View *v){
   for(int i = 0; i < NP; i++) if(parts[i].life > 0){
     const Part *q = &parts[i]; int x = VX(v, q->x), y = VY(v, q->y), k = v->ppc >= 4 ? 2 : 1;
+#if MX_N3DS_PARTICLE_VIEW_CULL
+    /* Hearts are <=10 px wide and glints have <=9 px arms.
+       Conservatively skip only effects fully outside this stereo viewport. */
+    if(x < -12 || x >= v->s->w+12 || y < -12 || y >= v->s->h+12) continue;
+#endif
+#ifdef MX_N3DS_PARTICLE_BENCH
+    n3_particles_rasterized++;
+#endif
     if(q->kind == 1){                                                        /* heart: two bumps and a point */
       rect(v->s, x - 2 * k, y - k, 2 * k, 2 * k, q->c); rect(v->s, x + 1, y - k, 2 * k, 2 * k, q->c);
       rect(v->s, x - 2 * k, y, 5 * k - (k - 1), k, q->c); rect(v->s, x - k, y + k, 3 * k, k, q->c); rect(v->s, x, y + 2 * k, k, k, q->c);
@@ -1144,6 +1167,8 @@ static int was_state;
 /* Real wall-clock frame completion, sampled after VBlank. */
 static MxFpsMeter n3_fps;
 static unsigned long long n3_prev_ms;
+/* CPU drawing duration for top stereo eyes + touch screen, excluding VBlank. */
+static unsigned n3_draw_ms_last,n3_draw_ms_peak,n3_draw_ms_window,n3_draw_frames;
 static void n3_frame_complete(int simulated){
   unsigned long long now=osGetTime();
   if(n3_prev_ms && now>=n3_prev_ms)
@@ -1324,6 +1349,7 @@ int main(void){
     }
 
     /* ---- draw ---- */
+    unsigned long long n3_draw_begin=osGetTime();
     bot.fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL); bot.w = 320; bot.h = 240;
     float sl = osGet3DSliderState();                   /* the 3D slider: 0 = flat, 1 = full depth */
     gfxSet3D(sl > 0.03f);
@@ -1367,8 +1393,10 @@ int main(void){
       snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d",
         (int)n3_fps.render_x10/10,(int)n3_fps.render_x10%10,
         (int)n3_fps.sim_x10/10,(int)n3_fps.sim_x10%10);
-      rect(&top,2,2,168,13,RGB(15,18,30));
+      rect(&top,2,2,168,26,RGB(15,18,30));
       text(&top,5,4,stats_line,1,RGB(255,220,120));
+      snprintf(stats_line,sizeof stats_line,"DRAW %uMS  PEAK %uMS",n3_draw_ms_last,n3_draw_ms_peak);
+      text(&top,5,16,stats_line,1,RGB(255,220,120));
     }
     }
     vb.cx = world.man.mode == MAN_WALK ? fminf(fmaxf(RTOF(world.man.x) - 40.0f, 0.0f), 40.0f) : -24.0f;        /* on foot the touch screen follows him, above the buttons */
@@ -1406,6 +1434,14 @@ int main(void){
       }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
     } else if(app == ST_TITLE) textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));
+    { unsigned long long end=osGetTime();
+      n3_draw_ms_last=end>=n3_draw_begin?(unsigned)(end-n3_draw_begin):0;
+      if(n3_draw_ms_last>n3_draw_ms_window)n3_draw_ms_window=n3_draw_ms_last;
+      if(++n3_draw_frames>=60){
+        n3_draw_ms_peak=n3_draw_ms_window;
+        n3_draw_ms_window=n3_draw_frames=0;
+      }
+    }
     gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();
     n3_frame_complete(app==ST_PLAY);
   }

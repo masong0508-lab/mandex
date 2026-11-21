@@ -1165,7 +1165,8 @@ static void end_run(MxWorld *w){
   real cx = 0, cy = 0;
   int n = aftershock(w, &cx, &cy);
   if(n){
-    if(w->shake < R(3)) w->shake = R(3);
+    real sh=RI(3+mx_crumble_tier(RI(n)));
+    if(w->shake<sh)w->shake=sh;
     ev(w, EV_CRUMBLE, cx, cy, 0, RI(n), 0);
   }
 }
@@ -1437,6 +1438,7 @@ void mx_release(MxWorld *w){
       if(pw==PW_TURBO){m->vx=rmul(m->vx,R(1.35));m->vy=rmul(m->vy,R(1.35));}
     } }
   m->mode = MAN_FLY; m->gt = 0; w->men--;
+  m->face = m->vx < 0 ? -1 : 1;
   m->spin = 0; m->ang = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
   ev(w, EV_LAUNCH, m->x, m->y, 0, 0, 0);
 }
@@ -1742,7 +1744,9 @@ static int wblocked(const MxWorld *w, real x, real y){
 #define PX(n) rmul(RI(n), R(0.125))
 static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
-  m->face = m->vx < 0 ? -1 : 1; m->mode = MAN_WALK; m->walked = 1; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0;
+  mx_flight_face_update(m);
+  if(m->face != -1) m->face = 1;
+  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0;
   m->in_ax = 0; m->in_jump = m->in_punch = m->in_stomp = 0;
   int ok = !wblocked(w, m->x, m->y);
   for(int u = 1; u <= 110 && !ok; u++) if(!wblocked(w, m->x, m->y - PX(u))){ m->y -= PX(u); ok = 1; }
@@ -1816,7 +1820,11 @@ static void walk_step(MxWorld *w, real dt){
   /* Don't count a forced pop-out from rubble as a walking stride. */
   const real stride_start_x=m->x;
   int ax = m->in_ax;
-  if(ax) m->face = (int8_t)ax;
+  if(ax && ax != m->face){ /* gameplay turns immediately; silhouette completes a short back-view turn */
+    m->face=(int8_t)ax;
+    m->turn_ticks=12;
+  } else if(ax) m->face=(int8_t)ax;
+  if(m->turn_ticks) m->turn_ticks--;
   { real tv = ax > 0 ? R(16.875) : ax < 0 ? -R(16.875) : 0, k = rmul(dt, m->gr ? RI(14) : RI(5)); if(k > RI(1)) k = RI(1); m->vx += rmul(tv - m->vx, k); }
   if(m->pCd > 0) m->pCd -= dt;
   if(m->pT > 0) m->pT -= dt;
@@ -2511,6 +2519,7 @@ void mx_update(MxWorld *w, real dt){
   }
 
   if(m->mode == MAN_FLY){
+    mx_flight_face_update(m);
     for(int i = 0; i < 8 && m->mode == MAN_FLY; i++){
 #ifdef MX_FIXED
       real sub = (dt >> 3) + (i < (dt & 7));          /* 8 slices that add up to exactly dt (dt/8 alone loses ~6%) */
@@ -2519,6 +2528,7 @@ void mx_update(MxWorld *w, real dt){
 #endif
       man_step(w, sub);
     }
+    if(m->mode == MAN_FLY)mx_flight_face_update(m);
     if(m->mode == MAN_FLY){
       if(m->x > RI(MX_COLS + 12) || m->x < RI(-12) || m->gt > RI(9)) end_run(w);
     }

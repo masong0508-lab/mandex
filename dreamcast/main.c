@@ -61,6 +61,7 @@ static int dc_valve_equipped; /* selected explicitly; hidden during ordinary sho
 static int hint_t;                            /* ticks left of the 'pull back' hint */
 static int bank_toast_t;                      /* rubber rebound trick shot HUD message */
 static int survivor_toast_t;                  /* rare catastrophic collapse escape */
+static int collapse_toast_t;                   /* capped severe aftershock tell */
 static float MAXHP[MX_NMAT];                 /* filled from the core's material table in main() */
 
 static uint32 argb(int r, int g, int b, int a){ return ((uint32)a << 24) | ((uint32)r << 16) | ((uint32)g << 8) | (uint32)b; }
@@ -318,8 +319,12 @@ static void handle_events(void){
                     break;
     case EV_THUD: if(e->a > R(0.6)) for(int k = 0; k < 4; k++)
       spawn(e->x, e->y, argb(175, 165, 145, 235), 190); break;
-    case EV_CRUMBLE: for(int k = 0; k < 10; k++)
-      spawn(e->x, e->y, k & 1 ? argb(191, 181, 162, 240) : argb(140, 134, 127, 240), 280); break;
+    case EV_CRUMBLE: {
+      int tier=mx_crumble_tier(e->a);
+      for(int k=0;k<8+2*tier;k++)
+        spawn(e->x,e->y,k&1?argb(191,181,162,240):argb(140,134,127,240),280);
+      if(tier>=2) collapse_toast_t=75+12*tier;
+      break; }
     case EV_BOUNCE: for(int k = 0; k < 10; k++) spawn(e->x, e->y, k & 1 ? argb(255, 126, 176, 255) : argb(255, 255, 255, 255), 420); break;
     case EV_TARGET: for(int k = 0; k < 14; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 360);
       if(e->b > 0) bank_toast_t = 105; break;
@@ -477,6 +482,7 @@ static void idle_fx(int fx, float wx, float wy, int face){
 /* one 60 Hz tick of everything cosmetic: idle gags, trails, particles */
 static void fx_step(int calm, int strain){
   fcount++;
+  if(collapse_toast_t>0)collapse_toast_t--;
   if(calm){ mi_update(&mi); if(mi.fx) idle_fx(mi.fx, world.man.x, world.man.y, 1); } else mi_reset(&mi);     /* gags run only while he waits, hands off */
   if(world.state == MX_PLAY && world.man.mode == MAN_FLY && fcount % 10 == 0)                                  /* stink trail */
     spawn_k(PK_STINK, world.man.x - (world.man.vx > 0 ? 2 : -2), world.man.y + 1, (frand() - 0.5f) * 30, (frand() - 0.5f) * 20, 0.7f + frand() * 0.4f, argb(135, 220, 75, 255));
@@ -502,6 +508,8 @@ static void fx_step(int calm, int strain){
 static int on_title = 1, title_t, paused, title_lv;
 static MxFpsMeter dc_fps;
 static unsigned long long dc_prev_ms;
+/* Last draw-list CPU time and the prior 60-frame high-water, in milliseconds. */
+static unsigned dc_draw_ms_last,dc_draw_ms_peak,dc_draw_ms_window,dc_draw_window_frames;
 /* The PVR cutscene is a separate timeline. Never tick world physics,
    landlord attacks, or achievement/save state behind the intro/end film.
    Title and pause likewise freeze the world; only live gameplay advances. */
@@ -728,6 +736,39 @@ static void draw_rubble_chunks(void){
     }
   }
 }
+#ifndef MX_DC_PARTICLE_VIEW_CULL
+#define MX_DC_PARTICLE_VIEW_CULL 1
+#endif
+#ifdef MX_DC_PARTICLE_BENCH
+static unsigned dc_particles_rasterized; /* host-only work counter */
+#endif
+static void draw_particles(void){
+  for(int i = 0; i < 256; i++) if(parts[i].life > 0){
+    const Part *p = &parts[i];
+#if MX_DC_PARTICLE_VIEW_CULL
+    /* Each effect is contained within 32px of its anchor. The 64px pad
+       safely covers text, heart arcs and oscillating sprite trails. */
+    if(p->x < -64.0f || p->x >= 704.0f ||
+       p->y < -64.0f || p->y >= 544.0f)continue;
+#endif
+#ifdef MX_DC_PARTICLE_BENCH
+    dc_particles_rasterized++;
+#endif
+    float age = 1.0f - p->life / p->max;
+    uint32 c = p->c & 0x00ffffff;
+    switch(p->kind){
+    case PK_STINK: { float r = 7 + age * 20; int a = (int)(150 * (1.0f - age * age)); puff(p->x, p->y, r, Z_FX, c | ((uint32)(a > 20 ? a : 20) << 24)); break; }   /* green cloud: swells, then thins out */
+    case PK_FLY: { float t = world.time * 18.0f + i; quad(p->x + sinf(t * 1.3f) * 9, p->y + cosf(t) * 7, 3, 3, Z_FX, p->c); break; }
+    case PK_ZZZ: { text("Z", p->x, p->y, 16 + age * 8, argb(255, 255, 255, (int)(255 * (1.0f - age))), 1, Z_FX); break; }
+    case PK_SWEAT: puff(p->x, p->y, 3.0f, Z_FX, p->c); break;
+    case PK_HEART: { float r = 7 + 2 * sinf(world.time * 9 + i), hx = p->x + sinf(world.time * 4 + i) * 5;      /* two blobs and a point: a heart */
+      puff(hx - r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c); puff(hx + r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c);
+      { float xs[4] = { hx - r * 1.1f, hx, hx, hx + r * 1.1f }, ys[4] = { p->y, p->y - 0.1f, p->y + r * 1.3f, p->y }; quad4(xs, ys, Z_FX, p->c); } break; }
+    case PK_GLINT: { float r = 10 * sinf(age * 3.14159f); if(r > 0){ quad(p->x - r, p->y - 1, r * 2, 2, Z_FX, p->c); quad(p->x - 1, p->y - r, 2, r * 2, Z_FX, p->c); } break; }
+    default: { float a = 1.0f - age; puff(p->x, p->y, 3.4f + a * 1.6f, Z_FX, c | ((uint32)((int)(255 * (a > 0.3f ? 1.0f : a / 0.3f))) << 24)); }
+    }
+  }
+}
 static void draw_all(void){
   shx = shy = 0;
   if(world.shake > 0.05f){ shx = (frand() - 0.5f) * world.shake * 0.6f; shy = (frand() - 0.5f) * world.shake * 0.6f; }
@@ -826,7 +867,7 @@ static void draw_all(void){
     }
     else if(m->mode == MAN_WALK){ fr = -1; }
     else if(m->mode == MAN_STUCK){ puff(x, y + 6, 30, Z_MAN - 0.2f, argb(111, 227, 74, 200)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
-    else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
+    else if(m->mode == MAN_FLY){ face = m->face < 0 ? -1 : 1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
     if(m->mode == MAN_AIM || m->mode == MAN_FLY){                         /* his shadow on the ground: smaller and fainter the higher he is */
       float hgt = (MX_ROWS - m->y) / 40.0f; if(hgt < 0) hgt = 0; if(hgt > 1) hgt = 1;
       float rw = 30.0f * (1.0f - 0.55f * hgt); quad(XB(m->x) - rw, YB(MX_ROWS) + 1, rw * 2, 4, Z_SLING + 0.05f, argb(0, 0, 0, (int)(90 - 60 * hgt)));
@@ -834,10 +875,11 @@ static void draw_all(void){
     if(m->mode == MAN_WALK){                                              /* on his own feet: the turning frame steps him along, three quarters of the sling size */
       if(!(m->hurtCd > 0 && (fcount & 2))){
         int phase = mx_walk_anim_phase(m);
-        int wf = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
-        int fc = m->face < 0 ? -1 : 1;
+        int wf = MSF_SPIN_6 + (m->turn_ticks ? mx_walk_turn_offset(m) :
+                                   phase == 0 ? -1 : phase == 2 ? 1 : 0);
+        int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
         const short *f = DCM_FR[wf + (man_fur ? MSF_NBASE : 0)]; float zm = man_zoom; man_zoom = zm * 0.75f;
-        float foot = Y(m->y + 2.375f) - (phase == 1 || phase == 3 ? 1.0f : 0.0f);
+        float foot = Y(m->y + 2.375f) - RTOF(mx_walk_foot_lift(m))*PXC;
         draw_frame(wf, x, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
         man_zoom = zm;
         if(m->pT > 0) for(int k = -3; k <= 3; k++) puff(x + fc * (24 - k * k * 1.4f) + fc * 18, y + k * 3.4f, 1.8f, Z_MAN + 0.3f, WHITE);
@@ -861,21 +903,7 @@ static void draw_all(void){
   }
   if(m->mode == MAN_AIM)
     seg(XB(MX_ANCHOR_X) - 6.0f, YB(MX_ANCHOR_Y) + 13.8f, X(m->x) - 1.0f, Y(m->y) + 3.8f, 2.8f, Z_MAN + 1.0f, argb(42, 22, 10, 255));
-  for(int i = 0; i < 256; i++) if(parts[i].life > 0){
-    const Part *p = &parts[i]; float age = 1.0f - p->life / p->max;
-    uint32 c = p->c & 0x00ffffff;
-    switch(p->kind){
-    case PK_STINK: { float r = 7 + age * 20; int a = (int)(150 * (1.0f - age * age)); puff(p->x, p->y, r, Z_FX, c | ((uint32)(a > 20 ? a : 20) << 24)); break; }   /* green cloud: swells, then thins out */
-    case PK_FLY: { float t = world.time * 18.0f + i; quad(p->x + sinf(t * 1.3f) * 9, p->y + cosf(t) * 7, 3, 3, Z_FX, p->c); break; }
-    case PK_ZZZ: { text("Z", p->x, p->y, 16 + age * 8, argb(255, 255, 255, (int)(255 * (1.0f - age))), 1, Z_FX); break; }
-    case PK_SWEAT: puff(p->x, p->y, 3.0f, Z_FX, p->c); break;
-    case PK_HEART: { float r = 7 + 2 * sinf(world.time * 9 + i), hx = p->x + sinf(world.time * 4 + i) * 5;      /* two blobs and a point: a heart */
-      puff(hx - r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c); puff(hx + r * 0.55f, p->y - r * 0.3f, r * 0.7f, Z_FX, p->c);
-      { float xs[4] = { hx - r * 1.1f, hx, hx, hx + r * 1.1f }, ys[4] = { p->y, p->y - 0.1f, p->y + r * 1.3f, p->y }; quad4(xs, ys, Z_FX, p->c); } break; }
-    case PK_GLINT: { float r = 10 * sinf(age * 3.14159f); if(r > 0){ quad(p->x - r, p->y - 1, r * 2, 2, Z_FX, p->c); quad(p->x - 1, p->y - r, 2, r * 2, Z_FX, p->c); } break; }
-    default: { float a = 1.0f - age; puff(p->x, p->y, 3.4f + a * 1.6f, Z_FX, c | ((uint32)((int)(255 * (a > 0.3f ? 1.0f : a / 0.3f))) << 24)); }
-    }
-  }
+  draw_particles();
   if(world.flash > 0){ int a = (int)(world.flash * 400); if(a > 255) a = 255; quad(0, 0, 640, 480, Z_HUD - 0.5f, argb(255, 240, 200, a)); }
 
   /* HUD */
@@ -897,6 +925,9 @@ static void draw_all(void){
     quad(18, 74, 174.0f * world.combo_left / 2.5f, 3, Z_HUD + 0.1f, argb(255, 210, 63, 255)); }
   if(bank_toast_t > 0 && world.state == MX_PLAY)
     text("BANK SHOT! +1500", 18, world.combo > 1 ? 99 : 69, 20, argb(255, 126, 176, 255), 0, Z_HUD + 0.1f);
+  if(collapse_toast_t>0 && world.state==MX_PLAY)
+    text("BUILDING DOWN!",320,104,24,argb(255,210,63,
+         collapse_toast_t<24?collapse_toast_t*10:240),1,Z_HUD+0.2f);
   if(survivor_toast_t > 0 && world.state == MX_PLAY)
     text("SOMEHOW ALIVE!", 18, world.combo > 1 || bank_toast_t > 0 ? 124 : 69, 20, argb(255, 210, 63, 255), 0, Z_HUD + 0.1f);
   if(hint_t > 0 && world.state == MX_PLAY && m->mode == MAN_AIM)
@@ -962,7 +993,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ bank_toast_t = survivor_toast_t = 0; mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
+static void load_level(int n){ bank_toast_t = survivor_toast_t = collapse_toast_t = 0; mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
 
 static void draw_intro(void){
   intro_draw(ic_top, ic_bot); ic_upload(tx_ic_top, ic_top); ic_upload(tx_ic_bot, ic_bot);
@@ -1136,21 +1167,31 @@ int main(int argc, char **argv){
       }
     }
     pvr_wait_ready();
+    unsigned long long dc_draw_begin=timer_ms_gettime64();
     pvr_scene_begin();
     pvr_list_begin(PVR_LIST_TR_POLY);
     cur_hdr = 0;
     if(in_intro){ draw_intro();
     } else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART   B MUSIC", 320, 270, 24, WHITE, 1, Z_HUD); text("DPAD LEFT: TITLE MENU", 320, 344, 22, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
     if(st&&st->ltrig>128&&st->rtrig>128){
-      char stats_line[60];
-      snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d",
+      char stats_line[76];
+      snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d DRAW %uMS PEAK %u",
                (int)dc_fps.render_x10/10,(int)dc_fps.render_x10%10,
-               (int)dc_fps.sim_x10/10,(int)dc_fps.sim_x10%10);
-      quad(8,8,224,24,Z_HUD+4,argb(12,16,31,225));
-      text(stats_line,120,12,15,argb(255,218,116,255),1,Z_HUD+5);
+               (int)dc_fps.sim_x10/10,(int)dc_fps.sim_x10%10,
+               dc_draw_ms_last,dc_draw_ms_peak);
+      quad(8,8,366,24,Z_HUD+4,argb(12,16,31,225));
+      text(stats_line,190,12,13,argb(255,218,116,255),1,Z_HUD+5);
     }
     pvr_list_finish();
     pvr_scene_finish();
+    { unsigned long long end=timer_ms_gettime64();
+      dc_draw_ms_last=end>=dc_draw_begin?(unsigned)(end-dc_draw_begin):0;
+      if(dc_draw_ms_last>dc_draw_ms_window)dc_draw_ms_window=dc_draw_ms_last;
+      if(++dc_draw_window_frames>=60){
+        dc_draw_ms_peak=dc_draw_ms_window;
+        dc_draw_ms_window=dc_draw_window_frames=0;
+      }
+    }
     dc_frame_complete(dc_world_tick_allowed());
   }
   return 0;

@@ -226,7 +226,34 @@ static int n3_rubble_damage_probe(void){
   printf("N3_RUBBLE_DAMAGE_PASS intact=%08x damaged=%08x\n",intact,cracked);
   return 0;
 }
+#ifdef MX_N3DS_PARTICLE_BENCH
+/* Exercise the real sprite painter on both stereoscopic top-eye projections
+ * and on the bottom screen, including deliberately offscreen effects. */
+static int n3_particle_view_probe(void){
+  gfx_init();top.fb=fb_top[0];top.w=400;top.h=240;
+  bot.fb=fb_bot;bot.w=320;bot.h=240;
+  memset(parts,0,sizeof parts);
+  for(int i=0;i<NP;i++){
+    Part *p=&parts[i];
+    p->x=(float)((i*37)%210)-42.0f;
+    p->y=(float)((i*47)%130)-29.0f;
+    p->life=15+(i%8);p->kind=i%3;p->c=RGB(150+(i&31),100+(i&63),135+(i&47));
+  }
+  View vt={&top,3,120,60,45,18},vr={&top,3,124,60,45,18},vb={&bot,4,70,35,45,18};
+  memset(fb_top,0,sizeof fb_top);memset(fb_bot,0,sizeof fb_bot);
+  n3_particles_rasterized=0;
+  draw_parts(&vt);top.fb=fb_top[1];draw_parts(&vr);draw_parts(&vb);
+  printf("N3_PARTICLE_VIEW_HASH %08x %08x %08x\n",
+         n3_hash(fb_top[0],sizeof fb_top[0]),n3_hash(fb_top[1],sizeof fb_top[1]),
+         n3_hash(fb_bot,sizeof fb_bot));
+  printf("N3_PARTICLE_VIEW_RASTERIZED %u\n",n3_particles_rasterized);
+  return 0;
+}
+#endif
 int main(int argc, char **argv){
+#ifdef MX_N3DS_PARTICLE_BENCH
+  if(getenv("N3DS_PARTICLE_VIEW_PROBE"))return n3_particle_view_probe();
+#endif
   if(getenv("N3DS_RUBBLE_DAMAGE_PROBE"))return n3_rubble_damage_probe();
   if(getenv("N3DS_FASTPATH_PROBE"))return n3_fastpath_probe();
   if(argc > 1) OUT = argv[1];

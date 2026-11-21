@@ -388,11 +388,18 @@ static void on_events(void){
       spawn_ring(e->x, e->y, 11, C_GOO); spawn_ring(e->x, e->y, 8, C_WHITE);
       sfx_play(SFX_SPLAT, pan); popup(e->x, e->y - RI(4), "SPLOOSH!", C_GOO); ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
       break;
-    case EV_CRUMBLE: {                                      /* the run is over and the damaged walls give way (core aftershock) */
-      for(int k = 0; k < 8; k++) spawn(PT_DUST, e->x + RI(rnd(9) - 4), e->y + RI(rnd(7) - 3), rnd(11) - 5, -rnd(6), 0, 24 + rnd(14));
-      sfx_play(SFX_THUD, pan); sfx_play(SFX_CRACK, pan);
-      popup(e->x, e->y - RI(4), "CRUMBLE!", C_GOLD);
-      ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
+    case EV_CRUMBLE: {                                      /* scale visual feedback with the number of cracked blocks */
+      int tier=mx_crumble_tier(e->a);
+      int dust=8+2*tier; /* never more than 14 particles */
+      for(int k=0;k<dust;k++)
+        spawn(PT_DUST,e->x+RI(rnd(9)-4),e->y+RI(rnd(7)-3),rnd(11)-5,-rnd(6),0,24+rnd(14));
+      if(tier>=2){ /* a legible outward shock ring, using the existing pool */
+        spawn_ring(e->x,e->y,11+2*tier,C_GOLD);
+        spawn_ring(e->x,e->y,7+tier,C_WHITE);
+      }
+      sfx_play(SFX_THUD,pan);sfx_play(SFX_CRACK,pan);
+      popup(e->x,e->y-RI(4),tier>=2?"BUILDING DOWN!":"CRUMBLE!",C_GOLD);
+      ev_fx=e->x;ev_fy=e->y;ev_ft=60+8*tier;
       break; }
     case EV_DISTRICT:                                       /* Landlord HQ: the next district is built in the same grid, with fresh men */
       cells0 = mx_cells_left(&world); dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts); part_high_water = 0; memset(pops, 0, sizeof pops); ev_ft = 0;
@@ -1126,16 +1133,18 @@ static void draw_man(const View *v){
   if(m->mode == MAN_WALK){                                                                  /* on his own feet: the turning-round frames step him along, three quarters of the sling size */
     if(m->hurtCd > 0 && (frame & 2)) return;                                                  /* blinks while he is protected after a hit */
     int p = v->ppc * 3 / 4, phase = mx_walk_anim_phase(m);
-    int fr = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
-    int face = m->face < 0 ? -1 : 1;
-    int fy = vy(v, m->y + R(2.375)) - (phase == 1 || phase == 3 ? 1 : 0);
+    int fr = MSF_SPIN_6 + (m->turn_ticks ? mx_walk_turn_offset(m) :
+                              phase == 0 ? -1 : phase == 2 ? 1 : 0);
+    int face = mx_walk_render_face(m) < 0 ? -1 : 1;
+    int foot_lift = (int)((rmul(mx_walk_foot_lift(m),RI(v->ppc)) + R(0.5)) >> 12);
+    int fy = vy(v, m->y + R(2.375)) - foot_lift;
     spr_man_walk(v->buf, x, fy, p < 1 ? 1 : p, face, fr, 0);
     if(m->pT > 0){ int r = v->ppc * 5, ax = x + face * v->ppc * 4; for(int k = -3; k <= 3; k++) gfx_px(v->buf, ax + face * (r - k * k * r / 18), y + k * v->ppc * 3 / 4, C_WHITE); }   /* punch swoosh */
     return;
   }
   int pose = POSE_IDLE, face = 1;
   ManJig jg = man_jig(v);
-  if(m->mode == MAN_FLY){ pose = m->dive ? POSE_DIVE : POSE_FLY; face = m->vx >= 0 ? 1 : -1; }
+  if(m->mode == MAN_FLY){ pose = m->dive ? POSE_DIVE : POSE_FLY; face = m->face < 0 ? -1 : 1; }
   else if(m->mode == MAN_STUCK) pose = POSE_STUCK;
   else if(m->mode == MAN_AIM && dragging) pose = POSE_DRAG;
   if(m->mode == MAN_AIM) gfx_ell(v->buf, x, y + v->ppc, v->ppc * 2, v->ppc * 3 / 2, C_HAIR2);        /* sling pouch */
