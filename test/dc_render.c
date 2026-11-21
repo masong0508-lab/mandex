@@ -171,14 +171,22 @@ static int dc_menu_flow_test(void){
              "restored title image is byte-identical to its initial drawing");
   pvr_mem_free(tx_ttl);tx_ttl=0;
   on_title=0;world.level=MX_NUM_LEVELS-1;world.state=MX_WIN;
-  dc_advance_after_end();
+  dc_end_input(CONT_START);
   MENU_CHECK(on_title && !paused && title_lv==0 && tx_ttl!=0,
              "winning final level returns to playable title instead of level out of bounds");
   on_title=0;load_level(7);world.state=MX_LOSE;
-  dc_advance_after_end();
+  dc_end_input(CONT_START);
   MENU_CHECK(!on_title && world.level==7 && world.state==MX_PLAY,
              "losing a level retries that same valid level");
-  dc_return_to_title(world.level);
+  on_title=0;load_level(11);world.state=MX_LOSE;
+  dc_end_input(CONT_B);
+  MENU_CHECK(on_title && title_lv==11 && tx_ttl!=0,
+             "B on a loss screen returns to title instead of forcing a retry");
+  on_title=0;load_level(13);world.state=MX_WIN;
+  dc_end_input(CONT_B|CONT_START);
+  MENU_CHECK(on_title && title_lv==13 && tx_ttl!=0,
+             "B on a win screen takes priority over START and returns to title");
+  dc_return_to_title(7);
   MENU_CHECK(on_title && title_lv==7 && tx_ttl!=0,
              "pause-menu exit to title preserves the current level selection");
   printf(fail?"Dreamcast menu flow: %d FAILED\n":"Dreamcast menu flow: all passed\n",fail);
