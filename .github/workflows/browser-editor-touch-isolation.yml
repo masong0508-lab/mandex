@@ -1,0 +1,33 @@
+name: Browser editor touch isolation
+on:
+  pull_request:
+    paths:
+      - "web/index.html"
+      - "test/browser_editor_touch_isolation_test.js"
+      - ".github/workflows/browser-editor-touch-isolation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/index.html"
+      - "test/browser_editor_touch_isolation_test.js"
+      - ".github/workflows/browser-editor-touch-isolation.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  editor-input:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run owner-only editor stroke tests
+        run: node test/browser_editor_touch_isolation_test.js
+      - name: Dispatch real browser pointer handlers with two fingers
+        run: node test/browser_editor_pointer_events_test.js
+      - name: Validate mobile orientation and multitouch
+        run: |
+          node test/browser_multitouch_test.js
+          node test/browser_orientation_test.js
+      - name: Check starter levels and Undo Redo
+        run: node test/browser_creator_starters_test.js
