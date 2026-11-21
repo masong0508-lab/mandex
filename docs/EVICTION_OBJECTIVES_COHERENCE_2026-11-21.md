@@ -31,3 +31,24 @@ texture, frame state or particle allocation. Every renderer computes the
 one-target condition once before the landlord loop rather than rescanning
 the target list per actor. The standard world culling margins remain valid
 because the marker fits within the existing warning and survivor tells.
+
+## HUD layout and real-pixel regression
+
+The browser portrait streak originally started at y=67, overlapping the
+objective caption (y=66..94). The streak now begins at y=100 in portrait,
+remaining below the caption even on narrow 320–699px displays; desktop
+keeps the existing unobtrusive corner layout. The browser regression checks
+rectangular non-overlap at seven viewport widths.
+
+The first full host run exposed a test-isolation problem: the rubble-only
+canvas VM cut the production code immediately before the landlord loop,
+accidentally including the new last-target objective expression. That VM
+has no game state by design. Its source slice now correctly ends at the
+start of final-target marker setup, leaving the actual rubble-draw code
+under the same pixel-order and culling assertions.
+
+A new `DS_OBJECTIVE_PROBE` in `test/ds_render.c` executes the real
+Nintendo DS font and world-sprite renderers at 256×192 and checks distinct
+pixel hashes for 2 landlords, last landlord, securing area, and an actual
+on-character locator with the second landlord offscreen. It runs in the
+regular host suite; screenshots/emulator checks remain additional gates.
