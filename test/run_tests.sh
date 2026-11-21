@@ -27,6 +27,14 @@ echo "--- back-wall impacts and floating room collapse (shared core fixed/float,
 gcc -std=gnu99 -O2 -Wno-unused-function -I../core room_backdrop_test.c -lm -o room_backdrop_float && ./room_backdrop_float
 gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -I../core room_backdrop_test.c -lm -o room_backdrop_fixed && ./room_backdrop_fixed
 if command -v node >/dev/null 2>&1;then node room_backdrop_web_test.js;fi
+echo "--- actual victory objective vs wreck score, last landlord direction, HQ progression (float/fixed/browser) ---"
+for mode in float fixed; do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=c99 -O2 -Wall $flags -I../core objective_tracker_test.c -o objective_tracker_$mode
+  ./objective_tracker_$mode
+done
+if command -v node >/dev/null 2>&1;then node browser_objective_test.js;fi
 echo "--- cross-port character pose continuity and bounded collapse feedback (float/fixed) ---"
 for mode in float fixed; do
   flags=""
