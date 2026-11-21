@@ -27,6 +27,29 @@ assert.strictEqual(probe(three,0,'none',-999).phase,'secure',
   'last eviction waits for the real end-state transition');
 assert.strictEqual(probe(three,0,'none',-999,'win').phase,'complete');
 assert.strictEqual(probe(three,0,'none',-999,'lose').phase,'failed');
+// Execute the real browser edge clamp in isolation; the production helper
+// reuses a single record and never has to allocate a marker every frame.
+const edge=new Function(impl+'\nreturn objectiveScreenEdge;')();
+let cue=edge(100,100,360,640,138,56);
+assert.strictEqual(cue.dir,0,'visible character gets no edge cue');
+cue=edge(-30,240,360,640,138,56);
+assert.strictEqual(cue.dir,1);assert.strictEqual(cue.x,42);
+cue=edge(390,240,360,640,138,56);
+assert.strictEqual(cue.dir,2);assert.strictEqual(cue.x,318);
+cue=edge(180,-40,360,640,138,56);
+assert.strictEqual(cue.dir,3);assert.strictEqual(cue.y,153);
+cue=edge(180,700,360,640,138,56);
+assert.strictEqual(cue.dir,4);assert.strictEqual(cue.y,569);
+assert.strictEqual(edge(-100,710,360,640,138,56).dir,1,
+  'diagonal last target remains inside the safe inset');
+assert.strictEqual(edge(80,80,30,240,138,56).dir,0,
+  'unusable tiny viewport does not draw edge cue');
+assert(web.includes('drawHUD();drawObjectiveEdge();drawToasts(frameDt)'),
+  'draw the cue in screen coordinates above the action but below toasts');
+assert(web.includes('const top=W<700?138:76;'),
+  'reserve portrait combo/mission HUD and desktop top bar');
+assert(web.includes('if(o.phase!==\'last\'||!o.target)return;'),
+  'avoid cues before the last landlord and after a cleared level');
 assert(web.includes('const objective=objectiveSnapshot(),lb=objective.remaining;'),
   'production browser HUD uses objective helper, not old disconnected target counts');
 assert(web.includes("const oy=P?66:38;"),'objective strip is positioned for portrait and landscape');
