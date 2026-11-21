@@ -72,7 +72,7 @@ for(const s of ['menu','select'])for(const height of [780,960,1240]){
   const entries=[];
   const navUI=nav(ctx,()=>{},(x,y,w,h,label,fn)=>{entries.push({x,y,w,h,label,fn})},
     (x,y,w,h,id,name,stars,locked,fn)=>{entries.push({x,y,w,h,label:name,fn})},
-    ()=>{},()=>{},()=>{},()=>{},()=>{},()=>{},()=>{},pd,levels,12,25,
+    ()=>{},()=>{},()=>{},()=>{},()=>{},()=>{},()=>{},()=>{},pd,levels,12,25,
     ()=>true,()=>true,()=>true,{},540,height,Array.from({length:18},(_,i)=>({id:i})),[],
     ()=>0,()=>0,()=>0,()=>0,false,()=>{},()=>{},()=>({}),{pop(){}},()=>{},()=>{},()=>{},
     ()=>true,()=>{},0,s);
