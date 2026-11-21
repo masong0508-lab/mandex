@@ -590,6 +590,12 @@ static void draw_tile(Scr *s, int sx, int sy, int p, int m, int v, int d, int dm
 #ifndef MX_N3DS_TILE_DIM_CACHE
 #define MX_N3DS_TILE_DIM_CACHE 1
 #endif
+/* Most rubble voxels are off the visible camera after a tower topples.
+   Drawing an entirely offscreen tile does no useful work. Keep the exact
+   per-pixel clipping path for every tile intersecting a display edge. */
+#ifndef MX_N3DS_RUBBLE_CULL
+#define MX_N3DS_RUBBLE_CULL 1
+#endif
 static void draw_cells(const View *v){
 #if MX_N3DS_TILE_DIM_CACHE
   const int dim_normal=(int)(256 * g_dim);
@@ -628,7 +634,11 @@ static void draw_cells(const View *v){
     for(int k = 0; k < ch->count; k++){
       const MxCell *a = &ch->cells[k];
       if(a->dead) continue;
-      draw_tile(v->s, VX(v, RTOF(a->wx)) - p / 2, VY(v, RTOF(a->wy)) - p / 2, p, a->m, (k * 7 + 3) & 3, 0,
+      const int sx=VX(v,RTOF(a->wx))-p/2, sy=VY(v,RTOF(a->wy))-p/2;
+#if MX_N3DS_RUBBLE_CULL
+      if(sx+p<=0 || sx>=sw || sy+p<=0 || sy>=sh)continue;
+#endif
+      draw_tile(v->s, sx, sy, p, a->m, (k * 7 + 3) & 3, 0,
 #if MX_N3DS_TILE_DIM_CACHE
         dim_normal
 #else
