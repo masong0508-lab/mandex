@@ -96,6 +96,16 @@ int main(void){
   ch->cells[0].dead=0;
   upd_targets(&w,R(0.016));
   CHECK(!t->alive,"live fast-moving rubble did not register a real collision");
-  puts("collapse survivors: intact vs failed frames, no-air pockets, HP injury, 1-HP miracles, one roll, expiring grace and killability PASSED");
+  /* Large high-velocity chunks must not hit a landlord through fixed-point
+     squared-distance wrapping. Keep chunk centroid nearby to deliberately
+     exercise the per-cell guard; a single far-flung cell is still harmless. */
+  init(1);t=&w.targets[0];t->room_id=255;
+  ch=&w.chunks[0];ch->active=1;ch->count=1;ch->rad=RI(2500);
+  ch->x=t->x;ch->y=t->y;ch->vx=RI(30);
+  ch->cells[0].wx=t->x+RI(2000);
+  ch->cells[0].wy=t->y;ch->cells[0].dead=0;
+  upd_targets(&w,R(0.016));
+  CHECK(t->alive,"long-flung rubble caused a ghost collision due to fixed-point distance overflow");
+  puts("collapse survivors: room escape, grounded injury, no repeats, real/dead/far rubble collisions PASSED");
   return 0;
 }
