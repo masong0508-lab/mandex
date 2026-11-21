@@ -193,6 +193,27 @@ static int dc_menu_flow_test(void){
   MENU_CHECK(human_face!=wolf_face && human_face!=0 && wolf_face!=0,
              "Dreamcast wolf side profile is visibly distinct from the human face");
   man_fur=0;
+  /* A walk used to draw its real side-profile sprite, then run the regular
+     towel path with frame=-1. That read MS_HAND[-1] / DCM_FR[-1]. */
+  memset(fb,0,sizeof fb);cur_hdr=0;nq=0;
+  unsigned empty=dc_hash(fb,sizeof fb);
+  man_with_towel(&tow_play,-1,320,240,1,Z_MAN,NULL);
+  MENU_CHECK(dc_hash(fb,sizeof fb)==empty && nq==0,
+             "negative walk sentinel never accesses/draws a nonexistent atlas frame");
+  /* Both grounded stride extremes use valid unique sprite silhouettes.
+     draw_all() must paint only the walking figure, with no -1 fallback. */
+  for(int m=1;m<MX_NMAT;m++)MAXHP[m]=(float)mx_material_hp(m);
+  load_level(22);on_title=0;world.state=MX_PLAY;
+  world.man.mode=MAN_WALK;world.man.walked=1;world.man.gr=1;
+  world.man.x=64.0f;world.man.y=56.625f;world.man.face=1;world.man.vx=9.0f;
+  world.man.gait=0;memset(fb,0,sizeof fb);cur_hdr=0;nq=0;
+  draw_all();
+  unsigned left_foot=dc_hash(fb,sizeof fb);
+  world.man.gait=2.0f;memset(fb,0,sizeof fb);cur_hdr=0;nq=0;
+  draw_all();
+  unsigned right_foot=dc_hash(fb,sizeof fb);
+  MENU_CHECK(left_foot!=empty && right_foot!=empty && left_foot!=right_foot,
+             "Dreamcast renders both grounded stride profiles without an invalid fallback");
   on_title=1;title_t=0;title_lv=0;nofight=0;cur_hdr=0;
   memset(fb,0,sizeof fb);draw_title();
   unsigned before=dc_hash(fb,sizeof fb);
