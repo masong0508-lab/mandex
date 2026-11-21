@@ -3738,7 +3738,10 @@ const ST0=()=>({kills:0,cells:0,booms:0,shots:0,flops:0,wins:0,oneShots:0,create
 let PD={stars:{},best:{},ach:{},outfit:'classic',own:{},custom:[],st:ST0(),unlockAll:false,opt:{collapse:false,tool:'none'}};
 function pdLoad(){try{const s=localStorage.getItem(SAVE_KEY);if(s){const o=JSON.parse(s);PD=Object.assign(PD,o);PD.st=Object.assign(ST0(),o.st||{})}}catch(e){}}
 let pdDirty=false;
-function pdSave(){pdDirty=false;try{localStorage.setItem(SAVE_KEY,JSON.stringify(PD))}catch(e){}}
+function pdSave(){
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify(PD));pdDirty=false;return true}
+  catch(e){pdDirty=true;return false}
+}
 function pdTouch(){pdDirty=true}
 pdLoad();
 const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'none'});
@@ -5209,7 +5212,12 @@ function importCode(){
   let s=null;try{s=prompt('Paste a level code:')}catch(e){}if(!s)return;
   try{
     const L=decodeSharedLevel(s.trim());
-    PD.custom.push(L);pdTouch();pdSave();
+    PD.custom.push(L);pdTouch();
+    if(!pdSave()){
+      PD.custom.pop(); // Never claim an import survived a failed storage write.
+      toast('ach','Level not imported','Browser storage unavailable; your original code is still safe');
+      return;
+    }
     toast('outfit','Level imported',L.n);
   }catch(e){toast('ach','That code did not work',e.message||'Invalid code')}
 }
@@ -5269,8 +5277,21 @@ function eSave(){
   const checked=eCheckedLevel('saving');if(!checked)return;
   if(!E.name){let nm=null;try{nm=prompt('Name your level:','My Level '+(PD.custom.length+1))}catch(e){}E.name=(nm&&nm.trim()?nm.trim():'My Level '+(PD.custom.length+1)).slice(0,24)}
   const L={n:E.name,m:checked.m,c:checked.c,t:checked.t};
-  if(E.id>=0)PD.custom[E.id]=L;else{PD.custom.push(L);E.id=PD.custom.length-1;ST().created++}
-  pdTouch();pdSave();achCheck();toast('outfit','Saved: '+E.name,'find it under PLAY > MY LEVELS')}
+  const previousId=E.id,previousCreated=ST().created;
+  const editing=E.id>=0&&E.id<PD.custom.length;
+  const previousLevel=editing?PD.custom[E.id]:null;
+  if(editing)PD.custom[E.id]=L;
+  else{PD.custom.push(L);E.id=PD.custom.length-1;ST().created++}
+  pdTouch();
+  if(!pdSave()){
+    if(editing)PD.custom[previousId]=previousLevel;
+    else PD.custom.pop();
+    E.id=previousId;ST().created=previousCreated;
+    toast('ach','Level not saved','Storage is full or unavailable. Copy the backup code.');
+    try{prompt('Storage unavailable. Copy this level backup code before leaving:',encodeSharedLevel(L))}catch(e){}
+    return;
+  }
+  achCheck();toast('outfit','Saved: '+E.name,'find it under PLAY > MY LEVELS')}
 const MATCOL=['#444',...MAT.slice(1).map(m=>m.c)];
 function drawBrushPanel(){
   const kb=(k,x,y)=>btn(x,y,100,44,BR_KIND[k],()=>eKind(k-E.bk),{size:15,on:E.bk===k});

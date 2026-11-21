@@ -1,0 +1,31 @@
+name: Browser creator save-recovery gates
+on:
+  pull_request:
+    paths:
+      - "web/index.html"
+      - "test/browser_creator_storage_test.js"
+      - ".github/workflows/browser-storage-gates.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/index.html"
+      - "test/browser_creator_storage_test.js"
+      - ".github/workflows/browser-storage-gates.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  creator-storage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm quota, rollback, retry and emergency backup
+        run: node test/browser_creator_storage_test.js
+      - name: Revalidate creator imports and Unicode codes
+        run: node test/browser_creator_codec_test.js
+      - name: Responsive editor and mobile touch regression
+        run: |
+          node test/browser_orientation_test.js
+          node test/browser_multitouch_test.js
