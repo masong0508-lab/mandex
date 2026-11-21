@@ -3515,7 +3515,11 @@ cv.addEventListener('pointerdown',e=>{
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
   if(state==='edit'){
     if(!isPortrait())eMove(mx,my);
-    else if(E.drag){const pos=mobileEditorToWorld(mx,clamp(my,0,WEB_UI.editorHeight));eMove(pos[0],pos[1]);}
+    else if(E.drag&&my>=0&&my<WEB_UI.editorHeight){
+      /* Leaving the world area for the toolbar must never paint the last
+         building row or carry a rectangle selection into a control. */
+      const pos=mobileEditorToWorld(mx,my);eMove(pos[0],pos[1]);
+    }
     return;
   }
   if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
@@ -3524,12 +3528,13 @@ cv.addEventListener('pointerup',e=>{
   if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId){
     const g=WEB_UI.gesture;WEB_UI.gesture=null;
     const p=pt(e),dy=p[1]-g.y;
-    if(g.screen===state&&Math.abs(dy)>65&&
-       (state==='select'||state==='ach'||state==='outfit'||state==='options')){
-      /* A vertical swipe browses the paginated mobile list. Page limits
-         are applied by mobilePage() on the next draw, without allocations. */
-      const key=state;
-      WEB_UI.page[key]=Math.max(0,(WEB_UI.page[key]||0)+(dy<0?1:-1));
+    if(g.screen===state&&Math.abs(dy)>65){
+      /* A swipe never activates a button, even on the non-paginated home
+         screen. On paginated menus it changes exactly one page. */
+      if(state==='select'||state==='ach'||state==='outfit'||state==='options'){
+        const key=state;
+        WEB_UI.page[key]=Math.max(0,(WEB_UI.page[key]||0)+(dy<0?1:-1));
+      }
     }else if(g.screen===state)hitTest(p[0],p[1]);
     return;
   }
