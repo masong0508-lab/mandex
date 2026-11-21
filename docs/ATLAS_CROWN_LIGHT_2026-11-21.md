@@ -21,3 +21,10 @@
 Use `python3 tools/render_turnaround_sheet.py out/art-review/turnaround.ppm` to inspect the actual baked frames, converted with `tools/ppm_to_png.py`. Review both turn directions, front→side→rear and flying/diving. The change is subtle and limited to crown lighting; it does **not** replace the body model, reconstruct the whole 3D rig or revise cutscene staging.
 
 **Port-specific truth:** Nintendo DS and Nintendo 3DS render the indexed `art/manspr.h` frames and receive these 94 pixel changes immediately when this PR is built. Dreamcast includes `manspr.h` for metadata/frame identifiers but renders its separate higher-resolution `art/dcart.h` atlas. That texture has **not** been modified in this patch. The canonical character rebake workflow already regenerates Dreamcast art and publishes its own preview; a matching Dreamcast lighting change needs separately inspected HD-source work, not an assertion of automatic parity. Visual hardware checks and the full host/console build suite remain required before merging.
+
+## Dreamcast high-resolution PVR follow-through
+
+- The separate `tools/gen_dc_art.py` bake now calls `tools/hd_wolf_finish.py` on Wolfman textures, after the browser has painted each true-color sprite and before it is packed into the existing 1024×512 PVR atlas.
+- Applies a restrained key/fill light to the visible torso contours, **starting below the sprite's body anchor** so eyes, muzzle, ears and teeth retain their canonical source look.
+- The alpha channel, rectangle dimensions, atlas UVs and packing order remain unchanged. This changes only RGB values in the **next generated** `art/dcart.h`; the presently committed Dreamcast HD texture hasn't been rebaked in this PR.
+- `test/hd_wolf_volume_test.py` exercises the real offline function with synthetic RGBA rows, checking head pixels, transparent/translucent edges, contour lighting and zero alpha movement. The rebake workflow will run that test and regenerate/review the real HD texture before publishing.
