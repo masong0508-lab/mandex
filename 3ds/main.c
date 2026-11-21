@@ -475,6 +475,7 @@ static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
 #endif
 #ifdef MX_N3DS_ROT_WORK_COUNT
 static unsigned man_rot_candidate_pixels,man_rot_sampled_pixels;
+static unsigned man_rot_floor_calls,man_rot_opaque_pixels;
 #endif
 static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, float a){
   if(!man_tone_ready) apply_outfit(0);
@@ -543,6 +544,9 @@ static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, fl
         if(!(tx>=0.f && tx<f->w && ty>=0.f && ty<f->h))continue;
         sx=(int)tx;sy=(int)ty;
 #else
+#ifdef MX_N3DS_ROT_WORK_COUNT
+        man_rot_floor_calls+=2; /* eight former floors per candidate pixel */
+#endif
         sx=(int)floorf(su+du[k]+.5f);
         sy=(int)floorf(sv+dv[k]+.5f);
         if((unsigned)sx >= (unsigned)f->w || (unsigned)sy >= (unsigned)f->h)continue;
@@ -552,6 +556,9 @@ static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, fl
         r+=(rgb>>16)&255u;g+=(rgb>>8)&255u;b+=rgb&255u;n++;
       }
       if(!n)continue;
+#ifdef MX_N3DS_ROT_WORK_COUNT
+      if(n==4)man_rot_opaque_pixels++;
+#endif
       u8 *dst=s->fb+(x*s->h+(s->h-1-y))*3;
 #if MX_N3DS_ROT_OPAQUE_SHORTCUT
       if(n==4){
