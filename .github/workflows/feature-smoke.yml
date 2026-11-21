@@ -30,6 +30,14 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Verify new rubber BANK SHOT bonus in both core numeric modes
+        run: |
+          for mode in float fixed; do
+            flags=""
+            test "$mode" = fixed && flags="-DMX_FIXED"
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/bank_shot_test.c -lm -o /tmp/bank_shot_$mode
+            /tmp/bank_shot_$mode
+          done
       - name: Test destructible back walls and room collapse across console/browser
         run: |
           for mode in float fixed; do
