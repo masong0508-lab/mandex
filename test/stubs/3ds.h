@@ -29,5 +29,5 @@ static inline void ndspChnReset(int c){ (void)c; } static inline void ndspChnSet
 static inline void ndspChnSetFormat(int c, int f){ (void)c; (void)f; } static inline void ndspChnSetMix(int c, float *m){ (void)c; (void)m; } static inline void ndspChnWaveBufClear(int c){ (void)c; }
 static inline void ndspChnWaveBufAdd(int c, ndspWaveBuf *w){ (void)c; (void)w; stub_snd_plays++; }
 #include <stdlib.h>
-static inline void *linearAlloc(size_t n){ return malloc(n); } static inline void DSP_FlushDataCache(const void *p, uint32_t n){ (void)p; (void)n; }
+static inline void *linearAlloc(size_t n){ return malloc(n); } static inline void linearFree(void *p){ free(p); } static inline void DSP_FlushDataCache(const void *p, uint32_t n){ (void)p; (void)n; }
 #endif

@@ -58,6 +58,29 @@ static unsigned dc_hash(const unsigned char *p,size_t n){
   for(size_t i=0;i<n;i++){h^=p[i];h*=16777619u;}
   return h;
 }
+/* Test the production on-demand RLE outfit path, including recovery
+   from a different tint. The source pixels must never accumulate rounding
+   errors and the PVR atlas allocation must stay stable. */
+static int dc_outfit_memory_probe(void){
+  if(!tx_man){ puts("FAIL: Dreamcast man atlas missing"); return 1; }
+  pvr_ptr_t atlas=tx_man;
+  const size_t bytes=(size_t)DCT_MAN_W*DCT_MAN_H*sizeof(unsigned short);
+  recolor_man(0);
+  unsigned classic=dc_hash((const unsigned char *)tx_man,bytes);
+  recolor_man(11); /* Working Man blue briefs */
+  unsigned work=dc_hash((const unsigned char *)tx_man,bytes);
+  recolor_man(4);  /* Camo Dad */
+  unsigned camo=dc_hash((const unsigned char *)tx_man,bytes);
+  recolor_man(0);
+  unsigned restored=dc_hash((const unsigned char *)tx_man,bytes);
+  if(atlas!=tx_man || classic!=restored || classic==work || classic==camo || work==camo){
+    printf("FAIL: Dreamcast outfit tint parity / VRAM stability %08x %08x %08x %08x\n",
+           classic,work,camo,restored);
+    return 1;
+  }
+  printf("ok: Dreamcast outfits round-trip identically in-place, permanent 1 MiB atlas not needed (%08x)\n",classic);
+  return 0;
+}
 static int dc_fastpath_probe(void){
   static unsigned char idx[256*192];
   ds_gfx_init();
@@ -232,7 +255,9 @@ static int dc_menu_flow_test(void){
 }
 int main(void){
   if(getenv("DC_FASTPATH_PROBE"))return dc_fastpath_probe();
-  gfx_init(); sound_init(); if(!snd_ok){ puts("FAIL: dc sound did not initialise"); return 1; }
+  gfx_init();
+  if(getenv("DC_OUTFIT_RECOLOR_PROBE"))return dc_outfit_memory_probe();
+  sound_init(); if(!snd_ok){ puts("FAIL: dc sound did not initialise"); return 1; }
   if(getenv("DC_MENU_FLOW_TEST"))return dc_menu_flow_test();
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
   memset(fb,0,sizeof fb); title_t=0; cur_hdr=0; draw_title(); dump("/tmp/dc_title.ppm"); title_t=40; cur_hdr=0; draw_title(); dump("/tmp/dc_title_blink.ppm");   /* the title, and the half of the blink with no PRESS START */

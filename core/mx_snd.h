@@ -5,6 +5,9 @@
 #define MX_SND_H
 #define MX_SND_RATE 22050
 #define MX_SND_MAX  (MX_SND_RATE * 11 / 10)   /* the longest effect (WIN, 0.9 s) plus its release */
+/* Exact sample count for pre-allocation: avoid a second PCM-sized scratch
+ * buffer on the 3DS. The rendering and all note envelopes are unchanged. */
+int mx_snd_sample_count(int id);
 int mx_snd_render(int id, short *out, int max);
 int mx_snd_cooldown(int id);                    /* frames before the same effect may be played again (same rate-limit as the DS) */
 #define MX_MUS_SAMPLES (8 * 8 * (12 * MX_SND_RATE / 60))   /* the theme's loop: 12.8 s */

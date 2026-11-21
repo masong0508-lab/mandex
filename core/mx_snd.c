@@ -8,12 +8,25 @@
    The whole effect fades linearly so it never ends on a click, and has a 2 ms attack for the same reason. */
 int mx_snd_cooldown(int id){ return id >= 0 && id < SFX_COUNT ? SFX[id].cool : 0; }
 
-int mx_snd_render(int id, short *out, int max){
-  if(id < 0 || id >= SFX_COUNT || max <= 0) return 0;
+/* Preflight exactly the bytes the normal synth would write. Only the final
+ * sample cap applies; do not reserve a full MX_SND_MAX buffer per effect. */
+int mx_snd_sample_count(int id){
+  if(id < 0 || id >= SFX_COUNT) return 0;
   const Sfx *s = &SFX[id];
-  int segn[4], total = 0;
-  for(int i = 0; i < s->n; i++){ segn[i] = s->len[i] * MX_SND_RATE / 60; if(segn[i] < 1) segn[i] = 1; total += segn[i]; }
-  total += MX_SND_RATE / 40;                                  /* a short release after the last segment */
+  int total = MX_SND_RATE / 40;                  /* release tail */
+  for(int i = 0; i < s->n; i++){
+    int n = s->len[i] * MX_SND_RATE / 60;
+    total += n < 1 ? 1 : n;
+  }
+  return total > MX_SND_MAX ? MX_SND_MAX : total;
+}
+
+int mx_snd_render(int id, short *out, int max){
+  if(id < 0 || id >= SFX_COUNT || max <= 0 || !out) return 0;
+  const Sfx *s = &SFX[id];
+  int segn[4];
+  for(int i = 0; i < s->n; i++){ segn[i] = s->len[i] * MX_SND_RATE / 60; if(segn[i] < 1) segn[i] = 1; }
+  int total = mx_snd_sample_count(id);
   if(total > max) total = max;
   int amp = s->vol * 150;                                     /* vol 127 -> 19050: well under full scale, so layered effects never clip into a buzz */
   unsigned lfsr = 0x4001; int lp = 0, lp2 = 0, noise_v = 0; long phase = 0; int pos = 0;
