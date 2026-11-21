@@ -21,6 +21,20 @@ int main(void){
  CK(m.render_x10==300); /* two-second window not complete yet */
  for(int i=0;i<30;i++)mx_fps_meter_add(&m,17,1000,1,1);
  CK(m.render_x10>=550&&m.render_x10<=650);
+ /* Microsecond clock: old 32-bit intermediate products wrap and report
+  * nonsensical values even with ordinary 60 Hz rendering. */
+ MxFpsMeter hi={0};
+ for(int i=0;i<120;i++)mx_fps_meter_add(&hi,16667,1000000,1,1);
+ CK(hi.render_x10>=599&&hi.render_x10<=600);
+ CK(hi.sim_x10>=599&&hi.sim_x10<=600);
+ /* A long stall is clipped to five seconds; reporting must remain finite. */
+ MxFpsMeter stall={0};
+ mx_fps_meter_add(&stall,UINT_MAX,1000000,1,1);
+ CK(stall.render_x10==2&&stall.sim_x10==2);
+ /* Saturation arithmetic must not wrap at a very high tick frequency. */
+ MxFpsMeter huge={0};
+ mx_fps_meter_add(&huge,UINT_MAX,1000000000u,1,1);
+ CK(huge.render_x10==2&&huge.sim_x10==2);
  unsigned short prev=65535,now=1;CK((unsigned short)(now-prev)==2);
  puts("ok: wall-clock FPS and simulation SPS distinguished at 60/30/30+catchup; 16-bit VBlank wrap");
  return 0;
