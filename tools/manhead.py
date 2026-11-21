@@ -131,6 +131,21 @@ SIDE_LANDMARKS = {
     "mouth": (12, 10), "chin": (11, 12),
 }
 SIDE_FEATURES = {
+    "turn": {
+        # Calm three-quarter/side rotation: same head and combed crown,
+        # but no dive scream, floating eyes or unrelated facial identity.
+        # Leave the brow, mustache, nostril and chin at identical landmarks
+        # to the active fly/dive profiles; only expression ink differs.
+        2: {7: "l", 8: "h"},
+        5: {10: "H", 11: "H", 12: "H", 13: "H"},
+        6: {11: "w", 12: "w", 13: "B", 14: "w"},
+        7: {11: "w", 12: "i", 13: "B"},
+        8: {5: "k", 6: "s", 14: "k"},
+        9: {5: "s", 11: "H", 12: "H", 13: "H", 14: "H"},
+        10: {10: "S", 11: "S", 12: "m", 13: "m"},
+        11: {10: "S", 11: "S", 12: "S"},
+        12: {10: "S", 11: "s"},
+    },
     "fly": {
         2: {7: "l", 8: "h"},
         5: {10: "H", 11: "H", 12: "H", 13: "H"},
@@ -163,7 +178,7 @@ def side_head(kind):
             rows[y][x] = ch
     return ["".join(r) for r in rows]
 
-def turn_head(angle, kind="dive"):
+def turn_head(angle, kind="turn"):
     """Project one head through front, three-quarter, profile and rear-quarter.
 
     Every master is 19 rows high: neither crown nor chin jumps between views.
