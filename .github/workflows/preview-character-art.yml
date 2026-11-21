@@ -5,6 +5,10 @@ name: Preview Mandex character atlases (PR)
 on:
   pull_request:
     paths:
+      - "web/index.html"
+      - "test/head_turnaround_test.py"
+      - "test/character_turnaround_test.py"
+      - "test/dreamcast_wolf_atlas_test.py"
       - "art/manspr.h"
       - "art/dcart.h"
       - "tools/manhead.py"
