@@ -1533,7 +1533,21 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
   MxMan *m = &w->man;
   int here = m->mode == MAN_AIM || m->mode == MAN_FLY || m->mode == MAN_WALK || m->mode == MAN_STUCK;
   real mx_ = here ? m->x : MX_ANCHOR_X, my_ = here ? m->y : MX_ANCHOR_Y;
-  real ddx = mx_ - t->x, ddy = my_ - t->y, tm = rsqrt(rmul(ddx, ddx) + rmul(ddy, ddy));
+  real ddx = mx_ - t->x, ddy = my_ - t->y;
+  /* Nothing in landlord AI needs the actual range beyond 35 cells.
+     Avoid the software fixed-point sqrt entirely for distant enemies;
+     retain the ORIGINAL sqrt for all near interactions so edge cases,
+     throws, chase triggers, and enemy behavior are bit-identical. */
+#ifndef MX_LORD_AI_DIST_CULL
+#define MX_LORD_AI_DIST_CULL 1
+#endif
+  real tm;
+#if MX_LORD_AI_DIST_CULL
+  real d2=rmul(ddx,ddx)+rmul(ddy,ddy);
+  tm=d2<RI(36*36)?rsqrt(d2):RI(999);
+#else
+  tm=rsqrt(rmul(ddx,ddx)+rmul(ddy,ddy));
+#endif
   int fight = !w->nofight && w->state == MX_PLAY && t->kind;
   if(t->stun > 0) t->stun -= dt;
   if(t->swing > 0) t->swing -= dt;
