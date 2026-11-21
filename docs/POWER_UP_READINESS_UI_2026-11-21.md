@@ -31,3 +31,7 @@ The `PW_*` inventory identifiers and `MX_TOOL_*` starting-option identifiers do 
 ### Native pre-merge console builds
 
 Before this change only the DS toolchain built on pull requests. The separate 3DS workflow now compiles `mandex.3dsx` and checks its ELF and payload on PRs that touch 3DS, shared core or art; the existing Dreamcast experimental native build additionally runs for relevant PRs. The repository's main-branch ROMs packaging remains unchanged. Native compilation alone is not a gameplay or hardware FPS test.
+
+### Launch-time inventory integrity (follow-up)
+
+The shared core now verifies both the selected `PW_*` ID and its remaining stock **at launch time**, in addition to the existing selection-time guard. This protects a game world with a stale/depleted selection from out-of-range inventory access, negative charge counts and phantom powered shots. A successful ordinary launch still spends exactly one stock unit; a short pull does not disarm or spend its selection. The two host math modes exercise actual `mx_release()` behavior for normal, short, depleted, negative and oversized power selections. This introduces no new state, per-frame work or allocation; fixed-point and float physics on valid inputs remain unchanged.
