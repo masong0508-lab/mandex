@@ -1540,6 +1540,18 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
   if(t->pan > 0) t->pan -= dt;
   if(m->mode == MAN_FLY && tm < R(26.25)) t->pan = R(0.7);          /* everybody flinches when a man comes screaming close (cosmetic) */
   int moving = 0;
+  /* Collapse survivors are disoriented, then flee for a short spell even
+     if their normal kind would stand still. Uses the existing walk solver,
+     never passes through walls, and adds no new per-frame scans. */
+  if(t->collapse_rolled==2){
+    if(t->stun>0){t->mv=0;return;}
+    if(t->dodge>0){
+      t->dodge-=dt;
+      if(lord_step(w,t,t->dd,R(9.375),dt)){
+        t->face=t->dd;t->mv=2;return;
+      }
+    }
+  }
   /* chapter 3: the mobile kinds look after themselves, fight switch or not: dodge debris, run for cover from a flying man, heal */
   if(IS_MOBILE(t->kind) && t->stun <= 0 && t->wind <= 0){
     if(t->dodge > 0) t->dodge -= dt;
@@ -1833,7 +1845,8 @@ static int collapse_survive(MxWorld *w, MxTarget *t){
     real x=t->x+RI(DX[k]),y=t->y+RI(DY[k]);
     if(x < RI(1)||x >= RI(MX_COLS-1)||y < RI(2)||y >= RI(MX_ROWS))continue;
     if(solid_at(w,x,y)||solid_at(w,x,y-R(0.875))||
-       solid_at(w,x-R(0.25),y)||solid_at(w,x+R(0.25),y))continue;
+       solid_at(w,x-R(0.25),y)||solid_at(w,x+R(0.25),y)||
+       !solid_at(w,x,y+RI(1)))continue; /* no floating rescue into a fatal fall */
     safe_x=x;safe_y=y;pocket=1;break;
   }
   if(!pocket)return 0;
@@ -1843,7 +1856,10 @@ static int collapse_survive(MxWorld *w, MxTarget *t){
   t->collapse_rolled=2;
   t->hp=t->hp>1?t->hp-1:1;
   t->armor=0;t->inv=R(1.5);t->stun=R(1.8);t->vy=0;
+  t->wind=t->swing=0; /* wounded landlords cannot launch an instant counterattack */
   t->x=safe_x;t->y=safe_y;
+  t->dodge=R(1.5);t->dd=(int8_t)(t->x >= RI(w->rooms[rid].x)+R(w->rooms[rid].w*0.5) ? 1 : -1);
+  t->pan=RI(2); /* after the stun, try to escape away from the ruined room */
   ev(w,EV_SURVIVOR,t->x,t->y,t->hp,0,0);
   return 1;
 #else
