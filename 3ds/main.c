@@ -896,12 +896,12 @@ static void draw_man(const View *v){
     int wf = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
     int fc = m->face < 0 ? -1 : 1;
     const MsFrame *f = &MS_FRAMES[wf + (man_fur ? MSF_NBASE : 0)];
-    int fy = VY(v, RTOF(m->y) + 2.375f) - (phase == 1 || phase == 3 ? 1 : 0);
+    int fy = VY(v, RTOF(m->y) + 2.375f) - (int)lroundf(RTOF(mx_walk_foot_lift(m)) * p);
     blit_frame(v->s, wf, x, fy - fdiv4((f->h - f->ay) * q), q, fc);
     if(m->pT > 0){ for(int k = -3; k <= 3; k++) px(v->s, x + fc * (p * 5 - k * k * p * 5 / 18) + fc * p * 4, y + k * p * 3 / 4, RGB(255, 255, 255)); }
     return;
   }
-  if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : (((frame >> 2) & 1) ? MSF_FLY_A : MSF_FLY_B); }
+  if(m->mode == MAN_FLY){ face = m->face < 0 ? -1 : 1; fr = m->dive ? MSF_DIVE : (((frame >> 2) & 1) ? MSF_FLY_A : MSF_FLY_B); }
   else if(m->mode == MAN_STUCK){ disc(v->s, x, y, p * 2, RGB(110, 255, 90)); fr = ((frame >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
   else if(dragging) fr = MSF_DRAG;
   else fr = mi_frame(&mi, frame);                                            /* idle gags */
