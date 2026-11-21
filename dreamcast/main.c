@@ -1011,7 +1011,7 @@ static void draw_all(void){
   if(world.state == MX_PLAY && m->mode == MAN_AIM){
     MxToolFeedback cue=mx_tool_feedback(&world);
     if(cue.selected)
-      snprintf(buf,sizeof buf,"X: POWER %s  x%d",mx_tool_name(cue.selected),
+      snprintf(buf,sizeof buf,"X: POWER %s  x%d",mx_power_name(cue.selected),
                cue.remaining);
     else snprintf(buf,sizeof buf,"X: POWER NONE  (CYCLE)");
     text(buf, 12, 466, 14, cue.selected ? argb(255, 210, 63, 255) : argb(255, 255, 255, 200), 0, Z_HUD);

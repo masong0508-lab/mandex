@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "mx_meta.h" /* Cross-header compile guard: MX_TOOL_* != PW_* */
 #include "mx_tool_feedback.h"
 static MxWorld w;
 static int bad;
@@ -46,7 +47,9 @@ int main(void){
         mx_tool_stock(&w,PW_NONE)==0,"invalid stock indices safe");
   w.pw_left[PW_BEANS]=-10;
   CHECK(mx_tool_stock(&w,PW_BEANS)==0,"broken negative stock never displayed");
-  CHECK(strcmp(mx_tool_name(PW_QUAKE),"QUAKE")==0 &&
+  CHECK(strcmp(mx_power_name(PW_QUAKE),"QUAKE")==0 &&
+        strcmp(mx_power_name(PW_NONE),"NONE")==0 &&
+        strcmp(mx_power_name(PW_COUNT),"NONE")==0 &&
         strcmp(mx_tool_status_label(MX_SHOT_DAZED),"DAZED - AIM LOCKED")==0,
         "clear shared text labels");
   CHECK(strcmp(mx_tool_effect(PW_BEANS),"MID-AIR JET")==0 &&

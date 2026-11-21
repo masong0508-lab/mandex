@@ -14,7 +14,8 @@ typedef struct {
   int phase, selected, remaining; /* no extra aim/sqrt work in HUD */
 } MxToolFeedback;
 
-static inline const char *mx_tool_name(int id){
+/* PW_* power names are intentionally distinct from MX_TOOL_* option names\n   in mx_meta.h (whose mx_tool_name has a different index mapping). */
+static inline const char *mx_power_name(int id){
   static const char *const names[PW_COUNT] = {
     "NONE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE"
   };

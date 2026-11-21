@@ -23,3 +23,7 @@ Short power descriptions refer to actual mechanics: BEANS → mid-air jet, TOWEL
 - `test/tool_feedback_test.c` exercises normal/charged sling, actual partial/full power 0–100% calculation, stock, valve, stun, fly, walk, recovery, finished state, and guard behavior in both floating-point and fixed-point modes.
 - `test/browser_tool_feedback_test.js` executes the real browser readiness helper in isolation, checks playable/nonplayable modes and shot threshold, and verifies the complete browser script still parses.
 - Both are part of `test/run_tests.sh`. The DS CI build must also compile successfully. The 3DS/Dreamcast HUD placement still requires screenshot and actual hardware/emulator checks; no console FPS improvement is claimed.
+
+### Cross-port build correction
+
+The `PW_*` inventory identifiers and `MX_TOOL_*` starting-option identifiers do not have identical numeric values: `MX_TOOL_VALVE` occupies an option index but is not consumable inventory. The original `mx_tool_name()` is declared externally by `mx_meta.h` for options. This UI now uses a distinct, header-only `mx_power_name()` for live `PW_*` inventory labels, so the DS/Dreamcast/3DS translation units can include both headers without linkage conflicts or mistakenly labeling a selected power. The host feedback test includes both public headers to catch future collisions. This correction is UI-only; it does not change any save indices, charges or simulation behavior.
