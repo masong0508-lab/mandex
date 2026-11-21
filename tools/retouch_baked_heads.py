@@ -79,7 +79,7 @@ def patch_string(data):
         affected.append((name,changed))
         total+=changed
         body="".join("  "+",".join(map(str,px[y*w:(y+1)*w]))+",\n" for y in range(h))
-        return m[1]+body+m[4]
+        return m[1]+body+m[5]
     output=ARRAY.sub(replacement,data)
     assert len(affected)>=10 and (total>=60 or total==0),(affected,total)
     return output,total,affected
