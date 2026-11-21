@@ -436,7 +436,7 @@ void swiWaitForVBlank(void){
     if(vf == 36){ OCHECK(!out_open, "B closes the screen"); shot("out5");
       printf(fails ? "outfits screen: %d FAILED\n" : "outfits screen: all passed\n", fails); exit(fails != 0); }
   } else if(getenv("WALK_TEST") && app == ST_PLAY){                      /* chapter 2: walk levels (22 = Walk-Up Wreckage), fight-back landlords (25 Collection Day, 26 Batter Up) */
-    static int fails, st, f0, x0, y0;
+    static int fails, st, f0, x0, y0, music_before;
 #define WCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
     int wt = atoi(getenv("WALK_TEST"));
     if(wt == 1){                                                       /* Walk-Up Wreckage */
@@ -448,7 +448,18 @@ void swiWaitForVBlank(void){
       if(st == 3 && vf == f0 + 1) g_keys |= KEY_A;
       if(st == 3 && vf == f0 + 8){ WCHECK(world.man.y < y0 - RI(1), "A jumps"); shot("walkjump"); st = 4; f0 = vf; }
       if(st == 4 && vf == f0 + 40){ g_keys |= KEY_B; world.man.pCd = 0; }
-      if(st == 4 && vf == f0 + 43){ WCHECK(world.man.pT > 0, "B punches"); shot("punch"); st = 5; f0 = vf; }
+      if(st == 4 && vf == f0 + 43){ WCHECK(world.man.pT > 0, "B punches"); shot("punch"); st = 7; f0 = vf; }
+      if(st == 7 && vf == f0 + 20){
+        /* A second punch on Y must NOT silence the backing music. */
+        music_before=music_pref;
+        world.man.pCd=0;
+        g_keys |= KEY_Y;
+      }
+      if(st == 7 && vf == f0 + 23){
+        WCHECK(world.man.pT > 0, "Y punches while on foot");
+        WCHECK(music_pref == music_before, "Y punch does not toggle music preference");
+        st = 5; f0 = vf;
+      }
       if(st == 5 && vf == f0 + 30){ g_keys |= KEY_TOUCH; g_touch.px = 70; g_touch.py = 176; }                      /* the JUMP button */
       if(st == 5 && vf == f0 + 31){ g_keys |= KEY_TOUCH; g_touch.px = 70; g_touch.py = 176; y0 = world.man.y; }
       if(st == 5 && vf == f0 + 38){ WCHECK(world.man.y < y0 - R(0.5) || !world.man.gr, "the touch JUMP button jumps"); shot("walkbtn"); st = 6; f0 = vf; }
