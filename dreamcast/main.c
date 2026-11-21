@@ -557,6 +557,45 @@ static void draw_rooms(void){
   }
 }
 
+/* Actual room geometry, rather than a texture of generic windows: glass and
+   furniture share the room's surviving wallpaper cell. Frustum culling and
+   at most three windows per room bound the translucent polygon budget. */
+static void draw_facades(void){
+  for(int r=0;r<world.nrooms;r++){
+    const MxRoom *rm=&world.rooms[r];
+    if(rm->w<6||rm->h<5)continue;
+    float roomx=X(rm->x),roomy=Y(rm->y);
+    if(roomx>644||roomx+rm->w*PXC<-4||roomy>484||roomy+rm->h*PXC<-4)continue;
+    int n=rm->w>=18?3:rm->w>=11?2:1;
+    for(int k=0;k<n;k++){
+      int wx=rm->x+rm->w*(2*k+1)/(2*n),wy=rm->y+rm->h/2;
+      int i=wy*MX_COLS+wx;
+      if(world.grid[i]||!world.paper[i])continue;
+      float ww=(rm->w>=10?4:3)*PXC,hh=(rm->h>=7?4:3)*PXC;
+      float sx=X(wx)-ww*.5f,sy=Y(wy)-hh*.5f;
+      if(sx>643||sx+ww<0||sy>483||sy+hh<0)continue;
+      int lit=(r+k+world.level)%5==0;
+      uint32 glass=lit?argb(247,200,123,255):(r&1)?argb(114,165,188,255):argb(102,139,178,255);
+      quad(sx-2,sy-2,ww+4,hh+4,Z_ROOM+.04f,argb(29,30,45,255));
+      quad(sx-1,sy-1,ww+2,hh+2,Z_ROOM+.05f,argb(223,216,198,255));
+      gquad(sx,sy,ww,hh,Z_ROOM+.06f,lit?argb(255,224,163,255):argb(174,203,226,255),glass);
+      quad(sx+2,sy+2,ww*.3f,hh*.24f,Z_ROOM+.07f,argb(229,240,251,100));
+      quad(sx+ww*.5f-1,sy,2,hh,Z_ROOM+.08f,argb(234,225,205,255));
+      quad(sx,sy+hh*.5f-1,ww,2,Z_ROOM+.08f,argb(234,225,205,255));
+      quad(sx-PXC*.5f,sy+hh+1,ww+PXC,2,Z_ROOM+.09f,argb(101,78,71,255));
+    }
+    if(rm->w>=9&&rm->h>=6){
+      int cx=rm->x+2,cy=rm->y+rm->h-2,i=cy*MX_COLS+cx;
+      if(cy>=MX_ROWS||world.grid[i]||!world.paper[i])continue;
+      float sx=X(cx),sy=Y(cy);
+      quad(sx,sy,3*PXC,PXC,Z_ROOM+.04f,argb(102,53,81,255));
+      quad(sx,sy,3*PXC,1,Z_ROOM+.05f,argb(231,151,132,255));
+      quad(sx,PXC+sy,2,PXC,Z_ROOM+.05f,argb(57,42,51,255));
+      quad(sx+3*PXC-2,PXC+sy,2,PXC,Z_ROOM+.05f,argb(57,42,51,255));
+      quad(sx+PXC,sy-2*PXC,PXC,PXC,Z_ROOM+.06f,argb(255,225,138,255));
+    }
+  }
+}
 static float cam_pan;                        /* camera drift (px): follows the man in flight; only the clouds and the near grass react */
 typedef struct { float x, y, s, v; } Cloud;
 static void draw_clouds(void){
@@ -576,6 +615,7 @@ static void draw_all(void){
   draw_clouds();
   tquad(&hdr_bgb, DCT_BGB_W, DCT_BGB_H, 0, 0, 1024, 512, 0, 0, 1024, 512, Z_BGB, WHITE);
   draw_rooms();
+  draw_facades();
   const MxMan *m = &world.man;
   /* sling band behind the man */
   if(m->mode == MAN_AIM){

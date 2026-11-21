@@ -631,7 +631,7 @@ static void draw_rooms(const View *v){                  /* the wallpaper behind 
       int x2 = x; while(x2 < x1 && world.paper[y * MX_COLS + x2] == n && !world.grid[y * MX_COLS + x2]) x2++;
       int sx = VX(v, (float)x), w = VX(v, (float)x2) - sx; const unsigned char *c = PAP[(n - 1) & 3]; float g = g_dim;
       rect(v->s, sx, sy, w, p, RGB((int)(c[0] * g), (int)(c[1] * g), (int)(c[2] * g)));
-      if(p >= 3) for(int k = 0; k < w; k += 5) rect(v->s, sx + k, sy, 2, p, RGB((int)(c[0] * g * .93f), (int)(c[1] * g * .93f), (int)(c[2] * g * .93f)));   /* wallpaper stripes */
+      if(p >= 3) for(int k = 0; k < w; k += 10) rect(v->s, sx + k, sy, 1, p, RGB((int)(c[0] * g * .93f), (int)(c[1] * g * .93f), (int)(c[2] * g * .93f)));   /* wallpaper stripes */
       if(y + 1 >= MX_ROWS || !world.paper[(y + 1) * MX_COLS + x]) rect(v->s, sx, sy + p - 1, w, 1, RGB((int)(c[0] * g * .7f), (int)(c[1] * g * .7f), (int)(c[2] * g * .7f)));
       if(world.paper_torn && p>=3){
         /* A damaged edge costs at most two short lines per room run. */
@@ -727,7 +727,17 @@ static void draw_landlords(const View *v){
     real ox, oy; mx_target_offset(&world, t, &ox, &oy);
     int p = v->ppc, fc = t->face < 0 ? -1 : 1, stun = t->stun > 0, wind = t->wind > 0, swing = t->swing > 0;
     int x = VX(v, RTOF(t->x + ox)), y = VY(v, RTOF(t->y + oy)) - (t->mv && ((frame >> 2) & 1) ? 1 : 0);
-    rect(v->s, x - p - 1, y - p / 2 - 1, p * 2 + 2, p * 2 + 2, RGB(14, 14, 22)); rect(v->s, x - p, y + p * 3 / 2, p * 2, 2, RGB(40, 64, 30));   /* outline + foot shadow */
+    /* Each suited landlord has planted legs, a contact shadow and a short
+       alternating stride while patrolling. No sprite buffers or textures. */
+    const int walking=t->mv && !stun;
+    const int stride=walking?((frame>>2)&1 ? 1 : -1)*((p+1)/2):0;
+    const int base=y+p*3/2;
+    rect(v->s,x-p,base+1,p*2+2,2,RGB(40,64,30));
+    rect(v->s,x-p/2-1+stride,base-p/2,p/2+2,p,RGB(36,39,54));
+    rect(v->s,x+p/2-1-stride,base-p/2,p/2+2,p,RGB(29,31,45));
+    rect(v->s,x-p/2-2+stride,base+p/2,p/2+3,2,RGB(18,20,29));
+    rect(v->s,x+p/2-2-stride,base+p/2,p/2+3,2,RGB(18,20,29));
+    rect(v->s, x - p - 1, y - p / 2 - 1, p * 2 + 2, p * 2 + 2, RGB(14, 14, 22));   /* suit outline */
     rect(v->s, x - p, y - p / 2, p * 2, p * 2, t->kind == LK_BAT ? RGB(47, 93, 58) : t->kind == LK_THROWER ? RGB(58, 74, 122) : t->kind == LK_BOSS ? RGB(28, 28, 36) : t->kind == LK_SPRINTER ? RGB(122, 90, 28) : t->kind == LK_HEALER ? RGB(244, 244, 244) : t->kind == LK_SHIELD ? RGB(51, 65, 63) : RGB(60, 70, 90));   /* suit */
     rect(v->s, x - p / 3, y - p / 2, p * 2 / 3 + 1, p, RGB(255, 255, 255)); rect(v->s, x - 1 + 0, y - p / 2, 1, p + 1, RGB(209, 43, 43));   /* shirt + tie */
     rect(v->s, x - p / 3 - 1, y - p / 2, 1, p, RGB(34, 40, 56)); rect(v->s, x + p / 3 + 1, y - p / 2, 1, p, RGB(34, 40, 56));                 /* lapels */

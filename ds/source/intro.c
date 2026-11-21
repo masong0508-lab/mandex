@@ -214,8 +214,14 @@ static void room_stage(u8 *b,int gy,u8 wall,u8 floor,u8 trim){
     gfx_rect(b,x+4,7,1,gy-16,C_CLOUD2);
     gfx_rect(b,x+12,gy-30,38,1,trim);
   }
+  /* Stage cornice and floor junction give every camera angle a consistent
+     architecture. The baseboard casts a small grounded shadow. */
+  gfx_rect(b,0,2,256,3,trim);
+  gfx_rect(b,0,5,256,1,C_CLOUD2);
+  gfx_rect(b,0,gy-8,256,2,C_DARK);
   gfx_rect(b,0,gy-6,256,6,trim);
   gfx_rect(b,0,gy-5,256,1,C_CLOUD2);
+  gfx_rect(b,0,gy+1,256,2,C_DARK);
   for(int x=-64;x<=320;x+=64)gfx_tline(b,128,gy,x,191,1,trim);
   for(int y=gy+14;y<192;y+=18)gfx_rect(b,0,y,256,1,trim);
 }

@@ -3067,6 +3067,43 @@ function grade(){ctx.save();ctx.setTransform(1,0,0,1,0,0);
     g=x.createLinearGradient(W,0,0,H*.9);g.addColorStop(0,'rgba(255,214,150,.34)');g.addColorStop(.5,'rgba(255,214,150,0)');x.globalCompositeOperation='soft-light';x.fillStyle=g;x.fillRect(0,0,W,H);
     g=x.createLinearGradient(0,H*.55,0,H);g.addColorStop(0,'rgba(60,70,140,0)');g.addColorStop(1,'rgba(60,70,140,.35)');x.fillStyle=g;x.fillRect(0,0,W,H);_vig=c;_vig.w=W;_vig.h=H}
   ctx.drawImage(_vig,0,0);ctx.restore()}
+// Interior silhouettes and glazing are attached to the actual wallpaper
+// cells, not to the camera. The voxel pass still occludes these details and
+// collapses remove them with their supporting room paper. No image assets.
+function drawRoomDetails(xlo,xhi,ylo,yhi){
+  for(let r=0;r<interiors.length;r++){
+    const rm=interiors[r];
+    if(rm.w<6||rm.h<5||rm.x+rm.w<xlo||rm.x>xhi||rm.y+rm.h<ylo||rm.y>yhi)continue;
+    const n=rm.w>=18?3:rm.w>=11?2:1;
+    for(let k=0;k<n;k++){
+      const wx=rm.x+Math.floor(rm.w*(2*k+1)/(2*n)),wy=rm.y+(rm.h>>1);
+      if(!inb(wx,wy)||paper[idx(wx,wy)]!==r+1||grid[idx(wx,wy)])continue;
+      const ww=(rm.w>=10?4:3)*V,hh=(rm.h>=7?4:3)*V;
+      const px=wx*V-ww/2,py=wy*V-hh/2;
+      const lit=(r+k+(level<0?0:level))%5===0;
+      ctx.fillStyle='rgba(23,28,45,.92)';ctx.fillRect(px-3,py-3,ww+6,hh+6);
+      ctx.fillStyle='#d9d2c6';ctx.fillRect(px-2,py-2,ww+4,hh+4);
+      ctx.fillStyle=lit?'#f3c67d':(r&1)?'#80acbd':'#7795b2';ctx.fillRect(px,py,ww,hh);
+      ctx.fillStyle=lit?'rgba(255,237,179,.56)':'rgba(227,244,255,.5)';
+      ctx.fillRect(px+2,py+2,ww*.32,hh*.32);
+      ctx.fillStyle='rgba(28,46,67,.26)';ctx.fillRect(px+2,py+hh-4,ww-4,2);
+      ctx.fillStyle='#e8dfce';ctx.fillRect(px+ww/2-1,py,2,hh);ctx.fillRect(px,py+hh/2-1,ww,2);
+      ctx.fillStyle='#66594f';ctx.fillRect(px-4,py+hh+2,ww+8,3);
+      ctx.fillStyle='#d6bca2';ctx.fillRect(px-4,py+hh+2,ww+8,1);
+    }
+    if(rm.w>=9&&rm.h>=6){
+      const cx=rm.x+2,cy=rm.y+rm.h-2;
+      if(!inb(cx,cy)||paper[idx(cx,cy)]!==r+1||grid[idx(cx,cy)])continue;
+      const px=cx*V,py=cy*V;
+      ctx.fillStyle='rgba(20,19,29,.28)';ctx.fillRect(px-1,py+V,3*V+4,3);
+      ctx.fillStyle='#643951';ctx.fillRect(px,py,3*V,V);
+      ctx.fillStyle='#d6a88a';ctx.fillRect(px,py,3*V,2);
+      ctx.fillStyle='#382d39';ctx.fillRect(px+1,py+V,3,Math.max(2,V-1));ctx.fillRect(px+3*V-4,py+V,3,Math.max(2,V-1));
+      ctx.fillStyle='#eddba0';ctx.fillRect(px+V,py-2*V,V,V);
+      ctx.fillStyle='#6c5d57';ctx.fillRect(px+V+V/2-1,py-V,2,V);
+    }
+  }
+}
 function draw(){
   hits=[];
   ctx.setTransform(1,0,0,1,0,0);const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
@@ -3099,6 +3136,7 @@ function draw(){
       if(x2<COLS&&!paper[idx(x2,y)])ctx.fillRect(x2*V-2,y*V,2,V);
     }
     x=x2}}
+  drawRoomDetails(paperX0,paperX1,paperY0,paperY1);
   drawSling(true);drawValve();drawBurpStand();drawPwProp();
   const cx0=Math.max(0,Math.floor(CAM.x/V)-2),cx1=Math.min(COLS,Math.ceil((CAM.x+W/CAM.z)/V)+2);   // only the columns on screen
   for(let y=0;y<ROWS;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;

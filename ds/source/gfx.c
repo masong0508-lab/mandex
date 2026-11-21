@@ -804,8 +804,17 @@ void spr_landlord(u8 *b, int x, int y, int ppc, int ph, int scared){
 /* chapter 2 landlords: the plain landlord plus what makes his kind.  face = -1/1, st bits: 1 dazed, 2 winding up, 4 swinging, 8 strolling, 16 running.
    bat (kind 3): green hat band and a club;  thrower (2): blue band, the briefcase goes up over his head to throw;  walker (1): strolls with a clipboard. */
 void spr_landlord_k(u8 *b, int x, int y, int ppc, int ph, int scared, int kind, int face, int st){
-  if(st & 24) y -= ((ph >> 2) & 1);                                           /* a bounce in his step */
+  /* A planted marching gait is more grounded than lifting the entire
+     landlord one pixel. The feet and case remain attached to the actor. */
   spr_landlord(b, x, y, ppc, ph, scared);
+  if(st & 24){
+    int step=((ph>>2)&1)?SM(2):-SM(2);
+    int gy=y+S(16);
+    gfx_rect(b,x-S(9)+step,gy,SM(8),SM(3),C_BLACK);
+    gfx_rect(b,x+S(1)-step,gy,SM(8),SM(3),C_BLACK);
+    gfx_rect(b,x-S(8)+step,gy,SM(4),1,C_GRAY);
+    gfx_rect(b,x+S(2)-step,gy,SM(4),1,C_GRAY);
+  }
   int by = y + ((ph >> 4) & 1 && ppc >= 4 ? 1 : 0), hy = by - S(16);
   if(kind >= 2) gfx_rect(b, x - S(8), hy - S(15), S(16), SM(5), kind == 3 ? C_GRASS : (kind == 5 || kind == 6) ? C_GOLD : kind == 4 ? C_UIHI : kind == 7 ? C_GRASS : C_UILINE);   /* hat band: bat green, thrower blue, sprinter/boss gold, shield grey, healer green */
   if(kind == 7){ gfx_rect(b, x - S(4), by - S(6), S(8), SM(8), C_WHITE); gfx_rect(b, x - 1, by - S(5), 2, SM(6), C_GRASS); gfx_rect(b, x - S(2), by - S(3), SM(4), 2, C_GRASS); }   /* healer: white coat, green cross */

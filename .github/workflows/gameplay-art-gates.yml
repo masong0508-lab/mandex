@@ -7,8 +7,12 @@ on:
       - "tools/gen_manspr.py"
       - "web/index.html"
       - "ds/source/main.c"
+      - "ds/source/intro.c"
+      - "ds/source/gfx.c"
+      - "3ds/main.c"
       - "dreamcast/main.c"
       - "test/sprite_surface_test.py"
+      - "test/room_facade_web_test.js"
       - ".github/workflows/gameplay-art-gates.yml"
   workflow_dispatch:
 jobs:
@@ -30,6 +34,7 @@ jobs:
           PY
           node --check /tmp/mandex-gameplay.js
           node test/room_backdrop_web_test.js
+          node test/room_facade_web_test.js
       - name: Render Nintendo DS gameplay and movement review screenshots
         run: |
           mkdir -p out/art-review
