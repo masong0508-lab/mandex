@@ -94,37 +94,86 @@ u32 cpuEndTiming(void){
 /* ------------------------------------------------------------- sound (ARM7 does the register writes) */
 enum { C_PLAY_PSG = 1, C_PLAY_NOISE = 2, C_FREQ = 3, C_KILL = 4, C_WAVE_SRC = 5, C_PLAY_WAVE = 6, C_VOL = 7 };
 static u8 busy[16];
-static void push(u32 cmd){
+static u16 pending_kill;
+
+/* ARM7 advances tail independently. Since it only CONSUMES commands, the
+   remaining space computed here is a conservative lower bound. A channel
+   start needs TWO commands (PSG/noise) or THREE (PCM); accepting only the
+   first half would leave a silent but permanently busy channel. */
+static u32 snd_room(void){
+  const MxIpc *p = MX_IPC;
+  return (p->tail - p->head - 1u) & 63u;
+}
+static void snd_push(u32 cmd){                 /* call only with reserved room */
   MxIpc *p = MX_IPC;
   u32 h = p->head;
-  if(((h + 1) & 63) == p->tail) return;             /* ring full: drop */
   p->ring[h & 63] = cmd;
-  p->head = (h + 1) & 63;
+  p->head = (h + 1u) & 63u;
 }
+static void snd_flush_kills(void){
+  /* A kill is essential for freeing a voice and ending a sustained note.
+     Never silently drop it when explosions flood the command ring. */
+  for(int c = 0; c < 16 && pending_kill; c++) if(pending_kill & (1u << c)){
+    if(!snd_room()) break;
+    snd_push((C_KILL << 28) | (c << 24));
+    pending_kill &= (u16)~(1u << c);
+    busy[c] = 0;
+  }
+}
+void soundPump(void){ snd_flush_kills(); }    /* one cheap check per game frame */
 static int grab(int lo, int hi){ for(int c = lo; c <= hi; c++) if(!busy[c]){ busy[c] = 1; return c; } return -1; }
-void soundEnable(void){ MX_IPC->head = MX_IPC->tail = 0; }
+void soundEnable(void){
+  MX_IPC->head = MX_IPC->tail = 0;
+  pending_kill = 0;
+  for(int c = 0; c < 16; c++) busy[c] = 0;
+}
 int soundPlayPSG(DutyCycle d, u16 f, u8 v, u8 pan){
+  snd_flush_kills();
+  if(snd_room() < 2) return -1;
   int c = grab(8, 13); if(c < 0) return -1;
-  push((C_FREQ << 28) | (c << 24) | f);               /* timer first, then start the channel */
-  push((C_PLAY_PSG << 28) | (c << 24) | ((u32)(d & 7) << 21) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
+  snd_push((C_FREQ << 28) | (c << 24) | f);
+  snd_push((C_PLAY_PSG << 28) | (c << 24) | ((u32)(d & 7) << 21) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
   return c;
 }
 int soundPlayNoise(u16 f, u8 v, u8 pan){
+  snd_flush_kills();
+  if(snd_room() < 2) return -1;
   int c = grab(14, 15); if(c < 0) return -1;
-  push((C_FREQ << 28) | (c << 24) | f);
-  push((C_PLAY_NOISE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
+  snd_push((C_FREQ << 28) | (c << 24) | f);
+  snd_push((C_PLAY_NOISE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
   return c;
 }
-int soundPlayWave(const signed char *cyc, u16 f, u8 v, u8 pan){   /* PCM channels 0..7 loop a 32-byte cycle: no square-wave buzz.  The ARM9 has no data cache here, so the ARM7 reads the table straight from RAM. */
+int soundPlayWave(const signed char *cyc, u16 f, u8 v, u8 pan){
+  /* The ARM9 has no enabled data cache: ARM7 reads the 32-sample table
+     directly from main RAM. Queue wave source, pitch and play atomically. */
+  snd_flush_kills();
+  if(snd_room() < 3) return -1;
   int c = grab(0, 7); if(c < 0) return -1;
-  push((C_WAVE_SRC << 28) | ((u32)cyc & 0xFFFFFC));   /* main RAM is 0x02xxxxxx: only the low 24 bits travel */
-  push((C_FREQ << 28) | (c << 24) | f);               /* timer first, then start the channel */
-  push((C_PLAY_WAVE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
+  snd_push((C_WAVE_SRC << 28) | ((u32)cyc & 0xFFFFFC));
+  snd_push((C_FREQ << 28) | (c << 24) | f);
+  snd_push((C_PLAY_WAVE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
   return c;
 }
-void soundSetVol(int h, u8 v){ if(h >= 0 && h < 8) push((C_VOL << 28) | (h << 24) | (v & 127)); }
-void soundSetFreq(int h, u16 f){ if(h >= 0 && h < 16) push((C_FREQ << 28) | (h << 24) | f); }
-void soundKill(int h){ if(h >= 0 && h < 16){ push((C_KILL << 28) | (h << 24)); busy[h] = 0; } }
+void soundSetVol(int h, u8 v){
+  /* Envelopes/glides are cosmetic. Keep a little headroom for a kill or
+     a complete new note; the next frame catches up its latest value. */
+  snd_flush_kills();
+  if(h >= 0 && h < 8 && busy[h] && snd_room() >= 4)
+    snd_push((C_VOL << 28) | (h << 24) | (v & 127));
+}
+void soundSetFreq(int h, u16 f){
+  snd_flush_kills();
+  if(h >= 0 && h < 16 && busy[h] && snd_room() >= 4)
+    snd_push((C_FREQ << 28) | (h << 24) | f);
+}
+void soundKill(int h){
+  if(h < 0 || h >= 16 || (!busy[h] && !(pending_kill & (1u << h)))) return;
+  if(snd_room()){
+    snd_push((C_KILL << 28) | (h << 24));
+    pending_kill &= (u16)~(1u << h);
+    busy[h] = 0;
+  }else pending_kill |= (u16)(1u << h);
+}
 
 /* ------------------------------------------------------------- cartridge backup chip (8 KB / 64 kbit EEPROM, 2-byte address, 32-byte pages)
    Register values are from memory of GBATEK ("DS Cartridge Backup") and libnds' cardEeprom code: check them on the first emulator run.
