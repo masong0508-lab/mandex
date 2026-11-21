@@ -18,13 +18,35 @@ enum {
 typedef struct {
   int phase, remaining, total;
   int direction; /* -1: target to left, +1: target to right, 0: aligned/not needed */
+  int target_index; /* final living landlord, or -1; only a read-only snapshot */
 } MxObjective;
 
+enum { MX_EDGE_NONE, MX_EDGE_LEFT, MX_EDGE_RIGHT, MX_EDGE_UP, MX_EDGE_DOWN };
+typedef struct { int dir, x, y; } MxObjectiveEdge;
+
+/* Small reusable screen-space navigation hint. The viewport rectangle
+   excludes the top mission HUD and bottom action controls. A cue is drawn
+   ONLY when the last landlord is outside that playable rectangle. */
+static inline MxObjectiveEdge mx_objective_edge(int sx,int sy,int width,
+                                               int height,int top,int bottom){
+  MxObjectiveEdge e={MX_EDGE_NONE,0,0};
+  if(width<48||height<48||top+bottom+28>=height)return e;
+  int floor=height-bottom;
+  if(sx>=0 && sx<width && sy>=top && sy<floor)return e;
+  if(sx<0)e.dir=MX_EDGE_LEFT;
+  else if(sx>=width)e.dir=MX_EDGE_RIGHT;
+  else if(sy<top)e.dir=MX_EDGE_UP;
+  else e.dir=MX_EDGE_DOWN;
+  e.x=sx<22?22:sx>width-22?width-22:sx;
+  e.y=sy<top+9?top+9:sy>floor-10?floor-10:sy;
+  return e;
+}
+
 static inline MxObjective mx_objective_snapshot(const MxWorld *w){
-  MxObjective o = {MX_OBJ_EVICT, 0, w->ntargets, 0};
+  MxObjective o = {MX_OBJ_EVICT, 0, w->ntargets, 0, -1};
   const MxTarget *last = 0;
   for(int i=0;i<w->ntargets;i++){
-    if(w->targets[i].alive){ o.remaining++; last=&w->targets[i]; }
+    if(w->targets[i].alive){ o.remaining++; last=&w->targets[i]; o.target_index=i; }
   }
   if(w->state==MX_WIN){ o.phase=MX_OBJ_COMPLETE; return o; }
   if(w->state==MX_LOSE){ o.phase=MX_OBJ_FAILED; return o; }
