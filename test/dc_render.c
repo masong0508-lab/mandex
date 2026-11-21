@@ -297,10 +297,29 @@ static int dc_damage_fastpath_probe(void){
   return 0;
 }
 #ifdef MX_DC_PARTICLE_BENCH
+static int dc_particle_bounds_probe(void){
+  memset(parts,0,sizeof parts);part_high_water=0;
+#if MX_DC_PARTICLE_HINT
+  part_free_hint=0;
+#endif
+  for(int k=0;k<8;k++) spawn_k(PK_BIT,20.f+k,15.f,1.f,0.f,.8f,argb(210,176,130,255));
+  if(part_high_water!=8){fputs("FAIL: DC particle highwater allocation\n",stderr);return 1;}
+  for(int k=5;k<8;k++)parts[k].life=.001f;
+  fx_step(0,0);
+  if(part_high_water!=5){fputs("FAIL: DC expired high-water tail\n",stderr);return 1;}
+  spawn_k(PK_BIT,27.f,16.f,1.f,0.f,.8f,argb(210,176,130,255));
+  if(part_high_water!=6){fputs("FAIL: DC particle tail reuse\n",stderr);return 1;}
+  memset(fb,0,sizeof fb);cur_hdr=0;nq=0;
+  draw_particles();
+  printf("DC_PARTICLE_BOUNDS_HASH %08x\n",dc_hash(fb,sizeof fb));
+  printf("DC_PARTICLE_BOUNDS_SCANNED %d\n",MX_DC_PARTICLE_BOUNDS?part_high_water:256);
+  return 0;
+}
 /* Render identical sprite scenes through reference and culled production
  * painters. The PVR emulator compares all 640x480 pixels byte-for-byte. */
 static int dc_particle_view_probe(void){
   memset(parts,0,sizeof parts);
+  part_high_water=256; /* synthetic fixture bypasses spawn_k() */
   for(int i=0;i<256;i++){
     Part *p=&parts[i];
     p->x=(float)((i*131)%1000)-175.0f;
@@ -322,6 +341,7 @@ int main(void){
   if(getenv("DC_FASTPATH_PROBE"))return dc_fastpath_probe();
   gfx_init();
 #ifdef MX_DC_PARTICLE_BENCH
+  if(getenv("DC_PARTICLE_BOUNDS_PROBE"))return dc_particle_bounds_probe();
   if(getenv("DC_PARTICLE_VIEW_PROBE"))return dc_particle_view_probe();
 #endif
   if(getenv("DC_OUTFIT_RECOLOR_PROBE"))return dc_outfit_memory_probe();

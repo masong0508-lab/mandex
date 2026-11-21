@@ -231,6 +231,12 @@ static void text(const char *s, float x, float y, float size, uint32 col, int al
 enum { PK_BIT, PK_STINK, PK_FLY, PK_ZZZ, PK_SWEAT, PK_HEART, PK_GLINT };
 typedef struct { float x, y, vx, vy, life, max; uint32 c; int kind; } Part;
 static Part parts[256];
+/* The highest slot ever occupied since the last expiry sweep. One integer,
+   no extra particle storage; an empty pool skips both update and drawing. */
+#ifndef MX_DC_PARTICLE_BOUNDS
+#define MX_DC_PARTICLE_BOUNDS 1
+#endif
+static int part_high_water;
 #ifndef MX_DC_PARTICLE_HINT
 #define MX_DC_PARTICLE_HINT 1
 #endif
@@ -245,11 +251,15 @@ static void spawn_k(int kind, float x, float y, float vx, float vy, float life, 
 #if MX_DC_PARTICLE_HINT
   for(int i = part_free_hint; i < 256; i++) if(parts[i].life <= 0){
     parts[i].x = XB(x); parts[i].y = YB(y); parts[i].vx = vx; parts[i].vy = vy; parts[i].life = parts[i].max = life; parts[i].c = c; parts[i].kind = kind;
-    part_free_hint = i + 1; return;
+    part_free_hint = i + 1;
+    if(part_high_water < i + 1) part_high_water = i + 1;
+    return;
   }
 #else
   for(int i = 0; i < 256; i++) if(parts[i].life <= 0){
-    parts[i].x = XB(x); parts[i].y = YB(y); parts[i].vx = vx; parts[i].vy = vy; parts[i].life = parts[i].max = life; parts[i].c = c; parts[i].kind = kind; return;
+    parts[i].x = XB(x); parts[i].y = YB(y); parts[i].vx = vx; parts[i].vy = vy; parts[i].life = parts[i].max = life; parts[i].c = c; parts[i].kind = kind;
+    if(part_high_water < i + 1) part_high_water = i + 1;
+    return;
   }
 #endif
 }
@@ -488,7 +498,7 @@ static void fx_step(int calm, int strain){
     spawn_k(PK_STINK, world.man.x - (world.man.vx > 0 ? 2 : -2), world.man.y + 1, (frand() - 0.5f) * 30, (frand() - 0.5f) * 20, 0.7f + frand() * 0.4f, argb(135, 220, 75, 255));
   if(strain && fcount % 7 == 0)                                                                                 /* straining in the sling */
     spawn_k(PK_SWEAT, world.man.x + (frand() - 0.5f) * 3, world.man.y - 4, (frand() - 0.5f) * 60, -frand() * 70, 0.5f, argb(190, 230, 255, 255));
-  for(int i = 0; i < 256; i++) if(parts[i].life > 0){
+  for(int i = 0; i < (MX_DC_PARTICLE_BOUNDS ? part_high_water : 256); i++) if(parts[i].life > 0){
     Part *p = &parts[i]; p->life -= DT; p->x += p->vx * DT; p->y += p->vy * DT;
     switch(p->kind){
     case PK_STINK: p->vx *= 0.97f; p->vy = p->vy * 0.97f - 18.0f * DT; break;      /* drifts up, never falls */
@@ -501,6 +511,8 @@ static void fx_step(int calm, int strain){
     if(p->life <= 0 && i < part_free_hint) part_free_hint = i;
 #endif
   }
+  while(part_high_water && parts[part_high_water - 1].life <= 0)
+    part_high_water--; /* never skip a live slot */
 }
 
 /* The title: the whole landscape with the man dropping butt-first on a landlord (a 852x480 picture, art/dcart.h, from the HTML title, logo included).
@@ -743,7 +755,7 @@ static void draw_rubble_chunks(void){
 static unsigned dc_particles_rasterized; /* host-only work counter */
 #endif
 static void draw_particles(void){
-  for(int i = 0; i < 256; i++) if(parts[i].life > 0){
+  for(int i = 0; i < (MX_DC_PARTICLE_BOUNDS ? part_high_water : 256); i++) if(parts[i].life > 0){
     const Part *p = &parts[i];
 #if MX_DC_PARTICLE_VIEW_CULL
     /* Each effect is contained within 32px of its anchor. The 64px pad
