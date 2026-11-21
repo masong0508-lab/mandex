@@ -17,6 +17,8 @@ static void init(int hp){
   MxTarget *t=&w.targets[0];
   t->x=R(24.5);t->y=RI(24);t->alive=1;
   t->hp=hp;t->hpmax=hp;t->room_id=0;
+  /* Actual footing at y=25, inside the room, not counted in the frame. */
+  for(int x=19;x<=31;x++)w.grid[IDX(x,25)]=MX_STONE;
 }
 static unsigned successful_seed(int chance){
   const real threshold=rdiv(RI(chance),RI(4096));
@@ -45,6 +47,9 @@ int main(void){
   for(int y=21;y<=26;y++)for(int x=21;x<=27;x++)w.grid[IDX(x,y)]=MX_STONE;
   CHECK(!collapse_survive(&w,t)&&!t->collapse_rolled,"buried with no air pocket");
   memset(w.grid,0,sizeof w.grid);
+  CHECK(!collapse_survive(&w,t)&&!t->collapse_rolled,
+        "cannot escape from a free-floating pocket without solid footing");
+  for(int x=19;x<=31;x++)w.grid[IDX(x,25)]=MX_STONE;
   t->room_id=255;
   CHECK(!collapse_survive(&w,t),"outdoor target got room survivor event");
   t->room_id=0;
@@ -61,6 +66,10 @@ int main(void){
   CHECK(w.nev==MX_MAX_EVENTS&&w.ev[MX_MAX_EVENTS-1].type==EV_SURVIVOR,
         "rare survivor announcement lost under debris event saturation");
   CHECK(!collapse_survive(&w,t),"one landlord survived multiple times");
+  CHECK(t->wind==0&&t->dodge>0&&t->dd<0,"survivor must cancel attack and flee away from room center");
+  t->stun=0;real oldx=t->x;
+  lord_ai(&w,t,R(0.016));
+  CHECK(t->x<oldx&&t->mv==2,"wounded landlord did not retreat after recovering");
   kill_hard(&w,t); CHECK(!t->alive,"escaped landlord permanently invulnerable");
   init(1); t=&w.targets[0];
   lucky=successful_seed(45);
