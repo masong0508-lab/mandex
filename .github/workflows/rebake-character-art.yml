@@ -1,0 +1,107 @@
+name: Rebuild canonical character art (console atlases)
+# One source of truth: browser 3D character + tools/manhead.py. Re-bake both
+# handheld and Dreamcast atlases and TEST before making a fast-forward push.
+# A new user/Codex commit during baking causes a safe skip, not an overwrite.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/index.html"
+      - "tools/manhead.py"
+      - "tools/gen_manspr.py"
+      - "tools/gen_dc_art.py"
+      - ".github/workflows/rebake-character-art.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: mandex-canonical-character-rebake-main
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install offline art-baker tools
+        run: |
+          python -m pip install --disable-pip-version-check "numpy<3" pillow playwright
+          python -m playwright install --with-deps chromium
+      - name: Regenerate ALL 142 console sprite frames from canonical head + 3D body
+        run: |
+          python3 tools/gen_manspr.py > /tmp/man-rebake-report.txt
+          python3 tools/gen_dc_art.py > /tmp/dreamcast-rebake-report.txt
+          test -s art/manspr.h
+          test -s art/dcart.h
+          grep -q 'MS_CANONICAL_TURN_BAKE 1' art/manspr.h
+          tail -n 10 /tmp/man-rebake-report.txt
+          tail -n 10 /tmp/dreamcast-rebake-report.txt
+      - name: Enforce head, hair, profile, wolf and atlas invariants
+        run: |
+          set -eu
+          python3 test/head_turnaround_test.py
+          python3 test/character_turnaround_test.py
+          python3 tools/retouch_baked_heads.py --check
+          python3 test/sprite_surface_test.py
+          git diff --check
+      - name: Compile actual handheld renderer against freshly baked frames
+        run: |
+          set -eu
+          gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST \
+            -Itest/stubs -Icore -Iart -Ids/source \
+            test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+            core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/rebake-ds-render
+          DS_PERF_BENCH=1 /tmp/rebake-ds-render /tmp/rebake-art 120 0 > /tmp/rebake-ds.log
+          grep -q 'DS_FRAME_HASH' /tmp/rebake-ds.log
+      - name: Compile real Dreamcast renderer against freshly baked high-resolution atlas
+        run: |
+          set -eu
+          for src in gfx intro; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_SHARED_CUTSCENE \
+              -Dgfx_init=ds_gfx_init -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
+              -c ds/source/$src.c -o /tmp/rebake-$src.o
+          done
+          gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation \
+            -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
+            /tmp/rebake-gfx.o /tmp/rebake-intro.o \
+            core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c test/dc_render.c \
+            -lm -o /tmp/rebake-dc-render
+          DC_MENU_FLOW_TEST=1 /tmp/rebake-dc-render > /tmp/rebake-dc.log
+          grep -q 'Dreamcast menu flow: all passed' /tmp/rebake-dc.log
+      - name: Publish reproducible generated atlas and review previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: mandex-canonical-character-atlas-and-preview
+          path: |
+            art/manspr.h
+            art/dcart.h
+            docs/man_sprites.png
+            docs/dc_art_sheet.png
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish to main only if its source revision is unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add art/manspr.h art/dcart.h docs/man_sprites.png docs/dc_art_sheet.png
+          if git diff --cached --quiet; then
+            echo "Already synchronized, no commit necessary"
+            exit 0
+          fi
+          latest="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$latest" != "$GITHUB_SHA" ]; then
+            echo "Main moved while baking; skip publication so newer source files are not overwritten."
+            echo "The checked generated atlases are in this run's artifact."
+            exit 0
+          fi
+          git commit -m "Rebake 142 canonical man poses and Dreamcast PVR atlas from corrected character model"
+          git push origin HEAD:main
