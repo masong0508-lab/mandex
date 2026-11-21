@@ -79,7 +79,7 @@ for(const [w,h] of [[960,540],[540,960],[320,568],[1280,720],[960,540]]){
     [rr-202,y,62,54],[rr-132,y,62,54],[rr-62,y,62,54]
   ],'same responsive walk input hitboxes');
 }
-const script=between('<script>','</script>');
-new Function(script); // Syntax of whole bundled browser game.
+const rawScript=between('<script>','</script>');
+new Function(rawScript.slice('<script>'.length)); // Syntax of whole bundled browser game.
 console.log('ok: '+cases+' walk-collision cases, '+hits+' hits / '+misses+' misses, '+hypotCalls+' narrow-phase distances');
 console.log('ok: 26 original character detail points reused and all five responsive touch controls stable');
