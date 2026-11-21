@@ -1876,6 +1876,7 @@ static void upd_targets(MxWorld *w, real dt){
       if(rmul(dx, dx) + rmul(dy, dy) > rmul(reach, reach)) continue;
       for(int k = 0; k < ch->count; k++){
         MxCell *a = &ch->cells[k];
+        if(a->dead)continue; /* shattered rubble has no collision body or invisible attacks */
         real ddx = a->wx - t->x, ddy = a->wy - t->y, lim = r + RC;
         if(rmul(ddx, ddx) + rmul(ddy, ddy) >= rmul(lim, lim)) continue;
         real vx = ch->vx - rmul(ch->w, a->wy - ch->y), vy = ch->vy + rmul(ch->w, a->wx - ch->x);
