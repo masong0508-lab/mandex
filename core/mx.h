@@ -210,13 +210,13 @@ static inline int mx_walk_anim_phase(const MxMan *m){
    The mirrored halves meet on the rear silhouette, without new sprites. */
 static inline int mx_walk_turn_offset(const MxMan *m){
   if(!m->turn_ticks || m->mode!=MAN_WALK) return 0;
-  int step=12-(int)m->turn_ticks;
+  /* walk_step() decrements turn_ticks before the frame is drawn; at
+     the first visible frame it is 11, not 12. Start at the nearest 15deg
+     atlas view to avoid a 30deg snap, then pass through the rear view. */
+  int step=11-(int)m->turn_ticks;
   if(step<0)step=0;
-  if(step>11)step=11;
-  /* Twelve distinct animation ticks reuse the existing 15-degree atlas
-     instead of holding six alternating frames. Mirrored halves meet at
-     the rear-facing SPIN_12 frame before returning toward profile. */
-  return step<6 ? step+1 : 12-step;
+  if(step>10)step=10;
+  return step<6 ? step+1 : 11-step;
 }
 static inline int mx_walk_render_face(const MxMan *m){
   return m->turn_ticks>6 && m->mode==MAN_WALK?-m->face:m->face;
