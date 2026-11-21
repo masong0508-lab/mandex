@@ -146,9 +146,48 @@ static int dc_fastpath_probe(void){
   }
   return 0;
 }
+/* Title bitmap is freed for RAM during gameplay. Validate its complete
+   VRAM lifecycle and the final-level transition against the REAL front-end,
+   not a mock image/header. Can run alone as DC_MENU_FLOW_TEST=1. */
+static int dc_menu_flow_test(void){
+  int fail=0;
+#define MENU_CHECK(c,m) do{if(!(c)){fprintf(stderr,"FAIL: %s\n",m);fail++;}else printf("ok: %s\n",m);}while(0)
+  MENU_CHECK(tx_ttl!=0,"title is initially allocated on the Dreamcast PVR");
+  on_title=1;title_t=0;title_lv=0;nofight=0;cur_hdr=0;
+  memset(fb,0,sizeof fb);draw_title();
+  unsigned before=dc_hash(fb,sizeof fb);
+  pvr_mem_free(tx_ttl);tx_ttl=0;
+  /* The old code would draw a stale PVR header pointing into freed VRAM. */
+  memset(fb,0,sizeof fb);cur_hdr=0;draw_title();
+  MENU_CHECK(dc_hash(fb,sizeof fb)!=before,
+             "missing title allocation displays safe fallback instead of stale texture");
+  dc_return_to_title(0);
+  MENU_CHECK(on_title && !paused && tx_ttl!=0,
+             "returning to title reacquires the freed PVR texture");
+  MENU_CHECK(tx_ttl==hdr_ttl.ptr,
+             "restored PVR header points to the new valid texture address");
+  memset(fb,0,sizeof fb);cur_hdr=0;draw_title();
+  MENU_CHECK(dc_hash(fb,sizeof fb)==before,
+             "restored title image is byte-identical to its initial drawing");
+  pvr_mem_free(tx_ttl);tx_ttl=0;
+  on_title=0;world.level=MX_NUM_LEVELS-1;world.state=MX_WIN;
+  dc_advance_after_end();
+  MENU_CHECK(on_title && !paused && title_lv==0 && tx_ttl!=0,
+             "winning final level returns to playable title instead of level out of bounds");
+  on_title=0;load_level(7);world.state=MX_LOSE;
+  dc_advance_after_end();
+  MENU_CHECK(!on_title && world.level==7 && world.state==MX_PLAY,
+             "losing a level retries that same valid level");
+  dc_return_to_title(world.level);
+  MENU_CHECK(on_title && title_lv==7 && tx_ttl!=0,
+             "pause-menu exit to title preserves the current level selection");
+  printf(fail?"Dreamcast menu flow: %d FAILED\n":"Dreamcast menu flow: all passed\n",fail);
+  return fail!=0;
+}
 int main(void){
   if(getenv("DC_FASTPATH_PROBE"))return dc_fastpath_probe();
   gfx_init(); sound_init(); if(!snd_ok){ puts("FAIL: dc sound did not initialise"); return 1; }
+  if(getenv("DC_MENU_FLOW_TEST"))return dc_menu_flow_test();
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;
   memset(fb,0,sizeof fb); title_t=0; cur_hdr=0; draw_title(); dump("/tmp/dc_title.ppm"); title_t=40; cur_hdr=0; draw_title(); dump("/tmp/dc_title_blink.ppm");   /* the title, and the half of the blink with no PRESS START */
   { const int T[3] = { 30, 170, 330 }; for(int k = 0; k < 3; k++){ char fn[48]; snprintf(fn, sizeof fn, "/tmp/dc_tpan%d.ppm", k); memset(fb,0,sizeof fb); title_t = T[k]; cur_hdr=0; draw_title(); dump(fn); } }   /* the pan: logo end, mid glide, the man */
