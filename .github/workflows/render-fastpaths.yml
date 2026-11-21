@@ -109,11 +109,11 @@ jobs:
           done
           for fast in 0 1; do
             gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation \
-              -DMX_DC_FAST_PALETTE=$fast -DMX_DC_PARTICLE_HINT=$fast -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
+              -DMX_DC_FAST_PALETTE=$fast -DMX_DC_PARTICLE_HINT=$fast -DMX_DC_RUBBLE_CULL=$fast -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source \
               /tmp/dc_gfx.o /tmp/dc_intro.o core/mx.c core/mx_meta.c \
               core/cloth.c core/mx_snd.c test/dc_render.c -lm -o /tmp/dc_fast_$fast
           done
-      - name: Compare Dreamcast texture bytes and particle pool order
+      - name: Compare Dreamcast palette bytes, particles and visible rotated rubble polygons
         run: |
           DC_FASTPATH_PROBE=1 /tmp/dc_fast_0 > /tmp/dc_reference.txt
           DC_FASTPATH_PROBE=1 /tmp/dc_fast_1 > /tmp/dc_optimized.txt
