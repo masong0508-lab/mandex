@@ -292,6 +292,20 @@ dc_ref=$(awk '/^DC_PARTICLE_VIEW_RASTERIZED /{print $2}' dc_particle_0.txt)
 dc_new=$(awk '/^DC_PARTICLE_VIEW_RASTERIZED /{print $2}' dc_particle_1.txt)
 test "$dc_new" -lt "$dc_ref"
 echo "DC_PARTICLE_CULL_PASS rasterized=$dc_new reference=$dc_ref pixel_identical=1"
+echo "--- Dreamcast particle active-range: tail expiry/reuse, exact pixels, 6 of 256 scans ---"
+for mode in 0 1; do
+  gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -DMX_DC_PARTICLE_BENCH=1 -DMX_DC_PARTICLE_BOUNDS=$mode \
+    -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source \
+    dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c \
+    dc_render.c -lm -o dc_particle_bounds_$mode
+  DC_PARTICLE_BOUNDS_PROBE=1 ./dc_particle_bounds_$mode > dc_particle_bounds_$mode.txt
+  grep '^DC_PARTICLE_BOUNDS_HASH ' dc_particle_bounds_$mode.txt > dc_particle_bounds_hash_$mode.txt
+done
+cmp dc_particle_bounds_hash_0.txt dc_particle_bounds_hash_1.txt
+dc_ref=$(awk '/^DC_PARTICLE_BOUNDS_SCANNED /{print $2}' dc_particle_bounds_0.txt)
+dc_new=$(awk '/^DC_PARTICLE_BOUNDS_SCANNED /{print $2}' dc_particle_bounds_1.txt)
+test "$dc_new" -eq 6 && test "$dc_ref" -eq 256
+echo "DC_PARTICLE_BOUNDS_PASS scanned=$dc_new reference=$dc_ref pixel_identical=1"
 echo "--- 3DS front-end drawing on the host (real 3ds/main.c loop, stub libctru): win-panel stars, NEW BEST!, best score on the title; slider flat and full 3D ---"
 N3D_UNITS="n3d_gfx.o n3d_intro.o"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o n3d_$f.o; done   # the shared DS cutscene code, as its own fixed-point unit, exactly as 3ds/Makefile builds it
@@ -310,6 +324,19 @@ n3_ref=$(awk '/^N3_PARTICLE_VIEW_RASTERIZED /{print $2}' n3d_particle_0.txt)
 n3_new=$(awk '/^N3_PARTICLE_VIEW_RASTERIZED /{print $2}' n3d_particle_1.txt)
 test "$n3_new" -lt "$n3_ref"
 echo "N3_PARTICLE_CULL_PASS rasterized=$n3_new reference=$n3_ref pixel_identical=1"
+echo "--- 3DS particle active-range: tail expiry/reuse, exact pixels, 6 of 160 scans ---"
+for mode in 0 1; do
+  gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -DMX_N3DS_PARTICLE_BENCH=1 -DMX_N3DS_PARTICLE_BOUNDS=$mode \
+    -I../3ds/shim -Istubs -I../core -I../art -I../ds/source \
+    n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3d_particle_bounds_$mode
+  N3DS_PARTICLE_BOUNDS_PROBE=1 ./n3d_particle_bounds_$mode > n3d_particle_bounds_$mode.txt
+  grep '^N3_PARTICLE_BOUNDS_HASH ' n3d_particle_bounds_$mode.txt > n3d_particle_bounds_hash_$mode.txt
+done
+cmp n3d_particle_bounds_hash_0.txt n3d_particle_bounds_hash_1.txt
+n3_ref=$(awk '/^N3_PARTICLE_BOUNDS_SCANNED /{print $2}' n3d_particle_bounds_0.txt)
+n3_new=$(awk '/^N3_PARTICLE_BOUNDS_SCANNED /{print $2}' n3d_particle_bounds_1.txt)
+test "$n3_new" -eq 6 && test "$n3_ref" -eq 160
+echo "N3_PARTICLE_BOUNDS_PASS scanned=$n3_new reference=$n3_ref pixel_identical=1"
 ./n3ds_render /tmp/n3r0 0 | grep -v "^ok:"
 ./n3ds_render /tmp/n3r1 1.0 | grep -v "^ok:"
 echo "--- pneumatic tubes and the hourglass (core, both math modes): a man flying into a mouth is posted out of the nozzle; the sand stands until the plug goes ---"
