@@ -437,6 +437,9 @@ static int fcount;
 static ClothActor tow_play, tow_win[2];          /* towels: the man in the sling, the two victory dancers */
 /* a man frame with his towel: the cloth behind him, the sprite, the cloth in front */
 static void man_with_towel(ClothActor *ta, int fr, float x, float y, int face, float z, const Jig *jg){
+  /* All calls take an unshifted base-frame index. Never read MS_HAND[-1]
+     or beyond its base sheet when a nonstandard character mode is active. */
+  if(fr < 0 || fr >= MSF_NBASE) return;
   cloth_actor_frame(ta, fcount, MS_HAND[fr], face);
   if(ta->live) draw_cloth(&ta->c, x, y, face, z - 0.5f, 0);
   draw_frame(fr, x, y, face, z, jg);
@@ -830,17 +833,24 @@ static void draw_all(void){
     }
     if(m->mode == MAN_WALK){                                              /* on his own feet: the turning frame steps him along, three quarters of the sling size */
       if(!(m->hurtCd > 0 && (fcount & 2))){
-        int mv = m->gr && (m->vx > 3 || m->vx < -3), wf = MSF_SPIN_6 + (mv ? ((fcount >> 2) & 1 ? 1 : -1) : 0), fc = m->face < 0 ? -1 : 1;
+        int phase = mx_walk_anim_phase(m);
+        int wf = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
+        int fc = m->face < 0 ? -1 : 1;
         const short *f = DCM_FR[wf + (man_fur ? MSF_NBASE : 0)]; float zm = man_zoom; man_zoom = zm * 0.75f;
-        float foot = Y(m->y + 2.375f) - (mv && ((fcount >> 2) & 1) ? 1.0f : 0.0f);
+        float foot = Y(m->y + 2.375f) - (phase == 1 || phase == 3 ? 1.0f : 0.0f);
         draw_frame(wf, x, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
         man_zoom = zm;
         if(m->pT > 0) for(int k = -3; k <= 3; k++) puff(x + fc * (24 - k * k * 1.4f) + fc * 18, y + k * 3.4f, 1.8f, Z_MAN + 0.3f, WHITE);
       }
-    } else
-    if(m->mode == MAN_FLY) man_rot = (m->dive ? m->spin : m->ang) * face; else if(m->mode == MAN_STUCK) man_rot = mx_man_wobble(m) * 0.17f;
-    man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
-    man_rot = 0;
+    } else {
+      /* The walking figure was already painted above. Previously this
+         unconditionally fell through with fr=-1, accessing MS_HAND[-1]
+         and DCM_FR[-1], drawing stray art or crashing on Dreamcast. */
+      if(m->mode == MAN_FLY) man_rot = (m->dive ? m->spin : m->ang) * face;
+      else if(m->mode == MAN_STUCK) man_rot = mx_man_wobble(m) * 0.17f;
+      man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
+      man_rot = 0;
+    }
     if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){               /* only the belly swells; the face flushes as the pressure builds */
       float f = m->inf, rx = 11 + f * 28, ry = 10 + f * 24, bx = x + face * f * 10, by = y + 6 + f * 4;
       puff(bx, by, (rx > ry ? rx : ry) + 2, Z_MAN + 0.3f, argb(205, 135, 100, 255)); puff(bx, by, (rx > ry ? rx : ry), Z_MAN + 0.4f, argb(244, 183, 142, 255));

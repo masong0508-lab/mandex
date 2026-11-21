@@ -1742,7 +1742,7 @@ static int wblocked(const MxWorld *w, real x, real y){
 #define PX(n) rmul(RI(n), R(0.125))
 static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
-  m->face = m->vx < 0 ? -1 : 1; m->mode = MAN_WALK; m->walked = 1; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = 0; m->stomp = 0;
+  m->face = m->vx < 0 ? -1 : 1; m->mode = MAN_WALK; m->walked = 1; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0;
   m->in_ax = 0; m->in_jump = m->in_punch = m->in_stomp = 0;
   int ok = !wblocked(w, m->x, m->y);
   for(int u = 1; u <= 110 && !ok; u++) if(!wblocked(w, m->x, m->y - PX(u))){ m->y -= PX(u); ok = 1; }
@@ -1813,6 +1813,8 @@ static void walk_step(MxWorld *w, real dt){
       if(!wblocked(w, m->x + sg * PX(u), m->y - PX(u))){ m->x += sg * PX(u); m->y -= PX(u); f = 1; }
     }
   }
+  /* Don't count a forced pop-out from rubble as a walking stride. */
+  const real stride_start_x=m->x;
   int ax = m->in_ax;
   if(ax) m->face = (int8_t)ax;
   { real tv = ax > 0 ? R(16.875) : ax < 0 ? -R(16.875) : 0, k = rmul(dt, m->gr ? RI(14) : RI(5)); if(k > RI(1)) k = RI(1); m->vx += rmul(tv - m->vx, k); }
@@ -1851,6 +1853,14 @@ static void walk_step(MxWorld *w, real dt){
     }
   }
   m->gr = (uint8_t)wblocked(w, m->x, m->y + R(0.1875));
+  /* Drive feet from REAL horizontal travel after wall collisions and
+     stepping, not from time or requested input. While airborne, blocked,
+     or paused, the grounded gait does not move. Cosmetics never feed
+     back into collision, animation state, or gameplay damage. */
+  if(m->gr){
+    m->gait += rabs(m->x-stride_start_x);
+    if(m->gait >= RI(4)) m->gait -= RI(4);
+  }
   if(m->gr) m->stomp = 0;
   if(m->padCd > 0) m->padCd -= dt;
   if(m->gr && !(m->padCd > 0)){

@@ -40,11 +40,24 @@ int main(void){
   CHECK(W.man.gr, "...and stands on the floor");
   CHECK(D(W.man.wt) > 40 && D(W.man.wt) < 45, "the 45 s walking clock is running");
 
+  /* Shared cosmetic gait is travel-driven and has no effect on physics:
+     the three console renderers use this same state and must agree. */
+  { MxMan a; memset(&a,0,sizeof a); a.mode=MAN_WALK;a.gr=1;a.vx=RI(9);
+    for(int q=0;q<4;q++){a.gait=RI(q); CHECK(mx_walk_anim_phase(&a)==q,"walk phase selects the same grounded pose on every port");}
+    a.gr=0;CHECK(mx_walk_anim_phase(&a)==-1,"jumping freezes the grounded step pose");
+    a.gr=1;a.vx=0;CHECK(mx_walk_anim_phase(&a)==-1,"standing still uses the stable side silhouette");
+    a.vx=-RI(9);a.gait=RI(2);CHECK(mx_walk_anim_phase(&a)==2,"reversing direction does not teleport the planted foot");
+  }
   /* ---- walking, jumping ---- */
   mx_load(&W, 22); for(int i = 0; i < 60; i++) mx_update(&W, DT);
   place_walk(62, FOOT_Y); step(10);
   double x0 = D(W.man.x);
-  mx_walk_input(&W, 1, 0, 0, 0); step(60);
+  mx_walk_input(&W, 1, 0, 0, 0);
+  { int changing=0; real previous=W.man.gait;
+    for(int i=0;i<60;i++){step(1);if(W.man.gait!=previous)changing++;previous=W.man.gait;}
+    CHECK(changing>10 && W.man.gait>=0 && W.man.gait<RI(4),
+          "walking advances a bounded animation cycle by actual distance");
+  }
   CHECK(D(W.man.x) - x0 > 8 && W.man.gr && W.man.face == 1, "right walks him along the floor at about 17 cells/s");
   mx_walk_input(&W, -1, 0, 0, 0); step(30);
   CHECK(W.man.face == -1 && D(W.man.x) < x0 + 14, "left turns him round");
@@ -60,6 +73,11 @@ int main(void){
   place_walk(80.5, FOOT_Y); step(10);
   mx_walk_input(&W, 1, 0, 0, 0); step(40);
   CHECK(D(W.man.x) < 82.5, "he cannot walk through the door");
+  { real planted=W.man.gait,x=W.man.x;
+    step(15);
+    CHECK(W.man.x==x && W.man.gait==planted,
+          "standing against a solid door cannot cycle feet in place");
+  }
   clear_saw(); mx_walk_input(&W, 1, 0, 1, 0); step(150);
   CHECK(saw[EV_PUNCH] >= 2 && W.grid[55 * MX_COLS + 83] == MX_EMPTY, "punches break it");
   mx_walk_input(&W, 1, 0, 0, 0); step(60);
