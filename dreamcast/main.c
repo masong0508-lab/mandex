@@ -818,6 +818,7 @@ static void draw_all(void){
   /* Cull whole offscreen rubble chunks before their per-cell draw. */
   draw_rubble_chunks();
   /* landlords */
+  const int last_target=world.state==MX_PLAY && mx_targets_alive(&world)==1;
   for(int i = 0; i < world.ntargets; i++){
     const MxTarget *t = &world.targets[i];
     if(!t->alive) continue;
@@ -826,6 +827,8 @@ static void draw_all(void){
     draw_landlord(tx,ty,Z_TARGET,t);
     if(t->collapse_rolled==2) /* survivor remains an objective after smoke fades */
       text("!",tx,ty-44,18,argb(255,210,63,255),1,Z_TARGET+0.75f);
+    if(last_target && t->collapse_rolled!=2)
+      text("LAST",tx,ty-54,14,argb(255,126,176,255),1,Z_TARGET+0.8f);
   }
   /* briefcases in the air (Batter Up) and the pink bounce pads of the walk levels */
   for(int i = 0; i < MX_MAX_CASES; i++){
