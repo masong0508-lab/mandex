@@ -891,7 +891,12 @@ static void draw_all(void){
                                    phase == 0 ? -1 : phase == 2 ? 1 : 0);
         int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
         const short *f = DCM_FR[wf + (man_fur ? MSF_NBASE : 0)]; float zm = man_zoom; man_zoom = zm * 0.75f;
-        float foot = Y(m->y + 2.375f) - RTOF(mx_walk_foot_lift(m))*PXC;
+        float ground_y = Y(m->y + 2.375f);
+        float foot = ground_y - RTOF(mx_walk_foot_lift(m))*PXC;
+        /* Ground the turning/walking sprite to the same contact plane as
+           the DS. A single translucent PVR quad; no atlas or heap cost. */
+        if(m->gr) quad(x - 13.0f, ground_y + 1.0f, 26.0f, 3.0f,
+                       Z_MAN - 0.15f, argb(0, 0, 0, 85));
         draw_frame(wf, x, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
         man_zoom = zm;
         if(m->pT > 0) for(int k = -3; k <= 3; k++) puff(x + fc * (24 - k * k * 1.4f) + fc * 18, y + k * 3.4f, 1.8f, Z_MAN + 0.3f, WHITE);
