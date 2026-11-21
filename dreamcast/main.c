@@ -88,11 +88,23 @@ static void sound_init(void){
     if(snd_h[i] == SFXHND_INVALID){ snd_ok = 0; return; }
   }
   snd_ok = 1;
-  { static unsigned char mwav[44 + MX_MUS_SAMPLES * 2] __attribute__((aligned(4)));          /* the theme: one 12.8 s loop */
-    int n = mx_music_render((short *)(void *)(mwav + 44), MX_MUS_SAMPLES);
-    if(n){ memcpy(mwav, "RIFF\0\0\0\0WAVEfmt \x10\0\0\0\1\0\1\0\0\0\0\0\0\0\0\0\2\0\x10\0data\0\0\0\0", 44);
-      le32(mwav + 4, 36 + n * 2); le32(mwav + 24, MX_SND_RATE); le32(mwav + 28, MX_SND_RATE * 2); le32(mwav + 40, n * 2);
-      mus_h = snd_sfx_load_buf((char *)mwav); } }                                                   /* if it does not fit in sound RAM there is simply no music */
+  /* KOS copies the decoded WAV into AICA RAM in snd_sfx_load_buf().
+     The 12.8-second PCM staging buffer is only needed during boot, never
+     during gameplay: avoid ~551 KiB of permanently reserved SH-4 BSS. */
+  { size_t bytes = 44u + (size_t)MX_MUS_SAMPLES * sizeof(short);
+    unsigned char *mwav = (unsigned char *)malloc(bytes);
+    if(mwav){
+      int n = mx_music_render((short *)(void *)(mwav + 44), MX_MUS_SAMPLES);
+      if(n){
+        memcpy(mwav, "RIFF\0\0\0\0WAVEfmt \x10\0\0\0\1\0\1\0\0\0\0\0\0\0\0\0\2\0\x10\0data\0\0\0\0", 44);
+        le32(mwav + 4, 36 + n * 2); le32(mwav + 24, MX_SND_RATE);
+        le32(mwav + 28, MX_SND_RATE * 2); le32(mwav + 40, n * 2);
+        mus_h = snd_sfx_load_buf((char *)mwav);
+      }
+      free(mwav);
+    }
+    /* Memory pressure only disables the optional music, not effects/gameplay. */
+  }
 }
 static void music_update(int want){                       /* plays the loop while a level runs; restarted every 12.8 s (the AICA effect player does not loop) */
   uint64 now = timer_ms_gettime64();
