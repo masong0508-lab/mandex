@@ -1,6 +1,12 @@
 #include <string.h>
+#include <limits.h>
 #include "mx_meta.h"
 
+/* Lifetime counters must never wrap negative after long sessions or imports. */
+static int count_plus(int value, int n){
+  if(n <= 0) return value;
+  return value >= INT_MAX - n ? INT_MAX : value + n;
+}
 static int story_done(const MxStats *s){ int n = 0; for(int i = 0; i < MX_STORY_LEVELS; i++) n += s->stars[i] > 0; return n; }
 static int three_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_STORY_LEVELS; i++) n += s->stars[i] >= 3; return n; }
 static int total_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_LEVELS; i++) n += s->stars[i]; return n; }
@@ -109,15 +115,35 @@ void mx_meta_events(MxStats *s, const MxWorld *w){
   for(int i = 0; i < w->nev; i++){
     const MxEvent *e = &w->ev[i];
     switch(e->type){
-    case EV_CELL: s->cells++; break;
-    case EV_BOOM: s->booms++; s->lv_booms++; if(s->lv_booms > s->maxChain) s->maxChain = s->lv_booms; break;
-    case EV_LAUNCH: s->shots++; s->lv_shots++; break;
-    case EV_TARGET: s->kills++; if(w->man.dive && w->man.mode == MAN_FLY) s->flops++; break;
+    case EV_CELL: s->cells = count_plus(s->cells, 1); break;
+    case EV_BOOM:
+      s->booms = count_plus(s->booms, 1);
+      s->lv_booms = count_plus(s->lv_booms, 1);
+      if(s->lv_booms > s->maxChain) s->maxChain = s->lv_booms;
+      break;
+    case EV_LAUNCH:
+      s->shots = count_plus(s->shots, 1);
+      s->lv_shots = count_plus(s->lv_shots, 1);
+      break;
+    case EV_TARGET:
+      s->kills = count_plus(s->kills, 1);
+      if(w->man.dive && w->man.mode == MAN_FLY) s->flops = count_plus(s->flops, 1);
+      break;
     }
   }
-  s->inflated += w->st_inflated - s->seen_st_inflated; s->seen_st_inflated = w->st_inflated;
-  s->pops += w->st_pops - s->seen_st_pops;             s->seen_st_pops = w->st_pops;
-  for(int i = 1; i < 4; i++){ s->pw[i] += w->st_pw[i] - s->seen_pw[i]; s->seen_pw[i] = w->st_pw[i]; }
+  /* A counter reset (e.g. level restart) is a new baseline, not negative
+   * progress. Use widened subtraction to avoid signed overflow. */
+  int64_t delta = (int64_t)w->st_inflated - s->seen_st_inflated;
+  s->inflated = count_plus(s->inflated, delta <= 0 ? 0 : delta > INT_MAX ? INT_MAX : (int)delta);
+  s->seen_st_inflated = w->st_inflated;
+  delta = (int64_t)w->st_pops - s->seen_st_pops;
+  s->pops = count_plus(s->pops, delta <= 0 ? 0 : delta > INT_MAX ? INT_MAX : (int)delta);
+  s->seen_st_pops = w->st_pops;
+  for(int i = 1; i < 4; i++){
+    delta = (int64_t)w->st_pw[i] - s->seen_pw[i];
+    s->pw[i] = count_plus(s->pw[i], delta <= 0 ? 0 : delta > INT_MAX ? INT_MAX : (int)delta);
+    s->seen_pw[i] = w->st_pw[i];
+  }
 }
 int mx_level_unlocked(const MxStats *s, int level){
 #ifdef MX_LEVEL_LOCKS
@@ -130,7 +156,7 @@ int mx_stars_for(const MxWorld *w){ return w->men >= 2 ? 3 : w->men >= 1 ? 2 : 1
 void mx_meta_win(MxStats *s, const MxWorld *w){
   int st = mx_stars_for(w);
   if(w->level >= 0 && w->level < MX_NUM_LEVELS && st > s->stars[w->level]) s->stars[w->level] = (uint8_t)st;
-  s->wins++; if(s->lv_shots == 1) s->oneShots++;
+  s->wins = count_plus(s->wins, 1); if(s->lv_shots == 1) s->oneShots = count_plus(s->oneShots, 1);
   if(w->score > s->bestScore) s->bestScore = w->score;
   if(w->level >= 0 && w->level < MX_NUM_LEVELS && w->score > 0 && (uint32_t)w->score > s->best[w->level]) s->best[w->level] = (uint32_t)w->score;
 }
