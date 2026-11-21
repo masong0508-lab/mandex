@@ -108,6 +108,21 @@ gcc -std=gnu99 -O2 -Wall -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm
 gcc -std=gnu99 -O2 -Wall -DMX_FIXED -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm -o cloth_fixed && ./cloth_fixed | grep -v "^  p"
 echo "--- DS front-end: real main loop on stub libnds, scripted stylus play on levels 1, 4, 6, 7 ---"
 gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Istubs -I../core -I../art -I../ds/source ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_render
+echo "--- DS landlord walking phase: exhaustively match 1,966,080 fixed-point values to original float phase ---"
+DS_WALK_PHASE_PROBE=1 ./ds_render
+echo "--- DS walking phase fastpath: sampled complete gameplay frame hashes vs original for 5 levels ---"
+for mode in 0 1; do
+  gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_INTEGER_WALK_PHASE=$mode \
+    -Istubs -I../core -I../art -I../ds/source \
+    ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c \
+    ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_walk_phase_$mode
+done
+for L in 0 20 29 39 59; do
+  DS_PERF_BENCH=1 ./ds_walk_phase_0 /tmp/mx_walk_ref 380 "$L" | grep '^DS_FRAME_HASH ' > ds_walk_phase_ref.txt
+  DS_PERF_BENCH=1 ./ds_walk_phase_1 /tmp/mx_walk_new 380 "$L" | grep '^DS_FRAME_HASH ' > ds_walk_phase_new.txt
+  cmp ds_walk_phase_ref.txt ds_walk_phase_new.txt
+  echo "DS_WALK_RENDER_PASS level=$((L+1)) pixel_identical=1"
+done
 echo "--- DS particle pool: 420-frame exhaustive 256x192 dual-view pixel parity vs full 128-slot reference ---"
 DS_PARTICLE_PROBE=1 ./ds_render > ds_particle_bounded.txt
 gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PARTICLE_BOUNDS=0 -Istubs -I../core -I../art -I../ds/source ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_render_particle_reference
