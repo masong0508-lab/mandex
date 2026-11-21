@@ -6,6 +6,8 @@ static int fails;
 #define CHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
 int main(void){
   MxStats S; mx_meta_init(&S);
+  CHECK(!mx_level_unlocked(&S, -1) && !mx_level_unlocked(&S, MX_NUM_LEVELS) &&
+        !mx_level_unlocked(&S, MX_NUM_LEVELS + 100), "reject out-of-range levels in every configuration");
 #ifdef MX_LEVEL_LOCKS
   CHECK(mx_level_unlocked(&S, 0) && mx_level_unlocked(&S, 1) && mx_level_unlocked(&S, 2), "fresh stats: levels 1-3 open");
   CHECK(!mx_level_unlocked(&S, 3), "fresh stats: level 4 locked");
