@@ -108,6 +108,16 @@ gcc -std=gnu99 -O2 -Wall -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm
 gcc -std=gnu99 -O2 -Wall -DMX_FIXED -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm -o cloth_fixed && ./cloth_fixed | grep -v "^  p"
 echo "--- DS front-end: real main loop on stub libnds, scripted stylus play on levels 1, 4, 6, 7 ---"
 gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Istubs -I../core -I../art -I../ds/source ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_render
+echo "--- DS particle edges: 8,568 frames, 14 effects, six ages, three scales, unculled pixel reference ---"
+for mode in 0 1; do
+  gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PARTICLE_VIEW_CULL=$mode \
+    -Istubs -I../core -I../art -I../ds/source \
+    ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c \
+    ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_particle_edge_$mode
+  DS_PARTICLE_EDGE_PROBE=1 ./ds_particle_edge_$mode > ds_particle_edge_$mode.txt
+done
+cmp ds_particle_edge_0.txt ds_particle_edge_1.txt
+cat ds_particle_edge_1.txt
 echo "--- DS landlords: 9,792 extreme pose/edge screenshots, 8 level frame hashes + paired CPU timings ---"
 for mode in 0 1; do
   gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_CULL_TARGETS=$mode \
