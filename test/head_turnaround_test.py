@@ -22,12 +22,17 @@ def mask(rows):
 # shrink the scalp or invent floating pieces outside the common side skull.
 fly = manhead.side_head("fly")
 dive = manhead.side_head("dive")
-check(len(fly) == len(dive) == 14, "canonical side skull must be 14 rows")
-check(mask(fly) == mask(dive), "profile expressions changed skull silhouette")
-check(fly != dive, "flying and diving need visibly different expressions")
+turn = manhead.side_head("turn")
+check(len(fly) == len(dive) == len(turn) == 14, "canonical side skull must be 14 rows")
+check(mask(fly) == mask(dive) == mask(turn),
+      "turn, flight and dive changed the shared skull silhouette")
+check(fly != dive and turn != fly and turn != dive,
+      "neutral turn, flight and diving require distinct facial expressions")
+check(turn[10] != dive[10] and "m" in turn[10] and "w" in dive[10],
+      "calm turning pose must not copy the diving scream")
 # A tiny rear tuft and a bald crown were making the profile resemble a
 # different character. The cap must cover the same crown in every expression.
-for kind, rows in (("fly", fly), ("dive", dive)):
+for kind, rows in (("turn", turn), ("fly", fly), ("dive", dive)):
     crown = sum(ch in "hHl" for row in rows[1:7] for ch in row)
     check(crown >= 30, f"{kind} loses the front comb-over at side profile")
     check(rows[1][7] in "hH" and rows[3][8] in "hH",
