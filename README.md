@@ -22,6 +22,36 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## Bank Shot trick scoring + another measured speed pass
+
+- **New gameplay challenge (all four ports):** rebound off a rubber block,
+  then directly evict a landlord with the flying man within **2 seconds**.
+  The first qualifying hit awards **+1,500 BANK SHOT** in addition to existing
+  combo points. TNT, falling rubble, remote explosions and walking collisions
+  cannot earn it. One rubber rebound can award the bonus only once. The browser
+  teaches it in *Rubber Room* and shows a score callout; the DS, 3DS and
+  Dreamcast display their own feedback, reusing existing text effects.
+- **DS rendering:** empty four-cell masonry runs are skipped and damage-color
+  thresholds are precalculated per material. The shared DS/3DS/Dreamcast
+  ellipse rasterizer reuses symmetrical integer-square-root work. All
+  optimizations preserve the sprite assets, pixel dimensions and simulation
+  steps; no extra framebuffer or heap allocation was added.
+- **Browser performance:** the frequently executed airborne man-to-landlord
+  collision uses squared distances rather than a square root. It retains the
+  same gameplay radius. These CPU savings are not a whole-game FPS claim.
+- **Validated earlier speed pass:** the dedicated
+  [simulation/render A-B workflow](https://github.com/masong0508-lab/mandex/actions/runs/44857948640)
+  reported **+1.14% fixed simulation, +0.28% floating simulation** on the
+  test host, and **3.67–7.66% lower DS host CPU frame time** on four sampled
+  levels. The comparisons had matching complete world digests and matching
+  frame hashes. These are NOT original console FPS figures.
+- **Regression gates:** `test/bank_shot_test.c` exercises armored targets,
+  expiring bonuses, repeat awards and real rubber bounce in float and fixed
+  modes. `test/run_tests.sh` and the focused feature workflow run it along
+  with the existing gameplay/cutscene/graphics tests. Build and hardware
+  validation for subsequent gameplay changes are separate from the earlier
+  measured speed pass.
+
 ## November 20 continuation: cross-port gameplay + speed
 
 This pass is integrated on **main** (no parallel feature branches):
