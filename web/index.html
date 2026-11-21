@@ -3527,7 +3527,10 @@ cv.addEventListener('pointerdown',e=>{
     return;
   }
   if(hitTest(x,y))return;
-  if(state==='play'&&man.mode==='walk'){walkTouch(x,y,e.pointerId);return}
+  if(state==='play'&&man.mode==='walk'){
+    if(walkTouch(x,y,e.pointerId))try{cv.setPointerCapture(e.pointerId)}catch(_){}
+    return;
+  }
   if(state==='win'){nextAfterWin();return}
   if(state==='lose'){retry();return}
   const[wx,wy]=toWorld(x,y);
@@ -3536,6 +3539,9 @@ cv.addEventListener('pointerdown',e=>{
   if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
+  if(state==='play'&&man.mode==='walk'&&TID[e.pointerId]){
+    walkTouch(mx,my,e.pointerId);return;
+  }
   if(state==='edit'){
     if(!isPortrait())eMove(mx,my);
     else if(E.drag&&my>=0&&my<WEB_UI.editorHeight){
@@ -3567,15 +3573,24 @@ cv.addEventListener('pointerup',e=>{
     if(man.vlv){man.seated=true;return}man.seated=false;launch()
   }}
 });   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
-addEventListener('keyup',e=>{KEYS[e.code]=false});addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false});
+addEventListener('keyup',e=>{KEYS[e.code]=false});
+function releaseAllWalkTouches(){
+  for(const id in TID){KEYS[TID[id]]=false;delete TID[id]}
+  WEB_UI.gesture=null;
+  dragging=false;sodaHold=false;sliderDrag=false;
+}
+addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false;releaseAllWalkTouches()});
+addEventListener('orientationchange',releaseAllWalkTouches);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseAllWalkTouches()});
 for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
-  const k=TID[e.pointerId];if(k){KEYS[k]=false;delete TID[e.pointerId]}
+  releaseWalkTouch(e.pointerId);
   if(ev==='pointercancel'){
     if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
     if(state==='edit'&&E.drag)eUp();
     if(dragging){dragging=false;man.seated=false}
   }
 });
+cv.addEventListener('lostpointercapture',e=>releaseWalkTouch(e.pointerId));
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
   if(e.code==='Space'){dive();e.preventDefault()}
