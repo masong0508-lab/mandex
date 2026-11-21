@@ -100,7 +100,7 @@ enum {
   EV_LAUNCH,
   EV_DIVE,
   EV_THUD,     /* chunk landed, a = strength */
-  EV_TARGET,   /* landlord evicted at x,y */
+  EV_TARGET,   /* landlord evicted at x,y; b=1 for BANK SHOT bonus */
   EV_POP,      /* man pops away after sticking */
   EV_WIN,
   EV_LOSE,
@@ -209,6 +209,7 @@ typedef struct {
   /* Evictions within 2.5 real-time seconds stack score bonuses; no allocations or save-format changes. */
   int combo, combo_peak;
   real combo_left;
+  real bank_left;               /* 2 seconds after a rubber rebound to earn one +1500 BANK SHOT */
   int district;                  /* Landlord HQ (level 39) is three 120-cell districts played one after another; 0..2 (always 0 on other levels) */
   real time, shake, slow, banner, flash, waitT, winT, loseT;
   int freeze, need_support, support_cd, substeps, nhouses;
