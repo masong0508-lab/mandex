@@ -52,3 +52,11 @@ Nintendo DS font and world-sprite renderers at 256×192 and checks distinct
 pixel hashes for 2 landlords, last landlord, securing area, and an actual
 on-character locator with the second landlord offscreen. It runs in the
 regular host suite; screenshots/emulator checks remain additional gates.
+
+## Four-way offscreen objective locator
+
+When just one landlord survives, the camera now shows a small pink **LAST** cue at the nearest appropriate screen edge whenever the actor is outside the usable view. This distinguishes a genuinely offscreen landlord from a visible one and prevents the player from needing to pan randomly through rubble. Left/right/up/down directions use an allocation-free, read-only `mx_objective_edge()` shared by Nintendo DS, 3DS and Dreamcast; the browser uses an equivalent reusable object and the existing world-to-screen camera transform.
+
+The cues deliberately reserve the game's HUD/control strips: DS top 64px/bottom 12px; 3DS top 54px/bottom 30px; Dreamcast top 74px/bottom 34px; browser top 76px in landscape or 138px in portrait, bottom 56px. Existing on-character LAST/survivor markers are unchanged. The entire feature is dormant for two or more targets, when the game is completed, or when the final landlord is already visible in the playable area. No textures, new world entities, dynamic arrays, framebuffer or new save fields. Core and browser tests cover all four directions, diagonals, visible suppression, narrow-screen suppression and target-index invalidation; the real DS renderer's pixel-hash probe verifies cue display only when the final actor is offscreen.
+
+The enlarged DS culling margin for the LAST tag is required: its glyph starts 9 world cells above the actor and remains visible near the lower viewport edge after the actor has left the picture. The cull-reference test tracks exactly the same conservative bound, preserving pixel parity against the unculled renderer.
