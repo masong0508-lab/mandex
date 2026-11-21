@@ -41,6 +41,34 @@ int main(void){
         (MX_IPC->ring[3] >> 28) == C_PLAY_WAVE,
         "PCM channel not safely recyclable after kill");
 
+  /* Gain quantization often repeats the previous frame's PCM volume.
+     Coalescing those duplicates must not use ring slots. */
+  MX_IPC->tail = MX_IPC->head;
+  unsigned gain_start = MX_IPC->head;
+  soundSetVol(0, 55); /* the freshly-started PCM voice already has gain 55 */
+  CHECK(MX_IPC->head == gain_start, "initial PCM gain redundantly queued");
+  soundSetVol(0, 22);
+  CHECK(MX_IPC->head == ((gain_start + 1) & 63u) &&
+        (MX_IPC->ring[gain_start] >> 28) == C_VOL,
+        "first changed PCM gain not queued");
+  gain_start = MX_IPC->head;
+  soundSetVol(0, 22);
+  CHECK(MX_IPC->head == gain_start, "identical PCM envelope gain queued twice");
+
+  /* A dropped gain is not marked as queued; replay the latest gain after
+     backpressure clears, or long notes could remain at stale loudness. */
+  MX_IPC->tail = (MX_IPC->head + 4) & 63u;
+  soundSetVol(0, 31);
+  CHECK(MX_IPC->head == gain_start && pcm_gain[0] == 22,
+        "dropped PCM gain incorrectly cached");
+  MX_IPC->tail = MX_IPC->head;
+  soundSetVol(0, 31);
+  CHECK(MX_IPC->head == ((gain_start + 1) & 63u) && pcm_gain[0] == 31,
+        "dropped PCM gain did not retry");
+  soundSetVol(0, 31);
+  CHECK(MX_IPC->head == ((gain_start + 1) & 63u),
+        "retried PCM gain was queued twice");
+
   /* A nearly-full queue drops cosmetic fades/glides to leave room for a
      necessary stop or a complete voice start. */
   MX_IPC->tail = (MX_IPC->head + 4) & 63u;  /* 3 slots free */
