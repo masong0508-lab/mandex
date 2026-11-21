@@ -55,6 +55,31 @@ static void ref_tri(u8 *b,int x0,int y0,int x1,int y1,int x2,int y2,u8 c){
     gfx_rect(b,xa,y,xb-xa+1,1,c);
   }
 }
+/* Original Bresenham paths, used as the literal output oracle for
+   offscreen AABB rejection in thin and thick line drawing. */
+static void ref_line(u8 *b,int x0,int y0,int x1,int y1,u8 c){
+  int dx=x1>x0?x1-x0:x0-x1,dy=y1>y0?y0-y1:y1-y0;
+  int sx=x0<x1?1:-1,sy=y0<y1?1:-1,err=dx+dy;
+  for(int n=0;n<600;n++){
+    gfx_px(b,x0,y0,c);
+    if(x0==x1&&y0==y1)break;
+    int e2=2*err;
+    if(e2>=dy){err+=dy;x0+=sx;}
+    if(e2<=dx){err+=dx;y0+=sy;}
+  }
+}
+static void ref_tline(u8 *b,int x0,int y0,int x1,int y1,int th,u8 c){
+  if(th<=1){ref_line(b,x0,y0,x1,y1,c);return;}
+  int dx=x1>x0?x1-x0:x0-x1,dy=y1>y0?y0-y1:y1-y0;
+  int sx=x0<x1?1:-1,sy=y0<y1?1:-1,err=dx+dy,h=th/2;
+  for(int n=0;n<600;n++){
+    ref_rect(b,x0-h,y0-h,th,th,c);
+    if(x0==x1&&y0==y1)break;
+    int e2=2*err;
+    if(e2>=dy){err+=dy;x0+=sx;}
+    if(e2<=dx){err+=dx;y0+=sy;}
+  }
+}
 static void ref_dither(u8 *b,int x,int y,int w,int h,u8 c){
   for(int j=y;j<y+h;j++)for(int i=x+((j^x)&1);i<x+w;i+=2)gfx_px(b,i,j,c);
 }
@@ -109,6 +134,25 @@ int main(void){
     gfx_dither(have+32,x,y,w,h,121);
     if(check("dither",k))return 1;
   }
-  puts("ok: rectangle, tiny strokes, ellipses, triangles and dither are pixel-identical on 3,968 random/offscreen cases");
+  /* Verify fully offscreen line rejection is byte-exact, including thick
+     strokes which may touch the frame even when their centerlines don't. */
+  for(int k=0;k<1400;k++){
+    int x0=pick(-650,950),y0=pick(-650,750),x1=pick(-650,950),y1=pick(-650,750);
+    if(k%11==0){x0=pick(-40,-1);x1=pick(-40,-1);y0=pick(-5,196);y1=pick(-5,196);}
+    if(k%13==0){y0=pick(192,230);y1=pick(192,230);x0=pick(-4,260);x1=pick(-4,260);}
+    reset();ref_line(want+32,x0,y0,x1,y1,14);
+    gfx_line(have+32,x0,y0,x1,y1,14);
+    if(check("line",k))return 1;
+  }
+  for(int k=0;k<512;k++){
+    int x0=pick(-550,820),y0=pick(-490,680),x1=pick(-550,820),y1=pick(-490,680);
+    int th=pick(2,12);
+    if(k%7==0){x0=x1=-th/2;y0=pick(0,190);y1=pick(0,190);}
+    if(k%9==0){y0=y1=192+th/2-1;x0=pick(0,250);x1=pick(0,250);}
+    reset();ref_tline(want+32,x0,y0,x1,y1,th,105);
+    gfx_tline(have+32,x0,y0,x1,y1,th,105);
+    if(check("thick_line",k))return 1;
+  }
+  puts("ok: rectangles, ellipses, triangles, dither and thin/thick lines are pixel-identical on 5,880 random/offscreen cases");
   return 0;
 }
