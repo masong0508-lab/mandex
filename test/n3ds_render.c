@@ -271,7 +271,73 @@ static int n3_particle_view_probe(void){
   return 0;
 }
 #endif
+/* Art-quality check on the REAL renderer, not pre-rendered mockups.
+   Verify all 142 human/Wolfman frames retain their silhouette as the
+   torso turns, and that a 4-tap rotation actually blends fine outlines
+   against the scene (rather than chopping hair/fingers from the cutout). */
+static int n3_sprite_volume_probe(void){
+  const u32 bg=RGB(7,34,61);
+  top.fb=fb_top[0];top.w=400;top.h=240;
+  apply_outfit(0);
+  u32 original=man_tone[0][5],shadow=man_tone[2][5];
+  if(original==shadow){puts("FAIL: 3DS contour palette lacks shaded side");return 1;}
+  apply_outfit(3);
+  if(original==man_tone[0][5]){
+    puts("FAIL: 3DS contour colors do not follow the selected outfit");return 1;
+  }
+  apply_outfit(0);
+  unsigned long long occupancy=1469598103934665603ull;
+  unsigned filled=0,soft=0,lit=0;
+  unsigned long long rotated_hash=1469598103934665603ull;
+  for(int fr=0;fr<MSF_COUNT;fr++)for(int face=-1;face<=1;face+=2){
+    rect(&top,0,0,400,240,bg);
+    blit_frame(&top,fr,200,120,4,face);
+    for(int y=30;y<211;y++)for(int x=120;x<281;x++){
+      u8 *p=top.fb+(x*top.h+(top.h-1-y))*3;
+      u32 pixel=RGB(p[2],p[1],p[0]);
+      unsigned active=pixel!=bg;filled+=active;
+      occupancy^=active;occupancy*=1099511628211ull;
+      if(active){
+        int matchesBase=0;
+        for(int i=0;i<MS_NPAL;i++)if(pixel==man_tone[0][i]){matchesBase=1;break;}
+        if(!matchesBase)lit++;
+      }
+    }
+  }
+  if(!filled){puts("FAIL: 3DS original and Wolfman poses lost their bodies");return 1;}
+#if MX_N3DS_SPRITE_VOLUME
+  if(!lit){puts("FAIL: 3DS volume normals never shade sprite contours");return 1;}
+#else
+  if(lit){puts("FAIL: 3DS reference sprite used extra contour colors");return 1;}
+#endif
+  for(int face=-1;face<=1;face+=2)
+  for(int k=0;k<8;k++){
+    rect(&top,0,0,400,240,bg);
+    blit_frame_rot(&top,MSF_SPIN_6,200,120,3,face,(k+1)*.27f);
+    for(int y=44;y<197;y++)for(int x=144;x<257;x++){
+      u8 *p=top.fb+(x*top.h+(top.h-1-y))*3;
+      u32 pixel=RGB(p[2],p[1],p[0]);
+      rotated_hash^=pixel;rotated_hash*=1099511628211ull;
+      if(pixel==bg)continue;
+      int full=0;
+      for(int s=0;s<3;s++)for(int i=0;i<MS_NPAL;i++)
+        if(pixel==man_tone[s][i])full=1;
+      if(!full)soft++;
+    }
+  }
+#if MX_N3DS_ROT_COVERAGE
+  if(!soft){puts("FAIL: 3DS rotated outline lacks blended subpixel edges");return 1;}
+#endif
+  printf("N3_SPRITE_OCCUPANCY %016llx pixels=%u\n",occupancy,filled);
+  printf("N3_SPRITE_CONTOURS shaded=%u blended_rotated=%u\n",lit,soft);
+  printf("N3_SPRITE_ROT_HASH %016llx\n",rotated_hash);
+#ifdef MX_N3DS_ROT_WORK_COUNT
+  printf("N3_ROT_WORK candidate=%u sampled=%u\n",man_rot_candidate_pixels,man_rot_sampled_pixels);
+#endif
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("N3DS_SPRITE_VOLUME_PROBE"))return n3_sprite_volume_probe();
 #ifdef MX_N3DS_PARTICLE_BENCH
   if(getenv("N3DS_PARTICLE_BOUNDS_PROBE"))return n3_particle_bounds_probe();
   if(getenv("N3DS_PARTICLE_VIEW_PROBE"))return n3_particle_view_probe();

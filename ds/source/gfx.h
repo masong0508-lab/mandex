@@ -31,7 +31,8 @@ enum {
   C_SHADOW, C_GRAY, C_DARK,
   C_MAT = 64,                   /* 64 + mat*5 + {HI,BASE,LO,CRACK,DARK} */
   C_SNOW = 110, C_CITY, C_CITY2, C_TREE, C_TREE2, C_TREE3, C_TRUNK, C_FENCE, C_FENCE2, C_FL1, C_FL2, C_GRASS3, C_SUN2,   /* scenery: 110..122 */
-  C_MAN0 = 160                  /* 160.. : the man's own palette (art/manspr.h) */
+  C_MAN0 = 160,                 /* 160..198: 39 original sprite colors */
+  C_MAN_RIM0 = 199, C_MAN_RIM_COUNT = 25 /* 199..223: optional shadow contour colors; swatches start at 224 */
 };
 enum { SH_HI, SH_BASE, SH_LO, SH_CRACK, SH_DARK };
 #define MATPAL(m) (C_MAT + (m) * 5)
@@ -45,6 +46,7 @@ static inline int vx(const View *v, real c){ return ((c * v->ppc) >> 12) - v->cx
 static inline int vy(const View *v, real c){ return ((c * v->ppc) >> 12) - v->cy; }
 
 void gfx_init(void);                                  /* palette, tiles, backgrounds */
+void gfx_man_rim_palette(void);                       /* refresh existing palette from the worn outfit; no frame allocations */
 
 /* primitives (all clip) */
 void gfx_px(u8 *b, int x, int y, u8 c);

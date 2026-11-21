@@ -102,12 +102,35 @@ static uint32_t prev_best;                              /* best[level] just befo
 static MxStats stats;                                   /* session achievements / outfits (no save on the 3DS yet) */
 static int man_fur;                                    /* the Wolfman outfit: flying frames get the wolf head */
 static unsigned char man_pal[MS_NPAL][3];              /* the man's palette, re-tinted for the worn outfit (boxers, towel, skin or the Wolfman's fur) */
+/* 3 tiny cached tonal variants, not new sprite sheets or framebuffers.
+   The silhouette stays connected while its front/side/rear lighting changes. */
+#ifndef MX_N3DS_SPRITE_VOLUME
+#define MX_N3DS_SPRITE_VOLUME 1
+#endif
+static u32 man_tone[3][MS_NPAL];   /* regular, warm-facing edge, cool trailing edge */
+static int man_tone_ready; /* standalone sprite host tools may draw before game init */
+/* This cache is initialized before the later software rasterizer's RGB macro
+   is declared. Keep the packer local and byte-order-identical. */
+static inline u32 man_rgb(int r,int g,int b){
+  return ((u32)r<<16)|((u32)g<<8)|(u32)b;
+}
+static void man_tone_prepare(void){
+  for(int i=0;i<MS_NPAL;i++){
+    int r=man_pal[i][0],g=man_pal[i][1],b=man_pal[i][2];
+    man_tone[0][i]=man_rgb(r,g,b);
+    if(i==0){man_tone[1][i]=man_tone[2][i]=man_tone[0][i];continue;} /* retain the dark ink outline */
+    man_tone[1][i]=man_rgb(r+(255-r)/9,g+(255-g)/11,b+(255-b)/13);
+    man_tone[2][i]=man_rgb(r*4/5,g*4/5,b*17/20);
+  }
+  man_tone_ready=1;
+}
 static void apply_outfit(int o){
   static const int idx[6] = { 5, 6, 7, 13, 14, 15 };
   uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); man_fur = mx_outfit_skin(o, sk);
   memcpy(man_pal, MS_PAL, sizeof man_pal);
   for(int k = 0; k < 6; k++) for(int c = 0; c < 3; c++) man_pal[idx[k]][c] = sh[k][c];
   for(int k = 0; k < 4; k++) for(int c = 0; c < 3; c++) man_pal[1 + k][c] = sk[k][c];
+  man_tone_prepare(); /* update the exact worn outfit's highlights once, not every frame */
 }
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
 static int nofight;                       /* title option, restored from save */
@@ -390,6 +413,23 @@ static void tick_parts(void){
 
 /* ---------------------------------------------------------------- the man: indexed sprite frames (art/manspr.h, 4 art pixels per cell), scaled to ppc px per cell */
 static inline int fdiv4(int a){ return a >= 0 ? a / 4 : -((-a + 3) / 4); }
+/* Use neighboring actual opaque sprite pixels as a tiny normal proxy, with a
+   stable light from upper left. Hair/face silhouettes and boxer colors are
+   preserved; dark ink stays ink. The caller already checked c != 0. */
+static inline u32 man_surface_color(const MsFrame *f,int sx,int sy,int face,int c){
+  /* In host intro/gag previews the renderer is sometimes used before
+     n3ds_main(). Seed the same Classic Red defaults once, never a black man. */
+  if(!man_tone_ready) apply_outfit(0);
+  if(!MX_N3DS_SPRITE_VOLUME || c==1)return man_tone[0][c-1];
+  int row=sy*f->w;
+  int right=sx+(face>0?1:-1),left=sx-(face>0?1:-1);
+  if((unsigned)right >= (unsigned)f->w || !f->px[row+right])
+    return man_tone[2][c-1];
+  if((unsigned)left >= (unsigned)f->w || !f->px[row+left] ||
+     sy==0 || !f->px[row-f->w+sx])
+    return man_tone[1][c-1];
+  return man_tone[0][c-1];
+}
 static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
   if(man_fur && fr < MSF_NBASE) fr += MSF_NBASE;                             /* the Wolfman's frames follow the human ones */
   const MsFrame *f = &MS_FRAMES[fr];
@@ -402,33 +442,87 @@ static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
       if(!c) continue;
       int dx = face >= 0 ? sx - f->ax : f->ax - sx - 1, x0 = cx + fdiv4(dx * ppc), x1 = cx + fdiv4((dx + 1) * ppc);
       if(x1 <= x0) x1 = x0 + 1;
-      rect(s, x0, y0, x1 - x0, y1 - y0, RGB(man_pal[c - 1][0], man_pal[c - 1][1], man_pal[c - 1][2]));
+      rect(s, x0, y0, x1 - x0, y1 - y0, man_surface_color(f,sx,sy,face,c));
     }
   }
 }
 /* the same sprite turned by angle a (radians, in the sprite's own facing; mirrored with it): flight pitches toward the path, the belly flop tumbles, a stuck man rocks.
    Inverse-mapped, so a turned sprite has no pin-holes; the outline pixels are kept as they are. */
+/* Coverage-sampled inverse rotation: four sub-pixel color taps, with their
+   opaque fraction composited over the ALREADY DRAWN world in BGR8.
+   Previously we discarded a pixel when its CENTER was transparent or <2
+   corners were opaque: that amputated hair strands, fingers and outlines.
+   This keeps all narrow features, gives real feathered edges and uses FOUR
+   sprite samples rather than five. No offscreen buffer, heap or extra pass. */
+#ifndef MX_N3DS_ROT_COVERAGE
+#define MX_N3DS_ROT_COVERAGE 1
+#endif
+#ifndef MX_N3DS_ROT_SOURCE_GUARD
+#define MX_N3DS_ROT_SOURCE_GUARD 1
+#endif
+#ifdef MX_N3DS_ROT_WORK_COUNT
+static unsigned man_rot_candidate_pixels,man_rot_sampled_pixels;
+#endif
 static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, float a){
   if(man_fur && fr < MSF_NBASE) fr += MSF_NBASE;
-  const MsFrame *f = &MS_FRAMES[fr];
-  float ca = cosf(a), sa = sinf(a), q = 4.0f / ppc, R = (float)ppc * 0.25f * (f->w > f->h ? f->w : f->h) * 1.5f;
-  int x0 = cx - (int)R - 1, x1 = cx + (int)R + 1, y0 = cy - (int)R - 1, y1 = cy + (int)R + 1;
-  if(x0 < 0) x0 = 0; if(y0 < 0) y0 = 0; if(x1 > s->w) x1 = s->w; if(y1 > s->h) y1 = s->h;
-  for(int y = y0; y < y1; y++) for(int x = x0; x < x1; x++){
-    float dx = (x - cx) * q, dy = (y - cy) * q;                       /* destination offset in sprite pixels */
-    if(face < 0) dx = -dx;
-    float ux = dx * ca + dy * sa, uy = -dx * sa + dy * ca;            /* undo the turn */
-    int sx = (int)floorf(ux + f->ax + 0.5f), sy = (int)floorf(uy + f->ay + 0.5f);
-    if(sx < 0 || sy < 0 || sx >= f->w || sy >= f->h) continue;
-    int c = f->px[sy * f->w + sx]; if(!c) continue;
-    int r = man_pal[c - 1][0], g = man_pal[c - 1][1], b = man_pal[c - 1][2], n = 4;     /* soften the edge: 2x2 samples, empty ones blend toward what is behind (drawn at half strength) */
-    float o = 0.5f * q * 0.5f; int hit = 0;
-    for(int k = 0; k < 4; k++){ float jx = (k & 1 ? o : -o), jy = (k & 2 ? o : -o);
-      int tx = (int)floorf((dx + jx) * ca + (dy + jy) * sa + f->ax + 0.5f), ty = (int)floorf(-(dx + jx) * sa + (dy + jy) * ca + f->ay + 0.5f);
-      if(tx >= 0 && ty >= 0 && tx < f->w && ty < f->h && f->px[ty * f->w + tx]) hit++; }
-    (void)n; if(hit < 2) continue;                                                     /* a lone corner sample is just a jaggy: drop it */
-    rect(s, x, y, 1, 1, RGB(r, g, b));
+  const MsFrame *f=&MS_FRAMES[fr];
+  float ca=cosf(a),sa=sinf(a),q=4.0f/ppc;
+  float R=(float)ppc*0.25f*(f->w>f->h?f->w:f->h)*1.5f;
+  int x0=cx-(int)R-1,x1=cx+(int)R+1,y0=cy-(int)R-1,y1=cy+(int)R+1;
+  if(x0<0)x0=0;if(y0<0)y0=0;if(x1>s->w)x1=s->w;if(y1>s->h)y1=s->h;
+#if MX_N3DS_ROT_COVERAGE
+  float o=q*0.25f;
+  float xs[4]={-o,o,-o,o},ys[4]={-o,-o,o,o};
+  for(int k=0;k<4;k++)if(face<0)xs[k]=-xs[k];
+  /* Hoist the four rotated sample offsets, and increment source coordinates
+     across a row to avoid repeated source transforms per subpixel. */
+  float du[4],dv[4];
+  for(int k=0;k<4;k++){du[k]=xs[k]*ca+ys[k]*sa;dv[k]=-xs[k]*sa+ys[k]*ca;}
+  float mirror=face<0?-1.0f:1.0f;
+  /* Largest inverse-rotated four-tap offset is q*(sqrt(2)/4), plus
+     0.5f for nearest-texel rounding. This slightly padded guard can NEVER
+     reject a visible sample, but avoids four floorf + texel lookups for
+     blank margins of the rotation candidate square. */
+  const float guard=.501f+.354f*q;
+  for(int y=y0;y<y1;y++){
+    float dy=(y-cy)*q,dx=(x0-cx)*q*mirror;
+    float su=dx*ca+dy*sa+f->ax,sv=-dx*sa+dy*ca+f->ay;
+    for(int x=x0;x<x1;x++,su+=q*mirror*ca,sv-=q*mirror*sa){
+#ifdef MX_N3DS_ROT_WORK_COUNT
+      man_rot_candidate_pixels++;
+#endif
+#if MX_N3DS_ROT_SOURCE_GUARD
+      if(su< -guard || sv< -guard || su>=f->w+guard || sv>=f->h+guard)continue;
+#endif
+#ifdef MX_N3DS_ROT_WORK_COUNT
+      man_rot_sampled_pixels++;
+#endif
+      unsigned r=0,g=0,b=0,n=0;
+      for(int k=0;k<4;k++){
+        int sx=(int)floorf(su+du[k]+.5f),sy=(int)floorf(sv+dv[k]+.5f);
+        if((unsigned)sx >= (unsigned)f->w || (unsigned)sy >= (unsigned)f->h)continue;
+        int index=f->px[sy*f->w+sx];if(!index)continue;
+        u32 rgb=man_surface_color(f,sx,sy,face,index);
+        r+=(rgb>>16)&255u;g+=(rgb>>8)&255u;b+=rgb&255u;n++;
+      }
+      if(!n)continue;
+      u8 *dst=s->fb+(x*s->h+(s->h-1-y))*3;
+      dst[0]=(u8)((b+(4-n)*dst[0]+2)>>2);
+      dst[1]=(u8)((g+(4-n)*dst[1]+2)>>2);
+      dst[2]=(u8)((r+(4-n)*dst[2]+2)>>2);
+    }
   }
+#else
+  /* Reference silhouette: nearest-neighbour center sampling, no alpha. */
+  for(int y=y0;y<y1;y++)for(int x=x0;x<x1;x++){
+    float dx=(x-cx)*q,dy=(y-cy)*q;if(face<0)dx=-dx;
+    int sx=(int)floorf(dx*ca+dy*sa+f->ax+.5f);
+    int sy=(int)floorf(-dx*sa+dy*ca+f->ay+.5f);
+    if((unsigned)sx >= (unsigned)f->w || (unsigned)sy >= (unsigned)f->h)continue;
+    int index=f->px[sy*f->w+sx];if(!index)continue;
+    rect(s,x,y,1,1,man_surface_color(f,sx,sy,face,index));
+  }
+#endif
 }
 static MiState mi;                                             /* idle gag state, see art/manidle.h */
 static void idle_fx(int fx, float wx, float wy){
@@ -556,7 +650,13 @@ static void draw_fore(const View *v){               /* grass blades and a fence 
   for(int x = -((int)g_pan % 18) - 18; x < s->w + 18; x += 18){ int h = 6 + ((x * 7 + 3) & 7), sw = (int)(sinf(frame * .05f + x) * 1.5f);
     rect(s, x + sw, gy - h + 6, 2, h, RGB(48, 140, 52)); rect(s, x + 4 + sw, gy - h / 2 + 6, 2, h / 2, RGB(70, 170, 70)); }
 }
-static void draw_shadow(const View *v, int cx, int cy_ground, int w){ rect(v->s, cx - w / 2, cy_ground, w, 3, RGB(60, 90, 40)); }
+/* Tight three-band contact shadow, not a solid rectangular sticker. */
+static void draw_shadow(const View *v,int cx,int cy_ground,int w){
+  if(w<2)w=2;
+  rect(v->s,cx-w/2,cy_ground,w,1,RGB(37,55,43));
+  rect(v->s,cx-w*2/5,cy_ground+1,w*4/5,1,RGB(24,38,35));
+  rect(v->s,cx-w/3,cy_ground+2,w*2/3,1,RGB(47,64,48));
+}
 
 /* ---- the web's 8x8 voxel sprites (paintCell), ported: built once per zoom level, box-filtered down to ppc x ppc, drawn per voxel */
 /* Two fixed zooms (top=3, bottom=4 px/cell): each texture is generated ONCE.
@@ -1051,7 +1151,12 @@ static void draw_valve(const View *v){
   if(m->mode == MAN_AIM && f > 0){ rect(v->s, x - p * 5, y - p * 9, p * 10, p, RGB(20, 24, 40)); rect(v->s, x - p * 5 + 1, y - p * 9 + 1, f * (p * 10 - 2) / 100, p - 2, f < 50 ? RGB(125, 255, 90) : f < 80 ? RGB(255, 210, 63) : RGB(255, 70, 70)); }
 }
 static void draw_world(const View *v){
-  draw_sky(v); draw_street_dressing(v); draw_rooms(v); draw_facades(v); draw_cells(v); draw_roof_trim(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v); draw_man(v); draw_parts(v);
+  draw_sky(v); draw_street_dressing(v); draw_rooms(v); draw_facades(v); draw_cells(v); draw_roof_trim(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v);
+  /* Bottom touch-screen camera: ground the sprite on the ledge he is
+     standing on, including elevated debris, not only street level. */
+  if(world.man.mode==MAN_WALK && world.man.gr)
+    draw_shadow(v,VX(v,RTOF(world.man.x)),VY(v,RTOF(world.man.y)+2.375f)+1,v->ppc*5);
+  draw_man(v); draw_parts(v);
 }
 
 /* Stereoscopic top screen.  The slider sets how strong the depth is; each layer gets a horizontal disparity D (px at full slider):
@@ -1073,7 +1178,13 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
   a.ox = vt->ox + DX(-4); draw_sling(&a); draw_valve(&a);
   a.ox = vt->ox + DX(-5); draw_aim(&a);
   if(m->mode != MAN_NONE && m->mode != MAN_WAIT){                                         /* ground shadow stays on the ground plane, man lifts off it */
-    int sh = VX(&a, mxc); a.ox = vt->ox; draw_shadow(&a, VX(&a, mxc), VY(&a, (float)MX_ROWS) - 1, 26 - (int)(fabsf(RTOF(m->y) - MX_ROWS) * .3f > 14 ? 14 : fabsf(RTOF(m->y) - MX_ROWS) * .3f)); (void)sh; }
+    a.ox=vt->ox;
+    float foot=(m->mode==MAN_WALK && m->gr)?RTOF(m->y)+2.375f:(float)MX_ROWS;
+    float height=fabsf(foot-RTOF(m->y));
+    int width=(m->mode==MAN_WALK && m->gr)?vt->ppc*5:
+      26-(int)(height*.3f>14.f?14.f:height*.3f);
+    draw_shadow(&a,VX(&a,mxc),VY(&a,foot)-1,width);
+  }
   a.ox = vt->ox + DX(-7 - fly * 2 - dv); draw_man(&a);                                    /* he comes out of the screen when flying, further when diving */
   a.ox = vt->ox + DX(-10); draw_parts(&a);
   a.ox = vt->ox + DX(-16); draw_fore(&a);                                                 /* grass in the face */

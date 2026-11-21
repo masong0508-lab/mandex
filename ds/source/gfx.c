@@ -19,6 +19,16 @@ static unsigned isq(unsigned n){
   return r;
 }
 static void setc(int i, int r, int g, int b){ gfx_pal[i] = (u16)RGB15(gfx_clamp(r, 0, 255) >> 3, gfx_clamp(g, 0, 255) >> 3, gfx_clamp(b, 0, 255) >> 3); }
+/* 25 spare colors sit between the original Man palette and inventory
+   swatches. Calculate them once when changing outfit, not per sprite. */
+void gfx_man_rim_palette(void){
+  for(int k=0;k<C_MAN_RIM_COUNT;k++){
+    u16 color=gfx_pal[C_MAN0+k];
+    int r=color&31,g=(color>>5)&31,b=(color>>10)&31;
+    gfx_pal[C_MAN_RIM0+k]=(u16)RGB15(r*4/5,g*4/5,b*17/20);
+  }
+}
+
 
 /* ---------------------------------------------------------------- primitives */
 void gfx_px(u8 *b, int x, int y, u8 c){ if((unsigned)x < 256u && (unsigned)y < 192u) b[y * 256 + x] = c; }
@@ -349,6 +359,7 @@ static void make_palette(void){
     setc(p + SH_DARK, r * 8 / 10, g * 8 / 10, b * 8 / 10);
   }
   for(int k = 0; k < MS_NPAL; k++) setc(C_MAN0 + k, MS_PAL[k][0], MS_PAL[k][1], MS_PAL[k][2]);   /* the man's own colours */
+  gfx_man_rim_palette();
   setc(MATPAL(MX_GLASS) + SH_CRACK, 235, 250, 255);         /* glass cracks show white */
   setc(MATPAL(MX_TNT) + SH_HI, 250, 235, 180);              /* TNT's cream label stripe */
 }
@@ -594,6 +605,24 @@ void gfx_wall(const View *v, int pal, int px, int py){
    Frames are authored at 4 px per cell; other zooms scale them with nearest-neighbour stepping.
    Jiggle: the belly and rear blobs of the frame are pushed around by the core's spring state (inverse-mapped with a
    quadratic falloff), and a hard hit squashes the whole figure along the impact. */
+#ifndef MX_DS_MAN_VOLUME
+#define MX_DS_MAN_VOLUME 1
+#endif
+/* Leave all silhouettes and hard outline ink unchanged; the interior edge
+   beside the far-side outline receives a cool shadow, including when rotated
+   and on Wolfman profiles. No second sprite pass or sprite-sized scratch. */
+static inline u8 man_ink(const MsFrame *fr,int sx,int sy,int face,u8 c){
+#if MX_DS_MAN_VOLUME
+  if(c>1 && c<=C_MAN_RIM_COUNT){
+    int nx=sx+(face>0?1:-1);
+    if((unsigned)nx>=(unsigned)fr->w || fr->px[sy*fr->w+nx]<=1)
+      return (u8)(C_MAN_RIM0+c-1);
+  }
+#else
+  (void)fr;(void)sx;(void)sy;(void)face;
+#endif
+  return (u8)(C_MAN0+c-1);
+}
 #define JM 9                                    /* margin (px) the jiggle may spill outside the frame */
 static void blit_frame(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, int rows, const ManJig *jg){
   int w = fr->w, h = rows > 0 && rows < fr->h ? rows : fr->h;
@@ -619,15 +648,15 @@ static void blit_frame(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, i
         u8 *d=b+(y0+j)*256;
         if(ppc==4){
           if(f>0){
-            for(int i=lo;i<hi;i++){u8 c=row[i];if(c)d[x0+i]=(u8)(C_MAN0+c-1);}
+            for(int i=lo;i<hi;i++){u8 c=row[i];if(c)d[x0+i]=man_ink(fr,i,j,f,c);}
           }else{
-            for(int i=lo;i<hi;i++){u8 c=row[w-1-i];if(c)d[x0+i]=(u8)(C_MAN0+c-1);}
+            for(int i=lo;i<hi;i++){int sx=w-1-i;u8 c=row[sx];if(c)d[x0+i]=man_ink(fr,sx,j,f,c);}
           }
         }else{
           for(int i=lo;i<hi;i++){
             int sx=i*4/ppc;
             u8 c=row[f>0?sx:w-1-sx];
-            if(c)d[x0+i]=(u8)(C_MAN0+c-1);
+            if(c)d[x0+i]=man_ink(fr,f>0?sx:w-1-sx,j*4/ppc,f,c);
           }
         }
       }
@@ -643,7 +672,7 @@ static void blit_frame(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, i
         if((unsigned)px >= 256u) continue;
         int sx = i * 4 / ppc;
         u8 c = row[f > 0 ? sx : w - 1 - sx];
-        if(c) d[px] = (u8)(C_MAN0 + c - 1);
+        if(c) d[px] = man_ink(fr,f>0?sx:w-1-sx,j*4/ppc,f,c);
       }
     }
 #endif
@@ -683,7 +712,7 @@ static void blit_frame(u8 *b, const MsFrame *fr, int x, int y, int ppc, int f, i
       int sx = cm[si], sy = rm[sj];
       if(sx < 0 || sy < 0) continue;
       u8 c = fr->px[sy * w + sx];
-      if(c) d[px] = (u8)(C_MAN0 + c - 1);
+      if(c) d[px] = man_ink(fr,sx,sy,f,c);
     }
   }
 }
@@ -753,7 +782,7 @@ static void blit_frame_rot(u8 *b, const MsFrame *fr, int x, int y, int ppc, int 
         int sx=(u*inv)>>12,sy=(v*inv)>>12;
         if(sx>=w||sy>=h)continue;
         u8 c=fr->px[sy*w+(f>0?sx:w-1-sx)];
-        if(c)d[x+i]=(u8)(C_MAN0+c-1);
+        if(c)d[x+i]=man_ink(fr,f>0?sx:w-1-sx,sy,f,c);
       }
       continue;
     }
@@ -777,7 +806,7 @@ static void blit_frame_rot(u8 *b, const MsFrame *fr, int x, int y, int ppc, int 
       int sx = (u * inv) >> 12, sy = (v * inv) >> 12;
       if(sx >= w || sy >= h) continue;
       u8 c = fr->px[sy * w + (f > 0 ? sx : w - 1 - sx)];
-      if(c) d[px] = (u8)(C_MAN0 + c - 1);
+      if(c) d[px] = man_ink(fr,f>0?sx:w-1-sx,sy,f,c);
     }
   }
 }
