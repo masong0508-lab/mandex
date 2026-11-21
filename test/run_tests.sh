@@ -108,6 +108,20 @@ gcc -std=gnu99 -O2 -Wall -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm
 gcc -std=gnu99 -O2 -Wall -DMX_FIXED -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm -o cloth_fixed && ./cloth_fixed | grep -v "^  p"
 echo "--- DS front-end: real main loop on stub libnds, scripted stylus play on levels 1, 4, 6, 7 ---"
 gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Istubs -I../core -I../art -I../ds/source ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_render
+echo "--- DS furniture offscreen culling: 3 HQ districts plus 8 gameplay frame-hash A/B checks ---"
+gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_FURNITURE_VIEW_CULL=0 \
+  -Istubs -I../core -I../art -I../ds/source \
+  ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c \
+  ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_furn_reference
+DS_FACADE_DISTRICT_PROBE=1 ./ds_furn_reference > ds_furn_district_reference.txt
+DS_FACADE_DISTRICT_PROBE=1 ./ds_render > ds_furn_district_optimized.txt
+cmp ds_furn_district_reference.txt ds_furn_district_optimized.txt
+for L in 0 9 20 21 29 39 50 59; do
+  DS_PERF_BENCH=1 ./ds_furn_reference /tmp/ds_furn_ref 340 "$L" | grep '^DS_FRAME_HASH ' > ds_furn_ref.txt
+  DS_PERF_BENCH=1 ./ds_render /tmp/ds_furn_opt 340 "$L" | grep '^DS_FRAME_HASH ' > ds_furn_opt.txt
+  cmp ds_furn_ref.txt ds_furn_opt.txt
+  echo "DS_FURNITURE_CULL_PASS level=$((L+1)) pixel_identical=1"
+done
 echo "--- DS landlord walking phase: exhaustively match 1,966,080 fixed-point values to original float phase ---"
 DS_WALK_PHASE_PROBE=1 ./ds_render
 echo "--- DS walking phase fastpath: sampled complete gameplay frame hashes vs original for 5 levels ---"
