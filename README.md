@@ -22,6 +22,31 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## Rare collapse survivors — all ports
+
+Landlords can now *occasionally* emerge alive from a near-total building
+collapse. This is evaluated only on an otherwise lethal fall, burial or
+moving-rubble impact, never by doing extra room scans every frame.
+
+- A landlord must belong to a room whose original roof, floor and structural
+  posts have lost **at least 60%** of their support, and a nearby empty body
+  pocket must actually exist. No outdoor or intact-building miracles.
+- The probability is deliberately small: about **1–3.5% for a one-HP enemy**
+  and up to approximately **7% for a three-HP boss**, depending on how much of
+  the room survives. More current HP and a few more standing supports
+  increase the chance; being utterly crushed with no escape space prevents it.
+- A survivor loses one HP if it has more than one, drops armor, and becomes
+  briefly stunned and impact-protected. It gets **one attempt per landlord**,
+  success or failure, and normal hazards resume after the short recovery.
+  Direct shots and subsequent hits can still evict it. The exit message
+  *SOMEHOW ALIVE!* / *STILL ALIVE!* appears with light reused dust effects.
+- The unchanged core layout and destruction solver are still shared by
+  Nintendo DS, Nintendo 3DS and Dreamcast; browser uses corresponding JS
+  rules. There are **no new textures or per-frame room loops**.
+- `test/collapse_survivor_test.c` and
+  `test/collapse_survivor_web_test.js` cover surviving room geometry,
+  unescapable entombment, reduced HP, one-time rolls, and continued killability.
+
 ## Bank Shot trick scoring + another measured speed pass
 
 - **New gameplay challenge (all four ports):** rebound off a rubber block,
