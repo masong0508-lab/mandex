@@ -3452,6 +3452,15 @@ function drawObjectiveEdge(){
   ctx.fillStyle='#ff9ec8';ctx.fillRect(edge.x-41,edge.y-14,82,3);
   txt(label,edge.x,edge.y+5,14,'#ff9ec8','center');
 }
+// Shared UX semantics with mx_tool_feedback.h, expressed in browser
+// pixels (8px per simulation cell). Never changes a shot or power stock.
+function shotReadiness(m){
+  if(state!=='play'||m.mode!=='aim')return '';
+  if(m.stun>0)return 'DAZED - AIM LOCKED';
+  if(m.seated||m.vlv)return 'AIR FILLING - DRAG OFF';
+  const dx=m.x-SX,dy=m.y-SY;
+  return dx*dx+dy*dy>=3*V*V?'RELEASE TO LAUNCH':'DRAG BACK TO AIM';
+}
 function drawHUD(){
   drawWalkHUD();
   const P=W<700;ctx.fillStyle='rgba(15,18,30,.72)';ctx.fillRect(0,0,W,P?62:34);ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(0,0,W,2);
@@ -3486,9 +3495,21 @@ function drawHUD(){
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
-  if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+pw.left[tid]:'';
+  if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
     if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
       btn(W-212,H-44,96,32,'< SLING',()=>goSling(slingK-1),{size:13,disabled:slingK<=0});btn(W-108,H-44,96,32,'SLING >',()=>goSling(slingK+1),{size:13,disabled:slingK>=CL.slings.length-1});void ny}
+    // Separate immediate shot readiness from tool inventory. The
+    // selection badge already shows charges and consumes none until launch.
+    if(man.mode==='aim'){
+      const ready=shotReadiness(man);
+      if(ready){
+        const cy=H-83;
+        ctx.fillStyle='rgba(15,18,30,.82)';
+        ctx.fillRect(Math.max(5,W/2-144),cy-17,Math.min(W-10,288),23);
+        txt(ready,W/2,cy,13,man.stun>0?'#ff7474':
+           ready==='RELEASE TO LAUNCH'?'#7dff5a':'#ffe190','center');
+      }
+    }
     btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
     if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
