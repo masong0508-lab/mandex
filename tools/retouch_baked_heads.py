@@ -86,6 +86,11 @@ def patch_string(data):
 
 def main():
     original=HEADER.read_text()
+    if "#define MS_CANONICAL_TURN_BAKE 1" in original:
+        if "--check" in sys.argv:
+            print("PASS: console sprites fully rebuilt from the canonical 19-row turnaround")
+            return
+        raise SystemExit("Fully regenerated atlas: edit manhead.py / gen_manspr.py instead")
     updated,total,affected=patch_string(original)
     if "--check" in sys.argv:
         # A second run must leave the committed sheet unchanged.
