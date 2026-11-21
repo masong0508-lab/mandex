@@ -460,6 +460,9 @@ static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
 #ifndef MX_N3DS_ROT_SOURCE_GUARD
 #define MX_N3DS_ROT_SOURCE_GUARD 1
 #endif
+#ifndef MX_N3DS_ROT_TIGHT_BOUNDS
+#define MX_N3DS_ROT_TIGHT_BOUNDS 1
+#endif
 #ifdef MX_N3DS_ROT_WORK_COUNT
 static unsigned man_rot_candidate_pixels,man_rot_sampled_pixels;
 #endif
@@ -484,6 +487,22 @@ static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, fl
      reject a visible sample, but avoids four floorf + texel lookups for
      blank margins of the rotation candidate square. */
   const float guard=.501f+.354f*q;
+#if MX_N3DS_ROT_TIGHT_BOUNDS
+  /* The old search square is sized by max(width,height), which wastes
+     thousands of iterations for narrow poses. Intersect it with an AABB
+     enclosing the inverse-rotated source rectangle, INCLUDING all four
+     subpixel taps and nearest-texel rounding. The +2px margin compensates
+     for float accumulation/rounding; existing search bounds are kept as a
+     hard outer limit, so no previously rendered pixels can be added. */
+  float ux=fmaxf((float)f->ax,(float)f->w-f->ax)+guard;
+  float uy=fmaxf((float)f->ay,(float)f->h-f->ay)+guard;
+  int rx=(int)ceilf((fabsf(ca)*ux+fabsf(sa)*uy)/q)+2;
+  int ry=(int)ceilf((fabsf(sa)*ux+fabsf(ca)*uy)/q)+2;
+  if(x0<cx-rx)x0=cx-rx;
+  if(x1>cx+rx+1)x1=cx+rx+1;
+  if(y0<cy-ry)y0=cy-ry;
+  if(y1>cy+ry+1)y1=cy+ry+1;
+#endif
   for(int y=y0;y<y1;y++){
     float dy=(y-cy)*q,dx=(x0-cx)*q*mirror;
     float su=dx*ca+dy*sa+f->ax,sv=-dx*sa+dy*ca+f->ay;
