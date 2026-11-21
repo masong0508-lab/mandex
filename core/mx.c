@@ -1904,6 +1904,14 @@ static void upd_targets(MxWorld *w, real dt){
       if(up){ t->y -= up; t->vy = 0; t->stun = RI(1); t->inv = RI(1); }
       else { if(!collapse_survive(w,t))kill_hard(w,t); continue; }
     }
+    /* A chunk can contain 512 rubble cells per landlord. The cell touch
+       radius is invariant across all chunks, so compute its squared value
+       once per target. Reject axis-separated cells before fixed-point
+       multiplies. This conservative rectangle cannot reject a circular hit. */
+#ifndef MX_LORD_RUBBLE_AABB
+#define MX_LORD_RUBBLE_AABB 1
+#endif
+    const real touch_lim=r+RC, touch_lim2=rmul(touch_lim,touch_lim);
     for(int c = 0; c < MX_MAX_CHUNKS && t->alive; c++){
       MxChunk *ch = &w->chunks[c];
       if(!ch->active) continue;
@@ -1912,8 +1920,11 @@ static void upd_targets(MxWorld *w, real dt){
       for(int k = 0; k < ch->count; k++){
         MxCell *a = &ch->cells[k];
         if(a->dead)continue; /* shattered rubble has no collision body or invisible attacks */
-        real ddx = a->wx - t->x, ddy = a->wy - t->y, lim = r + RC;
-        if(rmul(ddx, ddx) + rmul(ddy, ddy) >= rmul(lim, lim)) continue;
+        real ddx = a->wx - t->x, ddy = a->wy - t->y;
+#if MX_LORD_RUBBLE_AABB
+        if(rabs(ddx)>=touch_lim || rabs(ddy)>=touch_lim)continue;
+#endif
+        if(rmul(ddx, ddx) + rmul(ddy, ddy) >= touch_lim2) continue;
         real vx = ch->vx - rmul(ch->w, a->wy - ch->y), vy = ch->vy + rmul(ch->w, a->wx - ch->x);
         real sp2 = rmul(vx, vx) + rmul(vy, vy);
         if(sp2 > R(351.6)){ if(!collapse_survive(w,t))kill_target(w,t); break; }                              /* fast rubble (> 18.75 cells/s) kills; a slower graze only stuns */
