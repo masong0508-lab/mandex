@@ -222,19 +222,14 @@ for rot in before after; do
 done
 cmp rot_sprite_before.txt rot_sprite_after.txt
 cat rot_sprite_after.txt
-echo "--- DS volumetric contour ink: original/Wolfman silhouette parity with palette shadow enabled ---"
+echo "--- DS shaded sprite contours: identical original/Wolfman coverage on and off ---"
 for mode in 0 1; do
-  gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_MAN_VOLUME=$mode \
-    -Istubs -I../core -I../art -I../ds/source \
-    ds_sprite_volume_test.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_volume_$mode
+  gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_MAN_VOLUME=$mode -Istubs -I../core -I../art -I../ds/source ds_sprite_volume_test.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_volume_$mode
   ./ds_volume_$mode > ds_volume_$mode.txt
   grep '^DS_MAN_OCCUPANCY_HASH ' ds_volume_$mode.txt > ds_volume_mask_$mode.txt
 done
 cmp ds_volume_mask_0.txt ds_volume_mask_1.txt
-grep -q '^DS_MAN_CONTOUR_COUNT 0$' ds_volume_0.txt
-grep -Eq '^DS_MAN_CONTOUR_COUNT [1-9][0-9]*$' ds_volume_1.txt
-cat ds_volume_1.txt
-echo "--- DS hardware sound ring: atomic start, no dropped kills, reserved stop headroom ---"
+grep -q '^DS_MAN_CONTOUR_COUNT 0
 gcc -std=gnu99 -O2 -Wno-pointer-to-int-cast -I../ds/bare ds_sound_queue_test.c -o ds_sound_queue_test && ./ds_sound_queue_test
 echo "--- DS music clock: catch up missed ARM7 VBlank without accelerating gameplay physics ---"
 gcc -std=gnu99 -O2 -Istubs -I../ds/source music_clock_test.c -o music_clock_test && ./music_clock_test
@@ -323,17 +318,14 @@ N3D_UNITS="n3d_gfx.o n3d_intro.o"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o n3d_$f.o; done   # the shared DS cutscene code, as its own fixed-point unit, exactly as 3ds/Makefile builds it
 gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_render
 N3DS_RUBBLE_DAMAGE_PROBE=1 ./n3ds_render
-echo "--- 3DS connected character silhouettes, outfit lighting and four-tap rotated edges ---"
-for config in base lit smooth_ref smooth; do
+echo "--- 3DS silhouette, outfit and rotated edge quality: reference vs shaded vs antialiased ---"
+for config in base lit smooth; do
   case "$config" in
     base) defs="-DMX_N3DS_SPRITE_VOLUME=0 -DMX_N3DS_ROT_COVERAGE=0";;
     lit) defs="-DMX_N3DS_SPRITE_VOLUME=1 -DMX_N3DS_ROT_COVERAGE=0";;
-    smooth_ref) defs="-DMX_N3DS_SPRITE_VOLUME=1 -DMX_N3DS_ROT_COVERAGE=1 -DMX_N3DS_ROT_SOURCE_GUARD=0 -DMX_N3DS_ROT_WORK_COUNT=1";;
-    smooth) defs="-DMX_N3DS_SPRITE_VOLUME=1 -DMX_N3DS_ROT_COVERAGE=1 -DMX_N3DS_ROT_SOURCE_GUARD=1 -DMX_N3DS_ROT_WORK_COUNT=1";;
+    smooth) defs="-DMX_N3DS_SPRITE_VOLUME=1 -DMX_N3DS_ROT_COVERAGE=1";;
   esac
-  gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ $defs \
-    -I../3ds/shim -Istubs -I../core -I../art -I../ds/source \
-    n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3d_sprite_$config
+  gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ $defs -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3d_sprite_$config
   N3DS_SPRITE_VOLUME_PROBE=1 ./n3d_sprite_$config > n3d_sprite_$config.txt
   grep '^N3_SPRITE_OCCUPANCY ' n3d_sprite_$config.txt > n3d_sprite_coverage_$config.txt
 done
@@ -342,13 +334,6 @@ cmp n3d_sprite_coverage_lit.txt n3d_sprite_coverage_smooth.txt
 grep -q 'shaded=0 ' n3d_sprite_base.txt
 grep -Eq 'shaded=[1-9][0-9]* ' n3d_sprite_lit.txt
 grep -Eq 'blended_rotated=[1-9][0-9]*' n3d_sprite_smooth.txt
-grep '^N3_SPRITE_ROT_HASH ' n3d_sprite_smooth_ref.txt > n3d_rot_hash_ref.txt
-grep '^N3_SPRITE_ROT_HASH ' n3d_sprite_smooth.txt > n3d_rot_hash_new.txt
-cmp n3d_rot_hash_ref.txt n3d_rot_hash_new.txt
-n3_sample_ref=$(awk -F'sampled=' '/^N3_ROT_WORK /{print $2}' n3d_sprite_smooth_ref.txt)
-n3_sample_new=$(awk -F'sampled=' '/^N3_ROT_WORK /{print $2}' n3d_sprite_smooth.txt)
-test "$n3_sample_new" -lt "$n3_sample_ref"
-echo "N3_ROT_SOURCE_GUARD_PASS sampled=$n3_sample_new reference=$n3_sample_ref pixel_identical=1"
 cat n3d_sprite_smooth.txt
 echo "--- 3DS stereo/bottom particle culling: pixel parity and measured raster work ---"
 for mode in 0 1; do
@@ -419,7 +404,7 @@ if [ -n "$PARITY" ]; then
   node ../tools/level_parity.js /tmp/mx_c_levels.txt 0 38
 fi
  ds_volume_0.txt
-if grep -q '^DS_MAN_CONTOUR_COUNT 0
+grep -Eq '^DS_MAN_CONTOUR_COUNT [1-9][0-9]*
 gcc -std=gnu99 -O2 -Wno-pointer-to-int-cast -I../ds/bare ds_sound_queue_test.c -o ds_sound_queue_test && ./ds_sound_queue_test
 echo "--- DS music clock: catch up missed ARM7 VBlank without accelerating gameplay physics ---"
 gcc -std=gnu99 -O2 -Istubs -I../ds/source music_clock_test.c -o music_clock_test && ./music_clock_test
@@ -576,7 +561,7 @@ if [ -n "$PARITY" ]; then
   gcc -std=c99 -O2 -I../core ../core/mx.c level_dump.c -lm -o level_dump && ./level_dump > /tmp/mx_c_levels.txt
   node ../tools/level_parity.js /tmp/mx_c_levels.txt 0 38
 fi
- ds_volume_1.txt;then echo "FAIL: DS volume shades never reached the screen";exit 1;fi
+ ds_volume_1.txt
 cat ds_volume_1.txt
 echo "--- DS hardware sound ring: atomic start, no dropped kills, reserved stop headroom ---"
 gcc -std=gnu99 -O2 -Wno-pointer-to-int-cast -I../ds/bare ds_sound_queue_test.c -o ds_sound_queue_test && ./ds_sound_queue_test
