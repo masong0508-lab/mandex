@@ -168,7 +168,12 @@ real ratan2(real y, real x){
 #define MX_LORD_SHOCK_REACT 1
 #endif
 static void ev(MxWorld *w, int type, real x, real y, int m, real a, real b){
-  if(w->nev >= MX_MAX_EVENTS) return;
+  if(w->nev >= MX_MAX_EVENTS){
+    /* Full demolition frames can saturate the debris event queue. Never
+       hide the rare collapse survivor behind the final cosmetic shard. */
+    if(type != EV_SURVIVOR) return;
+    w->nev = MX_MAX_EVENTS - 1;
+  }
   MxEvent *e = &w->ev[w->nev++];
   e->type = (uint8_t)type; e->m = (uint8_t)m; e->x = x; e->y = y; e->a = a; e->b = b;
 #if MX_LORD_SHOCK_REACT
