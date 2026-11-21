@@ -629,7 +629,66 @@ static int rip_clip_probe(void){
   printf("DS_RIP_PASS visible_pixels=%u\n",any);
   return 0;
 }
+/* Compare the optimized high-water particle scan against the full-pool
+   reference build (MX_DS_PARTICLE_BOUNDS=0). Both binaries run the same
+   deterministic burst, expiration, ring and view-scale sequence. The printed
+   hash covers ALL pixels of both 256x192 buffers on every probe frame. */
+static int particle_pool_probe(void){
+  unsigned hash=2166136261u, peak=0, total_live=0;
+  gfx_init();
+  memset(parts,0,sizeof parts);
+  memset(pops,0,sizeof pops);
+  part_high_water=0;
+#if MX_DS_PARTICLE_HINT
+  part_free_hint=0;
+#endif
+  for(int f=0;f<420;f++){
+    frame=f;
+    /* Exercise the real pool reset used by level and HQ transitions. */
+    if(f==220){
+      memset(parts,0,sizeof parts);
+      part_high_water=0;
+#if MX_DS_PARTICLE_HINT
+      part_free_hint=0;
+#endif
+    }
+    int burst=f<90?5:(f<140?0:(f%5==0?3:1));
+    for(int k=0;k<burst;k++){
+      int type=(f*7+k*11)%14;
+      int x=4+(f*19+k*17)%90, y=3+(f*13+k*7)%38;
+      int vx=((f+k*5)%17)-8,vy=-((f+k)%9);
+      int life=4+(f*3+k*7)%75;
+      spawn(type,RI(x),RI(y),vx,vy,C_GOLD,life);
+    }
+    if(f%19==0)spawn_ring(RI(10+(f%40)),RI(15+(f%20)),4+f%5,C_GOLD);
+    update_parts();
+    int expected=0,live=0;
+    for(int i=0;i<NPART;i++)if(parts[i].life>0){expected=i+1;live++;}
+    if(expected!=part_high_water){
+      fprintf(stderr,"FAIL: particle high-water frame %d: got %d, highest live slot %d\n",f,part_high_water,expected);
+      return 1;
+    }
+    if((unsigned)expected>peak)peak=(unsigned)expected;
+    total_live+=(unsigned)live;
+    memset(buf_top,0,sizeof buf_top);
+    memset(buf_bot,0,sizeof buf_bot);
+    View top={buf_top,4,(f%7)*5,(f%3)*4};
+    View bot={buf_bot,2,(f%11)*3,(f%5)*2};
+    draw_parts(&top);
+    draw_parts(&bot);
+    for(unsigned i=0;i<sizeof buf_top;i++){
+      hash=(hash^buf_top[i])*16777619u;
+      hash=(hash^buf_bot[i])*16777619u;
+    }
+    hash=(hash^(unsigned)part_high_water)*16777619u;
+    hash=(hash^(unsigned)live)*16777619u;
+  }
+  if(!peak||!total_live){fputs("FAIL: particle test never populated the pool\n",stderr);return 1;}
+  printf("DS_PARTICLE_BOUND parity=%08x peak=%u live_frames=%u frames=420\n",hash,peak,total_live);
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("DS_PARTICLE_PROBE"))return particle_pool_probe();
   if(getenv("DS_ROOM_SCAN_PROBE"))return room_scan_probe();
   if(getenv("DS_RIP_CLIP_PROBE"))return rip_clip_probe();
   if(getenv("DS_FACADE_DISTRICT_PROBE"))return facade_district_probe();
