@@ -217,6 +217,8 @@ OUTFIT_SHOTS=1 ./ds_render /tmp/dsout 400 0 | grep -v "^ok:"
 echo "--- DS options screen (port 13): open, tap + d-pad, start tool pre-armed, valve hidden, collapse stays ON while overload cuts wobble work and substeps, saved and reloaded ---"
 rm -f /tmp/mx_opt.sav; MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_TEST=1 ./ds_render /tmp/dsopt 3000 0 | grep -v "^ok:"
 MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_LOAD=1 ./ds_render /tmp/dsopt2 400 0
+echo "--- DS pause safety: START cancels a live stylus pull without firing, music resumes, new grab works ---"
+PAUSE_DRAG_TEST=1 ./ds_render /tmp/ds_pause_drag 70 0 | grep -v "^ok:"
 echo "--- DS six-slot touchscreen toolbar: valve opt-in, normal aiming, TURBO/QUAKE selection ---"
 TOOLBAR_TEST=1 ./ds_render /tmp/dstool 60 0 | grep -v "^ok:"
 echo "--- DS title cheat: L+R+SELECT unlocks every level for the session, in any key order ---"
