@@ -11,6 +11,7 @@ on:
       - "test/bench.c"
       - "test/wob_state_digest.c"
       - "test/ds_render.c"
+      - "test/rot_sprite_parity_test.c"
       - ".github/workflows/sim-render-fastpath.yml"
   workflow_dispatch:
 
@@ -71,7 +72,7 @@ jobs:
         run: |
           for variant in before after; do
             defs=""
-            test "$variant" = before && defs="-DMX_DS_DAMAGE_THRESH=0 -DMX_DS_VOXEL_EMPTY4=0 -DMX_DS_ELLIPSE_SYMMETRY=0 -DMX_WOB_JOINT_MASK=0"
+            test "$variant" = before && defs="-DMX_DS_DAMAGE_THRESH=0 -DMX_DS_VOXEL_EMPTY4=0 -DMX_DS_ELLIPSE_SYMMETRY=0 -DMX_DS_ROT_INCREMENTAL=0 -DMX_WOB_JOINT_MASK=0"
             gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST $defs \
               -Itest/stubs -Icore -Iart -Ids/source \
               test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
@@ -86,6 +87,18 @@ jobs:
               test/gfx_clip_test.c ds/source/gfx.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/gfx_ellipse_${variant}
             /tmp/gfx_ellipse_${variant}
           done
+      - name: Prove 3100 rotated sprite frames are byte-identical for no-jiggle and deformed poses
+        run: |
+          for variant in before after; do
+            flag=1
+            test "$variant" = before && flag=0
+            gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_ROT_INCREMENTAL=$flag \
+              -Itest/stubs -Icore -Iart -Ids/source \
+              test/rot_sprite_parity_test.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_rot_$variant
+            /tmp/mandex_rot_$variant > /tmp/mandex_rot_$variant.txt
+          done
+          diff -u /tmp/mandex_rot_before.txt /tmp/mandex_rot_after.txt
+          cat /tmp/mandex_rot_after.txt
       - name: Compare framebuffer hashes and report host draw/physics cost
         run: |
           mkdir -p out/sim-render-fastpath
