@@ -32,6 +32,8 @@ echo "--- Browser refresh-rate-independent fixed-step simulation ---"
 if command -v node >/dev/null 2>&1;then node browser_fixed_step_test.js;fi
 echo "--- Browser walk physics parity, reusable touch controls and character-detail GC ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_memory_test.js;fi
+echo "--- Browser side -> rear -> side pose coherence at 60Hz ---"
+if command -v node >/dev/null 2>&1;then node browser_turn_pose_test.js;fi
 echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
 if command -v node >/dev/null 2>&1; then
   node -e 'const fs=require("fs");const h=fs.readFileSync("../web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<a)throw Error("game script missing");const s=h.slice(a+8,b);new Function(s);for(const sym of ["function cgRearPanel","function cgHotTake","function cgMoonlitKiss"])if(!s.includes(sym))throw Error(sym+" missing");console.log("ok: browser script parses and cutscene effects are present")'
