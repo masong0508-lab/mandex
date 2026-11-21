@@ -1776,7 +1776,15 @@ int main(void){
     sfx_tick();
 #endif
 
-    if(down & KEY_Y){ music_pref = !music_pref; music_set(music_pref && app != ST_PAUSE && world.state == MX_PLAY); }
+    /* Walk levels use Y as a punch button. Do not also toggle the music
+       on every punch press; Y remains the sound shortcut everywhere else.
+       This must depend on the CURRENT gameplay mode, not the level number,
+       since a sling level can transition into walking mid-run. */
+    if((down & KEY_Y) &&
+       !(app == ST_PLAY && world.state == MX_PLAY && world.man.mode == MAN_WALK)){
+      music_pref = !music_pref;
+      music_set(music_pref && app != ST_PAUSE && world.state == MX_PLAY);
+    }
     if(app == ST_TITLE && !ach_open && !out_open && !opt_open && (held & (KEY_L | KEY_R | KEY_SELECT)) == (KEY_L | KEY_R | KEY_SELECT) && !combo_held){
       combo_held = 1; stats.unlock_all = !stats.unlock_all; cheat_t = 120; sfx_play(SFX_TARGET, 64);       /* never saved (port 5 must leave unlock_all out) */
     }
