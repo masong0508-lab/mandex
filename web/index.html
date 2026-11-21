@@ -1,9 +1,11 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MANDEX</title>
 <style>
-html,body{margin:0;background:#0d0d14;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-canvas{max-width:100vw;max-height:100vh;touch-action:none;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.7);cursor:crosshair}
+html,body{margin:0;background:#0d0d14;width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
+body{display:flex;align-items:center;justify-content:center}
+canvas{display:block;touch-action:none;border-radius:8px;box-shadow:0 0 50px rgba(0,0,0,.65);cursor:crosshair;outline:none}
+@media (pointer:coarse){canvas{border-radius:0;box-shadow:none}}
 </style></head><body>
 <canvas id="c" width="960" height="540"></canvas>
 <script>
@@ -3224,14 +3226,34 @@ function drawSling1(back){
 // the ground sits at the bottom, and the camera slides sideways: to the buildings while you pull back, with the man in flight,
 // and to the wreckage between throws.  Aiming works in SCREEN distance, so the moving camera never fights your finger.
 const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0};
+/* Use the *visible* viewport, not the layout viewport: address bars, browser
+   zoom and phone rotation otherwise leave an offscreen/untouchable HUD.
+   Cutscenes and the level editor retain the 960x540 authoring canvas;
+   their entire image still fits, while all navigation screens are truly
+   portrait rather than being a postage-stamp landscape menu. */
+function webViewport(width,height,mode){
+  const portrait=height>width*1.1;
+  const wideOnly=mode==='cutscene'||mode==='edit';
+  const tall=portrait&&!wideOnly;
+  const w=tall?540:960,h=tall?Math.max(780,Math.min(1240,Math.round(540*height/width))):540;
+  const scale=Math.min(width/w,height/h);
+  return {portrait,tall,w,h,cssW:Math.max(1,Math.floor(w*scale)),cssH:Math.max(1,Math.floor(h*scale))};
+}
+let mobilePortrait=false;
 function layoutTick(){
-  const por=innerHeight>innerWidth*1.1&&(state==='play'||state==='win'||state==='lose');
-  const w=por?540:960,h=por?Math.max(780,Math.min(1240,Math.round(540*innerHeight/innerWidth))):540;
-  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;
-    if(por){cv.style.width='min(100vw,'+(100*w/h).toFixed(2)+'vh)';cv.style.height='auto'}else{cv.style.width='';cv.style.height=''}
-    CAM.snap=true}
-  if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);   // menus, cut scenes and the editor are always the normal 120 wide
-  CAM.on=por||!!(CL&&CL.cols>120&&(state==='play'||state==='win'||state==='lose'))}
+  const vp=window.visualViewport,vw=vp&&vp.width>0?vp.width:innerWidth;
+  const vh=vp&&vp.height>0?vp.height:innerHeight;
+  const lay=webViewport(vw,vh,state),por=lay.tall;
+  if(lay.w!==W||lay.h!==H){
+    W=lay.w;H=lay.h;cv.width=W;cv.height=H;CAM.snap=true;
+  }
+  mobilePortrait=por;
+  if(cv.style.width!==lay.cssW+'px')cv.style.width=lay.cssW+'px';
+  if(cv.style.height!==lay.cssH+'px')cv.style.height=lay.cssH+'px';
+  if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);
+  CAM.on=(por&&(state==='play'||state==='win'||state==='lose'))||
+    !!(CL&&CL.cols>120&&(state==='play'||state==='win'||state==='lose'));
+}
 function camTick(dt){
   if(!CAM.on){CAM.z=1;CAM.x=0;CAM.y=0;return}
   // fit the sling and every standing landlord across the screen (a tall phone shows the whole fight at once instead of an empty sky), ground at 80% of the height
