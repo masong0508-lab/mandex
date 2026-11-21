@@ -128,7 +128,7 @@ SIDE_BASE = _pad(SIDE_BASE)
 SIDE_LANDMARKS = {
     "crown": (8, 2), "ear": (5, 8), "brow": (12, 5),
     "eye": (12, 7), "nose": (15, 8), "moustache": (12, 9),
-    "mouth": (12, 10), "chin": (12, 12),
+    "mouth": (12, 10), "chin": (11, 12),
 }
 SIDE_FEATURES = {
     "fly": {
