@@ -205,15 +205,18 @@ static inline int mx_walk_anim_phase(const MxMan *m){
 }
 /* Half-stride lift: continuous 0 -> peak -> 0 in each two-cell step,
    aligned to the EXISTING side-profile sprites. No stored animation state. */
-/* A turn follows the existing 15-degree sprite atlas through the back:
-   facing old direction: 105,135,165 degrees; new: 195,225,255.
-   One frame per two simulation ticks, no overlay sprite or extra bitmap. */
+/* A turn follows the existing 15-degree atlas through the back, using
+   all six profile-to-rear offsets per side at one sample per simulation tick.
+   The mirrored halves meet on the rear silhouette, without new sprites. */
 static inline int mx_walk_turn_offset(const MxMan *m){
   if(!m->turn_ticks || m->mode!=MAN_WALK) return 0;
-  int step=(12-(int)m->turn_ticks)/2;
+  int step=12-(int)m->turn_ticks;
   if(step<0)step=0;
-  if(step>5)step=5;
-  return step<3?1+2*step:1+2*(5-step);
+  if(step>11)step=11;
+  /* Twelve distinct animation ticks reuse the existing 15-degree atlas
+     instead of holding six alternating frames. Mirrored halves meet at
+     the rear-facing SPIN_12 frame before returning toward profile. */
+  return step<6 ? step+1 : 12-step;
 }
 static inline int mx_walk_render_face(const MxMan *m){
   return m->turn_ticks>6 && m->mode==MAN_WALK?-m->face:m->face;
