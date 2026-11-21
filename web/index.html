@@ -3094,6 +3094,15 @@ function drawLandlord(t){
   if(t.armor>0){ctx.fillStyle='#9aa4b2';ctx.strokeStyle='#222';ctx.lineWidth=1;ctx.beginPath();ctx.rect(7,-12,5,22);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.fillRect(8.4,-4,2.2,6)}   // riot shield
   ctx.restore();
   if(t.hpMax>1){ctx.save();ctx.translate(t.x,t.y-(kind==='boss'?42:36));ctx.fillStyle='#000';ctx.fillRect(-11,-3,22,6);for(let i=0;i<t.hpMax;i++){ctx.fillStyle=i<t.hp?'#e84040':'#552';ctx.fillRect(-10+i*(20/t.hpMax),-2,20/t.hpMax-1,4)}ctx.restore()}
+  /* Surviving a whole building is rare: keep the injured landlord visibly
+     tagged until eviction, instead of hiding the objective after a toast. */
+  if(t.collapseRolled===2){
+    const by=t.y-(t.hpMax>1?54:41);
+    ctx.save();ctx.fillStyle='#9c661d';ctx.strokeStyle='#fff0ac';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(t.x,by,7,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#fff';ctx.fillRect(t.x-1,by-4,2,5);ctx.fillRect(t.x-1,by+3,2,2);
+    ctx.restore();
+  }
   if(wind&&(t.kind==='thrower'||t.kind==='boss')){ctx.save();ctx.translate(t.x,t.y-42);ctx.fillStyle='#ffd23f';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-3,-9);ctx.lineTo(3,-9);ctx.lineTo(1.5,2);ctx.lineTo(-1.5,2);ctx.closePath();ctx.stroke();ctx.fill();ctx.beginPath();ctx.arc(0,6,1.8,0,7);ctx.fill();ctx.restore()}}
 function drawCases(){for(const c of cases){ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.rot);ctx.fillStyle='#7a4a22';ctx.fillRect(-7,-5,14,10);ctx.strokeStyle='#3a220c';ctx.lineWidth=1.2;ctx.strokeRect(-7,-5,14,10);ctx.fillStyle='#ffd23f';ctx.fillRect(-1,-1.5,2,3);ctx.strokeRect(-3,-7.5,6,2.5);ctx.restore()}}
 
