@@ -1230,7 +1230,22 @@ int main(void){
         }
         world.valve_ok=valve_equipped&&mx_valve_unlocked(&stats);
         if((down&KEY_R)&&world.valve_ok&&mx_valve_seat(&world))pad_used=0;
-        if((down&KEY_TOUCH)&&tool_hit<0)dragging=1;
+        if((down&KEY_TOUCH)&&tool_hit<0){
+          /* A random tap on the overview must not teleport the character
+             into an aim drag. Pick up only near the actual rendered body,
+             just as the DS does. Directly tapping an equipped valve is
+             still allowed to seat him; a seated man can be dragged off. */
+          int mxp=(int)((RTOF(m->x)-vb.cx)*4.0f);
+          int myp=(int)((RTOF(m->y)-vb.cy)*4.0f);
+          int dx=(int)t.px-mxp,dy=(int)t.py-myp;
+          int vx=(int)((RTOF(MX_VALVE_X)-vb.cx)*4.0f);
+          int vy=(int)((RTOF(MX_VALVE_Y)-vb.cy)*4.0f);
+          int vdx=(int)t.px-vx,vdy=(int)t.py-vy;
+          if(world.valve_ok && !m->seated &&
+             vdx*vdx+vdy*vdy<20*20 && mx_valve_seat(&world)){
+            dragging=0;pad_used=0;
+          }else dragging=(dx*dx+dy*dy<34*34);
+        }
         if((held & KEY_TOUCH) && dragging){
           float cx = (float)t.px / 4.0f + vb.cx, cy = (float)t.py / 4.0f + vb.cy;
           mx_drag(&world, R(1) * (cx - RTOF(MX_ANCHOR_X)), R(1) * (cy - RTOF(MX_ANCHOR_Y)));   /* stretches on toward the valve; drops onto it up close */
