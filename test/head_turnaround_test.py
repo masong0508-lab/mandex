@@ -25,6 +25,16 @@ dive = manhead.side_head("dive")
 check(len(fly) == len(dive) == 14, "canonical side skull must be 14 rows")
 check(mask(fly) == mask(dive), "profile expressions changed skull silhouette")
 check(fly != dive, "flying and diving need visibly different expressions")
+# A tiny rear tuft and a bald crown were making the profile resemble a
+# different character. The cap must cover the same crown in every expression.
+for kind, rows in (("fly", fly), ("dive", dive)):
+    crown = sum(ch in "hHl" for row in rows[1:7] for ch in row)
+    check(crown >= 30, f"{kind} loses the front comb-over at side profile")
+    check(rows[1][7] in "hH" and rows[3][8] in "hH",
+          f"{kind} has a bald crown between 3/4 and side")
+web = (pathlib.Path(__file__).resolve().parents[1] / "web" / "index.html").read_text()
+check("ctx.moveTo(cx-r*.78,cy-r*.38)" in web,
+      "browser side profile lost the same crown sweep as console art")
 
 widths = []
 for angle in range(0, 181, 3):
