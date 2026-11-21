@@ -454,6 +454,7 @@ def main():
          "   Chunky pixel art at 4 pixels per cell; index 0 = transparent, index k = MS_PAL[k-1]. */",
          "/* #define MS_ENUM_ONLY before including to get just the frame names (MSF_*) without the pixel data. */",
          "#ifndef MX_MANSPR_H", "#define MX_MANSPR_H", f"#define MS_NPAL {len(pal_list)}"]
+    L.append("#define MS_CANONICAL_TURN_BAKE 1  /* generated with shared front/profile/rear turnaround */")
     L += [f"#define MSF_NBASE {sum(1 for o in out if not o[0].endswith('_W'))}   /* the Wolfman's copy of frame f is f + MSF_NBASE (same order); the front-ends add it while the fur outfit is worn */"]
     L += ["enum {" + ", ".join(f"MSF_{o[0]}" for o in out) + ", MSF_COUNT };", "#ifndef MS_ENUM_ONLY",
           "static const unsigned char MS_PAL[MS_NPAL][3] = {"]
