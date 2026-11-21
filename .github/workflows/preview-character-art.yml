@@ -83,6 +83,9 @@ jobs:
           test -s docs/art-review/turnaround.png
           test -s docs/art-review/turnaround.txt
       - name: Upload reviewable artwork (never push to main from a PR)
+        # Preserve generated sprites for visual diagnosis even if a validation
+        # assertion fails after both bakers have successfully produced art.
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: mandex-pr-character-sprite-review
@@ -93,5 +96,5 @@ jobs:
             docs/dc_art_sheet.png
             docs/art-review/turnaround.png
             docs/art-review/turnaround.txt
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
