@@ -508,6 +508,8 @@ static void fx_step(int calm, int strain){
 static int on_title = 1, title_t, paused, title_lv;
 static MxFpsMeter dc_fps;
 static unsigned long long dc_prev_ms;
+/* Last draw-list CPU time and the prior 60-frame high-water, in milliseconds. */
+static unsigned dc_draw_ms_last,dc_draw_ms_peak,dc_draw_ms_window,dc_draw_window_frames;
 /* The PVR cutscene is a separate timeline. Never tick world physics,
    landlord attacks, or achievement/save state behind the intro/end film.
    Title and pause likewise freeze the world; only live gameplay advances. */
@@ -1164,21 +1166,31 @@ int main(int argc, char **argv){
       }
     }
     pvr_wait_ready();
+    unsigned long long dc_draw_begin=timer_ms_gettime64();
     pvr_scene_begin();
     pvr_list_begin(PVR_LIST_TR_POLY);
     cur_hdr = 0;
     if(in_intro){ draw_intro();
     } else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART   B MUSIC", 320, 270, 24, WHITE, 1, Z_HUD); text("DPAD LEFT: TITLE MENU", 320, 344, 22, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
     if(st&&st->ltrig>128&&st->rtrig>128){
-      char stats_line[60];
-      snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d",
+      char stats_line[76];
+      snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d DRAW %uMS PEAK %u",
                (int)dc_fps.render_x10/10,(int)dc_fps.render_x10%10,
-               (int)dc_fps.sim_x10/10,(int)dc_fps.sim_x10%10);
-      quad(8,8,224,24,Z_HUD+4,argb(12,16,31,225));
-      text(stats_line,120,12,15,argb(255,218,116,255),1,Z_HUD+5);
+               (int)dc_fps.sim_x10/10,(int)dc_fps.sim_x10%10,
+               dc_draw_ms_last,dc_draw_ms_peak);
+      quad(8,8,366,24,Z_HUD+4,argb(12,16,31,225));
+      text(stats_line,190,12,13,argb(255,218,116,255),1,Z_HUD+5);
     }
     pvr_list_finish();
     pvr_scene_finish();
+    { unsigned long long end=timer_ms_gettime64();
+      dc_draw_ms_last=end>=dc_draw_begin?(unsigned)(end-dc_draw_begin):0;
+      if(dc_draw_ms_last>dc_draw_ms_window)dc_draw_ms_window=dc_draw_ms_last;
+      if(++dc_draw_window_frames>=60){
+        dc_draw_ms_peak=dc_draw_ms_window;
+        dc_draw_ms_window=dc_draw_window_frames=0;
+      }
+    }
     dc_frame_complete(dc_world_tick_allowed());
   }
   return 0;
