@@ -315,7 +315,8 @@ static void on_events(void){
       for(int k = 0; k < 16; k++){ float an = k * .39f; spawn(x, y, cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); spawn(RTOF(e->a), RTOF(e->b), cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); }
       popup(x, y - 5, "FWOOMP!", TC[e->m % 3]); } break;
     case EV_TARGET: for(int k = 0; k < 14; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 11) * .3f, 36, RGB(255, 220, 60));
-      if(e->m > 1) popup(x, y - 9, mx_combo_taunt(e->m), RGB(255, 126, 176)); break;
+      if(e->b > 0) popup(x, y - 9, "BANK SHOT! +1500", RGB(255, 126, 176));
+      else if(e->m > 1) popup(x, y - 9, mx_combo_taunt(e->m), RGB(255, 126, 176)); break;
     case EV_WALK: for(int k = 0; k < 10; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 30, RGB(110, 255, 90)); popup(x, y - 6, "ON FOOT!", RGB(125, 255, 90)); break;
     case EV_PUNCH: if(e->a > 0){ for(int k = 0; k < 6; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 20, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 3, e->m ? "SHOULDER!" : "POW!", RGB(255, 210, 63)); } break;
     case EV_SLAM: for(int k = 0; k < 10; k++) spawn(x + (rand() % 9 - 4), y, (rand() % 21 - 10) * .35f, -(rand() % 5) * .2f, 24, RGB(220, 220, 230)); popup(x, y - 5, "BELLY SLAM!", RGB(255, 138, 58)); break;
