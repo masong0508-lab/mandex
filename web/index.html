@@ -3252,7 +3252,11 @@ function layoutTick(){
   if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed){
     WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
     const rect=document.body.getBoundingClientRect(),
-      availW=rect.width||vw,availH=rect.height||vh,
+      css=window.getComputedStyle?window.getComputedStyle(document.body):null,
+      insetW=css?(parseFloat(css.paddingLeft)||0)+(parseFloat(css.paddingRight)||0):0,
+      insetH=css?(parseFloat(css.paddingTop)||0)+(parseFloat(css.paddingBottom)||0):0,
+      availW=Math.max(1,(rect.width||vw)-insetW),
+      availH=Math.max(1,(rect.height||vh)-insetH),
       scale=Math.max(.01,Math.min(availW/w,availH/h));
     cv.style.width=Math.floor(w*scale)+'px';cv.style.height=Math.floor(h*scale)+'px';
   }
