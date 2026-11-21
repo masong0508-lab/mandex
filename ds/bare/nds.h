@@ -81,6 +81,7 @@ int card_save_write(const u8 *src, int len);
 /* sound: commands go to the ARM7 */
 typedef enum { DutyCycle_50 = 3 } DutyCycle;
 void soundEnable(void);
+void soundPump(void);              /* retry queued channel stops, once per frame */
 int soundPlayPSG(DutyCycle duty, u16 freq, u8 volume, u8 pan);
 int soundPlayNoise(u16 freq, u8 volume, u8 pan);
 void soundSetFreq(int handle, u16 freq);
