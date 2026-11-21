@@ -15,7 +15,7 @@ const create=new Function(`
           starters:false,id:3,name:'Old Design',drag:null};
  ${codecs}
  ${editor}
- return {E,eState,eSnap,eUndo,eRedo,eStarterPattern,eApplyStarter,validateSharedLevel,
+ return {E,eState,eSnap,eUndo,eRedo,eAdjustMen,eStarterPattern,eApplyStarter,validateSharedLevel,
           encodeCells,get notice(){return notice}};
 `)();
 const old=create.E;
@@ -58,6 +58,22 @@ create.eRedo();
 assert.strictEqual(old.g[40*120+40],3,'redo cannot replay stale branch');
 for(let i=0;i<60;i++){create.eSnap();old.g[45*120+40]=i%8}
 assert(old.undo.length<=24,'undo snapshots stay within memory cap');
+old.men=5;
+assert.strictEqual(create.eAdjustMen(-1),true,'changing character count records an edit');
+assert.strictEqual(old.men,4);
+create.eUndo();assert.strictEqual(old.men,5,'Undo restores character count');
+create.eRedo();assert.strictEqual(old.men,4,'Redo reapplies character count');
+old.men=1;let history=old.undo.length;
+assert.strictEqual(create.eAdjustMen(-1),false,'minimum is an unchanged edit');
+assert.strictEqual(old.undo.length,history,'minimum must not consume an undo state');
+old.men=12;history=old.undo.length;
+assert.strictEqual(create.eAdjustMen(1),false,'maximum is an unchanged edit');
+assert.strictEqual(old.undo.length,history,'maximum must not consume an undo state');
+assert(html.includes("['MEN -',()=>eAdjustMen(-1)]") &&
+       html.includes("['MEN +',()=>eAdjustMen(1)]") &&
+       html.includes("btn(x,y2,26,24,'-',()=>eAdjustMen(-1)") &&
+       html.includes("btn(x+98,y2,26,24,'+',()=>eAdjustMen(1)"),
+       'desktop and portrait count controls use the reversible helper');
 assert.strictEqual(create.eStarterPattern(1).level.n,'BREAKAWAY BRIDGE');
 assert.strictEqual(create.eStarterPattern(2).level.n,'FACTORY WORKSHOP');
 assert(html.includes("'STARTER BUILDS'")&&html.includes("'STARTERS'")&&
@@ -65,4 +81,4 @@ assert(html.includes("'STARTER BUILDS'")&&html.includes("'STARTERS'")&&
 assert(html.includes("if(E.starters)return;"),'starter overlay blocks accidental edits');
 const a=html.indexOf('<script>'),b=html.indexOf('</script>',a);
 new Function(html.slice(a+8,b));
-console.log('BROWSER_STARTERS_PASS count=3 validated=3 undo_redo=1 saved_id=1 memory_cap=24 mobile=1 syntax=1');
+console.log('BROWSER_STARTERS_PASS count=3 validated=3 undo_redo=1 saved_id=1 memory_cap=24 mobile=1 men_undo=1 syntax=1');
