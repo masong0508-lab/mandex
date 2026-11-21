@@ -3446,6 +3446,12 @@ function drawTitlePicture(w,h,t,words){
   if(words){ctx.save();ctx.translate(270,170);ctx.rotate(-.03);txt('MANDEX',0,0,96,'#ffd23f','center','#7a1a1a');ctx.restore()}
   ctx.restore()}
 function drawTitle(){
+  if(mobilePortrait){
+    ctx.fillStyle='rgba(10,14,30,.5)';ctx.fillRect(0,0,W,H);
+    ctx.save();ctx.translate(W/2,GY+120);ctx.scale(1.4,1.4);drawSlamScene(time);ctx.restore();
+    ctx.save();ctx.translate(W/2,170);ctx.rotate(-.03);txt('MANDEX',0,0,87,'#ffd23f','center','#7a1a1a');ctx.restore();
+    txt('TAP TO START',W/2,H-78,25,'#fff','center');return;
+  }
   ctx.fillStyle='rgba(10,14,30,.35)';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate(700,GY-4);ctx.scale(2.2,2.2);drawSlamScene(time);ctx.restore();
   drawParts();drawTexts();
@@ -4504,7 +4510,72 @@ function drawCutscene(){
 const ch2Unlocked=i=>PD.unlockAll||i===CH1||(PD.stars[i-1]||0)>0;
 const ch3Unlocked=i=>PD.unlockAll||(i===CH2?(PD.stars[CH2-1]||0)>0:(PD.stars[i-1]||0)>0);   // the first chapter 2 level is open; the rest unlock in order
 function storyUnlocked(i){return PD.unlockAll||i<3||(PD.stars[i-1]||0)>0}
+/* Portrait navigation: real, reachable touch targets and paged content.
+   Every button uses the same hit-test registry and game actions as landscape,
+   so rotation never changes the save, level IDs or world coordinates. */
+let mobileLevelPage=0,mobileOptionsPage=0,mobileAchPage=0,mobileOutfitPage=0;
+function mobileHeader(title,back){
+  ctx.fillStyle='rgba(10,14,30,.76)';ctx.fillRect(0,0,W,H);
+  txt(title,W/2,66,38,'#ffd23f','center','#7a1a1a');
+  btn(12,14,106,40,'< BACK',back,{size:17});
+}
+function mobilePager(page,count,onChange){
+  if(count<=1)return;
+  const y=H-79;
+  btn(20,y,112,50,'< PREV',()=>onChange(Math.max(0,page-1)),{size:17,disabled:page===0});
+  txt('PAGE '+(page+1)+' / '+count,W/2,y+32,17,'#fff','center');
+  btn(W-132,y,112,50,'NEXT >',()=>onChange(Math.min(count-1,page+1)),{size:17,disabled:page>=count-1});
+}
+function drawMobileMenu(){
+  mobileHeader('MANDEX',()=>{state='title';hits=[]});
+  txt('THE LANDLORD SMASHER',W/2,106,18,'#e9cbaa','center');
+  const entries=[
+    ['PLAY',goSelect],['LEVEL CREATOR',()=>openEditor(false)],
+    ['ACHIEVEMENTS  '+achCount()+'/'+ACH.length,()=>{mobileAchPage=0;state='ach'}],
+    ['OUTFITS  '+ownedCount()+'/'+OUTFITS.length,()=>{mobileOutfitPage=0;state='outfit'}],
+    [muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();setMuted(!muted)}],
+    ['OPTIONS',()=>{mobileOptionsPage=0;state='options'}]
+  ];
+  const gap=Math.min(82,(H-225)/entries.length),y0=150;
+  entries.forEach(([label,fn],i)=>btn(48,y0+i*gap,W-96,Math.min(62,gap-8),label,fn,{size:i===0?26:19,on:i===0,col:'#7dff5a'}));
+  txt(totalStars()+' ★ EARNED',W/2,H-24,17,'#fff','center');
+}
+function mobileSelectEntries(){
+  if(selTab===0)return Array.from({length:CH1},(_,i)=>({id:i+1,name:LEVELS[i].name,stars:PD.stars[i]||0,locked:!storyUnlocked(i),fn:()=>startStory(i)}));
+  if(selTab===2)return Array.from({length:CH2-CH1},(_,j)=>{const i=CH1+j;return{id:i+1,name:LEVELS[i].name,stars:PD.stars[i]||0,locked:!ch2Unlocked(i),fn:()=>startStory(i)}});
+  if(selTab===3)return Array.from({length:LEVELS.length-CH2},(_,j)=>{const i=CH2+j;return{id:i+1,name:LEVELS[i].name,stars:PD.stars[i]||0,locked:!ch3Unlocked(i),fn:()=>startStory(i)}});
+  return [{id:'+',name:'NEW LEVEL',stars:0,locked:false,fn:()=>openEditor(false,-1),actions:[]},
+    {id:'↓',name:'IMPORT LEVEL',stars:0,locked:false,fn:importCode,actions:[]},
+    ...PD.custom.map((v,i)=>({id:i+1,name:v.n,stars:0,locked:false,fn:()=>startCustom(i),
+      actions:[['EDIT',()=>openEditor(false,i)],['SHARE',()=>exportCode(v)],
+        ['DEL',()=>{if(confirmDel(v)){PD.custom.splice(i,1);pdTouch();pdSave()}}]]}))];
+}
+function drawMobileSelect(){
+  mobileHeader('SELECT LEVEL',goMenu);
+  const tw=(W-36)/2;
+  const tabs=[['STORY',0],['CHAPTER 2',2],['CHAPTER 3',3],['MY LEVELS',1]];
+  tabs.forEach(([name,id],k)=>btn(12+(k%2)*(tw+12),88+((k/2)|0)*48,tw,42,name,
+    ()=>{if(selTab!==id){selTab=id;mobileLevelPage=0}},{size:16,on:selTab===id}));
+  const data=mobileSelectEntries(),th=76,step=86,y0=202;
+  const rows=Math.max(2,Math.floor((H-y0-105)/step)),per=rows*2;
+  const pages=Math.max(1,Math.ceil(data.length/per));
+  mobileLevelPage=Math.min(mobileLevelPage,pages-1);
+  const off=mobileLevelPage*per;
+  data.slice(off,off+per).forEach((item,k)=>{
+    const x=12+(k%2)*(tw+12),y=y0+((k/2)|0)*step;
+    tile(x,y,tw,th,item.id,item.name,item.stars,item.locked,item.fn);
+    if(item.actions)for(let j=0;j<item.actions.length;j++){
+      const [label,fn]=item.actions[j],w=(tw-16)/3;
+      btn(x+8+j*w,y+th-31,w-3,24,label,fn,{size:11});
+    }
+  });
+  mobilePager(mobileLevelPage,pages,i=>{mobileLevelPage=i});
+  txt(selTab===0?totalStars()+'/'+(CH1*3)+' ★  '+storyDone()+' BEATEN':
+    selTab===1?'TAP A LEVEL TO PLAY OR EDIT':'COMPLETE PREVIOUS LEVELS TO UNLOCK',
+    W/2,H-15,14,'#ddd','center');
+}
 function drawMenu(){
+  if(mobilePortrait){drawMobileMenu();return}
   ctx.fillStyle='rgba(10,14,30,.45)';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate(745,GY-4);ctx.scale(1.7,1.7);drawSlamScene(time);ctx.restore();
   ctx.save();ctx.translate(290,92);ctx.rotate(-.03);txt('MANDEX',0,0,78,'#ffd23f','center','#7a1a1a');ctx.restore();
@@ -4565,6 +4636,7 @@ function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
   ctx.font='bold 13px "Trebuchet MS",sans-serif';let s=name;while(ctx.measureText(s).width>w-16&&s.length>3)s=s.slice(0,-2);if(s!==name)s+='…';
   txt(s,x+w/2,y+h-12,13,locked?'#778':'#fff','center');ctx.restore()}
 function drawSelect(){
+  if(mobilePortrait){drawMobileSelect();return}
   ctx.fillStyle='rgba(10,14,30,.55)';ctx.fillRect(0,0,W,H);
   txt('SELECT LEVEL',W/2,52,40,'#ffd23f','center','#7a1a1a');
   btn(16,14,90,36,'< MENU',goMenu,{size:16});
