@@ -479,7 +479,12 @@ void swiWaitForVBlank(void){
     int wt = atoi(getenv("WALK_TEST"));
     if(wt == 1){                                                       /* Walk-Up Wreckage */
       if(st == 0 && world.banner <= 0 && world.man.mode == MAN_AIM){ world.men--; world.man.mode = MAN_FLY; world.man.x = RI(64); world.man.y = R(54); world.man.vx = RI(3); world.man.vy = RI(10); world.man.gt = 0; st = 1; f0 = vf; }
-      if(st == 1 && world.man.mode == MAN_WALK){ WCHECK(1, "he lands on his feet on the walk level"); st = 2; f0 = vf; }
+      if(st == 1 && world.man.mode == MAN_WALK){
+        WCHECK(1, "he lands on his feet on the walk level");
+        WCHECK(gfx_text_w(DS_WALK_HELP,1) <= 252,
+               "walking controls help fits the native 256-pixel DS display");
+        st = 2; f0 = vf;
+      }
       if(st == 2 && vf == f0 + 40){ shot("walk0"); x0 = world.man.x; g_keys |= KEY_RIGHT; }
       if(st == 2 && vf > f0 + 40 && vf < f0 + 100) g_keys |= KEY_RIGHT;
       if(st == 2 && vf == f0 + 100){ WCHECK(world.man.x - x0 > RI(8), "D-pad right walks him along"); shot("walk1"); st = 3; f0 = vf; y0 = world.man.y; }
