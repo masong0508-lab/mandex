@@ -134,6 +134,8 @@ echo "--- DS hardware sound ring: atomic start, no dropped kills, reserved stop 
 gcc -std=gnu99 -O2 -Wno-pointer-to-int-cast -I../ds/bare ds_sound_queue_test.c -o ds_sound_queue_test && ./ds_sound_queue_test
 echo "--- DS music clock: catch up missed ARM7 VBlank without accelerating gameplay physics ---"
 gcc -std=gnu99 -O2 -Istubs -I../ds/source music_clock_test.c -o music_clock_test && ./music_clock_test
+echo "--- DS effects: no wasted segment pitches after missed VBlank, correct scaled glides ---"
+gcc -std=gnu99 -O2 -Istubs -I../ds/source sfx_catchup_test.c -o sfx_catchup_test && ./sfx_catchup_test
 echo "--- DS music: one soft PCM note at a time, every note fades, no leaked channel (a looping note that is never killed would drone forever) ---"
 for L in 3 6; do ./ds_render /tmp/dsM$L 12000 $L | grep -q "music wave channels peak=[2-8] (fades=[0-9][0-9]*, bad=0)" && echo "ok: level index $L: music (melody + bass) and tone effects share the 8 PCM channels, volumes and frequencies in range" || { echo "FAIL: music channel leak or bad wave parameters (level index $L)"; exit 1; }; done
 echo "--- DS outfits screen: open, walk, wear, locked swatches, back (scripted stylus + d-pad) ---"
