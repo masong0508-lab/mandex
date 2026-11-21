@@ -1325,9 +1325,26 @@ function updTargets(dt){
     if(solidAt(t.x,t.y)){   // buried by settling rubble: dig out if there is air within 3 cells above (a light collapse), else crushed
       let up=0;for(let d=2;d<=V*3;d+=2)if(!solidAt(t.x,t.y-d)&&!solidAt(t.x,t.y-d-t.r)){up=d;break}
       if(up){t.y-=up;t.vy=0;t.stun=1;t.inv=1;popText(t.x,t.y-38,'PHEW!','#7dff5a',16)}else{killTarget(t,true);continue}}
-    for(const ch of chunks){if(Math.hypot(ch.x-t.x,ch.y-t.y)>ch.rad+t.r+4)continue;let dead=false;
-      for(const a of ch.cells){if(Math.hypot(a.wx-t.x,a.wy-t.y)<t.r+RC){const sp=Math.hypot(ch.vx-ch.w*(a.wy-ch.y),ch.vy+ch.w*(a.wx-ch.x));if(sp>70){if(sp>150){dead=true;break}if(t.inv<=0){t.inv=.8;t.stun=.9;t.vx=0;popText(t.x,t.y-38,'OOF!','#ffd23f',16);shake=Math.max(shake,4);SFX.thud(.5)}}}}
-      if(dead){killTarget(t);break}}}}
+    /* Rubble can hold hundreds of cells. Test squared proximity before
+       entering each particle collision: there is no need for Math.hypot
+       until a cell actually strikes a landlord and impact speed matters. */
+    for(const ch of chunks){
+      const cdx=ch.x-t.x,cdy=ch.y-t.y,cr=ch.rad+t.r+4;
+      if(cdx*cdx+cdy*cdy>cr*cr)continue;
+      let dead=false;
+      const radius=t.r+RC,rad2=radius*radius;
+      for(const a of ch.cells){
+        const dx=a.wx-t.x,dy=a.wy-t.y;
+        if(dx*dx+dy*dy<rad2){
+          const sp=Math.hypot(ch.vx-ch.w*(a.wy-ch.y),ch.vy+ch.w*(a.wx-ch.x));
+          if(sp>70){
+            if(sp>150){dead=true;break}
+            if(t.inv<=0){t.inv=.8;t.stun=.9;t.vx=0;popText(t.x,t.y-38,'OOF!','#ffd23f',16);shake=Math.max(shake,4);SFX.thud(.5)}
+          }
+        }
+      }
+      if(dead){killTarget(t);break}
+    }}}
 
 // =====================================================================
 //  UPDATE
