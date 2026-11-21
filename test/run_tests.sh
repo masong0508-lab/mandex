@@ -31,6 +31,14 @@ if command -v node >/dev/null 2>&1; then
   node collapse_survivor_web_test.js
   node landlord_ai_web_test.js
 fi
+echo "--- moving rubble vs landlords: conservative contact AABB parity (fixed/float/browser) ---"
+for mode in float fixed; do
+  defs=""
+  test "$mode" = fixed && defs="-DMX_FIXED"
+  gcc -std=gnu99 -O2 $defs -I../core rubble_broadphase_test.c -lm -o rubble_broadphase_$mode
+  ./rubble_broadphase_$mode
+done
+if command -v node >/dev/null 2>&1;then node rubble_broadphase_web_test.js;fi
 echo "--- BANK SHOT trick bonus: true rubber rebound, direct eviction only, 2s expiry (fixed/float) ---"
 for mode in float fixed; do
   defs=""
