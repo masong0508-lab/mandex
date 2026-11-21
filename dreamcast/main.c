@@ -56,6 +56,7 @@ static int dc_valve_equipped; /* selected explicitly; hidden during ordinary sho
 #define Z_END    6.00f
 static int hint_t;                            /* ticks left of the 'pull back' hint */
 static int bank_toast_t;                      /* rubber rebound trick shot HUD message */
+static int survivor_toast_t;                  /* rare catastrophic collapse escape */
 static float MAXHP[MX_NMAT];                 /* filled from the core's material table in main() */
 
 static uint32 argb(int r, int g, int b, int a){ return ((uint32)a << 24) | ((uint32)r << 16) | ((uint32)g << 8) | (uint32)b; }
@@ -304,6 +305,9 @@ static void handle_events(void){
     case EV_PAD:   for(int k = 0; k < (e->m ? 16 : 8); k++) spawn(e->x, e->y, k & 1 ? argb(255, 126, 176, 255) : argb(255, 255, 255, 255), 460); break;
     case EV_HURT:  for(int k = 0; k < 12; k++) spawn(e->x, e->y, k & 1 ? argb(255, 74, 74, 255) : argb(255, 255, 255, 255), 420); break;
     case EV_OOF:   for(int k = 0; k < 10; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), 520); break;
+    case EV_SURVIVOR: survivor_toast_t=120;
+      for(int k=0;k<6;k++)spawn(e->x,e->y,k&1?argb(255,210,63,255):argb(190,180,160,255),230);
+      break;
     case EV_DISTRICT: break;                               /* Landlord HQ: next district; the banner (below) announces it */
     case EV_HEAL:  for(int k = 0; k < 8; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 520); break;
     case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), 520); break;
@@ -792,6 +796,8 @@ static void draw_all(void){
     quad(18, 74, 174.0f * world.combo_left / 2.5f, 3, Z_HUD + 0.1f, argb(255, 210, 63, 255)); }
   if(bank_toast_t > 0 && world.state == MX_PLAY)
     text("BANK SHOT! +1500", 18, world.combo > 1 ? 99 : 69, 20, argb(255, 126, 176, 255), 0, Z_HUD + 0.1f);
+  if(survivor_toast_t > 0 && world.state == MX_PLAY)
+    text("SOMEHOW ALIVE!", 18, world.combo > 1 || bank_toast_t > 0 ? 124 : 69, 20, argb(255, 210, 63, 255), 0, Z_HUD + 0.1f);
   if(hint_t > 0 && world.state == MX_PLAY && m->mode == MAN_AIM)
     text("PULL BACK WITH THE STICK, RELEASE WITH A!", 340, 330, 18, argb(255, 255, 255, 160 + (int)(95 * sinf(world.time * 5))), 1, Z_HUD);
   if(m->mode == MAN_WALK && world.state == MX_PLAY){                       /* walk levels: the clock and the controls */
@@ -854,7 +860,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ bank_toast_t = 0; mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
+static void load_level(int n){ bank_toast_t = survivor_toast_t = 0; mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
 
 static void draw_intro(void){
   intro_draw(ic_top, ic_bot); ic_upload(tx_ic_top, ic_top); ic_upload(tx_ic_bot, ic_bot);
@@ -982,6 +988,7 @@ int main(int argc, char **argv){
         } was = world.state; }
       if(hint_t > 0) hint_t--;
       if(bank_toast_t > 0) bank_toast_t--;
+      if(survivor_toast_t > 0) survivor_toast_t--;
       {
         int calm = st && world.state == MX_PLAY && world.man.mode == MAN_AIM && world.banner <= 0 && !st->buttons && abs(st->joyx) < 30 && abs(st->joyy) < 30;
         int strain = st && world.man.mode == MAN_AIM && (abs(st->joyx) > 90 || abs(st->joyy) > 90);
