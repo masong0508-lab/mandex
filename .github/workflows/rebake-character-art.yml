@@ -31,7 +31,7 @@ jobs:
         with:
           fetch-depth: 50   # enough ancestry to fast-forward over concurrent test-only commits
           persist-credentials: true
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install offline art-baker tools
