@@ -7,10 +7,11 @@ const a=html.indexOf('function eUp(){');
 const b=html.indexOf('function eBuild(){',a);
 assert(a>=0&&b>a,'real editor stroke helpers exist');
 const make=new Function(`
- const E={drag:null,pointer:null},commits=[];
+ const E={drag:null,pointer:null},commits=[],snapshots=[];
+ const eSnap=()=>snapshots.push(1);
  const eRect=(a,b,m)=>commits.push([a,b,m]);
  ${html.slice(a,b)}
- return {E,commits,eBeginStroke,eStrokeOwner,eEndStroke};
+ return {E,commits,snapshots,eBeginStroke,eStrokeOwner,eEndStroke};
 `)();
 const E=make.E;
 E.drag={a:[30,33],b:[40,39],m:2};
@@ -24,6 +25,7 @@ assert.strictEqual(make.commits.length,0,'foreign release never commits rectangl
 assert(E.drag,'foreign release does not erase active stroke');
 assert(make.eEndStroke(101,false),'owner release finishes stroke');
 assert.strictEqual(make.commits.length,1,'rectangle commits exactly once');
+assert.strictEqual(make.snapshots.length,1,'one snapshot only on rectangle commit');
 assert.strictEqual(E.pointer,null,'owner cleared on completion');
 assert.strictEqual(E.drag,null,'draw state cleared on completion');
 E.drag={a:[30,33],b:[36,37],m:4};
@@ -31,6 +33,7 @@ assert(make.eBeginStroke(303),'new gesture can begin after prior ends');
 assert(!make.eEndStroke(404,true),'foreign cancellation ignored');
 assert(make.eEndStroke(303,true),'owner cancellation clears stroke');
 assert.strictEqual(make.commits.length,1,'cancelled rectangle is not committed');
+assert.strictEqual(make.snapshots.length,1,'cancelled rectangle never consumes history');
 assert.strictEqual(E.pointer,null);
 assert.strictEqual(E.drag,null);
 assert(!make.eBeginStroke(505),'an empty stroke cannot steal pointer');
