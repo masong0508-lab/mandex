@@ -617,6 +617,11 @@ static void draw_tile(Scr *s, int sx, int sy, int p, int m, int v, int d, int dm
 #ifndef MX_N3DS_CHUNK_VIS_CULL
 #define MX_N3DS_CHUNK_VIS_CULL 1
 #endif
+/* Match the stationary blocks' damage texture after a chunk breaks loose.
+   This only selects an existing texture variant; no extra atlas/RAM. */
+#ifndef MX_N3DS_RUBBLE_DAMAGE
+#define MX_N3DS_RUBBLE_DAMAGE 1
+#endif
 static void draw_cells(const View *v){
 #if MX_N3DS_TILE_DIM_CACHE
   const int dim_normal=(int)(256 * g_dim);
@@ -665,7 +670,13 @@ static void draw_cells(const View *v){
 #if MX_N3DS_RUBBLE_CULL
       if(sx+p<=0 || sx>=sw || sy+p<=0 || sy>=sh)continue;
 #endif
-      draw_tile(v->s, sx, sy, p, a->m, (k * 7 + 3) & 3, 0,
+#if MX_N3DS_RUBBLE_DAMAGE
+      const float health=RTOF(a->h)*minv[a->m];
+      const int damage=health>.66f?0:health>.33f?1:2;
+#else
+      const int damage=0;
+#endif
+      draw_tile(v->s, sx, sy, p, a->m, (k * 7 + 3) & 3, damage,
 #if MX_N3DS_TILE_DIM_CACHE
         dim_normal
 #else
