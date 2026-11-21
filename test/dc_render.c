@@ -189,6 +189,27 @@ static int dc_menu_flow_test(void){
   dc_return_to_title(7);
   MENU_CHECK(on_title && title_lv==7 && tx_ttl!=0,
              "pause-menu exit to title preserves the current level selection");
+  /* Exercise the exact predicate used by the production Dreamcast main
+     loop. Unlike the cinematic timeline, gameplay must stop completely
+     during intro/end movies, title screens, and paused frames. */
+  load_level(4); on_title=0;paused=0;in_intro=0;
+  float t0=world.time;
+  MENU_CHECK(dc_world_tick_allowed(),"normal Dreamcast gameplay can simulate");
+  if(dc_world_tick_allowed())tick(0);
+  MENU_CHECK(world.time>t0,"active Dreamcast gameplay advances physics");
+  t0=world.time;in_intro=1;
+  for(int i=0;i<900;i++)if(dc_world_tick_allowed())tick(0);
+  MENU_CHECK(world.time==t0 && world.state==MX_PLAY,
+             "900 cutscene frames freeze physics and cannot decide a level");
+  in_intro=0;paused=1;
+  for(int i=0;i<90;i++)if(dc_world_tick_allowed())tick(0);
+  MENU_CHECK(world.time==t0,"pausing freezes the Dreamcast world");
+  paused=0;on_title=1;
+  for(int i=0;i<90;i++)if(dc_world_tick_allowed())tick(0);
+  MENU_CHECK(world.time==t0,"title UI frames cannot advance hidden gameplay");
+  on_title=0;
+  if(dc_world_tick_allowed())tick(0);
+  MENU_CHECK(world.time>t0,"world simulation resumes after the intro/pause");
   printf(fail?"Dreamcast menu flow: %d FAILED\n":"Dreamcast menu flow: all passed\n",fail);
   return fail!=0;
 }
