@@ -62,6 +62,15 @@ jobs:
             ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o /tmp/mx_ds_quick_render
           DS_WALK_PHASE_PROBE=1 /tmp/mx_ds_quick_render
           DS_PARTICLE_PROBE=1 /tmp/mx_ds_quick_render
+      - name: DS walking gameplay - Y punches without muting soundtrack, B and touch controls remain functional
+        run: |
+          set -eu
+          cd test
+          WALK_TEST=1 /tmp/mx_ds_quick_render /tmp/mx_walk_music 1400 22 > /tmp/mx_walk_music.log
+          grep -q 'Y punches while on foot' /tmp/mx_walk_music.log
+          grep -q 'Y punch does not toggle music preference' /tmp/mx_walk_music.log
+          grep -q 'walk: all passed' /tmp/mx_walk_music.log
+          tail -n 8 /tmp/mx_walk_music.log
       - name: Expanding rings and smoke - exact particle edge pixels against unculled reference
         run: |
           set -eu
