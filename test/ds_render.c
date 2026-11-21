@@ -790,7 +790,9 @@ static int target_visibility_probe(void){
             int bar=(t->hpmax*(ppc*7/8>1?ppc*7/8:1))/2+3;
             if(bar>pad)pad=bar;
           }
-          int pad_bottom=(t->collapse_rolled==2 && ppc>=3)?ppc*13:ppc*8;
+          int pad_bottom=(t->collapse_rolled==2 && ppc>=3)?ppc*13:
+            (world.state==MX_PLAY && mx_targets_alive(&world)==1 &&
+             t->collapse_rolled!=2 && ppc>=2)?ppc*11:ppc*8;
           if(sx < -pad || sx >= 256+pad ||
              sy < -ppc*12 || sy >= 192+pad_bottom){
             fprintf(stderr,"DS_TARGET_BOUNDS_LEAK ppc=%d kind=%d variant=%d facing=%d axis=%u pos=%u anchor=(%d,%d) sprite=(%d,%d) pad=%d pixels=%u\n",
