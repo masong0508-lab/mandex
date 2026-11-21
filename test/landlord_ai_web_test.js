@@ -33,7 +33,7 @@ if(!(t.x>old)||t.mv!==2)throw Error('wounded collapse survivor did not flee');
 t=makeT();t.collapseRolled=2;t.stun=1;t.dodge=1.5;
 const frozen=t.x;lordAI(t,1/60);
 if(t.x!==frozen||t.mv)throw Error('stunned survivor moved before recovering');
-'web landlord AI: bat proximity and injured survivor retreat passed';
+'web landlord AI: bat proximity and injured survivor retreat PASSED';
 `;
 const result=vm.runInNewContext(scene,{});
 assert(result.includes('PASSED'));
