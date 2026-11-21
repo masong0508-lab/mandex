@@ -1256,6 +1256,17 @@ static void panel(u8 *b, int x, int y, int w, int h){
   gfx_rect(b, x + 1, y + 1, w - 2, 1, C_UIHI);
 }
 static int hit(const touchPosition *t, int x, int y, int w, int h){ return t->px >= x && t->px < x + w && t->py >= y && t->py < y + h; }
+/* Pause is navigable without hardware face buttons. Three separated,
+   large targets sit on the bottom edge; never overlap active gameplay
+   because the world is frozen while the pause overlay is visible. */
+static const struct { int x,w; const char *label; } PAUSE_BTNS[3] = {
+  {8,76,"RESUME"}, {90,76,"RESTART"}, {172,76,"MENU"}
+};
+static int pause_touch_action(const touchPosition *t){
+  for(int i=0;i<3;i++)
+    if(hit(t,PAUSE_BTNS[i].x,162,PAUSE_BTNS[i].w,27))return i;
+  return -1;
+}
 static void button(u8 *b, int x, int y, int w, int h, const char *s){
   gfx_rect(b, x, y, w, h, C_UILINE);
   gfx_rect(b, x + 1, y + 1, w - 2, h - 2, C_UIHI);
@@ -1849,11 +1860,18 @@ int main(void){
         if(intro_mode() == 3 && intro_level == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_start_wolf(); sfx_play(SFX_CLICK, 64); }   /* the closer of chapter 2 hands over to the wolfman cutscene */
         else { app = ST_PLAY; apply_outfit(outfit_sel); load_level(intro_level); music_set(music_pref); sfx_play(SFX_CLICK, 64); } }   /* finished or skipped: straight into level 1 */
     } else if(app == ST_PAUSE){
-      /* Resume the music clock along with gameplay. Previously START
-         unpaused the world but left the soundtrack muted. */
-      if(down & KEY_START){ app = ST_PLAY; music_set(music_pref); }
-      if(down & KEY_SELECT){ load_level(world.level); app = ST_PLAY; music_set(music_pref); }
-      if(down & KEY_B){ app = ST_TITLE; sel_level = world.level; load_level(sel_level); }
+      /* All three visible options work through either buttons or stylus.
+         Execute only one action per frame: START+SELECT or overlapping
+         button presses must not load a level and then resume the old one. */
+      int action=(down & KEY_TOUCH)?pause_touch_action(&t):-1;
+      if((down & KEY_START) || action==0){
+        app=ST_PLAY; music_set(music_pref);
+      }else if((down & KEY_SELECT) || action==1){
+        load_level(world.level); app=ST_PLAY; music_set(music_pref);
+      }else if((down & KEY_B) || action==2){
+        app=ST_TITLE; sel_level=world.level; load_level(sel_level);
+        music_set(0);
+      }
     } else if(world.state != MX_PLAY){
       if(down & KEY_B){ app = ST_TITLE; sel_level = world.level; load_level(sel_level); }
       else if((down & (KEY_START | KEY_A)) || ((down & KEY_TOUCH) && end_t > 30)){
@@ -2125,6 +2143,12 @@ int main(void){
         gfx_text_c(buf_top, 128, 92, "START  RESUME", C_WHITE, C_UIBG, 1);
         gfx_text_c(buf_top, 128, 101, "SELECT RESTART", C_WHITE, C_UIBG, 1);
         gfx_text_c(buf_top, 128, 110, "B      MENU", C_WHITE, C_UIBG, 1);
+        /* Touchscreen equivalents; the paused game beneath stays visible.
+           No additional framebuffer and no per-play-frame drawing. */
+        panel(buf_bot, 3, 134, 250, 58);
+        gfx_text_c(buf_bot, 128, 142, "PAUSED - CHOOSE AN ACTION", C_GOLD, C_UIBG, 1);
+        for(int k=0;k<3;k++)
+          button(buf_bot,PAUSE_BTNS[k].x,162,PAUSE_BTNS[k].w,27,PAUSE_BTNS[k].label);
       }
     }
     if(debug_on){
