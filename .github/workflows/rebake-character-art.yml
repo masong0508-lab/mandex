@@ -9,7 +9,11 @@ on:
       - "web/index.html"
       - "tools/manhead.py"
       - "tools/gen_manspr.py"
+      - "tools/turn_hair_finish.py"
       - "tools/gen_dc_art.py"
+      - "tools/hd_wolf_finish.py"
+      - "tools/sprite_pinhole_cleanup.py"
+      - "tools/wolf_upper_volume.py"
       - "dreamcast/main.c"
       - "test/dreamcast_wolf_atlas_test.py"
       - "test/character_turnaround_test.py"
@@ -54,7 +58,14 @@ jobs:
           python3 test/head_turnaround_test.py
           python3 test/character_turnaround_test.py
           python3 test/dreamcast_wolf_atlas_test.py
+          python3 test/hd_wolf_volume_test.py
+          python3 test/turnaround_preview_palette_test.py
+          python3 test/sprite_turn_anchor_test.py
+          python3 test/sprite_volume_continuity_test.py
+          python3 tools/sprite_pinhole_cleanup.py --check
+          python3 tools/wolf_upper_volume.py --check
           python3 tools/retouch_baked_heads.py --check
+          python3 tools/turn_hair_finish.py --check
           python3 test/sprite_surface_test.py
           git diff --check
       - name: Compile actual handheld renderer against freshly baked frames
@@ -82,6 +93,11 @@ jobs:
           DC_MENU_FLOW_TEST=1 /tmp/rebake-dc-render > /tmp/rebake-dc.log
           grep -q 'Dreamcast menu flow: all passed' /tmp/rebake-dc.log
           grep -q 'Dreamcast wolf side profile is visibly distinct from the human face' /tmp/rebake-dc.log
+      - name: Preview actual shipped front-side-rear poses at the same body pivot
+        run: |
+          python3 tools/render_turnaround_sheet.py /tmp/mandex-turnaround.ppm
+          python3 tools/ppm_to_png.py /tmp/mandex-turnaround.ppm
+          test -s /tmp/mandex-turnaround.png
       - name: Publish reproducible generated atlas and review previews
         uses: actions/upload-artifact@v4
         with:
@@ -91,6 +107,8 @@ jobs:
             art/dcart.h
             docs/man_sprites.png
             docs/dc_art_sheet.png
+            /tmp/mandex-turnaround.png
+            /tmp/mandex-turnaround.txt
           if-no-files-found: error
           retention-days: 14
       - name: Publish to main only if its source revision is unchanged
@@ -117,7 +135,7 @@ jobs:
               exit 0
             fi
             changed="$(git diff --name-only "$GITHUB_SHA" origin/main)"
-            if echo "$changed" | grep -Eq '^(art/|web/|tools/(gen_manspr.py|manhead.py|gen_dc_art.py|retouch_baked_heads.py)|dreamcast/main.c|ds/source/|3ds/main.c|.github/workflows/rebake-character-art.yml)'; then
+            if echo "$changed" | grep -Eq '^(art/|web/|tools/(gen_manspr.py|manhead.py|gen_dc_art.py|retouch_baked_heads.py|turn_hair_finish.py|sprite_pinhole_cleanup.py|hd_wolf_finish.py)|dreamcast/main.c|ds/source/|3ds/main.c|.github/workflows/rebake-character-art.yml)'; then
               echo "Model, atlas, renderer, or baker source changed during baking:"
               echo "$changed"
               echo "Skip publication; the validated generated atlases remain in this run's artifact."

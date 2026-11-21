@@ -40,7 +40,10 @@ for name in ('IDLE_A','IDLE_B','FLEX_A','DRAG','STUCK_A'):
     torso=[v for y in range(ay+2,min(h,ay+21)) for v in p[y*w:(y+1)*w]]
     assert 3 in torso and 4 in torso,(name,'lost face-safe body shading')
 assert "const phase=mv?m.x/15:0" in web
-assert "const th=Math.PI/2+(mv?.055*step:0)" in web
+# Reversals now blend through walkTurnAngle()/walkTurnFace() rather than
+# snapping directly back to the old side-on walking transform.
+assert "const th=turning?walkTurnAngle(m.turn):Math.PI/2+(mv?.055*step:0)" in web
+assert "const visualFace=turning?walkTurnFace(m.face,m.turn):m.face;" in web
 assert "lit?'rgba(255,224,164,.52)'" in web
 assert "x.fillStyle='rgba(215,248,166,.20)'" in web
 # The intact-glazing ledge must be rendered with the same palette ink,

@@ -222,6 +222,13 @@ def main():
             alpha = (c[..., 3] / 255.0).reshape(h, SS, w, SS).mean(axis=(1, 3))
             rgb = np.where(alpha[..., None] > 0.004, pm / np.maximum(alpha[..., None], 1e-4), 0)
             out = np.dstack([np.clip(rgb, 0, 255), alpha * 255]).astype(np.uint8)
+            if wolf:
+                # Dreamcast has an independent high-resolution ARGB4444
+                # atlas. Prelight its torso (not the muzzle/eyes) rather
+                # than assuming changes to handheld indexed sprites appear.
+                import hd_wolf_finish
+                hd_wolf_finish.finish_hd_wolf_volume(
+                    out, (CY - y0) // SS)
             pad = np.zeros((h + 2, w + 2, 4), np.uint8); pad[1:-1, 1:-1] = out
             im = Image.fromarray(pad, "RGBA")
             # Pack independently. Human and Wolfman use the same UV layout

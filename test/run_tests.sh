@@ -4,6 +4,14 @@ set -e
 cd "$(dirname "$0")"
 echo "--- Canonical face, hair and side-profile bake consistency (web and all console atlases) ---"
 python3 character_turnaround_test.py
+echo "--- checked-in 142-frame atlas keeps consistent front/profile/rear hair lighting ---"
+python3 ../tools/turn_hair_finish.py --check
+python3 ../tools/sprite_pinhole_cleanup.py --check
+python3 ../tools/wolf_upper_volume.py --check
+python3 sprite_volume_continuity_test.py
+python3 hd_wolf_volume_test.py
+python3 turnaround_preview_palette_test.py
+python3 sprite_turn_anchor_test.py
 python3 head_turnaround_test.py
 echo "--- Dreamcast: all 71 Wolfman profiles use independent HD UV rectangles ---"
 python3 dreamcast_wolf_atlas_test.py

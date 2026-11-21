@@ -205,8 +205,10 @@ def finish_cel_shading(idx, PI, ay, name):
     """Material-aware 1-2px rim lights/shadows baked into console sprites.
     Exact silhouette and transparency stay unchanged; the expensive lighting
     work happens only in the offline sprite generator, not on DS/3DS CPUs."""
-    if name.endswith("_W"):
-        return
+    # The Wolfman's torso needs the same pre-baked light/shadow topology as
+    # the human body. We start BELOW the anchor, so the character's canonical
+    # muzzle, ears and eyes remain pixel-identical. Fur tinting happens in the
+    # runtime palette and already has distinct bright/dark skin shades.
     h, w = idx.shape
     source = idx.copy()
     for y in range(max(0, int(ay) + 2), h - 1):
@@ -442,6 +444,17 @@ def main():
                 idx = new
         if name.startswith("BACK") or name.startswith("FART") or name.startswith("SPIN_"): shade_butt(idx, PI, int(ay))
         finish_cel_shading(idx, PI, int(ay), name)   # (the oops frames keep the HTML's own bare / boxer shading)
+        # Final crown highlight stays put as the shared skull rotates. This
+        # identical stdlib helper also polishes the checked-in compiled atlas.
+        import turn_hair_finish
+        turn_hair_finish.finish_grid(idx, int(ay), name)
+        import sprite_pinhole_cleanup
+        sprite_pinhole_cleanup.close_pinholes(idx, int(ay), name)
+        # Give the Wolfman's head, shoulders and raised arms the same
+        # restrained volume as the prebaked lower body. Palette-only source
+        # finish: no new assets, body state or runtime drawing instructions.
+        import wolf_upper_volume
+        wolf_upper_volume.finish_grid(idx, int(ay), name)
         ys, xs = np.nonzero(idx); y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
         idx = idx[y0:y1, x0:x1]; ax -= x0; ay -= y0; h, w = idx.shape
         (bx, by, br), (rx, ry, rr) = BLOBS[family(name)]
