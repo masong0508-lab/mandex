@@ -31,6 +31,14 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Verify rare collapse survivor odds, HP loss and no-invulnerability in both modes
+        run: |
+          for mode in float fixed; do
+            flags=""
+            test "$mode" = fixed && flags="-DMX_FIXED"
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/collapse_survivor_test.c -lm -o /tmp/collapse_survivor_$mode
+            /tmp/collapse_survivor_$mode
+          done
       - name: Verify new rubber BANK SHOT bonus in both core numeric modes
         run: |
           for mode in float fixed; do
