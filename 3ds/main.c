@@ -1091,6 +1091,18 @@ static void draw_end(void){
 /* walk levels: touch buttons on the bottom screen while he is on foot (one finger at a time; the pad and face buttons do the same) */
 static const struct { int x, w; const char *s; } WB[6] = { { 4, 44, "<" }, { 52, 44, ">" }, { 104, 52, "JUMP" }, { 160, 56, "PUNCH" }, { 220, 52, "SLAM" }, { 276, 40, "QUIT" } };
 static int walk_btn_at(int tx, int ty){ if(ty < 196 || ty >= 236) return -1; for(int i = 0; i < 6; i++) if(tx >= WB[i].x && tx < WB[i].x + WB[i].w) return i; return -1; }
+/* 3DS touchscreen pause actions. Separate 96 px wide targets fit inside
+   the native 320x240 lower display; no extra texture or framebuffer. */
+static const struct { int x,w; const char *name; } PAUSE3_BTNS[3] = {
+  {8,96,"RESUME"}, {112,96,"RESTART"}, {216,96,"MENU"}
+};
+static int pause3_touch_at(int x,int y){
+  if(y<188 || y>=238) return -1;
+  for(int i=0;i<3;i++)
+    if(x>=PAUSE3_BTNS[i].x && x<PAUSE3_BTNS[i].x+PAUSE3_BTNS[i].w)
+      return i;
+  return -1;
+}
 static void load_level(int l){
   mx_load(&world, l); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); valve_equipped=0; world.valve_ok=0;
   memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); mi_reset(&mi);
@@ -1154,14 +1166,33 @@ int main(void){
         else if(sel == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_level = sel; app = ST_INTRO; intro_start_wolf(); }
         else { app = ST_PLAY; load_level(sel); } }
     } else if(app == ST_PAUSE){
-      if(down & KEY_START) app = ST_PLAY;
-      if(down & KEY_SELECT){ load_level(world.level); app = ST_PLAY; }
-      if(down & KEY_B){ app = ST_TITLE; sel = world.level; load_level(sel); }
+      int choice=(down & KEY_TOUCH)?pause3_touch_at(t.px,t.py):-1;
+      /* A single action wins if simultaneous keys are pressed. */
+      if((down & KEY_START) || choice==0) app=ST_PLAY;
+      else if((down & KEY_SELECT) || choice==1){ load_level(world.level);app=ST_PLAY; }
+      else if((down & KEY_B) || choice==2){ app=ST_TITLE;sel=world.level;load_level(sel); }
+      else if(down & KEY_Y) mus_pref=!mus_pref; /* dedicated pause music shortcut */
     } else {
       MxMan *m = &world.man;
-      if((down & KEY_START) && world.state == MX_PLAY) app = ST_PAUSE;
-      if(down & KEY_SELECT) mus_pref = !mus_pref;                                            /* SELECT: music on / off */
-      if(down & KEY_SELECT) load_level(world.level);
+      if((down & KEY_START) && world.state == MX_PLAY){
+        /* Treat START as a pause-only action, not as an aim/attack input.
+           In particular do not leave a dangling touch drag that launches
+           the man after a finger is lifted on the pause screen. */
+        if(dragging && m->mode==MAN_AIM && !m->seated)mx_set_pull(&world,0,0);
+        dragging=0;pad_used=0;pad_dx=pad_dy=0;
+        app=ST_PAUSE;
+        down=held=up=0;
+      }
+      if((down & KEY_SELECT) && world.state == MX_PLAY){
+        /* SELECT has ALWAYS been labeled RESTART; it previously ALSO
+           flipped the music preference, accidentally muting every retry. */
+        load_level(world.level);
+        down=held=up=0;
+      }
+      /* Y controls music in aiming/flight, but remains PUNCH on foot.
+         In pause use Y as well; on the title it controls landlord AI. */
+      if((down & KEY_Y) && world.state==MX_PLAY &&
+         m->mode!=MAN_WALK)mus_pref=!mus_pref;
       if((down&KEY_X)&&m->mode==MAN_AIM){
         int nx=world.pw_sel;
         for(int k=0;k<PW_COUNT;k++){nx=(nx+1)%PW_COUNT;if(nx==PW_NONE||world.pw_left[nx]>0)break;}
@@ -1279,7 +1310,13 @@ int main(void){
       { char ob[64]; sprintf(ob, "L/R: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {
       draw_hud(); draw_end();
-      if(app == ST_PAUSE){ rect(&top, 110, 80, 180, 70, RGB(15, 18, 30)); textc(&top, 200, 88, "PAUSED", 3, RGB(255, 210, 63)); textc(&top, 200, 116, "START RESUME", 1, RGB(255, 255, 255)); textc(&top, 200, 126, "SELECT RESTART  B MENU", 1, RGB(255, 255, 255)); }
+      if(app == ST_PAUSE){
+        rect(&top,110,80,180,76,RGB(15,18,30));
+        textc(&top,200,88,"PAUSED",3,RGB(255,210,63));
+        textc(&top,200,116,"START RESUME",1,RGB(255,255,255));
+        textc(&top,200,126,"SELECT RESTART  B MENU",1,RGB(255,255,255));
+        textc(&top,200,138,mus_pref?"Y MUSIC: ON":"Y MUSIC: OFF",1,RGB(255,210,63));
+      }
     }
     /* An unobtrusive diagnostic in *both* eyes only while L+R is held. */
     if((held&(KEY_L|KEY_R))==(KEY_L|KEY_R)){
@@ -1298,6 +1335,18 @@ int main(void){
       for(int i = 0; i < 6; i++){ int on = (held & KEY_TOUCH) && walk_btn_at(t.px, t.py) == i; rect(&bot, WB[i].x, 196, WB[i].w, 40, RGB(255, 255, 255)); rect(&bot, WB[i].x + 1, 197, WB[i].w - 2, 38, on ? RGB(60, 80, 140) : RGB(26, 32, 56)); textc(&bot, WB[i].x + WB[i].w / 2, 212, WB[i].s, 1, RGB(255, 255, 255)); }
       textc(&bot, 160, 8, "PAD MOVE  A JUMP  B PUNCH  X SLAM  L QUIT", 1, RGB(255, 255, 255));
     }
+    if(app == ST_PAUSE){
+      /* Draw the actual touchscreen controls on top of the frozen world;
+         all hit rectangles match the painted 96x50 px buttons exactly. */
+      rect(&bot,0,159,320,81,RGB(15,18,30));
+      textc(&bot,160,166,"PAUSED - TAP AN ACTION",2,RGB(255,210,63));
+      for(int i=0;i<3;i++){
+        int x=PAUSE3_BTNS[i].x,w=PAUSE3_BTNS[i].w;
+        rect(&bot,x,188,w,50,RGB(200,210,234));
+        rect(&bot,x+2,190,w-4,46,RGB(29,39,67));
+        textc(&bot,x+w/2,207,PAUSE3_BTNS[i].name,2,RGB(255,255,255));
+      }
+    }
     if(app == ST_PLAY){
       if(world.man.mode == MAN_AIM && !dragging && world.state == MX_PLAY) textc(&bot, 200, 12, "DRAG BACK AND LET GO", 2, RGB(255, 255, 255));
       if(world.man.mode==MAN_AIM && world.state==MX_PLAY){
@@ -1313,7 +1362,7 @@ int main(void){
         textc(&bot,160,204,"TAP TOOL  /  X CYCLE  /  R USE AIR",1,RGB(255,210,63));
       }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
-    } else textc(&bot, 160, 12, "TOUCH TO START", 2, RGB(255, 255, 255));
+    } else if(app == ST_TITLE) textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));
     gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank();
     n3_frame_complete(app==ST_PLAY);
   }
