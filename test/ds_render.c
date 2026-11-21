@@ -687,7 +687,38 @@ static int particle_pool_probe(void){
   printf("DS_PARTICLE_BOUND parity=%08x peak=%u live_frames=%u frames=420\n",hash,peak,total_live);
   return 0;
 }
+/* Every 20.12 distance in the common 0..480-cell gait range must
+   select the EXACT same animation phase as the original float expression.
+   Test all 1,966,080 values rather than sample a few frames. */
+static int walk_phase_probe(void){
+  unsigned long count=0;
+  for(int wk=0;wk<RI(480);wk++){
+    int old_phase=(int)(RTOF(wk)*14.0f);
+    int new_phase=ds_target_walk_phase((real)wk);
+#if MX_DS_INTEGER_WALK_PHASE
+    if(new_phase!=old_phase){
+      fprintf(stderr,"DS_WALK_PHASE_FAIL wk=%d old=%d new=%d\n",
+              wk,old_phase,new_phase);
+      return 1;
+    }
+#endif
+    count++;
+  }
+  /* Uncommon accumulated distances and negative corrupted values use the
+     original path, including its exact float-rounding behavior. */
+  static const real edge[]={-RI(13),-1,RI(480),RI(640),RI(1000)};
+  for(unsigned i=0;i<sizeof edge/sizeof edge[0];i++){
+    real wk=edge[i];
+    if(ds_target_walk_phase(wk)!=(int)(RTOF(wk)*14.0f)){
+      fprintf(stderr,"DS_WALK_PHASE_FAIL fallback wk=%d\n",(int)wk);
+      return 1;
+    }
+  }
+  printf("DS_WALK_PHASE_PASS inputs=%lu exact_float_parity=1\n",count);
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("DS_WALK_PHASE_PROBE"))return walk_phase_probe();
   if(getenv("DS_PARTICLE_PROBE"))return particle_pool_probe();
   if(getenv("DS_ROOM_SCAN_PROBE"))return room_scan_probe();
   if(getenv("DS_RIP_CLIP_PROBE"))return rip_clip_probe();
