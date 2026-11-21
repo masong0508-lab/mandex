@@ -995,9 +995,23 @@ static void draw_aim(const View *v){
     rect(v->s, VX(v, RTOF(ox)) - 1, VY(v, RTOF(oy)) - 1, 3, 3, RGB(255, 255, 255));
   }
 }
+#ifndef MX_N3DS_PARTICLE_VIEW_CULL
+#define MX_N3DS_PARTICLE_VIEW_CULL 1
+#endif
+#ifdef MX_N3DS_PARTICLE_BENCH
+static unsigned n3_particles_rasterized; /* host diagnostic; zero runtime cost */
+#endif
 static void draw_parts(const View *v){
   for(int i = 0; i < NP; i++) if(parts[i].life > 0){
     const Part *q = &parts[i]; int x = VX(v, q->x), y = VY(v, q->y), k = v->ppc >= 4 ? 2 : 1;
+#if MX_N3DS_PARTICLE_VIEW_CULL
+    /* Hearts are <=10 px wide and glints have <=9 px arms.
+       Conservatively skip only effects fully outside this stereo viewport. */
+    if(x < -12 || x >= v->s->w+12 || y < -12 || y >= v->s->h+12) continue;
+#endif
+#ifdef MX_N3DS_PARTICLE_BENCH
+    n3_particles_rasterized++;
+#endif
     if(q->kind == 1){                                                        /* heart: two bumps and a point */
       rect(v->s, x - 2 * k, y - k, 2 * k, 2 * k, q->c); rect(v->s, x + 1, y - k, 2 * k, 2 * k, q->c);
       rect(v->s, x - 2 * k, y, 5 * k - (k - 1), k, q->c); rect(v->s, x - k, y + k, 3 * k, k, q->c); rect(v->s, x, y + 2 * k, k, k, q->c);
