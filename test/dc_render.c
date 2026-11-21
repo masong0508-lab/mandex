@@ -90,6 +90,32 @@ static int dc_fastpath_probe(void){
     }
     printf("DC_PARTICLE_POOL=%08x\n",h);
   }
+  /* The same helper that submits actual Dreamcast rubble polygons, in
+     reference and culled modes. Render real textured rotated quads into
+     the software PVR for a range of rotations and all screen edges.
+     Identical framebuffer hashes prove invisible polygons are the ONLY
+     ones omitted, not just equivalent vertex-count guesses. */
+  {
+    static unsigned short fake_atlas[512*512];
+    memset(fake_atlas,0xff,sizeof fake_atlas);
+    make_hdr(&hdr_atl,PVR_TXRFMT_ARGB1555,512,512,fake_atlas);
+    memset(fb,0,sizeof fb);cur_hdr=0;nq=0;
+    for(int k=0;k<260;k++){
+      float cx=(float)((k*131)%680)-20.f;
+      float cy=(float)((k*97)%520)-20.f;
+      float angle=(float)(k%33)*0.187f;
+      tile_rot_visible(cx,cy,cosf(angle),sinf(angle),
+                       MX_WOOD,k&3,k%3,Z_CHUNK);
+    }
+    for(int k=0;k<7;k++){
+      const float xedge[]={-4.f,-3.9f,-3.2f,0.f,639.5f,643.8f,644.f};
+      tile_rot_visible(xedge[k],240.f,cosf(k*.4f),sinf(k*.4f),
+                       MX_STONE,k&3,0,Z_CHUNK);
+      tile_rot_visible(320.f,k<4?xedge[k]:480.f+(xedge[k]-639.5f),
+                       cosf(k*.4f),sinf(k*.4f),MX_WOOD,k&3,0,Z_CHUNK);
+    }
+    printf("DC_FAST_RUBBLE=%08x\n",dc_hash(fb,sizeof fb));
+  }
   return 0;
 }
 int main(void){
