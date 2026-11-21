@@ -13,6 +13,7 @@ on:
       - "tools/gen_dc_art.py"
       - "tools/hd_wolf_finish.py"
       - "tools/sprite_pinhole_cleanup.py"
+      - "tools/wolf_upper_volume.py"
       - "dreamcast/main.c"
       - "test/dreamcast_wolf_atlas_test.py"
       - "test/character_turnaround_test.py"
@@ -62,6 +63,7 @@ jobs:
           python3 test/sprite_turn_anchor_test.py
           python3 test/sprite_volume_continuity_test.py
           python3 tools/sprite_pinhole_cleanup.py --check
+          python3 tools/wolf_upper_volume.py --check
           python3 tools/retouch_baked_heads.py --check
           python3 tools/turn_hair_finish.py --check
           python3 test/sprite_surface_test.py
