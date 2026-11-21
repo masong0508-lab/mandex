@@ -316,6 +316,12 @@ static void on_events(void){
     case EV_HEAL:
       spawn_ring(e->x, e->y, 4, C_WHITE); popup(e->x, e->y - RI(6), "+HP", C_WHITE); sfx_play(SFX_TARGET, pan);
       break;
+    case EV_SURVIVOR:
+      for(int k=0;k<5;k++)spawn(PT_DUST,e->x,e->y,rnd(17)-8,-rnd(8),0,20+rnd(12));
+      spawn_ring(e->x,e->y,5,C_GOLD);
+      popup(e->x,e->y-RI(5),"STILL ALIVE!",C_GOLD);
+      sfx_play(SFX_THUD,pan);
+      break;
     case EV_THROW: case EV_SWING: sfx_play(SFX_WHOOSH, pan); break;
     case EV_THUD:
       if(e->a > R(0.3)) sfx_play(SFX_THUD, pan);
