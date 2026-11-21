@@ -32,3 +32,7 @@ Use `python3 tools/render_turnaround_sheet.py out/art-review/turnaround.ppm` to 
 ## Runtime-accurate review coloring
 
 The original offline turnaround preview drew Wolfman sprites using the default tan `MS_PAL` skin shades. Actual DS and 3DS gameplay remap those colors to grey fur when the Wolfman outfit is selected. The contact sheet now reads the four `FUR` RGB values from the real `mx_outfit_skin()` implementation in `core/mx_meta.c` and substitutes them **only in preview output**. Both the indexed sprite bytes and the default human palette remain unchanged. `test/turnaround_preview_palette_test.py` checks the exact PPM pixels for both variants, preventing misleading artwork reviews.
+
+## Sprite anchor stability
+
+A new compiled-art regression fixture, `test/sprite_turn_anchor_test.py`, verifies the top of the skull and the floor-contact pixel across all 48 human and Wolfman turnaround poses. The turnaround contact sheet additionally draws a thin floor guide beneath only the grounded turning rows, making floating feet and inconsistent vertical scaling easier to identify. The guide is **review-only** and not an in-game sprite or gameplay effect.
