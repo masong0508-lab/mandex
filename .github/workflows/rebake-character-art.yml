@@ -102,11 +102,26 @@ jobs:
             echo "Already synchronized, no commit necessary"
             exit 0
           fi
-          latest="$(git ls-remote origin refs/heads/main | cut -f1)"
-          if [ "$latest" != "$GITHUB_SHA" ]; then
-            echo "Main moved while baking; skip publication so newer source files are not overwritten."
-            echo "The checked generated atlases are in this run's artifact."
-            exit 0
-          fi
           git commit -m "Rebake 142 canonical man poses and Dreamcast PVR atlas from corrected character model"
+          git fetch origin main
+          latest="$(git rev-parse origin/main)"
+          if [ "$latest" != "$GITHUB_SHA" ]; then
+            # A concurrent commit may only modify tests, docs or CI metadata.
+            # Never publish stale character pixels after a *model*, sprite
+            # generator, or hand-edited art change. Keep successful previews
+            # in the workflow artifact if the input source has moved.
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+              echo "Main was rewritten; skip stale generated assets."
+              exit 0
+            fi
+            changed="$(git diff --name-only "$GITHUB_SHA" origin/main)"
+            if echo "$changed" | grep -Eq '^(art/|web/|tools/(gen_manspr.py|manhead.py|gen_dc_art.py|retouch_baked_heads.py)|dreamcast/main.c|ds/source/|3ds/main.c|.github/workflows/rebake-character-art.yml)'; then
+              echo "Model, atlas, renderer, or baker source changed during baking:"
+              echo "$changed"
+              echo "Skip publication; the validated generated atlases remain in this run's artifact."
+              exit 0
+            fi
+            echo "Only non-render-source changes landed. Fast-forward onto current main."
+            git rebase origin/main
+          fi
           git push origin HEAD:main
