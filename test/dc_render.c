@@ -214,6 +214,22 @@ static int dc_menu_flow_test(void){
   unsigned right_foot=dc_hash(fb,sizeof fb);
   MENU_CHECK(left_foot!=empty && right_foot!=empty && left_foot!=right_foot,
              "Dreamcast renders both grounded stride profiles without an invalid fallback");
+  /* Exact production draw: with velocity 0 the atlas frame and foot lift are
+     identical whether he is grounded or airborne. A pixel difference must
+     therefore come from the ground-contact shadow, not a changed pose. */
+  world.man.vx=0.0f;world.man.gait=0.0f;world.man.pT=0.0f;
+  world.man.gr=1;memset(fb,0,sizeof fb);cur_hdr=0;nq=0;draw_all();
+  unsigned contact=dc_hash(fb,sizeof fb);
+  world.man.gr=0;memset(fb,0,sizeof fb);cur_hdr=0;nq=0;draw_all();
+  unsigned airborne=dc_hash(fb,sizeof fb);
+  MENU_CHECK(contact!=airborne && contact!=empty,
+             "Dreamcast grounded walking contact renders independently of airborne pose");
+  world.man.gr=1;world.man.pT=0.1f;
+  memset(fb,0,sizeof fb);cur_hdr=0;nq=0;draw_all();
+  unsigned punch=dc_hash(fb,sizeof fb);
+  MENU_CHECK(punch!=contact && punch!=empty,
+             "Dreamcast punch anticipation changes real rendered pixels");
+  world.man.pT=0;
   on_title=1;title_t=0;title_lv=0;nofight=0;cur_hdr=0;
   memset(fb,0,sizeof fb);draw_title();
   unsigned before=dc_hash(fb,sizeof fb);
