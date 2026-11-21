@@ -85,22 +85,45 @@ static void hspan(u8 *b, int x0, int x1, int y, u8 c){
   if(x1 >= x0) memset(&b[y * 256 + x0], c, (size_t)(x1 - x0 + 1));
 }
 
+#ifndef MX_DS_ELLIPSE_SYMMETRY
+#define MX_DS_ELLIPSE_SYMMETRY 1
+#endif
 void gfx_ell(u8 *b, int cx, int cy, int rx, int ry, u8 c){
   if(rx <= 0 || ry <= 0){ if(rx > 0 || ry > 0) gfx_px(b, cx, cy, c); return; }
   /* Drawing huge moons or actors half out of frame should never pay for the
-     hidden scanlines or their integer square roots. This is pixel-identical
-     to the original inclusive ellipse loop on all visible rows. */
+     hidden scanlines or their integer square roots. */
   if(cx + rx < 0 || cx - rx >= 256 || cy + ry < 0 || cy - ry >= 192) return;
+  int D = ry * ry + ry;
+  int den = 8 * ry;
+#if MX_DS_ELLIPSE_SYMMETRY
+  /* e(-j)==e(+j): calculate the identical integer square root only once
+     and paint both scanlines. Preserve the old inclusive span and exact
+     checker-free silhouette; the center row is written once. With a
+     partially offscreen ellipse, discard j values invisible in BOTH halves
+     before calling isq(). No buffers, floats or additional allocations. */
+  int j0 = 0, j1 = ry;
+  if(cy < 0){ j0 = -cy; if(j1 > 191 - cy) j1 = 191 - cy; }
+  else if(cy >= 192){ j0 = cy - 191; if(j1 > cy) j1 = cy; }
+  else{
+    int limit = cy > 191 - cy ? cy : 191 - cy;
+    if(j1 > limit) j1 = limit;
+  }
+  for(int j = j0; j <= j1; j++){
+    int e = (int)(((unsigned)rx * isq((unsigned)(D - j * j) * 64u)) / (unsigned)den);
+    if(e > rx) e = rx;
+    if((unsigned)(cy - j) < 192u) hspan(b, cx - e, cx + e, cy - j, c);
+    if(j && (unsigned)(cy + j) < 192u) hspan(b, cx - e, cx + e, cy + j, c);
+  }
+#else
   int j0 = -ry, j1 = ry;
   if(j0 < -cy) j0 = -cy;
   if(j1 > 191 - cy) j1 = 191 - cy;
-  int D = ry * ry + ry;
-  int den = 8 * ry;
   for(int j = j0; j <= j1; j++){
     int e = (int)(((unsigned)rx * isq((unsigned)(D - j * j) * 64u)) / (unsigned)den);
     if(e > rx) e = rx;
     hspan(b, cx - e, cx + e, cy + j, c);
   }
+#endif
 }
 
 void gfx_line(u8 *b, int x0, int y0, int x1, int y1, u8 c){
