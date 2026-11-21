@@ -5,6 +5,8 @@
  * correctly reports BOTH 30 rendered FPS and 30 simulation steps/s. */
 #ifndef MX_FPS_METER_H
 #define MX_FPS_METER_H
+#include <stdint.h>
+#include <limits.h>
 typedef struct {
   unsigned clock_ticks, renders, simulations, dropped_ticks;
   unsigned render_x10, sim_x10, last_dropped, max_gap_ticks;
@@ -13,15 +15,21 @@ static inline void mx_fps_meter_add(MxFpsMeter *m, unsigned elapsed,
                                     unsigned ticks_per_second,
                                     unsigned draws, unsigned sim_steps){
   if(!ticks_per_second)return;
-  if(elapsed>ticks_per_second*5u)elapsed=ticks_per_second*5u;
+  /* Saturate long stalls without overflowing when the clock uses a high
+   * tick rate.  Keep arithmetic accurate even for microsecond clocks. */
+  const unsigned cap = ticks_per_second > UINT_MAX/5u
+                       ? UINT_MAX : ticks_per_second*5u;
+  if(elapsed>cap)elapsed=cap;
   m->clock_ticks+=elapsed;
   m->renders+=draws;
   m->simulations+=sim_steps;
   if(elapsed>m->max_gap_ticks)m->max_gap_ticks=elapsed;
   if(elapsed>1u && ticks_per_second==60u)m->dropped_ticks+=elapsed-1;
   if(m->clock_ticks>=ticks_per_second*2u){
-    m->render_x10=(m->renders*ticks_per_second*10u)/m->clock_ticks;
-    m->sim_x10=(m->simulations*ticks_per_second*10u)/m->clock_ticks;
+    /* Multiplication in unsigned is unsafe for high resolution clocks.
+     * This is executed only once per reporting window, never per pixel. */
+    m->render_x10=(unsigned)(((uint64_t)m->renders*ticks_per_second*10u)/m->clock_ticks);
+    m->sim_x10=(unsigned)(((uint64_t)m->simulations*ticks_per_second*10u)/m->clock_ticks);
     m->last_dropped=m->dropped_ticks;
     m->clock_ticks=0;m->renders=0;m->simulations=0;m->dropped_ticks=0;
     m->max_gap_ticks=0;
