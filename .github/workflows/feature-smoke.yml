@@ -181,5 +181,10 @@ jobs:
           grep -q 'restored title image is byte-identical' /tmp/dc_menu_flow.log
           grep -q 'winning final level returns to playable title' /tmp/dc_menu_flow.log
           grep -q 'losing a level retries that same valid level' /tmp/dc_menu_flow.log
+          grep -q 'B on a loss screen returns to title' /tmp/dc_menu_flow.log
+          grep -q 'B on a win screen takes priority over START' /tmp/dc_menu_flow.log
+          grep -q '900 cutscene frames freeze physics' /tmp/dc_menu_flow.log
+          grep -q 'title UI frames cannot advance hidden gameplay' /tmp/dc_menu_flow.log
+          grep -q 'world simulation resumes after the intro/pause' /tmp/dc_menu_flow.log
           grep -q 'Dreamcast menu flow: all passed' /tmp/dc_menu_flow.log
           cat /tmp/dc_menu_flow.log
