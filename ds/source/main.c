@@ -137,6 +137,11 @@ static Part parts[NPART];
 /* Highest slot ever populated since the last trim.  Avoid scanning the
    untouched tail of the fixed particle pool on quiet DS frames. */
 static int part_high_water;
+/* Build-time pixel-parity reference: 0 restores a full 128-slot scan without
+   changing the actual particle simulation or pool allocation policy. */
+#ifndef MX_DS_PARTICLE_BOUNDS
+#define MX_DS_PARTICLE_BOUNDS 1
+#endif
 #ifndef MX_DS_PARTICLE_HINT
 #define MX_DS_PARTICLE_HINT 1
 #endif
@@ -219,7 +224,7 @@ static void idle_fx(int fx, real wx, real wy, int face, int sc, int popups){
 
 static void update_parts(void){
   int ground = MX_ROWS * 64;
-  for(int i = 0; i < part_high_water; i++){
+  for(int i = 0; i < (MX_DS_PARTICLE_BOUNDS ? part_high_water : NPART); i++){
     Part *p = &parts[i];
     if(p->life <= 0) continue;
     p->life--;
@@ -1054,7 +1059,7 @@ static void draw_man(const View *v){
 }
 
 static void draw_parts(const View *v){
-  for(int i = 0; i < part_high_water; i++){
+  for(int i = 0; i < (MX_DS_PARTICLE_BOUNDS ? part_high_water : NPART); i++){
     const Part *p = &parts[i];
     if(p->life <= 0) continue;
     int px = (p->x * v->ppc >> 6) - v->cx, py = (p->y * v->ppc >> 6) - v->cy;
