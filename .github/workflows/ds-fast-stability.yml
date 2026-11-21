@@ -51,6 +51,23 @@ jobs:
             ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o /tmp/mx_ds_quick_render
           DS_WALK_PHASE_PROBE=1 /tmp/mx_ds_quick_render
           DS_PARTICLE_PROBE=1 /tmp/mx_ds_quick_render
+      - name: Landlord visibility - full sprite bounds across 9,792 poses and screen edges
+        run: |
+          set -eu
+          for mode in 0 1; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST \
+              -DMX_DS_CULL_TARGETS=$mode \
+              -Itest/stubs -Icore -Iart -Ids/source \
+              test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+              core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mx_ds_target_$mode
+            DS_TARGET_CULL_PROBE=1 /tmp/mx_ds_target_$mode > /tmp/mx_ds_target_$mode.txt
+          done
+          diff -u /tmp/mx_ds_target_0.txt /tmp/mx_ds_target_1.txt
+          cat /tmp/mx_ds_target_1.txt
+          DS_PERF_BENCH=1 /tmp/mx_ds_target_0 /tmp/mx_target_ref 360 39 | grep '^DS_FRAME_HASH ' > /tmp/mx_target_hq_ref.txt
+          DS_PERF_BENCH=1 /tmp/mx_ds_target_1 /tmp/mx_target_new 360 39 | grep '^DS_FRAME_HASH ' > /tmp/mx_target_hq_opt.txt
+          diff -u /tmp/mx_target_hq_ref.txt /tmp/mx_target_hq_opt.txt
+          echo "Landlord HQ sampled gameplay pixels match original painter"
       - name: Compare original and optimized window pixels at every district transition
         run: |
           set -eu
