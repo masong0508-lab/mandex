@@ -4,7 +4,12 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const src=fs.readFileSync(require('path').join(__dirname,'../web/index.html'),'utf8');
 const a=src.indexOf('  /* At high zoom, most collapsed rubble');
-const b=src.indexOf('  for(const t of targets)if(t.alive)',a);
+// Stop before the target draw setup, not just before its actor loop.
+// The final-landlord locator now precomputes its objective state between
+// rubble and actor painting; this isolated rubble test has no HUD globals.
+const marker=src.indexOf('  const lastTargetVisible=',a);
+const fallback=src.indexOf('  for(const t of targets)if(t.alive)',a);
+const b=marker>=0?marker:fallback;
 assert(a>=0&&b>a,'missing production optimized rubble renderer');
 const live=src.slice(a,b);
 const program=`
