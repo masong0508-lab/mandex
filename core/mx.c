@@ -167,12 +167,30 @@ real ratan2(real y, real x){
 #ifndef MX_LORD_SHOCK_REACT
 #define MX_LORD_SHOCK_REACT 1
 #endif
+/* A huge collapse may fill the fixed event queue with individual debris
+   effects BEFORE its objective, district transition or outcome is emitted.
+   Preserve gameplay-significant notifications; keep visual-only debris
+   best-effort. This is shared by DS (fixed point), Dreamcast and host/web
+   (float). No extra queue, heap, or normal-frame sorting. */
+static int ev_is_critical(int type){
+  return type==EV_SURVIVOR || type==EV_DISTRICT ||
+         type==EV_WIN || type==EV_LOSE || type==EV_TARGET ||
+         type==EV_LAUNCH || type==EV_HURT || type==EV_AIRPOP;
+}
 static void ev(MxWorld *w, int type, real x, real y, int m, real a, real b){
   if(w->nev >= MX_MAX_EVENTS){
-    /* Full demolition frames can saturate the debris event queue. Never
-       hide the rare collapse survivor behind the final cosmetic shard. */
-    if(type != EV_SURVIVOR) return;
-    w->nev = MX_MAX_EVENTS - 1;
+    if(!ev_is_critical(type)) return;
+    /* Evict the latest cosmetic event, not an earlier objective or
+       already-queued survivor. Shift the surviving tail forward in time
+       so front-ends still consume events in their original causal order.
+       At most 96 small records are inspected, only on queue saturation. */
+    int victim=-1;
+    for(int k=MX_MAX_EVENTS-1;k>=0;k--){
+      if(!ev_is_critical(w->ev[k].type)){victim=k;break;}
+    }
+    if(victim<0) return; /* A pathological all-critical queue is still bounded. */
+    for(int k=victim;k<MX_MAX_EVENTS-1;k++) w->ev[k]=w->ev[k+1];
+    w->nev=MX_MAX_EVENTS-1;
   }
   MxEvent *e = &w->ev[w->nev++];
   e->type = (uint8_t)type; e->m = (uint8_t)m; e->x = x; e->y = y; e->a = a; e->b = b;
