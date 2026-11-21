@@ -210,6 +210,7 @@ typedef struct {
   int combo, combo_peak;
   real combo_left;
   real bank_left;               /* 2 seconds after a rubber rebound to earn one +1500 BANK SHOT */
+  int bank_contact;              /* transient: only actual flying-man collisions earn the bonus */
   int district;                  /* Landlord HQ (level 39) is three 120-cell districts played one after another; 0..2 (always 0 on other levels) */
   real time, shake, slow, banner, flash, waitT, winT, loseT;
   int freeze, need_support, support_cd, substeps, nhouses;
