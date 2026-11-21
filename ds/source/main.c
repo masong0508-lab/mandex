@@ -911,6 +911,10 @@ static void draw_targets(const View *v){
     if(t->kind||st)spr_landlord_k(v->buf,sx,sy,v->ppc,phase,scared,t->kind,t->face<0?-1:1,st);
     else spr_landlord(v->buf,sx,sy,v->ppc,phase,scared);
     if(t->hpmax>1)spr_hpbar(v->buf,sx,sy,v->ppc,t->hp,t->hpmax);
+    /* Rare collapse survivor: tiny persistent gold signal so the player
+       can still locate the unfinished objective after the popup fades. */
+    if(t->collapse_rolled==2 && v->ppc>=3)
+      gfx_text_c(v->buf,sx,sy-v->ppc*11,"!",C_GOLD,C_BLACK,1);
   }
 }
 
