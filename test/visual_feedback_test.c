@@ -17,6 +17,20 @@ int main(void){
   }
   m.gait=RI(3);
   CK(mx_walk_anim_phase(&m)==3,"existing sprite stride order is unchanged");
+  /* The six 15-degree atlas offsets turn through the BACK, never through
+     a face/body mirror pop or new geometry. Reverse input remains instant. */
+  { static const int offsets[12]={1,1,3,3,5,5,5,5,3,3,1,1};
+    m.face=-1; m.mode=MAN_WALK;
+    for(int tick=12;tick>=1;tick--){
+      m.turn_ticks=(uint8_t)tick;
+      CK(mx_walk_turn_offset(&m)==offsets[12-tick],"turn frames follow atlas rear arc");
+      CK(mx_walk_render_face(&m)==(tick>6?1:-1),"render side swaps behind the shoulders");
+      CK(mx_walk_foot_lift(&m)==0,"feet remain planted while the body turns");
+    }
+    m.turn_ticks=0;
+    CK(mx_walk_turn_offset(&m)==0 && mx_walk_render_face(&m)==-1,
+       "back turn resolves into the requested side view");
+  }
   m.vx=0;CK(mx_walk_foot_lift(&m)==0,"stationary foot lift disappears");
   m.vx=RI(9);m.gr=0;CK(mx_walk_foot_lift(&m)==0,"airborne lift stays anchored");
   m.gr=1;m.mode=MAN_FLY;CK(mx_walk_foot_lift(&m)==0,"non-walk modes do not bob");
