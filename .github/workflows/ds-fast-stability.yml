@@ -62,6 +62,15 @@ jobs:
             ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o /tmp/mx_ds_quick_render
           DS_WALK_PHASE_PROBE=1 /tmp/mx_ds_quick_render
           DS_PARTICLE_PROBE=1 /tmp/mx_ds_quick_render
+      - name: DS pause/resume - stylus pull cannot silently launch or strand input, music resumes
+        run: |
+          set -eu
+          cd test
+          PAUSE_DRAG_TEST=1 /tmp/mx_ds_quick_render /tmp/mx_pause_drag 70 0 > /tmp/mx_pause_drag.log
+          grep -q 'pausing a stylus pull safely returns to anchor without firing' /tmp/mx_pause_drag.log
+          grep -q 'releasing a new pull after resume launches exactly once' /tmp/mx_pause_drag.log
+          grep -q 'pause and stylus drag: all passed' /tmp/mx_pause_drag.log
+          tail -n 8 /tmp/mx_pause_drag.log
       - name: DS walking gameplay - Y punches without muting soundtrack, B and touch controls remain functional
         run: |
           set -eu
