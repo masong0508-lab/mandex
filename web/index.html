@@ -5254,12 +5254,21 @@ function eDown(x,y){
 function eMove(x,y){if(!E.drag)return;const c=eCell(x,y);if(E.drag.pen){if(y<GY+3){const t=[c[0],Math.min(c[1],ROWS-1)];eLine(E.drag.l,t,E.drag.m);E.drag.l=t}}else E.drag.b=[c[0],Math.min(c[1],ROWS-1)]}
 function eUp(){if(E.drag&&!E.drag.pen)eRect(E.drag.a,E.drag.b,E.drag.m);E.drag=null}
 function eBuild(){const g=E.g.slice(),t=E.t.map(p=>p.slice());return{name:E.name||'Test Level',men:E.men,custom:true,build(){for(let i=0;i<g.length;i++)if(g[i])set(i%COLS,(i/COLS)|0,g[i]);for(const[cx,row]of t)tgt(cx,row)}}}
-function eTest(){if(!E.t.length){toast('ach','Add at least one landlord','use the LANDLORD tool');return}testing=true;load(-1,eBuild())}
+/* The same safe geometry rules apply to edited and shared levels. Never
+ * launch a broken test scene or overwrite a good saved level with one. */
+function eCheckedLevel(action){
+  try{return validateSharedLevel({
+    n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t
+  })}catch(err){toast('ach','Fix level before '+action,err.message||'Invalid layout');return null}
+}
+function eTest(){
+  if(!eCheckedLevel('testing'))return;
+  testing=true;load(-1,eBuild());
+}
 function eSave(){
-  if(!E.t.length){toast('ach','Add at least one landlord','use the LANDLORD tool');return}
-  let solid=0;for(const v of E.g)if(v)solid++;if(solid<8){toast('ach','Build something first','');return}
+  const checked=eCheckedLevel('saving');if(!checked)return;
   if(!E.name){let nm=null;try{nm=prompt('Name your level:','My Level '+(PD.custom.length+1))}catch(e){}E.name=(nm&&nm.trim()?nm.trim():'My Level '+(PD.custom.length+1)).slice(0,24)}
-  const L={n:E.name,m:E.men,c:encodeCells(E.g),t:E.t.map(p=>p.slice())};
+  const L={n:E.name,m:checked.m,c:checked.c,t:checked.t};
   if(E.id>=0)PD.custom[E.id]=L;else{PD.custom.push(L);E.id=PD.custom.length-1;ST().created++}
   pdTouch();pdSave();achCheck();toast('outfit','Saved: '+E.name,'find it under PLAY > MY LEVELS')}
 const MATCOL=['#444',...MAT.slice(1).map(m=>m.c)];
