@@ -164,22 +164,42 @@ def side_head(kind):
     return ["".join(r) for r in rows]
 
 def turn_head(angle, kind="dive"):
-    """A continuous-width turnaround, retaining the front head's height.
+    """Project one head through front, three-quarter, profile and rear-quarter.
 
-    A 14-row side head used to pop upward on the 55-degree frame while
-    19-row front heads stayed planted.  Resample the profile at 19 rows
-    and keep the original brow/mouth heights through the turn.  The
-    flattened front/head width is monotone (19->14) instead of ballooning
-    back out at the side.  The returned grid is still pure 1-byte palette
-    symbols; renderer memory and sprite frame count never increase.
+    Every master is 19 rows high: neither crown nor chin jumps between views.
+    At three quarters the far eye is occluded rather than crushed into a
+    second pupil. The back of the hair sweeps progressively across the cheek,
+    with no sudden face-to-back jump at the old 125-degree threshold.
     """
-    a = min(125, max(0, abs(float(angle))))
-    if a < 38:
-        width = 19 if a < 18 else 17
-        return scaled(head("open", "grin"), width, 19)
+    a = min(180.0, max(0.0, abs(float(angle))))
     if a < 56:
-        return scaled(head("open", "grin"), 14, 19)
-    return scaled(side_head(kind), 14, 19)
+        width = 19 if a < 18 else 17 if a < 36 else 14
+        rows = head("open", "grin")
+        if width == 19:
+            return rows
+        rows = [list(row) for row in shrink(rows, width, 19)]
+        # The camera is rotating past the man's left cheek: the distant
+        # (screen-left) eye disappears behind the nose as he turns.
+        edge = max(0, width // 2 - (3 if a < 36 else 1))
+        for y in range(7, 12):
+            for x in range(edge):
+                if rows[y][x] in "BiwGg":
+                    rows[y][x] = "S" if y >= 10 else "s"
+        return ["".join(row) for row in rows]
+    if a >= 158:
+        return shrink(back_head(), 17, 19)
+    rows = [list(row) for row in shrink(side_head(kind), 14, 19)]
+    if a >= 116:
+        # Turn the visible cheek away, then wrap the *same* combed hair
+        # around the back of the skull. No moving eyes or floating mouth.
+        for y in range(5, 17):
+            for x in range(6, 14):
+                ch = rows[y][x]
+                if ch in "BiwGgmMtTL":
+                    rows[y][x] = "s" if y < 10 else "S"
+                if a >= 138 and x >= 9 and y < 13 and rows[y][x] in "Ssk":
+                    rows[y][x] = "h" if x < 12 else "H"
+    return ["".join(row) for row in rows]
 
 # how much each character wins a tie when several source pixels are squeezed into one: eyes, mouths and rims must survive the shrink
 _PRI = {'B': 2.8, 'i': 1.7, 'w': 1.5, 'm': 1.9, 't': 1.7, 'T': 1.5, 'L': 1.5, 'G': 0.9, 'g': 0.8, 'H': 1.5, 'o': 1.35, 'r': 1.4, '.': 0.9}
