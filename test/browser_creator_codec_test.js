@@ -10,7 +10,7 @@ const create=new Function(`
   const V=8,ROWS=60;let COLS=120;const EMIN=28;
   let promptText='',lastToast='',saved=0,dirty=0,exported=0;
   const PD={custom:[]};const ST=()=>({set exported(x){exported=x},get exported(){return exported}});
-  const pdTouch=()=>dirty++,pdSave=()=>saved++,achCheck=()=>{};
+  const pdTouch=()=>dirty++,pdSave=()=>{saved++;return true},achCheck=()=>{};
   const toast=(kind,message)=>{lastToast=message};
   const navigator={clipboard:{writeText:()=>Promise.resolve()}};
   const prompt=(label,value)=>{if(label.startsWith('Paste'))return promptText;return value};
