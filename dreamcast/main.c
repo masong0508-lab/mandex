@@ -31,6 +31,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "mx.h"
+#include "mx_tool_feedback.h"
 #include "mx_objective.h"
 #include "mx_fps_meter.h"
 #include "mx_meta.h"
@@ -1008,9 +1009,26 @@ static void draw_all(void){
   }
   if(m->mode == MAN_FLY && !m->dive) text("PRESS A = BELLY FLOP", 320, 466, 20, argb(255, 255, 255, 205), 1, Z_HUD);
   if(world.state == MX_PLAY && m->mode == MAN_AIM){
-    static const char *const PWN[PW_COUNT] = { "NONE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE" };
-    snprintf(buf, sizeof buf, "X: POWER-UP  %s%s", PWN[world.pw_sel], world.pw_sel ? "" : " (B/T/S/T/Q x1)");
-    text(buf, 12, 466, 14, world.pw_sel ? argb(255, 210, 63, 255) : argb(255, 255, 255, 200), 0, Z_HUD);
+    MxToolFeedback cue=mx_tool_feedback(&world);
+    if(cue.selected)
+      snprintf(buf,sizeof buf,"X: POWER %s  x%d",mx_tool_name(cue.selected),
+               cue.remaining);
+    else snprintf(buf,sizeof buf,"X: POWER NONE  (CYCLE)");
+    text(buf, 12, 466, 14, cue.selected ? argb(255, 210, 63, 255) : argb(255, 255, 255, 200), 0, Z_HUD);
+    text(mx_tool_status_label(cue.phase),12,443,14,
+         cue.phase==MX_SHOT_DAZED?argb(255,92,92,255):
+         cue.phase==MX_SHOT_PULL?argb(125,255,90,255):argb(230,232,244,215),0,Z_HUD);
+    if(cue.selected && cue.remaining>0)
+      text(mx_tool_effect(cue.selected),12,423,13,
+           argb(255,210,63,225),0,Z_HUD);
+    /* Real-time sling tension in the HUD, without an extra art asset. */
+    int power=mx_sling_power_pct(&world);
+    text("POWER",432,425,12,argb(230,232,244,230),0,Z_HUD);
+    quad(484,412,138,13,Z_HUD,argb(40,44,64,230));
+    if(power>0)
+      quad(485,413,136.0f*power/100.0f,11,Z_HUD+0.05f,
+           power>84?argb(255,92,92,255):
+           power>49?argb(255,210,63,255):argb(125,255,90,255));
     snprintf(buf,sizeof buf,"DOWN: AIR %s   UP: SEAT (3 LEVELS)",world.valve_ok?"ON":"OFF");
     if(m->inf<=0)text(buf,628,444,12,world.valve_ok?argb(255,210,63,255):argb(255,255,255,155),2,Z_HUD);
   }
