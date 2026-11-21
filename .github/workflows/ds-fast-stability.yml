@@ -13,6 +13,7 @@ on:
       - "art/**"
       - "test/landlord_motion_regression.py"
       - "test/event_overflow_test.c"
+      - "test/landlord_shock_test.c"
       - "test/ds_render.c"
       - "test/ds_sound_queue_test.c"
       - "test/sfx_catchup_test.c"
@@ -38,6 +39,17 @@ jobs:
             gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore \
               test/event_overflow_test.c -lm -o /tmp/mx_event_overflow_$mode
             /tmp/mx_event_overflow_$mode
+          done
+      - name: Shared landlord shock remains active even after all visual event slots fill
+        run: |
+          set -eu
+          for mode in float fixed old; do
+            flags=""
+            if test "$mode" = fixed; then flags="-DMX_FIXED"; fi
+            if test "$mode" = old; then flags="-DMX_LORD_SHOCK_REACT=0"; fi
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore \
+              test/landlord_shock_test.c -lm -o /tmp/mx_lord_shock_$mode
+            /tmp/mx_lord_shock_$mode
           done
       - name: Audio queue, missed-VBlank effects and tempo
         run: |
