@@ -32,7 +32,7 @@ jobs:
             test "$mode" = fixed && defs="-DMX_FIXED"
             for variant in before after; do
               ref=""
-              test "$variant" = before && ref="-DMX_WOB_JOINT_MASK=0"
+              test "$variant" = before && ref="-DMX_WOB_JOINT_MASK=0 -DMX_LORD_AI_DIST_CULL=0"
               gcc -std=gnu99 -O2 $defs $ref -Icore core/mx.c test/wob_state_digest.c -lm -o /tmp/sim_${mode}_${variant}_digest
               gcc -std=gnu99 -O2 $defs $ref -Icore core/mx.c test/bench.c -lm -o /tmp/sim_${mode}_${variant}_bench
             done
@@ -72,7 +72,7 @@ jobs:
         run: |
           for variant in before after; do
             defs=""
-            test "$variant" = before && defs="-DMX_DS_DAMAGE_THRESH=0 -DMX_DS_VOXEL_EMPTY4=0 -DMX_DS_ELLIPSE_SYMMETRY=0 -DMX_DS_ROT_INCREMENTAL=0 -DMX_WOB_JOINT_MASK=0"
+            test "$variant" = before && defs="-DMX_DS_DAMAGE_THRESH=0 -DMX_DS_VOXEL_EMPTY4=0 -DMX_DS_ELLIPSE_SYMMETRY=0 -DMX_DS_ROT_INCREMENTAL=0 -DMX_WOB_JOINT_MASK=0 -DMX_LORD_AI_DIST_CULL=0"
             gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST $defs \
               -Itest/stubs -Icore -Iart -Ids/source \
               test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
