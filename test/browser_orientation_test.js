@@ -41,10 +41,17 @@ assert(!v.dragging&&!v.sliderDrag&&v.activeTouches===0,'rotating cancels stuck i
 assert(parseFloat(cv.style.width)<=390 && parseFloat(cv.style.height)<=844,'canvas fits portrait viewport');
 h.setState('edit');h.tick();assert(h.info().portrait,'editor stays portrait');
 h.setState('play');h.tick();assert(h.info().camera,'portrait gameplay camera activates');
+/* A soft keyboard changes the visual viewport, not the physical device
+   orientation: it must shrink CSS size without triggering landscape menus. */
+window.visualViewport.height=340;h.tick();v=h.info();
+assert(v.portrait&&v.W===540,'soft keyboard never forces a portrait layout to landscape');
+window.visualViewport.height=844;
+window.innerWidth=844;window.innerHeight=390;
 window.visualViewport.width=844;window.visualViewport.height=390;h.tick();v=h.info();
 assert(!v.portrait&&v.W===960&&v.H===540,'landscape uses original virtual resolution');
 assert(!v.camera,'normal landscape returns to unzoomed world camera');
 assert(parseFloat(cv.style.width)<=844 && parseFloat(cv.style.height)<=390,'landscape fits viewport');
+window.innerWidth=360;window.innerHeight=640;
 window.visualViewport.width=360;window.visualViewport.height=640;h.setState('menu');h.tick();
 assert(h.info().portrait,'resize back to portrait without restarting game');
 const pointerCode=extract('function pt(e){','function retry(');
