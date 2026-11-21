@@ -255,7 +255,7 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
             # 19 -> 17 -> 14 pixels.  The old side switch at 56 degrees
             # was a 14-high head with a different chin/head pivot, which
             # made the hairline and mouth visibly snap up during a turn.
-            rows = manhead.turn_head(a, "dive")
+            rows = manhead.turn_head(a, "turn")
             # The same skull-local anchor is used for every non-back turn.
             # Head changes affect neither frame atlas dimensions nor blobs.
             assert len(rows) == 19 and 14 <= len(rows[0]) <= 19
