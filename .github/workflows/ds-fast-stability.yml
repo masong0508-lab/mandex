@@ -12,6 +12,7 @@ on:
       - "core/**"
       - "art/**"
       - "test/landlord_motion_regression.py"
+      - "test/event_overflow_test.c"
       - "test/ds_render.c"
       - "test/ds_sound_queue_test.c"
       - "test/sfx_catchup_test.c"
@@ -28,6 +29,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate landlord art and travel-based gait
         run: python3 test/landlord_motion_regression.py
+      - name: Shared C event overflow and objective signal retention - float and fixed
+        run: |
+          set -eu
+          for mode in float fixed; do
+            flags=""
+            if test "$mode" = fixed; then flags="-DMX_FIXED"; fi
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore \
+              test/event_overflow_test.c -lm -o /tmp/mx_event_overflow_$mode
+            /tmp/mx_event_overflow_$mode
+          done
       - name: Audio queue, missed-VBlank effects and tempo
         run: |
           set -eu
