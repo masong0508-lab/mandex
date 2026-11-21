@@ -40,6 +40,8 @@ jobs:
             gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/collapse_survivor_test.c -lm -o /tmp/collapse_survivor_$mode
             /tmp/collapse_survivor_$mode
           done
+      - name: Verify browser collapse-survivor logic on intact, crushed and empty rooms
+        run: node test/collapse_survivor_web_test.js
       - name: Verify new rubber BANK SHOT bonus in both core numeric modes
         run: |
           for mode in float fixed; do
