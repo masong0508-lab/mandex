@@ -30,8 +30,8 @@ assert.strictEqual(probe(three,0,'none',-999,'lose').phase,'failed');
 // Execute the real browser edge clamp in isolation; the production helper
 // reuses a single record and never has to allocate a marker every frame.
 const edge=new Function(impl+'\nreturn objectiveScreenEdge;')();
-let cue=edge(100,100,360,640,138,56);
-assert.strictEqual(cue.dir,0,'visible character gets no edge cue');
+let cue=edge(100,240,360,640,138,56);
+assert.strictEqual(cue.dir,0,'visible character below portrait HUD gets no edge cue');
 cue=edge(-30,240,360,640,138,56);
 assert.strictEqual(cue.dir,1);assert.strictEqual(cue.x,42);
 cue=edge(390,240,360,640,138,56);
