@@ -22,6 +22,43 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## Further gameplay and frame-cost pass
+
+- **Collapse aftermath:** rare HP- and structure-dependent survivors now
+  require actual supporting floor, lose armor, recover from stun and flee
+  briefly. Each survivor has a persistent gold indicator in the browser,
+  DS, 3DS and Dreamcast scenes. Destructible rubble that is already dead
+  never deals invisible damage.
+- **Fixed-point collision integrity:** an early conservative ±256-cell
+  distance guard prevents enormous debris separations from overflowing
+  the 20.12 squared-distance contact test. This deliberately corrects a
+  pathological ghost-hit case; the safety guard is enabled with *both*
+  reference and optimized builds, so speed parity does not depend on
+  preserving incorrect hits.
+- **Per-fragment contact optimization:** moving-rubble collisions use a
+  cheap axis-aligned gate before the exact circular distance test. The
+  browser checks the same geometry. Two focused regressions include
+  **200,000 contact positions per C numeric mode** plus **8,281 actual
+  browser collision cases**; tests cover contact edges, destroyed rubble,
+  stun/kill thresholds and remote overflow ghosts.
+- **Measured isolated host cost:** the
+  [rubble A/B gate](https://github.com/masong0508-lab/mandex/actions/runs/44863019245)
+  verified complete-world state parity on all 60 levels (360 scripted
+  frames each). For the rubble rectangle alone, fixed-point host CPU
+  changed **429.90 → 429.00 ms** (0.21% faster) and floating-point
+  changed **322.70 → 320.20 ms** (0.77% faster) in that run.
+  This is *not* console FPS. Tiny gains can vary with host load.
+- **3DS stereo rendering:** culls fully offscreen flying voxel tiles
+  before per-pixel drawing; the host stereo-framebuffer A/B probe now
+  includes real moving rubble at viewport edges and multiple brightness
+  values. Standing voxels, visible rubble, and damage tints remain on
+  their original drawing paths.
+- **Dreamcast:** rotated rubble polygons whose conservative 4px
+  envelope misses the 640×480 display are not submitted to the PVR.
+  A host software-PVR comparison renders the actual textured,
+  rotated tile primitive with edge-crossing and offscreen positions.
+  No new textures, large buffers, or gameplay-speed changes are required.
+
 ## November 21 continuation — verified AI distance optimization
 
 - The native core now avoids fixed-point square roots for landlords farther
