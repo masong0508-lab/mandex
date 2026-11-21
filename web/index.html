@@ -5478,7 +5478,7 @@ function drawEditor(){
   btn(x,y2,56,24,'EXIT',()=>{selTab=1;goSelect()},{size:12});x+=62;
   btn(x,y2,106,24,'STARTER BUILDS',()=>{E.starters=!E.starters},{size:12,on:E.starters});
   btn(x+112,y2,90,24,'CHECK BUILD',eCheckBuild,{size:11});
-  txt(E.name?E.name:'unsaved level',W-8,y2+17,13,'#99a','right');
+  txt(E.name?E.name:'unsaved level',W-8,y1+17,13,'#99a','right');
   if(E.starters)drawStarterMenu(W-308,66,296)}
 
 // ---------- level finished: stars, achievements ----------
