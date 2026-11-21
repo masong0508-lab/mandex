@@ -629,6 +629,65 @@ static int rip_clip_probe(void){
   printf("DS_RIP_PASS visible_pixels=%u\n",any);
   return 0;
 }
+/* Offscreen landlord fast-path parity: exercise every NPC kind, walking,
+   winding, attacking, dazed, armored, damaged, and escaped poses, at all
+   DS scales and around every screen edge. Exact RGB-index framebuffer
+   hash against MX_DS_CULL_TARGETS=0, no artificial graphic compromises. */
+static int target_visibility_probe(void){
+  static const int anchors_x[]={
+    -360,-200,-100,-70,-45,-20,-1,0,1,40,128,240,255,256,275,310,360,500
+  };
+  static const int anchors_y[]={
+    -260,-170,-95,-70,-48,-20,-1,0,1,96,190,191,192,218,255,320
+  };
+  unsigned hash=2166136261u, samples=0, painted=0;
+  gfx_init(); mx_meta_init(&stats); mx_options_default(&opt);
+  load_level(39);
+  if(world.ntargets<=0){fputs("DS_TARGET_CULL_FAIL no HQ landlord\n",stderr);return 1;}
+  world.ntargets=1;
+  MxTarget *t=&world.targets[0];
+  t->alive=1; t->x=RI(40); t->y=RI(25); t->vy=0;
+  for(int ppc=2;ppc<=4;ppc++)for(int kind=0;kind<=7;kind++)
+  for(int variant=0;variant<6;variant++)for(int facing=0;facing<2;facing++){
+    t->kind=(uint8_t)kind;
+    t->face=facing?-1:1;
+    t->mv=(uint8_t)(variant%3);
+    t->wk=RI(15+variant*7);
+    t->hpmax=(uint8_t)(variant==5?12:(variant&1)?3:1);
+    t->hp=t->hpmax;
+    t->armor=(uint8_t)(variant&1);
+    t->stun=variant==1?RI(1):0;
+    t->wind=variant==2?RI(1):0;
+    t->swing=variant==3?RI(1):0;
+    t->pan=variant==4?RI(1):0;
+    t->collapse_rolled=(uint8_t)(variant==5?2:0);
+    for(unsigned axis=0;axis<2;axis++){
+      unsigned count=axis?
+        sizeof anchors_y/sizeof anchors_y[0]:
+        sizeof anchors_x/sizeof anchors_x[0];
+      for(unsigned pos=0;pos<count;pos++){
+        int ax=axis?128:anchors_x[pos];
+        int ay=axis?anchors_y[pos]:96;
+        View view={buf_top,ppc,40*ppc-ax,25*ppc-ay};
+        frame=(int)(samples*17u);
+        memset(buf_top,0,sizeof buf_top);
+        draw_targets(&view);
+        unsigned ink=0;
+        for(unsigned i=0;i<sizeof buf_top;i++){
+          hash=(hash^(unsigned)buf_top[i])*16777619u;
+          ink+=(buf_top[i]!=0);
+        }
+        painted+=(ink!=0);
+        samples++;
+      }
+    }
+  }
+  if(!painted){fputs("DS_TARGET_CULL_FAIL no rendered landlord pixels\n",stderr);return 1;}
+  printf("DS_TARGET_CULL_HASH samples=%u visible=%u checksum=%08x\n",
+         samples,painted,hash);
+  return 0;
+}
+
 /* Compare the optimized high-water particle scan against the full-pool
    reference build (MX_DS_PARTICLE_BOUNDS=0). Both binaries run the same
    deterministic burst, expiration, ring and view-scale sequence. The printed
@@ -718,6 +777,7 @@ static int walk_phase_probe(void){
   return 0;
 }
 int main(int argc, char **argv){
+  if(getenv("DS_TARGET_CULL_PROBE"))return target_visibility_probe();
   if(getenv("DS_WALK_PHASE_PROBE"))return walk_phase_probe();
   if(getenv("DS_PARTICLE_PROBE"))return particle_pool_probe();
   if(getenv("DS_ROOM_SCAN_PROBE"))return room_scan_probe();
