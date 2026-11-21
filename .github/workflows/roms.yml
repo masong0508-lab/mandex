@@ -53,6 +53,16 @@ jobs:
     container: kazade/dreamcast-sdk:latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate both character atlases before Dreamcast ROM build
+        run: |
+          set -eu
+          grep -q '^#define DCT_MAN_W 1024' art/dcart.h
+          grep -q '^#define DCT_MAN_H 512' art/dcart.h
+          grep -q '^#define DCT_WMAN_W 1024' art/dcart.h
+          grep -q '^#define DCT_WMAN_H 512' art/dcart.h
+          grep -q '^#define DCM_NFR 142' art/dcart.h
+          grep -q '^#define MSF_NBASE 71' art/manspr.h
+          echo "PASS: human + Wolfman have separate 1MB PVR atlases, 142 frame records"
       - name: Build
         shell: bash
         run: |
