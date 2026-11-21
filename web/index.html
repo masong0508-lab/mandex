@@ -1357,10 +1357,10 @@ function updTargets(dt){
   for(const t of targets){if(!t.alive)continue;t.t+=dt;if(t.inv>0)t.inv-=dt;lordAI(t,dt);
     const gr=solidAt(t.x,t.y+t.r+1)||solidAt(t.x-4,t.y+t.r+1)||solidAt(t.x+4,t.y+t.r+1);
     if(gr){if(t.vy>430){if(!collapseSurvive(t))killTarget(t,true);continue}if(t.vy>300&&t.inv<=0){t.stun=.8;t.inv=.8;popText(t.x,t.y-38,'OOF!','#ffd23f',16)}t.vy=0}else{t.vy+=G*dt;t.y+=t.vy*dt}
+    if(t.collapseRolled===2&&t.inv>0)continue; // brief post-escape grace; ordinary hazards resume afterward
     if(solidAt(t.x,t.y)){   // buried by settling rubble: dig out if there is air within 3 cells above (a light collapse), else crushed
       let up=0;for(let d=2;d<=V*3;d+=2)if(!solidAt(t.x,t.y-d)&&!solidAt(t.x,t.y-d-t.r)){up=d;break}
       if(up){t.y-=up;t.vy=0;t.stun=1;t.inv=1;popText(t.x,t.y-38,'PHEW!','#7dff5a',16)}else{if(!collapseSurvive(t))killTarget(t,true);continue}}
-    if(t.collapseRolled===2&&t.inv>0)continue; // temporary escape grace, never permanent invulnerability
     /* Rubble can hold hundreds of cells. Test squared proximity before
        entering each particle collision: there is no need for Math.hypot
        until a cell actually strikes a landlord and impact speed matters. */
