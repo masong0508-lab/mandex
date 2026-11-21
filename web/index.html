@@ -3399,7 +3399,8 @@ function draw(){
     const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);
     // A compact locator above the surviving actor, positioned in the same
     // transformed world coordinate system as the actual landlord artwork.
-    if(lastTargetVisible)txt('LAST',t.x,t.y-63,12,'#ff9ec8','center');
+    if(lastTargetVisible && t.collapseRolled!==2)
+      txt('LAST',t.x,t.y-63,12,'#ff9ec8','center');
     ctx.restore();
   }
   if(cases.length)drawCases();
