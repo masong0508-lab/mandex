@@ -31,7 +31,7 @@ int main(void){
     puts("FAIL: DS shadow ink does not follow outfit recolors");return 1;
   }
   gfx_init();
-  for(int fr=0;fr<MSF_COUNT;fr+=3)for(int face=-1;face<=1;face+=2)
+  for(int fr=0;fr<MSF_COUNT;fr++)for(int face=-1;face<=1;face+=2)
   for(int ppc=2;ppc<=4;ppc++){
     memset(surface,0x57,sizeof surface);
     memset(surface+32,0,256*192);
