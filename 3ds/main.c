@@ -108,6 +108,7 @@ static unsigned char man_pal[MS_NPAL][3];              /* the man's palette, re-
 #define MX_N3DS_SPRITE_VOLUME 1
 #endif
 static u32 man_tone[3][MS_NPAL];   /* regular, warm-facing edge, cool trailing edge */
+static int man_tone_ready; /* standalone sprite host tools may draw before game init */
 static void man_tone_prepare(void){
   for(int i=0;i<MS_NPAL;i++){
     int r=man_pal[i][0],g=man_pal[i][1],b=man_pal[i][2];
@@ -116,6 +117,7 @@ static void man_tone_prepare(void){
     man_tone[1][i]=RGB(r+(255-r)/9,g+(255-g)/11,b+(255-b)/13);
     man_tone[2][i]=RGB(r*4/5,g*4/5,b*17/20);
   }
+  man_tone_ready=1;
 }
 static void apply_outfit(int o){
   static const int idx[6] = { 5, 6, 7, 13, 14, 15 };
@@ -410,6 +412,9 @@ static inline int fdiv4(int a){ return a >= 0 ? a / 4 : -((-a + 3) / 4); }
    stable light from upper left. Hair/face silhouettes and boxer colors are
    preserved; dark ink stays ink. The caller already checked c != 0. */
 static inline u32 man_surface_color(const MsFrame *f,int sx,int sy,int face,int c){
+  /* In host intro/gag previews the renderer is sometimes used before
+     n3ds_main(). Seed the same Classic Red defaults once, never a black man. */
+  if(!man_tone_ready) apply_outfit(0);
   if(!MX_N3DS_SPRITE_VOLUME || c==1)return man_tone[0][c-1];
   int row=sy*f->w;
   int right=sx+(face>0?1:-1),left=sx-(face>0?1:-1);
