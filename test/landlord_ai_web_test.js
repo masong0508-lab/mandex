@@ -7,7 +7,8 @@ const a=source.indexOf('const WALKS=['),b=source.indexOf('function batBlock(t,m)
 assert(a>=0&&b>a,'landlord AI source range unavailable');
 const scene=`
 let man={mode:'fly',x:0,y:0},targets=[],chunks=[],V=8,G=900;
-const SCARES=['EEK!'],solidAt=()=>false;
+const SCARES=['EEK!'];let floorY=Infinity;
+const solidAt=(x,y)=>y>=floorY;
 const lordSay=(t,s)=>{t.lastSay=s};
 const fightOn=()=>true;
 `+source.slice(a,b)+`
@@ -25,7 +26,14 @@ if(t.swing>0)throw Error('bat reacted outside strict 150px range');
 t=makeT();man.x=t.x+70;man.y=t.y+130;
 lordAI(t,1/60);
 if(!(t.swing>0))throw Error('bat range missed diagonal distance');
-'web landlord AI: bat proximity, squared distance threshold and no stale variables PASSED';
+t=makeT();t.r=7;t.collapseRolled=2;t.dodge=1.5;t.dd=1;
+man.mode='none';floorY=t.y+t.r+1;
+const old=t.x;lordAI(t,1/60);
+if(!(t.x>old)||t.mv!==2)throw Error('wounded collapse survivor did not flee');
+t=makeT();t.collapseRolled=2;t.stun=1;t.dodge=1.5;
+const frozen=t.x;lordAI(t,1/60);
+if(t.x!==frozen||t.mv)throw Error('stunned survivor moved before recovering');
+'web landlord AI: bat proximity and injured survivor retreat passed';
 `;
 const result=vm.runInNewContext(scene,{});
 assert(result.includes('PASSED'));
