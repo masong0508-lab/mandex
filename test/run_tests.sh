@@ -92,6 +92,17 @@ rm -f /tmp/mx_save.sav; MX_SAVE_PATH=/tmp/mx_save.sav ./ds_render /tmp/dssave1 1
 MX_SAVE_PATH=/tmp/mx_save.sav ./ds_render /tmp/dssave2 400 0 | grep "^save:" | grep "file_valid=1" > /dev/null && echo "ok: second boot reads the first boot's progress"
 head -c 100 /dev/urandom > /tmp/mx_bad.sav; MX_SAVE_PATH=/tmp/mx_bad.sav ./ds_render /tmp/dssave3 400 0 | grep -c "^final" > /dev/null && echo "ok: a garbage chip starts fresh"
 for L in 0 3 5 6; do ./ds_render /tmp/dsL$L 12000 $L | grep -v "^  chunk"; done
+echo "--- rotated DS character parity: 3100 frames, every pose, angle, edge and jiggle condition ---"
+for rot in before after; do
+  flag=1
+  test "$rot" = before && flag=0
+  gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_ROT_INCREMENTAL=$flag \
+    -Istubs -I../core -I../art -I../ds/source \
+    rot_sprite_parity_test.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o rot_sprite_$rot
+  ./rot_sprite_$rot > rot_sprite_$rot.txt
+done
+cmp rot_sprite_before.txt rot_sprite_after.txt
+cat rot_sprite_after.txt
 echo "--- DS hardware sound ring: atomic start, no dropped kills, reserved stop headroom ---"
 gcc -std=gnu99 -O2 -Wno-pointer-to-int-cast -I../ds/bare ds_sound_queue_test.c -o ds_sound_queue_test && ./ds_sound_queue_test
 echo "--- DS music clock: catch up missed ARM7 VBlank without accelerating gameplay physics ---"
