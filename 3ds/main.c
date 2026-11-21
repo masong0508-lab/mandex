@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "mx.h"
+#include "mx_objective.h"
 #include "mx_fps_meter.h"
 #include "intro.h"
 #include "sfx.h"
@@ -1291,6 +1292,23 @@ static void draw_hud(void){
   text(&top, 8, 32, "WRECKED", 1, RGB(236, 228, 207));
   rect(&top, 54, 33, 69, 5, RGB(55, 58, 78));
   rect(&top, 54, 33, hud_wrecked*69/100, 5, hud_wrecked>70 ? RGB(255, 88, 91) : hud_wrecked>35 ? RGB(255, 210, 63) : RGB(125, 255, 90));
+  /* Separate the demolition score meter from the eviction victory goal.
+     Render the same short objective stages as DS/Dreamcast, including the
+     next-district wait and the direction of the final remaining landlord. */
+  if(world.state==MX_PLAY){
+    MxObjective objective=mx_objective_snapshot(&world);
+    const char *label=mx_objective_label(objective.phase);
+    if(objective.phase==MX_OBJ_EVICT)
+      snprintf(b,sizeof b,"%s %d/%d",label,objective.remaining,objective.total);
+    else if(objective.phase==MX_OBJ_LAST && objective.direction)
+      snprintf(b,sizeof b,"%s %c",label,objective.direction<0?'<':'>');
+    else snprintf(b,sizeof b,"%s",label);
+    rect(&top,202,29,192,16,RGB(18,24,42));
+    rect(&top,202,29,192,1,RGB(255,210,63));
+    text(&top,208,33,b,1,objective.phase==MX_OBJ_LAST?RGB(255,126,176):
+         objective.phase==MX_OBJ_SECURE||objective.phase==MX_OBJ_DISTRICT?
+         RGB(125,255,90):RGB(255,210,63));
+  }
   rect(&top, 0, 216, 400, 24, RGB(15, 18, 30)); rect(&top, 0, 228, 400, 12, RGB(10, 12, 22)); rect(&top, 0, 216, 400, 1, RGB(255, 138, 138));
   text(&top, 6, 224, "MEN", 2, RGB(190, 190, 190)); itoa_(world.men, b); text(&top, 40, 224, b, 2, RGB(255, 255, 255));
   text(&top, 80, 224, "LANDLORDS", 2, RGB(255, 138, 138)); sprintf(b, "%d/%d", alive(), world.ntargets); text(&top, 168, 224, b, 2, RGB(255, 255, 255));
