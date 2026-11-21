@@ -203,6 +203,26 @@ static inline int mx_walk_anim_phase(const MxMan *m){
   if(m->mode != MAN_WALK || !m->gr || rabs(m->vx) <= R(3)) return -1;
   return rfloor(m->gait) & 3;
 }
+/* Half-stride lift: continuous 0 -> peak -> 0 in each two-cell step,
+   aligned to the EXISTING side-profile sprites. No stored animation state. */
+static inline real mx_walk_foot_lift(const MxMan *m){
+  if(mx_walk_anim_phase(m)<0) return 0;
+  real g=m->gait;
+  if(g>=RI(2)) g-=RI(2);
+  if(g>RI(1)) g=RI(2)-g;
+  return rmul(g,R(0.3));
+}
+/* Avoid single-frame left/right sprite flips when flying near zero horizontal
+   speed. The existing face byte is cosmetic until the player walks. */
+static inline void mx_flight_face_update(MxMan *m){
+  if(m->vx>R(1.5))m->face=1;
+  else if(m->vx<-R(1.5))m->face=-1;
+}
+/* A shared visual intensity scale for aftershock events. A score-derived
+   effect should remain capped even if nearly the whole structure collapses. */
+static inline int mx_crumble_tier(real cells){
+  return cells>=RI(48)?3:cells>=RI(24)?2:cells>=RI(8)?1:0;
+}
 
 typedef struct {
   /* world */
