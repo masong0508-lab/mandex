@@ -736,6 +736,18 @@ static void facade_prepare(void){
   fac_dirty=0;
 }
 #endif
+#ifndef MX_DS_FACADE_FAST_RECT
+#define MX_DS_FACADE_FAST_RECT 0 /* only enable after paired pixel/FPS A/B */
+#endif
+#if MX_DS_FACADE_FAST_RECT
+/* The visible interior of a window needs no x/y clipping on each stroke.
+   For a wholly in-bounds rectangle use identical row-order memset writes.
+   The fully clipped gfx_rect painter remains for every edge case. */
+static inline void facade_rect_noclip(u8 *buf,int x,int y,int w,int h,u8 col){
+  u8 *row=buf+(size_t)y*256+x;
+  for(int j=0;j<h;j++,row+=256)memset(row,col,(size_t)w);
+}
+#endif
 static void draw_facades(const View *v){
   int p = v->ppc;
   if(p <= 2) return;  /* overview is only 2 pixels per cell: avoid costly unreadable microdetails */
@@ -768,17 +780,34 @@ static void draw_facades(const View *v){
 #else
       u8 glass = (r + k + world.level) % 5 == 0 ? C_GOLD2 : (r & 1) ? C_CITY2 : C_SKY0 + 9;
 #endif
-      gfx_rect(v->buf, x - 2, y - 2, ww + 4, hh + 4, C_SHADOW);
-      gfx_rect(v->buf, x - 1, y - 1, ww + 2, hh + 2, C_FENCE);
-      gfx_rect(v->buf, x, y, ww, hh, glass);
+#if MX_DS_FACADE_FAST_RECT
+      /* The lowest sill stretches to x+ww+p-p/2-1; its two-pixel
+         height ends at y+hh+2. This conservative region also encloses
+         the pane, frame, vertical highlights and all inset reflections. */
+      int fully_visible = x>=2 && y>=2 &&
+                          x+ww+p-p/2<=256 && y+hh+3<=192;
+#define FAC_RECT(X,Y,W,H,C) do{ \
+        if(fully_visible)facade_rect_noclip(v->buf,(X),(Y),(W),(H),(C)); \
+        else gfx_rect(v->buf,(X),(Y),(W),(H),(C)); \
+      }while(0)
+#else
+#define FAC_RECT(X,Y,W,H,C) gfx_rect(v->buf,(X),(Y),(W),(H),(C))
+#endif
+      FAC_RECT(x - 2, y - 2, ww + 4, hh + 4, C_SHADOW);
+      FAC_RECT(x - 1, y - 1, ww + 2, hh + 2, C_FENCE);
+      FAC_RECT(x, y, ww, hh, glass);
       /* A small upper-left reflected sky panel, dark glazed lower ledge and
          consistent mullions. The extra 1px ledge uses existing palette ink. */
-      gfx_rect(v->buf, x + 1, y + 1, ww/3, hh/3, C_CLOUD);
-      gfx_rect(v->buf, x + 1, y + hh - 2, ww - 2, 1, C_CITY2);
-      gfx_rect(v->buf, x + ww/2, y, p > 2 ? 2 : 1, hh, C_WHITE);
-      gfx_rect(v->buf, x, y + hh/2, ww, p > 2 ? 2 : 1, C_WHITE);
-      gfx_rect(v->buf, x - p/2, y + hh + 1, ww + p, p > 2 ? 2 : 1, C_FENCE2);
-      if(p >= 3){ gfx_rect(v->buf, x, y + 2, 1, hh - 3, C_RED2); gfx_rect(v->buf, x + ww - 1, y + 2, 1, hh - 3, C_RED2); }
+      FAC_RECT(x + 1, y + 1, ww/3, hh/3, C_CLOUD);
+      FAC_RECT(x + 1, y + hh - 2, ww - 2, 1, C_CITY2);
+      FAC_RECT(x + ww/2, y, p > 2 ? 2 : 1, hh, C_WHITE);
+      FAC_RECT(x, y + hh/2, ww, p > 2 ? 2 : 1, C_WHITE);
+      FAC_RECT(x - p/2, y + hh + 1, ww + p, p > 2 ? 2 : 1, C_FENCE2);
+      if(p >= 3){
+        FAC_RECT(x, y + 2, 1, hh - 3, C_RED2);
+        FAC_RECT(x + ww - 1, y + 2, 1, hh - 3, C_RED2);
+      }
+#undef FAC_RECT
     }
     /* Occupied interiors: furniture, wall pictures, and a small desk lamp.
        The same wallpaper check makes these vanish when the room is demolished. */
