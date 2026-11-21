@@ -113,7 +113,71 @@ int main(void){
         (MX_IPC->ring[1] >> 28) == C_PLAY_NOISE,
         "PSG/noise start commands not correctly ordered");
 
+  /* A late ARM7 consumer must eventually receive the LATEST desired
+     pitch/gain even if the sequencer never calls soundSet* again. */
+  soundEnable();
+  h = soundPlayWave((const signed char *)0x02001000u, 330, 55, 64);
+  CHECK(h == 0, "deferred-control PCM setup failed");
+  MX_IPC->tail = (MX_IPC->head + 4) & 63u; /* 3 free: no cosmetic updates */
+  before = MX_IPC->head;
+  soundSetVol(h, 22); soundSetFreq(h, 660);
+  soundSetVol(h, 31); soundSetFreq(h, 880);
+  CHECK(MX_IPC->head == before && pcm_gain_pending == 1 &&
+        queued_freq_pending == 1 && pcm_gain_wanted[0] == 31 &&
+        queued_freq_wanted[0] == 880, "congested ring lost latest controls");
+  soundPump();
+  CHECK(MX_IPC->head == before, "deferred controls bypassed reserved ring room");
+  MX_IPC->tail = MX_IPC->head; /* simulated ARM7 drain */
+  soundPump();
+  CHECK(MX_IPC->head == ((before + 2) & 63u) &&
+        (MX_IPC->ring[before] >> 28) == C_VOL &&
+        (MX_IPC->ring[before] & 127u) == 31 &&
+        (MX_IPC->ring[(before + 1) & 63u] >> 28) == C_FREQ &&
+        (MX_IPC->ring[(before + 1) & 63u] & 0xffffu) == 880 &&
+        !pcm_gain_pending && !queued_freq_pending,
+        "deferred controls were not safely replayed after drain");
+  before=MX_IPC->head;
+  soundPump();
+  CHECK(MX_IPC->head == before, "queued controls replayed twice");
+
+  /* Reverting to the already-queued value cancels an obsolete pending
+     change; the old pitch must not be resurrected a frame later. */
+  MX_IPC->tail = (MX_IPC->head + 4) & 63u;
+  soundSetVol(h, 99); soundSetFreq(h, 1200);
+  CHECK(pcm_gain_pending == 1 && queued_freq_pending == 1,
+        "revert test did not create pending changes");
+  soundSetVol(h, 31); soundSetFreq(h, 880);
+  CHECK(!pcm_gain_pending && !queued_freq_pending,
+        "a superseded desired value was not cancelled");
+  MX_IPC->tail = MX_IPC->head;
+  before=MX_IPC->head; soundPump();
+  CHECK(MX_IPC->head == before, "superseded pending pitch/gain got replayed");
+
+  /* Stopping a voice while the ring is FULL clears its pending controls
+     immediately. A reused channel must not inherit an old note's pitch. */
+  MX_IPC->tail = (MX_IPC->head + 4) & 63u;
+  soundSetVol(h, 80); soundSetFreq(h, 1300);
+  MX_IPC->tail = (MX_IPC->head + 1) & 63u; /* now 0 slots */
+  before = MX_IPC->head;
+  soundKill(h);
+  CHECK(pending_kill == 1 && busy[0] &&
+        !pcm_gain_pending && !queued_freq_pending &&
+        MX_IPC->head == before, "voice stop retained stale pending controls");
+  MX_IPC->tail=MX_IPC->head;
+  soundPump();
+  CHECK(!pending_kill && !busy[0] &&
+        MX_IPC->head == ((before + 1) & 63u) &&
+        (MX_IPC->ring[before] >> 28) == C_KILL,
+        "pending stop did not outrank deferred controls");
+  before=MX_IPC->head;
+  h=soundPlayWave((const signed char *)0x02001000u,440,55,64);
+  CHECK(h==0 && queued_freq[0]==440 && pcm_gain[0]==55 &&
+        MX_IPC->head==((before + 3) & 63u),
+        "recycled channel inherited old control commands");
+  before=MX_IPC->head; soundPump();
+  CHECK(MX_IPC->head==before, "stale controls replayed onto new note");
+
   munmap(mem,4096);
-  puts("DS sound queue: atomic starts, backpressure, essential kill and recovery passed");
+  puts("DS sound queue: atomic starts, backpressure, deferred latest controls and recovery passed");
   return 0;
 }
