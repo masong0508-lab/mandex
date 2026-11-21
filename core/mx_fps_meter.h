@@ -8,7 +8,8 @@
 #include <stdint.h>
 #include <limits.h>
 typedef struct {
-  unsigned clock_ticks, renders, simulations, dropped_ticks;
+  uint64_t clock_ticks;
+  unsigned renders, simulations, dropped_ticks;
   unsigned render_x10, sim_x10, last_dropped, max_gap_ticks;
 } MxFpsMeter;
 static inline void mx_fps_meter_add(MxFpsMeter *m, unsigned elapsed,
@@ -25,7 +26,7 @@ static inline void mx_fps_meter_add(MxFpsMeter *m, unsigned elapsed,
   m->simulations+=sim_steps;
   if(elapsed>m->max_gap_ticks)m->max_gap_ticks=elapsed;
   if(elapsed>1u && ticks_per_second==60u)m->dropped_ticks+=elapsed-1;
-  if(m->clock_ticks>=ticks_per_second*2u){
+  if(m->clock_ticks >= (uint64_t)ticks_per_second*2u){
     /* Multiplication in unsigned is unsafe for high resolution clocks.
      * This is executed only once per reporting window, never per pixel. */
     m->render_x10=(unsigned)(((uint64_t)m->renders*ticks_per_second*10u)/m->clock_ticks);
