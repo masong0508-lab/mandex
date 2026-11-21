@@ -124,12 +124,12 @@ for L in 0 9 19 20 29 39 40 59; do
   grep '^DS_FRAME_HASH ' ds_target_ref_run.txt > ds_target_ref.txt
   grep '^DS_FRAME_HASH ' ds_target_opt_run.txt > ds_target_opt.txt
   cmp ds_target_ref.txt ds_target_opt.txt
-  ref_us=$(sed -n 's/.*cpu_frame_mean_us=\\([0-9.]*\\).*/\\1/p' ds_target_ref_run.txt | head -n 1)
-  opt_us=$(sed -n 's/.*cpu_frame_mean_us=\\([0-9.]*\\).*/\\1/p' ds_target_opt_run.txt | head -n 1)
+  ref_us=$(sed -n 's/.*cpu_frame_mean_us=\([0-9.]*\).*/\1/p' ds_target_ref_run.txt | head -n 1)
+  opt_us=$(sed -n 's/.*cpu_frame_mean_us=\([0-9.]*\).*/\1/p' ds_target_opt_run.txt | head -n 1)
   test -n "$ref_us" && test -n "$opt_us"
   awk -v lev="$((L+1))" -v ref="$ref_us" -v opt="$opt_us" 'BEGIN{
     gain=ref>0?(ref-opt)*100/ref:0
-    printf "DS_TARGET_CULL_AB level=%d ref_host_us=%.2f new_host_us=%.2f gain_pct=%+.2f pixel_identical=1\\n",lev,ref,opt,gain
+    printf "DS_TARGET_CULL_AB level=%d ref_host_us=%.2f new_host_us=%.2f gain_pct=%+.2f pixel_identical=1\n",lev,ref,opt,gain
   }'
 done
 echo "--- DS furniture offscreen culling: 3 HQ districts plus 8 gameplay frame-hash A/B checks ---"
