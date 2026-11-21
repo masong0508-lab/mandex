@@ -1,0 +1,114 @@
+name: Simulation and rendering fast-path A-B
+
+# Focused deterministic parity/performance gate. Host us is not DS hardware FPS.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "core/mx.c"
+      - "ds/source/main.c"
+      - "test/bench.c"
+      - "test/wob_state_digest.c"
+      - "test/ds_render.c"
+      - ".github/workflows/sim-render-fastpath.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: sim-render-fastpath-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile original and optimized simulation paths for fixed/float
+        run: |
+          for mode in float fixed; do
+            defs=""
+            test "$mode" = fixed && defs="-DMX_FIXED"
+            for variant in before after; do
+              ref=""
+              test "$variant" = before && ref="-DMX_WOB_JOINT_MASK=0"
+              gcc -std=gnu99 -O2 $defs $ref -Icore core/mx.c test/wob_state_digest.c -lm -o /tmp/sim_${mode}_${variant}_digest
+              gcc -std=gnu99 -O2 $defs $ref -Icore core/mx.c test/bench.c -lm -o /tmp/sim_${mode}_${variant}_bench
+            done
+          done
+      - name: Verify exact whole-world state over 60 levels x 360 frames, both modes
+        run: |
+          for mode in float fixed; do
+            /tmp/sim_${mode}_before_digest > /tmp/world-${mode}-before
+            /tmp/sim_${mode}_after_digest > /tmp/world-${mode}-after
+            diff -u /tmp/world-${mode}-before /tmp/world-${mode}-after
+            echo "$mode world parity: $(cat /tmp/world-${mode}-after)"
+          done
+      - name: Alternate reference/optimized runs and report median simulation CPU
+        run: |
+          python3 - <<'PY'
+          import re,subprocess,statistics
+          for mode in ('fixed','float'):
+            times={'before':[],'after':[]}
+            for turn in range(4):
+              for variant in (('before','after') if turn%2==0 else ('after','before')):
+                s=subprocess.check_output([f'/tmp/sim_{mode}_{variant}_bench','--quiet','360'],text=True)
+                m=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',s)
+                assert m,s
+                times[variant].append((float(m.group(1)),m.group(2)))
+            a=statistics.median(t for t,c in times['before'])
+            b=statistics.median(t for t,c in times['after'])
+            assert {c for v in times.values() for t,c in v}.__len__()==1, 'simulation changed!'
+            print(f'SIM_AB mode={mode} reference_ms={a:.2f} optimized_ms={b:.2f} improvement_pct={(a-b)*100/a:.2f}')
+          PY
+
+  ds-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build real DS main-loop harness with reference and optimized render flags
+        run: |
+          for variant in before after; do
+            defs=""
+            test "$variant" = before && defs="-DMX_DS_DAMAGE_THRESH=0 -DMX_WOB_JOINT_MASK=0"
+            gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST $defs \
+              -Itest/stubs -Icore -Iart -Ids/source \
+              test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+              core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_${variant}
+          done
+      - name: Compare framebuffer hashes and report host draw/physics cost
+        run: |
+          mkdir -p out/sim-render-fastpath
+          for level in 0 9 39 59; do
+            for variant in before after; do
+              DS_PERF_BENCH=1 /tmp/ds_${variant} /tmp/ds-${variant} 520 "$level" > out/sim-render-fastpath/${variant}-${level}.txt
+            done
+          done
+          python3 - <<'PY'
+          import pathlib,re
+          root=pathlib.Path('out/sim-render-fastpath')
+          for level in (0,9,39,59):
+            a=(root/f'before-{level}.txt').read_text()
+            b=(root/f'after-{level}.txt').read_text()
+            p=r'DS_FRAME_HASH checksum=([0-9a-f]+) screen_samples=(\d+)'
+            ha=re.search(p,a);hb=re.search(p,b)
+            if not ha or not hb or ha.groups()!=hb.groups():
+              raise SystemExit(f'framebuffer mismatch level {level+1}: {ha and ha.groups()} vs {hb and hb.groups()}')
+            def get(s,rx):
+              m=re.search(rx,s)
+              if not m:raise SystemExit(f'profile metric not found: {rx}')
+              return float(m.group(1))
+            x=get(a,r'cpu_frame_mean_us=([0-9.]+)')
+            y=get(b,r'cpu_frame_mean_us=([0-9.]+)')
+            td=r'DS_PHASE phase=top_draw mean_us=([0-9.]+)'
+            t0=get(a,td);t1=get(b,td)
+            ph=r'DS_PHASE phase=physics mean_us=([0-9.]+)'
+            p0=get(a,ph);p1=get(b,ph)
+            print(f'DS_AB level={level+1} pixels=IDENTICAL old_frame_us={x:.2f} new_frame_us={y:.2f} total_gain_pct={(x-y)*100/x:.2f} old_top_us={t0:.2f} new_top_us={t1:.2f} old_physics_us={p0:.2f} new_physics_us={p1:.2f}')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sim-render-fastpath-host-metrics
+          path: out/sim-render-fastpath/*.txt
+          if-no-files-found: ignore
