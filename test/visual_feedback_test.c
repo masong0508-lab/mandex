@@ -17,9 +17,9 @@ int main(void){
   }
   m.gait=RI(3);
   CK(mx_walk_anim_phase(&m)==3,"existing sprite stride order is unchanged");
-  /* The six 15-degree atlas offsets turn through the BACK, never through
+  /* Twelve held atlas offsets turn through the BACK, never through
      a face/body mirror pop or new geometry. Reverse input remains instant. */
-  { static const int offsets[12]={1,1,3,3,5,5,5,5,3,3,1,1};
+  { static const int offsets[12]={1,2,3,4,5,6,6,5,4,3,2,1};
     m.face=-1; m.mode=MAN_WALK;
     for(int tick=12;tick>=1;tick--){
       m.turn_ticks=(uint8_t)tick;
