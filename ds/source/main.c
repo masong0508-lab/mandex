@@ -1125,8 +1125,10 @@ static void draw_man(const View *v){
   int x = vx(v, m->x), y = vy(v, m->y);
   if(m->mode == MAN_WALK){                                                                  /* on his own feet: the turning-round frames step him along, three quarters of the sling size */
     if(m->hurtCd > 0 && (frame & 2)) return;                                                  /* blinks while he is protected after a hit */
-    int p = v->ppc * 3 / 4, mv = m->gr && (m->vx > R(3) || m->vx < -R(3)), fr = MSF_SPIN_6 + (mv ? ((frame >> 2) & 1 ? 1 : -1) : 0), face = m->face < 0 ? -1 : 1;
-    int fy = vy(v, m->y + R(2.375)) - (mv && ((frame >> 2) & 1) ? 1 : 0);
+    int p = v->ppc * 3 / 4, phase = mx_walk_anim_phase(m);
+    int fr = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
+    int face = m->face < 0 ? -1 : 1;
+    int fy = vy(v, m->y + R(2.375)) - (phase == 1 || phase == 3 ? 1 : 0);
     spr_man_walk(v->buf, x, fy, p < 1 ? 1 : p, face, fr, 0);
     if(m->pT > 0){ int r = v->ppc * 5, ax = x + face * v->ppc * 4; for(int k = -3; k <= 3; k++) gfx_px(v->buf, ax + face * (r - k * k * r / 18), y + k * v->ppc * 3 / 4, C_WHITE); }   /* punch swoosh */
     return;
