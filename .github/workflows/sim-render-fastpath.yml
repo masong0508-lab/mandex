@@ -89,16 +89,18 @@ jobs:
           done
       - name: Prove 3100 rotated sprite frames are byte-identical for no-jiggle and deformed poses
         run: |
-          for variant in before after; do
-            flag=1
-            test "$variant" = before && flag=0
-            gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_ROT_INCREMENTAL=$flag \
-              -Itest/stubs -Icore -Iart -Ids/source \
-              test/rot_sprite_parity_test.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_rot_$variant
-            /tmp/mandex_rot_$variant > /tmp/mandex_rot_$variant.txt
+          for clip in 0 1; do
+            for variant in before after; do
+              flag=1
+              test "$variant" = before && flag=0
+              gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_CLIP_ROT=$clip -DMX_DS_ROT_INCREMENTAL=$flag \
+                -Itest/stubs -Icore -Iart -Ids/source \
+                test/rot_sprite_parity_test.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_rot_$variant
+              /tmp/mandex_rot_$variant > /tmp/mandex_rot_$variant.txt
+            done
+            diff -u /tmp/mandex_rot_before.txt /tmp/mandex_rot_after.txt
+            echo "Clipping mode $clip: $(cat /tmp/mandex_rot_after.txt)"
           done
-          diff -u /tmp/mandex_rot_before.txt /tmp/mandex_rot_after.txt
-          cat /tmp/mandex_rot_after.txt
       - name: Compare framebuffer hashes and report host draw/physics cost
         run: |
           mkdir -p out/sim-render-fastpath
