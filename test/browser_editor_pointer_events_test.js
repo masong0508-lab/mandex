@@ -12,7 +12,7 @@ const strokes=cut('function eUp(){','function eBuild(){');
 const handlers=cut("cv.addEventListener('pointerdown',e=>{","addEventListener('keyup',e=>{");
 const after=cut("for(const ev of['pointerup','pointercancel'])","addEventListener('keydown',e=>{");
 const editor=new Function(`
- const events={},captures=[],rects=[],moves=[],starts=[];
+ const events={},captures=[],rects=[],moves=[],starts=[],snapshots=[];
  const cv={addEventListener(n,fn){(events[n]||=[]).push(fn)},
            setPointerCapture(id){captures.push(id)}};
  let mouseX=0,mouseY=0,dragging=false,sliderDrag=false,sodaHold=false,state='edit',
@@ -25,11 +25,12 @@ const editor=new Function(`
  const eDown=(x,y)=>{starts.push([x,y]);E.drag={a:[x,y],b:[x,y],m:2}};
  const eMove=(x,y)=>{moves.push([x,y]);if(E.drag)E.drag.b=[x,y]};
  const eRect=(a,b,m)=>rects.push({a,b,m});
+ const eSnap=()=>snapshots.push(1);
  const releaseWalkTouch=()=>{},addEventListener=()=>{};
  ${strokes}
  ${handlers}
  ${after}
- return {E,events,captures,rects,moves,starts,
+ return {E,events,captures,rects,moves,starts,snapshots,
    portrait(value){portrait=!!value},setStarters(value){E.starters=!!value}};
 `)();
 const send=(name,id,x,y)=>{
@@ -50,6 +51,7 @@ assert.strictEqual(editor.E.pointer,1,'foreign up cannot steal owner');
 send('pointermove',1,375,215);
 send('pointerup',1,375,215);
 assert.strictEqual(editor.rects.length,1,'owner completes exactly once');
+assert.strictEqual(editor.snapshots.length,1,'owner commit takes one history snapshot');
 assert.deepStrictEqual(editor.rects[0].b,[375,215],'owner controls rectangle');
 assert.strictEqual(editor.E.pointer,null,'owner cleared after finishing');
 send('lostpointercapture',1,375,215);
@@ -59,6 +61,7 @@ send('pointercancel',4,361,191);
 assert.strictEqual(editor.E.pointer,3,'foreign cancel cannot discard live stroke');
 send('pointercancel',3,361,191);
 assert.strictEqual(editor.rects.length,1,'owner cancellation discards rectangle');
+assert.strictEqual(editor.snapshots.length,1,'cancel cannot create an undo state');
 assert.strictEqual(editor.E.drag,null);
 assert.strictEqual(editor.E.pointer,null);
 send('pointerdown',5,365,220);
@@ -75,6 +78,7 @@ send('pointermove',6,220,190);
 assert.deepStrictEqual(editor.moves.at(-1),[225,197],'portrait draws in world coordinates');
 send('pointerup',6,220,190);
 assert.strictEqual(editor.rects.length,2);
+assert.strictEqual(editor.snapshots.length,2,'portrait commit takes one history snapshot');
 const before=editor.starts.length,captureCount=editor.captures.length;
 send('pointerdown',7,190,530);
 assert.strictEqual(editor.starts.length,before,'portrait toolbar never starts painting');

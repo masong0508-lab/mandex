@@ -5008,7 +5008,8 @@ function drawMobileEditor(){
       ['SHARE',()=>{if(!E.t.length){toast('ach','Add a landlord first','');return}
         exportCode({n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t})}],
       ['STARTERS',()=>{E.starters=true}],
-      ['EXIT',()=>{selTab=1;goSelect()}]
+      ['EXIT',()=>{selTab=1;goSelect()}],
+      ['CHECK BUILD',eCheckBuild]
     ];
     actions.forEach((a,i)=>btn(12+(i%4)*132,y+Math.floor(i/4)*48,120,42,a[0],a[1],
         {size:14,on:i===5}));
@@ -5337,7 +5338,14 @@ function drawStarterMenu(x,y,w){
   btn(x+12,y+216,w-24,30,'CANCEL',()=>{E.starters=false},{size:13});
 }
 function eCell(px,py){return[Math.floor(px/V),Math.floor(py/V)]}
-function eClearLord(x,y){E.t=E.t.filter(p=>!(p[0]===x&&p[1]-1===y))}
+// Preserve the tiny target list: large rectangle brushes can paint thousands
+// of cells, and must not allocate a fresh array at every painted cell.
+function eClearLord(x,y){
+  for(let i=E.t.length-1;i>=0;i--){
+    const p=E.t[i];
+    if(p[0]===x&&p[1]-1===y)E.t.splice(i,1);
+  }
+}
 // brushes: SQUARE n x n, WIDE n x thickness (long beams), TALL thickness x n (columns), ROUND radius n (discs)
 const BR_KIND=['SQUARE','WIDE','TALL','ROUND'];
 const BR_SIZE=[[1,2,3,4,6,8,12],[4,6,10,16,24,32,48],[4,6,10,16,24,36],[1,2,3,5,8,12,16]];
@@ -5353,14 +5361,28 @@ function ePut(cx,cy,m){const B=brushDims(),ox=cx-((B.w-1)>>1),oy=cy-((B.h-1)>>1)
 function eLine(a,b,m){const n=Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]));for(let t=1;t<=n;t++)ePut(Math.round(a[0]+(b[0]-a[0])*t/n),Math.round(a[1]+(b[1]-a[1])*t/n),m)}   // no gaps when you drag fast
 function eRect(a,b,m){const x0=Math.min(a[0],b[0]),x1=Math.max(a[0],b[0]),y0=Math.min(a[1],b[1]),y1=Math.max(a[1],b[1]);for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(x<EMIN||x>=COLS||y<0||y>=ROWS)continue;E.g[idx(x,y)]=m;eClearLord(x,y)}}
 function eDown(x,y){
-  if(y>=GY+3||x<EMIN*V)return;const c=eCell(x,y);
-  if(E.tool==='lord'){eSnap();const k=E.t.findIndex(p=>Math.abs(p[0]-c[0])<=1&&Math.abs(p[1]-1-c[1])<=1);
-    if(k>=0)E.t.splice(k,1);else if(E.t.length>=12)toast('ach','Max 12 landlords','');else if(c[0]>=EMIN&&c[1]<ROWS&&!E.g[idx(c[0],c[1])])E.t.push([c[0],c[1]+1]);return}
-  eSnap();const m=E.tool==='erase'?0:E.mat;
+  // Invalid taps are not edits: do not consume undo or touch ownership.
+  if(!Number.isFinite(x)||!Number.isFinite(y)||y<0||y>=GY||
+     x<EMIN*V||x>=COLS*V)return;
+  const c=eCell(x,y);
+  if(c[1]<0||c[1]>=ROWS||c[0]<EMIN||c[0]>=COLS)return;
+  if(E.tool==='lord'){
+    const k=E.t.findIndex(p=>Math.abs(p[0]-c[0])<=1&&Math.abs(p[1]-1-c[1])<=1);
+    if(k>=0){eSnap();E.t.splice(k,1)}
+    else if(E.t.length>=12)toast('ach','Max 12 landlords','');
+    else if(!E.g[idx(c[0],c[1])]){eSnap();E.t.push([c[0],c[1]+1])}
+    return;
+  }
+  const m=E.tool==='erase'?0:E.mat;
+  // Rectangles are previews until release; cancellation cannot erase redo.
   if(E.shape==='rect'){E.drag={a:c,b:c,m};return}
-  E.drag={pen:true,m,l:c};ePut(c[0],c[1],m)}
+  eSnap();E.drag={pen:true,m,l:c};ePut(c[0],c[1],m);
+}
 function eMove(x,y){if(!E.drag)return;const c=eCell(x,y);if(E.drag.pen){if(y<GY+3){const t=[c[0],Math.min(c[1],ROWS-1)];eLine(E.drag.l,t,E.drag.m);E.drag.l=t}}else E.drag.b=[c[0],Math.min(c[1],ROWS-1)]}
-function eUp(){if(E.drag&&!E.drag.pen)eRect(E.drag.a,E.drag.b,E.drag.m);E.drag=null}
+function eUp(){
+  if(E.drag&&!E.drag.pen){eSnap();eRect(E.drag.a,E.drag.b,E.drag.m)}
+  E.drag=null;
+}
 // Only the touch that began an editor stroke may move or finish it.
 // Canceled/rotated strokes discard an unfinished rectangle.
 function eBeginStroke(id){
@@ -5380,6 +5402,14 @@ function eCheckedLevel(action){
   try{return validateSharedLevel({
     n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t
   })}catch(err){toast('ach','Fix level before '+action,err.message||'Invalid layout');return null}
+}
+// Explicitly requested preflight only; never encode 7,200 cells per frame.
+function eCheckBuild(){
+  const level=eCheckedLevel('checking');
+  if(!level)return false;
+  toast('outfit','BUILD READY',
+    level.t.length+' landlords • '+level.m+' shots — TEST PLAY to try it');
+  return true;
 }
 function eTest(){
   if(!eCheckedLevel('testing'))return;
@@ -5447,7 +5477,8 @@ function drawEditor(){
   btn(x,y2,70,24,'SHARE',()=>{if(!E.t.length){toast('ach','Add a landlord first','');return}exportCode({n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t})},{size:12});x+=76;
   btn(x,y2,56,24,'EXIT',()=>{selTab=1;goSelect()},{size:12});x+=62;
   btn(x,y2,106,24,'STARTER BUILDS',()=>{E.starters=!E.starters},{size:12,on:E.starters});
-  txt(E.name?E.name:'unsaved level',W-8,y2+17,13,'#99a','right');
+  btn(x+112,y2,90,24,'CHECK BUILD',eCheckBuild,{size:11});
+  txt(E.name?E.name:'unsaved level',W-8,y1+17,13,'#99a','right');
   if(E.starters)drawStarterMenu(W-308,66,296)}
 
 // ---------- level finished: stars, achievements ----------
