@@ -826,7 +826,7 @@ static void draw_all(void){
     }
     else if(m->mode == MAN_WALK){ fr = -1; }
     else if(m->mode == MAN_STUCK){ puff(x, y + 6, 30, Z_MAN - 0.2f, argb(111, 227, 74, 200)); fr = ((ph >> 3) & 1) ? MSF_STUCK_A : MSF_STUCK_B; }
-    else if(m->mode == MAN_FLY){ face = m->vx >= 0 ? 1 : -1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
+    else if(m->mode == MAN_FLY){ face = m->face < 0 ? -1 : 1; fr = m->dive ? MSF_DIVE : ((ph >> 2) & 1 ? MSF_FLY_A : MSF_FLY_B); }
     if(m->mode == MAN_AIM || m->mode == MAN_FLY){                         /* his shadow on the ground: smaller and fainter the higher he is */
       float hgt = (MX_ROWS - m->y) / 40.0f; if(hgt < 0) hgt = 0; if(hgt > 1) hgt = 1;
       float rw = 30.0f * (1.0f - 0.55f * hgt); quad(XB(m->x) - rw, YB(MX_ROWS) + 1, rw * 2, 4, Z_SLING + 0.05f, argb(0, 0, 0, (int)(90 - 60 * hgt)));
@@ -837,7 +837,7 @@ static void draw_all(void){
         int wf = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
         int fc = m->face < 0 ? -1 : 1;
         const short *f = DCM_FR[wf + (man_fur ? MSF_NBASE : 0)]; float zm = man_zoom; man_zoom = zm * 0.75f;
-        float foot = Y(m->y + 2.375f) - (phase == 1 || phase == 3 ? 1.0f : 0.0f);
+        float foot = Y(m->y + 2.375f) - RTOF(mx_walk_foot_lift(m))*PXC;
         draw_frame(wf, x, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
         man_zoom = zm;
         if(m->pT > 0) for(int k = -3; k <= 3; k++) puff(x + fc * (24 - k * k * 1.4f) + fc * 18, y + k * 3.4f, 1.8f, Z_MAN + 0.3f, WHITE);
