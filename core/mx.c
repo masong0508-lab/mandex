@@ -1939,6 +1939,11 @@ static void upd_targets(MxWorld *w, real dt){
         if(sp2 > R(351.6)){ if(!collapse_survive(w,t))kill_target(w,t); break; }                              /* fast rubble (> 18.75 cells/s) kills; a slower graze only stuns */
         if(sp2 > R(76.6) && t->inv <= 0){ t->inv = R(0.8); t->stun = R(0.9); ev(w, EV_OOF, t->x, t->y, 0, RI(t->hp), 0); }
       }
+      /* An escape during THIS chunk must end the impact scan immediately.
+         Otherwise another overlapping chunk can evict a 1-HP miracle
+         survivor in the same simulation tick, before the new grace takes
+         effect. Browser already exits its chunk loop on a rescue. */
+      if(t->collapse_rolled==2 && t->inv>0) break;
     }
   }
 }
