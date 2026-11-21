@@ -20,6 +20,7 @@
 #include <string.h>
 #include "mx.h"
 #include "mx_meta.h"
+#include "mx_objective.h"
 #include "gfx.h"
 #include "sfx.h"
 #include "intro.h"
@@ -1365,6 +1366,26 @@ static void top_hud(u8 *b){
     gfx_rect(b, 140, 28, (int)(rmul(world.combo_left, RI(110)) / R(2.5)), 2, C_GOLD); }
   gfx_text_o(b, 4, 24, "LANDLORDS", C_WHITE, C_BLACK, 1);
   draw_hats(b, 46, 28);
+  /* WRECKED is a bonus meter; the actual win condition is evicting every
+     landlord. Keep a concise objective cue visible while aiming or walking.
+     Only existing tiny glyphs, no new sprite atlas or framebuffer. */
+  if(world.state == MX_PLAY){
+    MxObjective obj=mx_objective_snapshot(&world);
+    const char *goal=mx_objective_label(obj.phase);
+    int px=4, y=47;
+    gfx_text_o(b, px, y, goal, obj.phase==MX_OBJ_LAST ? C_PINK : C_GOLD, C_BLACK, 1);
+    px+=gfx_text_w(goal,1)+5;
+    if(obj.phase==MX_OBJ_EVICT){
+      const char *left=gfx_int(obj.remaining);
+      gfx_text_o(b,px,y,left,C_WHITE,C_BLACK,1);
+      px+=gfx_text_w(left,1)+1;
+      gfx_text_o(b,px,y,"/",C_WHITE,C_BLACK,1);
+      px+=4;
+      gfx_text_o(b,px,y,gfx_int(obj.total),C_WHITE,C_BLACK,1);
+    }else if(obj.phase==MX_OBJ_LAST && obj.direction){
+      gfx_text_o(b,px,y,obj.direction<0?"<":">",C_PINK,C_BLACK,1);
+    }
+  }
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                      /* walk levels: the clock, and what the buttons do */
     int k = gfx_clamp((int)((world.man.wt * 100 / MX_WALK_T) >> 12), 0, 100);
     gfx_rect(b, 4, 36, 82, 7, C_UIBG); gfx_rect(b, 5, 37, 80, 5, C_DARK); gfx_rect(b, 5, 37, k * 80 / 100, 5, k > 30 ? C_GOO : C_RED);
