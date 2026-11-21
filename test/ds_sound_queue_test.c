@@ -1,0 +1,70 @@
+/* Host regression for the REAL bare-metal ARM9 sound queue. On Linux, map
+   the DS IPC address to anonymous RAM; no ARM7 hardware or emulator required.
+   Verify backpressure never half-starts a voice or drops an essential kill. */
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/mman.h>
+#include "../ds/bare/hw9.c"
+
+#define CHECK(x,msg) do{ if(!(x)){fprintf(stderr,"DS sound queue: %s (line %d)\n",msg,__LINE__);return 1;} }while(0)
+int main(void){
+  void *mem = mmap((void *)MX_IPC_ADDR, 4096, PROT_READ|PROT_WRITE,
+                   MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED_NOREPLACE, -1, 0);
+  if(mem == MAP_FAILED){ perror("mmap DS IPC"); return 1; }
+  soundEnable();
+
+  /* Exactly two slots cannot admit a 3-command PCM start. No phantom voice. */
+  MX_IPC->head = 61; MX_IPC->tail = 0;
+  int h = soundPlayWave((const signed char *)0x02001000u, 440, 55, 64);
+  CHECK(h == -1 && MX_IPC->head == 61 && !busy[0], "partial PCM voice admitted");
+  MX_IPC->tail = 61;
+  h = soundPlayWave((const signed char *)0x02001000u, 440, 55, 64);
+  CHECK(h == 0 && MX_IPC->head == 0, "PCM start failed to wrap correctly");
+  CHECK((MX_IPC->ring[61] >> 28) == C_WAVE_SRC &&
+        (MX_IPC->ring[62] >> 28) == C_FREQ &&
+        (MX_IPC->ring[63] >> 28) == C_PLAY_WAVE,
+        "PCM source/frequency/start sequence interrupted");
+
+  /* Fill to capacity and kill the PCM note. The kill must be retried before
+     recycling channel zero; the ARM7 must never hear a start without a stop. */
+  MX_IPC->tail = (MX_IPC->head + 1) & 63u;
+  soundKill(h);
+  CHECK(pending_kill == 1 && busy[0] && MX_IPC->head == 0, "kill lost at full queue");
+  CHECK(soundPlayWave((const signed char *)0x02001000u, 330, 55, 64) < 0,
+        "busy channel recycled before its kill");
+  MX_IPC->tail = MX_IPC->head; /* ARM7 drains old commands */
+  soundPump();
+  CHECK(pending_kill == 0 && !busy[0] && (MX_IPC->ring[0] >> 28) == C_KILL,
+        "pending kill not flushed first");
+  h = soundPlayWave((const signed char *)0x02001000u, 330, 55, 64);
+  CHECK(h == 0 && MX_IPC->head == 4 &&
+        (MX_IPC->ring[3] >> 28) == C_PLAY_WAVE,
+        "PCM channel not safely recyclable after kill");
+
+  /* A nearly-full queue drops cosmetic fades/glides to leave room for a
+     necessary stop or a complete voice start. */
+  MX_IPC->tail = (MX_IPC->head + 4) & 63u;  /* 3 slots free */
+  unsigned before = MX_IPC->head;
+  soundSetVol(0, 22); soundSetFreq(0, 220);
+  CHECK(MX_IPC->head == before, "cosmetic commands consumed reserved room");
+  soundKill(0);
+  CHECK(MX_IPC->head == ((before + 1) & 63u) && !busy[0],
+        "essential stop blocked by optional updates");
+
+  /* PSG and noise starts are two-command transactions, not single writes. */
+  soundEnable();
+  MX_IPC->head = 62; MX_IPC->tail = 0;      /* one slot free */
+  CHECK(soundPlayPSG(DutyCycle_50, 440, 50, 64) == -1 && !busy[8] &&
+        soundPlayNoise(220, 50, 64) == -1 && !busy[14] &&
+        MX_IPC->head == 62, "PSG/noise admitted half a start");
+  MX_IPC->tail = 62;
+  CHECK(soundPlayPSG(DutyCycle_50, 440, 50, 64) == 8 &&
+        soundPlayNoise(220, 50, 64) == 14 &&
+        (MX_IPC->ring[63] >> 28) == C_PLAY_PSG &&
+        (MX_IPC->ring[1] >> 28) == C_PLAY_NOISE,
+        "PSG/noise start commands not correctly ordered");
+
+  munmap(mem,4096);
+  puts("DS sound queue: atomic starts, backpressure, essential kill and recovery passed");
+  return 0;
+}
