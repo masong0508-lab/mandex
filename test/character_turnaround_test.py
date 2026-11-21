@@ -57,6 +57,32 @@ if "#define MS_CANONICAL_TURN_BAKE 1" in header:
        "fully regenerated console atlas retains all turnaround/flight frame names")
     ok("static const MsFrame MS_FRAMES[MSF_COUNT]" in header,
        "complete high-fidelity re-bake preserves renderer metadata and frame order")
+    # This actually reads the shipped 142-frame atlas. The old bald
+    # profile had only 2 hair pixels above the eyes on SPIN_5/6.
+    # A regression that merely reads the Python model would miss a stale
+    # baked header, so guard actual pixels and the real sprite pivot.
+    meta={}
+    for match in re.finditer(r"\\{\\s*MS_(\\w+),\\s*(\\d+),\\s*(\\d+),\\s*(-?\\d+),\\s*(-?\\d+),",header):
+        name,w,h,ax,ay=match.groups()
+        meta[name]=tuple(map(int,(w,h,ax,ay)))
+    def crown_ink(name):
+        m=re.search(r"static const unsigned char MS_"+name+
+                    r"\\[(\\d+)\\] = \\{(.*?)\\};",header,re.S)
+        assert m,name
+        w,h,ax,ay=meta[name]
+        p=[int(q) for q in re.findall(r"\\d+",m[2])]
+        assert len(p)==w*h,(name,len(p),w*h)
+        return sum(p[y*w+x] in (11,12,23)
+                   for y in range(5,11)
+                   for x in range(max(0,ax-11),min(w,ax+12)))
+    for name in ["SPIN_3","SPIN_4","SPIN_5","SPIN_6",
+                 "SPIN_7","SPIN_8","SPIN_R4","SPIN_R5",
+                 "SPIN_R6","SPIN_R7","SPIN_R8"]:
+        ink=crown_ink(name)
+        ok(ink>=14, f"{name} maintains swept hairstyle from 3/4 through profile ({ink} crown pixels)")
+    for name in ["FLY_A","FLY_B","DIVE"]:
+        ink=crown_ink(name)
+        ok(ink>=10, f"{name} shares the full side-profile hair mass ({ink} crown pixels)")
 else:
     output,changed,frames=baked.patch_string(header)
     ok(output==header and changed==0 and len(frames)==13,
