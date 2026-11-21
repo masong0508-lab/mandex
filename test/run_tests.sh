@@ -60,6 +60,13 @@ gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c stars
 echo "--- level unlock order (rules on / default off) ---"
 gcc -std=c99 -O2 -Wall -DMX_LEVEL_LOCKS -I../core ../core/mx.c ../core/mx_meta.c meta_test.c -lm -o meta_locks && ./meta_locks | tail -n 1
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c meta_test.c -lm -o meta_open && ./meta_open | tail -n 1
+echo "--- shared event queue: preserve win, district, surviving landlords and controls after 96 cosmetic events ---"
+for mode in float fixed; do
+  defs=""
+  if test "$mode" = fixed; then defs="-DMX_FIXED"; fi
+  gcc -std=gnu99 -O2 -Wno-unused-function $defs -I../core event_overflow_test.c -lm -o event_overflow_$mode
+  ./event_overflow_$mode
+done
 echo "--- event-driven landlord structural-shock reactions (float, fixed, fallback-off) ---"
 gcc -std=gnu99 -O2 -Wno-unused-function -I../core landlord_shock_test.c -lm -o landlord_shock_float && ./landlord_shock_float
 gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -I../core landlord_shock_test.c -lm -o landlord_shock_fixed && ./landlord_shock_fixed
