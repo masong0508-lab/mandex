@@ -43,7 +43,12 @@ assert "const phase=mv?m.x/15:0" in web
 assert "const th=Math.PI/2+(mv?.055*step:0)" in web
 assert "lit?'rgba(255,224,164,.52)'" in web
 assert "x.fillStyle='rgba(215,248,166,.20)'" in web
-assert 'gfx_rect(v->buf, x + 1, y + hh - 2, ww - 2, 1, C_CITY2);' in ds
+# The intact-glazing ledge must be rendered with the same palette ink,
+# whether the clipped reference painter or the optional in-bounds painter
+# handles the stroke. The A/B renderer test checks pixel-exact output.
+assert ('gfx_rect(v->buf, x + 1, y + hh - 2, ww - 2, 1, C_CITY2);' in ds or
+        'FAC_RECT(x + 1, y + hh - 2, ww - 2, 1, C_CITY2);' in ds)
+assert 'else gfx_rect(v->buf,(X),(Y),(W),(H),(C));' in ds
 assert 'for(float k = 0; k < w; k += 20)' in dc
 assert 'light[j+1][i+1]' in dc
 assert 'static uint32 light[' not in dc  # small stack-only vertex gradient
