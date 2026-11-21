@@ -58,6 +58,7 @@ jobs:
           python3 test/character_turnaround_test.py
           python3 test/dreamcast_wolf_atlas_test.py
           python3 test/hd_wolf_volume_test.py
+          python3 test/turnaround_preview_palette_test.py
           python3 test/sprite_volume_continuity_test.py
           python3 tools/sprite_pinhole_cleanup.py --check
           python3 tools/retouch_baked_heads.py --check
