@@ -487,6 +487,7 @@ static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, fl
      reject a visible sample, but avoids four floorf + texel lookups for
      blank margins of the rotation candidate square. */
   const float guard=.501f+.354f*q;
+  const int ref_x0=x0; /* preserve the old incremental sample origin */
 #if MX_N3DS_ROT_TIGHT_BOUNDS
   /* The old search square is sized by max(width,height), which wastes
      thousands of iterations for narrow poses. Intersect it with an AABB
@@ -504,8 +505,12 @@ static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, fl
   if(y1>cy+ry+1)y1=cy+ry+1;
 #endif
   for(int y=y0;y<y1;y++){
-    float dy=(y-cy)*q,dx=(x0-cx)*q*mirror;
+    float dy=(y-cy)*q,dx=(ref_x0-cx)*q*mirror;
     float su=dx*ca+dy*sa+f->ax,sv=-dx*sa+dy*ca+f->ay;
+    /* Starting at the reference x0 avoids altering floating-point
+       accumulation for pixels that are still drawn. The skipped columns
+       require only two additions each, not expensive coverage samples. */
+    for(int x=ref_x0;x<x0;x++){su+=q*mirror*ca;sv-=q*mirror*sa;}
     for(int x=x0;x<x1;x++,su+=q*mirror*ca,sv-=q*mirror*sa){
 #ifdef MX_N3DS_ROT_WORK_COUNT
       man_rot_candidate_pixels++;
