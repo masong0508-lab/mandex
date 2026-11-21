@@ -708,6 +708,57 @@ static int target_visibility_probe(void){
   return 0;
 }
 
+/* Edge-quality regression: all 14 effects across three zoom levels,
+   six ages, four screen edges and deliberately offscreen anchors. The
+   reference build has NO view culling, while the fast build skips only
+   effects proven not to touch a pixel. Hash EVERY pixel in each frame. */
+static int particle_edge_probe(void){
+  static const int xpos[]={-48,-32,-24,-17,-12,-9,-8,-4,-1,0,1,255,256,259,264,272,288};
+  static const int ypos[]={-48,-32,-24,-17,-12,-9,-8,-4,-1,0,1,191,192,196,200,208,232};
+  static const int ages[]={0,1,20,50,75,95};
+  unsigned hash=2166136261u, ncase=0, visible=0, exterior_visible=0;
+  gfx_init();
+  memset(parts,0,sizeof parts);
+  part_high_water=1;
+  Part *q=&parts[0];
+  q->x=100*64; q->y=50*64; q->max=100; q->r=10*64;
+  q->col=C_GOLD; q->vx=1;
+  for(int zoom=2;zoom<=4;zoom++)for(int type=0;type<14;type++)
+  for(unsigned a=0;a<sizeof ages/sizeof ages[0];a++){
+    q->type=(u8)type;
+    q->life=(short)(q->max-ages[a]);
+    for(int axis=0;axis<2;axis++){
+      const int *coords=axis?ypos:xpos;
+      unsigned limit=axis?sizeof ypos/sizeof ypos[0]:sizeof xpos/sizeof xpos[0];
+      for(unsigned k=0;k<limit;k++){
+        int sx=axis?128:coords[k], sy=axis?coords[k]:96;
+        View v={buf_top,zoom,100*zoom-sx,50*zoom-sy};
+        frame=(int)(ncase*7u);
+        memset(buf_top,0,sizeof buf_top);
+        draw_parts(&v);
+        unsigned ink=0;
+        for(unsigned j=0;j<sizeof buf_top;j++){
+          hash=(hash^buf_top[j])*16777619u;
+          ink+=(buf_top[j]!=0);
+        }
+        if(ink){
+          visible++;
+          if(sx < -8 || sx > 264 || sy < -8 || sy > 200)
+            exterior_visible++;
+        }
+        ncase++;
+      }
+    }
+  }
+  if(!exterior_visible){
+    fputs("DS_PARTICLE_EDGE_FAIL no off-camera visible effects tested\n",stderr);
+    return 1;
+  }
+  printf("DS_PARTICLE_EDGE_HASH cases=%u visible=%u edge_visible=%u checksum=%08x\n",
+         ncase,visible,exterior_visible,hash);
+  return 0;
+}
+
 /* Compare the optimized high-water particle scan against the full-pool
    reference build (MX_DS_PARTICLE_BOUNDS=0). Both binaries run the same
    deterministic burst, expiration, ring and view-scale sequence. The printed
@@ -797,6 +848,7 @@ static int walk_phase_probe(void){
   return 0;
 }
 int main(int argc, char **argv){
+  if(getenv("DS_PARTICLE_EDGE_PROBE"))return particle_edge_probe();
   if(getenv("DS_TARGET_CULL_PROBE"))return target_visibility_probe();
   if(getenv("DS_WALK_PHASE_PROBE"))return walk_phase_probe();
   if(getenv("DS_PARTICLE_PROBE"))return particle_pool_probe();
