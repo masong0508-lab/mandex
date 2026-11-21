@@ -27,7 +27,10 @@ for mode in float fixed; do
   gcc -std=gnu99 -O2 -Wno-unused-function $defs -I../core collapse_survivor_test.c -lm -o collapse_survivor_$mode
   ./collapse_survivor_$mode
 done
-if command -v node >/dev/null 2>&1; then node collapse_survivor_web_test.js; fi
+if command -v node >/dev/null 2>&1; then
+  node collapse_survivor_web_test.js
+  node landlord_ai_web_test.js
+fi
 echo "--- BANK SHOT trick bonus: true rubber rebound, direct eviction only, 2s expiry (fixed/float) ---"
 for mode in float fixed; do
   defs=""
