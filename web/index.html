@@ -1,9 +1,10 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MANDEX</title>
 <style>
-html,body{margin:0;background:#0d0d14;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-canvas{max-width:100vw;max-height:100vh;touch-action:none;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.7);cursor:crosshair}
+html,body{margin:0;background:#0d0d14;width:100%;height:100%;height:100dvh;overflow:hidden}
+body{display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+canvas{display:block;max-width:100%;max-height:100%;touch-action:none;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.7);cursor:crosshair;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
 </style></head><body>
 <canvas id="c" width="960" height="540"></canvas>
 <script>
@@ -3219,19 +3220,46 @@ function drawSling1(back){
   ctx.strokeStyle='#7a5230';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(SX,GY);ctx.lineTo(SX,SY+44);ctx.stroke();
   ctx.strokeStyle='#4a2e14';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(SX,SY+44);ctx.lineTo(SX-12,SY+22);ctx.stroke();
   ctx.strokeStyle='#8f6238';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX,SY+44);ctx.lineTo(SX-12,SY+22);ctx.stroke()}
-// ---------- portrait play: a zoomed camera ----------
+// ---------- portrait play and responsive UI ----------
 // Landscape is untouched (zoom 1, camera at 0,0).  In portrait the screen is a tall 540xN canvas, the world is drawn zoomed in,
 // the ground sits at the bottom, and the camera slides sideways: to the buildings while you pull back, with the man in flight,
 // and to the wreckage between throws.  Aiming works in SCREEN distance, so the moving camera never fights your finger.
 const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0};
+/* UI state never changes physics/world dimensions. The portrait virtual
+   canvas is 540px wide and fills the available display at its real ratio;
+   landscapes retain the original 960x540 artwork and screen geometry. */
+const MOBILE={portrait:false,viewportW:0,viewportH:0,
+  page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0,editorScale:1,
+  editorHeight:480,gesture:null};
+const isPortrait=()=>MOBILE.portrait;
+const mobilePage=(kind,n,size)=>Math.max(0,Math.min(Math.max(0,Math.ceil(n/size)-1),MOBILE.page[kind]||0));
 function layoutTick(){
-  const por=innerHeight>innerWidth*1.1&&(state==='play'||state==='win'||state==='lose');
-  const w=por?540:960,h=por?Math.max(780,Math.min(1240,Math.round(540*innerHeight/innerWidth))):540;
-  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;
-    if(por){cv.style.width='min(100vw,'+(100*w/h).toFixed(2)+'vh)';cv.style.height='auto'}else{cv.style.width='';cv.style.height=''}
-    CAM.snap=true}
-  if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);   // menus, cut scenes and the editor are always the normal 120 wide
-  CAM.on=por||!!(CL&&CL.cols>120&&(state==='play'||state==='win'||state==='lose'))}
+  const vp=window.visualViewport;
+  const vw=Math.max(1,vp&&vp.width||window.innerWidth||960),
+        vh=Math.max(1,vp&&vp.height||window.innerHeight||540);
+  const por=vh>vw*1.08;
+  const w=por?540:960,h=por?Math.max(720,Math.min(1240,Math.round(w*vh/vw))):540;
+  const changed=por!==MOBILE.portrait;
+  if(changed){
+    MOBILE.portrait=por;MOBILE.gesture=null;
+    if(typeof dragging!=='undefined')dragging=false;
+    if(typeof sliderDrag!=='undefined')sliderDrag=false;
+    if(typeof E!=='undefined'&&E)E.drag=null;
+    for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
+    CAM.reset=true;CAM.snap=true;hits=[];
+  }
+  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
+  if(vw!==MOBILE.viewportW||vh!==MOBILE.viewportH||changed){
+    MOBILE.viewportW=vw;MOBILE.viewportH=vh;
+    const rect=document.body.getBoundingClientRect(),
+      availW=rect.width||vw,availH=rect.height||vh,
+      scale=Math.max(.01,Math.min(availW/w,availH/h));
+    cv.style.width=Math.floor(w*scale)+'px';cv.style.height=Math.floor(h*scale)+'px';
+  }
+  if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);
+  CAM.on=(por&&(state==='play'||state==='win'||state==='lose'))||
+    !!(CL&&CL.cols>120&&(state==='play'||state==='win'||state==='lose'));
+}
 function camTick(dt){
   if(!CAM.on){CAM.z=1;CAM.x=0;CAM.y=0;return}
   // fit the sling and every standing landlord across the screen (a tall phone shows the whole fight at once instead of an empty sky), ground at 80% of the height
@@ -3302,11 +3330,13 @@ function draw(){
   if(camOn&&CAM.y<0){ctx.drawImage(bgA,0,0,WW,GY,0,CAM.y,WW,GY-CAM.y);ctx.drawImage(bgA,0,GY,WW,WH-GY,0,GY,WW,WH-GY)}else ctx.drawImage(bgA,0,0);
   if(camOn){const dh=Math.max(0,(CAM.y+H/CAM.z)-WH);if(dh>0){const g=ctx.createLinearGradient(0,WH,0,WH+dh);g.addColorStop(0,'#4d311d');g.addColorStop(1,'#2a1a10');ctx.fillStyle=g;ctx.fillRect(CAM.x-2,WH-1,W/CAM.z+4,dh+2)}}   // portrait: the earth continues below the ground line   // sky stretches up so the sun is never cut off
   for(const c of clouds)drawCloud(c);ctx.drawImage(bgB,0,0);
-  if(state==='cutscene'){drawCutscene();return}
-  if(state==='title'){drawTitle();return}
+  if(state==='cutscene'){if(isPortrait())drawMobileCutscene();else drawCutscene();return}
+  if(state==='title'){if(isPortrait())drawMobileTitle();else drawTitle();return}
   if(state==='ending'){drawEnding();drawToasts(frameDt);return}
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='edit'){
-    (state==='menu'?drawMenu:state==='options'?drawOptions:state==='select'?drawSelect:state==='ach'?drawAch:state==='outfit'?drawOutfits:drawEditor)();drawToasts(frameDt);return}
+    if(isPortrait())drawMobileScreen();
+    else (state==='menu'?drawMenu:state==='options'?drawOptions:state==='select'?drawSelect:state==='ach'?drawAch:state==='outfit'?drawOutfits:drawEditor)();
+    drawToasts(frameDt);return}
   ctx.save();ctx.translate((Math.random()-.5)*shake*shakeScale(),(Math.random()-.5)*shake*shakeScale());
   // During a zoom, thousands of interior wall strips may be fully outside
   // the canvas. Preserve each original run's start (stripe phase) while
