@@ -502,6 +502,19 @@ static void tile_rot(float cx, float cy, float ca, float sa, int m, int v, int d
   use(&hdr_atl);
   for(int k = 0; k < 4; k++) vtx(cx + ex[k] * ca - ey[k] * sa, cy + ex[k] * sa + ey[k] * ca, z, uu[k], vv[k], WHITE, k == 3);
 }
+/* A rotated voxel has half-side (PXC/2 + .2) = 2.7 pixels.
+   Even at 45 degrees its axis extent stays below 3.82 px. Reject cells
+   whose entire conservative 4px envelope misses the 640x480 screen.
+   Saves PVR vertices and texture state without any asset/framebuffer cost. */
+#ifndef MX_DC_RUBBLE_CULL
+#define MX_DC_RUBBLE_CULL 1
+#endif
+static void tile_rot_visible(float cx,float cy,float ca,float sa,int m,int v,int d,float z){
+#if MX_DC_RUBBLE_CULL
+  if(cx<=-4.0f || cx>=644.0f || cy<=-4.0f || cy>=484.0f)return;
+#endif
+  tile_rot(cx,cy,ca,sa,m,v,d,z);
+}
 static int dmg(float hp, int m){ float r = hp / MAXHP[m]; return r > 0.66f ? 0 : r > 0.33f ? 1 : 2; }
 
 /* chapter 2 kinds: the same sprite, tinted (bat green, thrower blue), mirrored to face his way, plus the club / briefcase / papers / dazed stars */
@@ -660,7 +673,8 @@ static void draw_all(void){
     for(int k = 0; k < ch->count; k++){
       const MxCell *a = &ch->cells[k];
       if(a->dead) continue;
-      tile_rot(X(a->wx), Y(a->wy), ca, sa, a->m, variant((int)(a->lx * 7), (int)(a->ly * 3)), dmg(a->h, a->m), Z_CHUNK);
+      tile_rot_visible(X(a->wx), Y(a->wy), ca, sa, a->m,
+                       variant((int)(a->lx * 7), (int)(a->ly * 3)), dmg(a->h, a->m), Z_CHUNK);
     }
   }
   /* landlords */
