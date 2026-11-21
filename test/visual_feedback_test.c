@@ -31,6 +31,23 @@ int main(void){
     CK(mx_walk_turn_offset(&m)==0 && mx_walk_render_face(&m)==-1,
        "back turn resolves into the requested side view");
   }
+  /* Punch silhouette should ease forward then recover on the original
+     timer; it must not move the real player body or turn frames. */
+  m.mode=MAN_WALK;m.turn_ticks=0;m.pT=R(0.2);
+  CK(near(mx_walk_punch_lunge(&m),0), "punch begins without a teleport");
+  m.pT=R(0.15);
+  CK(near(mx_walk_punch_lunge(&m),0.15), "punch anticipates at quarter-time");
+  m.pT=R(0.1);
+  CK(near(mx_walk_punch_lunge(&m),0.3), "punch reaches bounded forward lunge");
+  m.pT=R(0.05);
+  CK(near(mx_walk_punch_lunge(&m),0.15), "punch recovers smoothly");
+  m.pT=0;
+  CK(near(mx_walk_punch_lunge(&m),0), "punch returns to exact body anchor");
+  m.pT=R(0.1);m.turn_ticks=4;
+  CK(mx_walk_punch_lunge(&m)==0, "rear turn cannot slide while punching");
+  m.turn_ticks=0;m.mode=MAN_FLY;
+  CK(mx_walk_punch_lunge(&m)==0, "airborne animation does not inherit grounded lunge");
+  m.mode=MAN_WALK;m.pT=0;
   m.vx=0;CK(mx_walk_foot_lift(&m)==0,"stationary foot lift disappears");
   m.vx=RI(9);m.gr=0;CK(mx_walk_foot_lift(&m)==0,"airborne lift stays anchored");
   m.gr=1;m.mode=MAN_FLY;CK(mx_walk_foot_lift(&m)==0,"non-walk modes do not bob");
