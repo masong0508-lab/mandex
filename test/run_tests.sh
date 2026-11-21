@@ -58,6 +58,8 @@ echo "--- Browser editor: isolate painting to owning pointer ---"
 if command -v node >/dev/null 2>&1;then node browser_editor_touch_isolation_test.js;fi
 echo "--- Browser creator: starter structures, undo/redo, mobile actions ---"
 if command -v node >/dev/null 2>&1;then node browser_creator_starters_test.js;fi
+echo "--- Browser creator: large-brush allocations, rectangle cancellation and preflight ---"
+if command -v node >/dev/null 2>&1;then node browser_creator_paint_test.js;fi
 echo "--- Browser creator: storage quota and recovery saves ---"
 if command -v node >/dev/null 2>&1;then node browser_creator_storage_test.js;fi
 echo "--- Browser creator: bounded MX1 imports, Unicode share names and legacy codes ---"
