@@ -17,7 +17,7 @@ const create=new Function(`
   ${html.slice(start,end)}
   return {encodeCells,decodeSharedLevel,encodeSharedLevel,validateSharedLevel,
           importCode,exportCode,PD,get lastToast(){return lastToast},
-          get saved(){return saved},setPrompt(x){promptText=x}};
+          get saved(){return saved},setPrompt(x){promptText=x},setCols(x){COLS=x}};
 `)();
 const grid=new Uint8Array(120*60);
 for(let i=0;i<8;i++)grid[30*120+30+i]=1;
@@ -25,6 +25,10 @@ const canonical={n:'Café 世界 😀',m:5,c:create.encodeCells(grid),t:[[56,31]
 const code=create.encodeSharedLevel(canonical);
 assert(code.startsWith('MX1.'),'MX1 prefix retained');
 assert.deepStrictEqual(create.decodeSharedLevel(code),canonical,'unicode round trip');
+create.setCols(360);
+assert.deepStrictEqual(create.decodeSharedLevel(code),canonical,
+  'share-code geometry stays 120x60 after 360-column finale');
+create.setCols(120);
 const old='MX1.'+btoa(JSON.stringify({...canonical,n:'Legacy ASCII'}));
 assert.strictEqual(create.decodeSharedLevel(old).n,'Legacy ASCII','existing ASCII codes read');
 const latin='MX1.'+btoa(JSON.stringify({...canonical,n:'Café'}));
@@ -58,4 +62,4 @@ assert.strictEqual(create.saved,priorSave+1,'valid import persists');
 assert.strictEqual(create.PD.custom[before].n,'Café 世界 😀','Unicode saved correctly');
 assert.strictEqual(create.exportCode(canonical),code,'export matches pure encoder');
 new Function(html.slice(html.indexOf('<script>')+8,html.indexOf('</script>'))); // whole shipped game parses
-console.log('WEB_CREATOR_CODEC_PASS legacy=2 unicode=1 rejects=14 atomic_import=1 whole_script=1');
+console.log('WEB_CREATOR_CODEC_PASS legacy=2 unicode=1 fixed_grid=1 rejects=14 atomic_import=1 whole_script=1');
