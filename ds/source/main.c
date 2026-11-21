@@ -1845,7 +1845,9 @@ int main(void){
         if(intro_mode() == 3 && intro_level == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_start_wolf(); sfx_play(SFX_CLICK, 64); }   /* the closer of chapter 2 hands over to the wolfman cutscene */
         else { app = ST_PLAY; apply_outfit(outfit_sel); load_level(intro_level); music_set(music_pref); sfx_play(SFX_CLICK, 64); } }   /* finished or skipped: straight into level 1 */
     } else if(app == ST_PAUSE){
-      if(down & KEY_START) app = ST_PLAY;
+      /* Resume the music clock along with gameplay. Previously START
+         unpaused the world but left the soundtrack muted. */
+      if(down & KEY_START){ app = ST_PLAY; music_set(music_pref); }
       if(down & KEY_SELECT){ load_level(world.level); app = ST_PLAY; music_set(music_pref); }
       if(down & KEY_B){ app = ST_TITLE; sel_level = world.level; load_level(sel_level); }
     } else if(world.state != MX_PLAY){
