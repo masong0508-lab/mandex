@@ -331,8 +331,17 @@ static void handle_events(void){
       spawn(e->x, e->y, argb(175, 165, 145, 235), 190); break;
     case EV_CRUMBLE: {
       int tier=mx_crumble_tier(e->a);
-      for(int k=0;k<8+2*tier;k++)
-        spawn(e->x,e->y,k&1?argb(191,181,162,240):argb(140,134,127,240),280);
+      /* The old collapse emitted every chip at exactly one point, so even
+         a large building read as a small smoky dot. Spread the SAME bounded
+         8-14 particles over two visible facade layers. This is deterministic
+         placement only; the normal lifetime and motion remain unchanged. */
+      float reach=tier>=2?5.5f:2.5f;
+      for(int k=0;k<8+2*tier;k++){
+        float dx=((k%7)-3)*(reach/3.0f);
+        float dy=((k/7)-1)*(tier>=2?2.0f:1.0f);
+        spawn(e->x+dx,e->y+dy,
+              k&1?argb(191,181,162,240):argb(140,134,127,240),280);
+      }
       if(tier>=2) collapse_toast_t=75+12*tier;
       break; }
     case EV_BOUNCE: for(int k = 0; k < 10; k++) spawn(e->x, e->y, k & 1 ? argb(255, 126, 176, 255) : argb(255, 255, 255, 255), 420); break;
