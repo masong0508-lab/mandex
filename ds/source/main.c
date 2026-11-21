@@ -995,6 +995,7 @@ static int ds_target_walk_phase(real wk){
 }
 static void draw_targets(const View *v){
   const MxMan *m = &world.man;
+  const int last_target=world.state==MX_PLAY && mx_targets_alive(&world)==1;
   for(int i=0;i<world.ntargets;i++){
     const MxTarget *t=&world.targets[i];
     if(!t->alive)continue;
@@ -1035,6 +1036,10 @@ static void draw_targets(const View *v){
        can still locate the unfinished objective after the popup fades. */
     if(t->collapse_rolled==2 && v->ppc>=3)
       gfx_text_c(v->buf,sx,sy-v->ppc*11,"!",C_GOLD,C_BLACK,1);
+    /* Mark the single remaining objective, not every landlord. The tag
+       sits inside the conservative existing sprite-culling margins. */
+    if(last_target && t->collapse_rolled!=2 && v->ppc>=2)
+      gfx_text_c(v->buf,sx,sy-v->ppc*9,"LAST",C_PINK,C_BLACK,1);
   }
 }
 
