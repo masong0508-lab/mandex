@@ -1859,7 +1859,21 @@ int main(void){
         sfx_play(SFX_CLICK, 64);
       }
     } else {
-      if(down & KEY_START){ app = ST_PAUSE; music_set(0); }
+      if(down & KEY_START){
+        /* Pause must NOT treat a simultaneous touch or D-pad button as a
+           shot, and a touch released while paused must not leave the
+           invisible drag latch stuck on resume. Cancel an unseated pull
+           without firing, consuming a man, or detaching an occupied valve. */
+        if(dragging){
+          if(world.man.mode == MAN_AIM && !world.man.seated)
+            mx_set_pull(&world,0,0);
+          dragging=0;
+        }
+        pad_used=0;
+        app = ST_PAUSE;
+        music_set(0);
+        down=held=up=0; /* consume all gameplay actions on this pause frame */
+      }
       if(down & KEY_SELECT){ load_level(world.level); sfx_play(SFX_CLICK, 64); }
       MxMan *m = &world.man;
       if(m->mode == MAN_AIM){
