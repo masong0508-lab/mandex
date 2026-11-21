@@ -739,6 +739,9 @@ static void facade_prepare(void){
 #ifndef MX_DS_FACADE_FAST_RECT
 #define MX_DS_FACADE_FAST_RECT 1 /* 8-level exact-pixel A/B: 1.23-7.55% lower host frame CPU; hardware FPS still unverified */
 #endif
+#ifndef MX_DS_FURNITURE_VIEW_CULL
+#define MX_DS_FURNITURE_VIEW_CULL 1
+#endif
 #if MX_DS_FACADE_FAST_RECT
 /* The visible interior of a window needs no x/y clipping on each stroke.
    For a wholly in-bounds rectangle use identical row-order memset writes.
@@ -819,6 +822,13 @@ static void draw_facades(const View *v){
 #endif
       if(cy < MX_ROWS && !world.grid[cy*MX_COLS+cx] && world.paper[cy*MX_COLS+cx]){
         int x = cx*p-v->cx, y = cy*p-v->cy;
+#if MX_DS_FURNITURE_VIEW_CULL
+        /* All furniture strokes fit x..x+3*p and y-2*p..y+2*p.
+           Reject only if that ENTIRE footprint is offscreen. This avoids
+           six rectangle calls per off-camera furnished room while leaving
+           edge-clipped and visible pixels exactly unchanged. */
+        if(x>=256 || x+3*p<=0 || y-2*p>=192 || y+2*p<=0) continue;
+#endif
         gfx_rect(v->buf, x, y, 3*p, p, C_SUIT);
         gfx_rect(v->buf, x, y-1, 3*p, 1, C_GOLD2);
         gfx_rect(v->buf, x, y+p, p/2+1, p, C_HAIR2);
