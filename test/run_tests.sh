@@ -238,7 +238,7 @@ echo "--- idle gags: every step valid, every gag ends and plays, he falls asleep
 gcc -std=c99 -O2 -Wall -Wno-unused-function -I../art idle_test.c -o idle_test && ./idle_test
 echo "--- Dreamcast front-end drawing on the host (software rasteriser instead of the PVR): jiggle, gags, win/lose ---"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o dc_$f.o; done   # the shared cutscene code, built exactly as dreamcast/Makefile does
-gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c dc_render.c -lm -o dc_render && ./dc_render
+gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c dc_render.c -lm -o dc_render && DC_MENU_FLOW_TEST=1 ./dc_render && ./dc_render
 echo "--- 3DS front-end drawing on the host (real 3ds/main.c loop, stub libctru): win-panel stars, NEW BEST!, best score on the title; slider flat and full 3D ---"
 N3D_UNITS="n3d_gfx.o n3d_intro.o"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o n3d_$f.o; done   # the shared DS cutscene code, as its own fixed-point unit, exactly as 3ds/Makefile builds it
