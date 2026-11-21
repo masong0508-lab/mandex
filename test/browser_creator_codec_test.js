@@ -61,5 +61,29 @@ assert.strictEqual(create.PD.custom.length,before+1,'valid import adds exactly o
 assert.strictEqual(create.saved,priorSave+1,'valid import persists');
 assert.strictEqual(create.PD.custom[before].n,'Café 世界 😀','Unicode saved correctly');
 assert.strictEqual(create.exportCode(canonical),code,'export matches pure encoder');
+// The real editor must run the same check before TEST or SAVE; a broken
+// layout must stay editable, never start gameplay or corrupt an existing save.
+const gateStart=html.indexOf('function eCheckedLevel(');
+const gateEnd=html.indexOf('function eTest(){',gateStart);
+assert(gateStart>=0&&gateEnd>gateStart,'shared editor preflight helper exists');
+const gateFactory=new Function('grid','targets','validateSharedLevel','encodeCells',`
+  const E={g:grid.slice(),t:targets.map(p=>p.slice()),men:5,name:'Validated'};
+  let lastMessage='';
+  const toast=(kind,title,detail)=>{lastMessage=detail};
+  ${html.slice(gateStart,gateEnd)}
+  return {run:eCheckedLevel,E,get message(){return lastMessage}};
+`);
+const editor=gateFactory(grid,canonical.t,create.validateSharedLevel,create.encodeCells);
+assert(editor.run('testing')&&editor.run('saving'),'valid editor can test or save');
+editor.E.t=[[30,31]];
+assert.strictEqual(editor.run('testing'),null,'embedded landlord blocks test');
+assert(editor.message.includes('Landlord'),'invalid editor explains failure');
+editor.E.t=canonical.t.map(p=>p.slice());
+editor.E.g.fill(0);
+assert.strictEqual(editor.run('saving'),null,'empty editor cannot overwrite a save');
+const liveTest=html.slice(html.indexOf('function eTest(){'),html.indexOf('function eSave(){'));
+const liveSave=html.slice(html.indexOf('function eSave(){'),html.indexOf('const MATCOL='));
+assert(liveTest.includes("eCheckedLevel('testing')"),'real TEST checks geometry');
+assert(liveSave.includes("eCheckedLevel('saving')"),'real SAVE checks geometry');
 new Function(html.slice(html.indexOf('<script>')+8,html.indexOf('</script>'))); // whole shipped game parses
-console.log('WEB_CREATOR_CODEC_PASS legacy=2 unicode=1 fixed_grid=1 rejects=14 atomic_import=1 whole_script=1');
+console.log('WEB_CREATOR_CODEC_PASS legacy=2 unicode=1 fixed_grid=1 rejects=14 atomic_import=1 editor_preflight=1 whole_script=1');
