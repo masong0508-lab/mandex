@@ -655,7 +655,7 @@ function lordShock(x,y,reach,seconds){
   for(const t of targets){
     if(!t.alive||Math.abs(t.x-x)>reach||Math.abs(t.y-y)>56)continue;
     t.pan=Math.max(t.pan||0,.65);
-    if(MOBILE.includes(t.kind)&&!(t.dodge>0)){
+    if(WEB_UI.includes(t.kind)&&!(t.dodge>0)){
       t.dd=t.x>=x?1:-1;t.dodge=seconds;
     }
   }
@@ -1360,7 +1360,7 @@ function lordAI(t,dt){
       if(lordStep(t,t.dd,75,dt)){t.face=t.dd;t.mv=2;return}
     }
   }
-  if(MOBILE.includes(t.kind)&&t.stun<=0&&t.wind<=0){
+  if(WEB_UI.includes(t.kind)&&t.stun<=0&&t.wind<=0){
     if(t.dodge>0)t.dodge-=dt;
     const dg=lordDanger(t);
     if(dg){t.dodge=.5;t.dd=dg;if(t.pan<=0&&t.say<=0)lordSay(t,'LOOK OUT!','#ffb0b0');t.pan=.5}
@@ -3228,20 +3228,20 @@ const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0};
 /* UI state never changes physics/world dimensions. The portrait virtual
    canvas is 540px wide and fills the available display at its real ratio;
    landscapes retain the original 960x540 artwork and screen geometry. */
-const MOBILE={portrait:false,viewportW:0,viewportH:0,
+const WEB_UI={portrait:false,viewportW:0,viewportH:0,
   page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0,editorScale:1,
   editorHeight:480,gesture:null};
-const isPortrait=()=>MOBILE.portrait;
-const mobilePage=(kind,n,size)=>Math.max(0,Math.min(Math.max(0,Math.ceil(n/size)-1),MOBILE.page[kind]||0));
+const isPortrait=()=>WEB_UI.portrait;
+const mobilePage=(kind,n,size)=>Math.max(0,Math.min(Math.max(0,Math.ceil(n/size)-1),WEB_UI.page[kind]||0));
 function layoutTick(){
   const vp=window.visualViewport;
   const vw=Math.max(1,vp&&vp.width||window.innerWidth||960),
         vh=Math.max(1,vp&&vp.height||window.innerHeight||540);
   const por=vh>vw*1.08;
   const w=por?540:960,h=por?Math.max(720,Math.min(1240,Math.round(w*vh/vw))):540;
-  const changed=por!==MOBILE.portrait;
+  const changed=por!==WEB_UI.portrait;
   if(changed){
-    MOBILE.portrait=por;MOBILE.gesture=null;
+    WEB_UI.portrait=por;WEB_UI.gesture=null;
     if(typeof dragging!=='undefined')dragging=false;
     if(typeof sliderDrag!=='undefined')sliderDrag=false;
     if(typeof E!=='undefined'&&E)E.drag=null;
@@ -3249,8 +3249,8 @@ function layoutTick(){
     CAM.reset=true;CAM.snap=true;hits=[];
   }
   if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
-  if(vw!==MOBILE.viewportW||vh!==MOBILE.viewportH||changed){
-    MOBILE.viewportW=vw;MOBILE.viewportH=vh;
+  if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed){
+    WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
     const rect=document.body.getBoundingClientRect(),
       availW=rect.width||vw,availH=rect.height||vh,
       scale=Math.max(.01,Math.min(availW/w,availH/h));
@@ -3482,14 +3482,14 @@ cv.addEventListener('pointerdown',e=>{
   if(isPortrait()&&['menu','select','ach','outfit','options'].includes(state)){
     /* Defer activation until release: a swipe must change pages without
        accidentally opening a level or erasing a custom project. */
-    MOBILE.gesture={id:e.pointerId,x,y,screen:state};
+    WEB_UI.gesture={id:e.pointerId,x,y,screen:state};
     try{cv.setPointerCapture(e.pointerId)}catch(_){}
     return;
   }
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending'){hitTest(x,y);return}
   if(state==='edit'){
     if(hitTest(x,y))return;
-    if(isPortrait()&&y>=0&&y<MOBILE.editorHeight){
+    if(isPortrait()&&y>=0&&y<WEB_UI.editorHeight){
       const p=mobileEditorToWorld(x,y);eDown(p[0],p[1]);
     }else if(!isPortrait())eDown(x,y);
     try{cv.setPointerCapture(e.pointerId)}catch(_){}
@@ -3507,21 +3507,21 @@ cv.addEventListener('pointerdown',e=>{
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
   if(state==='edit'){
     if(!isPortrait())eMove(mx,my);
-    else if(E.drag){const pos=mobileEditorToWorld(mx,clamp(my,0,MOBILE.editorHeight));eMove(pos[0],pos[1]);}
+    else if(E.drag){const pos=mobileEditorToWorld(mx,clamp(my,0,WEB_UI.editorHeight));eMove(pos[0],pos[1]);}
     return;
   }
   if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
   if(vOn&&dv<VPULL){const k=.9*(VPULL-dv)/(VPULL-VGRAB);man.x+=(VX-man.x)*k;man.y+=(VY-man.y)*k}});   // nearing the valve the sling stretches on back toward it (power stays a full pull), then he drops onto it
 cv.addEventListener('pointerup',e=>{
-  if(MOBILE.gesture&&MOBILE.gesture.id===e.pointerId){
-    const g=MOBILE.gesture;MOBILE.gesture=null;
+  if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId){
+    const g=WEB_UI.gesture;WEB_UI.gesture=null;
     const p=pt(e),dy=p[1]-g.y;
     if(g.screen===state&&Math.abs(dy)>65&&
        (state==='select'||state==='ach'||state==='outfit'||state==='options')){
       /* A vertical swipe browses the paginated mobile list. Page limits
          are applied by mobilePage() on the next draw, without allocations. */
       const key=state;
-      MOBILE.page[key]=Math.max(0,(MOBILE.page[key]||0)+(dy<0?1:-1));
+      WEB_UI.page[key]=Math.max(0,(WEB_UI.page[key]||0)+(dy<0?1:-1));
     }else if(g.screen===state)hitTest(p[0],p[1]);
     return;
   }
@@ -3535,7 +3535,7 @@ addEventListener('keyup',e=>{KEYS[e.code]=false});addEventListener('blur',()=>{f
 for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
   const k=TID[e.pointerId];if(k){KEYS[k]=false;delete TID[e.pointerId]}
   if(ev==='pointercancel'){
-    if(MOBILE.gesture&&MOBILE.gesture.id===e.pointerId)MOBILE.gesture=null;
+    if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
     if(state==='edit'&&E.drag)eUp();
     if(dragging){dragging=false;man.seated=false}
   }
@@ -4570,12 +4570,12 @@ function mobileHeader(title,detail,back){
 function mobilePager(kind,number,size,atY){
   const pages=Math.max(1,Math.ceil(number/size));
   const page=mobilePage(kind,number,size);
-  MOBILE.page[kind]=page;
+  WEB_UI.page[kind]=page;
   if(pages>1){
     const y=atY==null?H-58:atY;
-    btn(12,y,116,46,'< PREV',()=>{MOBILE.page[kind]=Math.max(0,page-1)},{size:16,disabled:page===0});
+    btn(12,y,116,46,'< PREV',()=>{WEB_UI.page[kind]=Math.max(0,page-1)},{size:16,disabled:page===0});
     txt('PAGE '+(page+1)+' / '+pages,W/2,y+29,18,'#fff','center');
-    btn(W-128,y,116,46,'NEXT >',()=>{MOBILE.page[kind]=Math.min(pages-1,page+1)},{size:16,disabled:page===pages-1});
+    btn(W-128,y,116,46,'NEXT >',()=>{WEB_UI.page[kind]=Math.min(pages-1,page+1)},{size:16,disabled:page===pages-1});
   }
   return page;
 }
@@ -4619,9 +4619,9 @@ function drawMobileMenu(){
   const y=H*.19,w=W-76,x=38,h=62,g=13;
   btn(x,y,w,h,'PLAY',goSelect,{size:28,on:true,col:'#7dff5a'});
   btn(x,y+(h+g),w,h,'LEVEL CREATOR',()=>openEditor(false),{size:24});
-  btn(x,y+2*(h+g),w,h,'ACHIEVEMENTS '+achCount()+'/'+ACH.length,()=>{state='ach';MOBILE.page.ach=0},{size:19});
-  btn(x,y+3*(h+g),w,h,'OUTFITS '+ownedCount()+'/'+OUTFITS.length,()=>{state='outfit';MOBILE.page.outfit=0},{size:21});
-  btn(x,y+4*(h+g),w,h,'OPTIONS',()=>{state='options';MOBILE.page.options=0},{size:21});
+  btn(x,y+2*(h+g),w,h,'ACHIEVEMENTS '+achCount()+'/'+ACH.length,()=>{state='ach';WEB_UI.page.ach=0},{size:19});
+  btn(x,y+3*(h+g),w,h,'OUTFITS '+ownedCount()+'/'+OUTFITS.length,()=>{state='outfit';WEB_UI.page.outfit=0},{size:21});
+  btn(x,y+4*(h+g),w,h,'OPTIONS',()=>{state='options';WEB_UI.page.options=0},{size:21});
   btn(x,H-130,w,52,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();setMuted(!muted)},{size:18});
   txt(totalStars()+' ★ EARNED',W/2,H-28,18,'#ffd23f','center');
 }
@@ -4638,7 +4638,7 @@ function drawMobileSelect(){
   mobileHeader('SELECT LEVEL',selTab===1?'YOUR CUSTOM LEVELS':'CHOOSE A DISTRICT',goMenu);
   const labels=['STORY','MY LEVELS','CHAPTER 2','CHAPTER 3'],tabs=[0,1,2,3];
   for(let i=0;i<4;i++)mobileTab(12+(i%2)*264,101,252,labels[i],
-    ()=>{selTab=tabs[i];MOBILE.page.select=0},selTab===tabs[i]);
+    ()=>{selTab=tabs[i];WEB_UI.page.select=0},selTab===tabs[i]);
   const items=mobileSelectItems(),top=208,rh=78,rowGap=8,cols=2,
     visibleRows=Math.max(2,Math.floor((H-top-94)/(rh+rowGap))),size=visibleRows*cols,
     page=mobilePage('select',items.length,size),start=page*size;
@@ -4687,10 +4687,10 @@ function drawMobileOutfits(){
   mobilePager('outfit',OUTFITS.length,size);
 }
 function drawMobileOptions(){
-  const page=MOBILE.page.options?1:0,o=OPT();
+  const page=WEB_UI.page.options?1:0,o=OPT();
   mobileHeader('OPTIONS',page?'SOUND, SCREEN & DATA':'GAMEPLAY',goMenu);
-  mobileTab(12,108,252,'GAMEPLAY',()=>{MOBILE.page.options=0},page===0);
-  mobileTab(276,108,252,'SOUND & DATA',()=>{MOBILE.page.options=1},page===1);
+  mobileTab(12,108,252,'GAMEPLAY',()=>{WEB_UI.page.options=0},page===0);
+  mobileTab(276,108,252,'SOUND & DATA',()=>{WEB_UI.page.options=1},page===1);
   let y=169;const rh=58,gap=8;
   function row(label,value,fn,on){
     btn(20,y,W-40,rh,label+': '+value,()=>{fn();pdTouch();pdSave();SFX.pop()},
@@ -4714,29 +4714,29 @@ function drawMobileOptions(){
     if(y+rh<H-72)row('RESET OPTIONS','DEFAULT',()=>{if(performance.now()<armReset){optsReset();armReset=0}else armReset=performance.now()+3000},false);
     if(y+rh<H-68)row('ERASE PROGRESS','CONFIRM',()=>{if(performance.now()<armProg){progReset();armProg=0}else armProg=performance.now()+3000},false);
   }
-  if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{MOBILE.page.options=1},{size:18});
-  else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{MOBILE.page.options=0},{size:18});
+  if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{WEB_UI.page.options=1},{size:18});
+  else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{WEB_UI.page.options=0},{size:18});
 }
 /* Portrait creator: a genuine 120-column editing surface with horizontal
    panning, unclipped world-cell touch mapping and a separate tool/action tray.
    No copy of E.g, no second offscreen canvas and no changed save encoding. */
 function mobileEditorSurface(){
   const h=Math.min(GY,Math.max(300,H-320));
-  MOBILE.editorHeight=h;MOBILE.editorScale=h/GY;
-  MOBILE.editorX=clamp(MOBILE.editorX,0,Math.max(0,WW-W/MOBILE.editorScale));
+  WEB_UI.editorHeight=h;WEB_UI.editorScale=h/GY;
+  WEB_UI.editorX=clamp(WEB_UI.editorX,0,Math.max(0,WW-W/WEB_UI.editorScale));
   return h;
 }
 function mobileEditorToWorld(x,y){
-  return [x/MOBILE.editorScale+MOBILE.editorX,y/MOBILE.editorScale];
+  return [x/WEB_UI.editorScale+WEB_UI.editorX,y/WEB_UI.editorScale];
 }
 function drawMobileEditor(){
-  const surface=mobileEditorSurface(),sc=MOBILE.editorScale;
+  const surface=mobileEditorSurface(),sc=WEB_UI.editorScale;
   ctx.fillStyle='#24344e';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.beginPath();ctx.rect(0,0,W,surface);ctx.clip();
-  ctx.scale(sc,sc);ctx.translate(-MOBILE.editorX,0);
+  ctx.scale(sc,sc);ctx.translate(-WEB_UI.editorX,0);
   ctx.drawImage(bgA,0,0);
-  const first=Math.max(0,Math.floor(MOBILE.editorX/V)-1),
-    last=Math.min(COLS,Math.ceil((MOBILE.editorX+W/sc)/V)+1);
+  const first=Math.max(0,Math.floor(WEB_UI.editorX/V)-1),
+    last=Math.min(COLS,Math.ceil((WEB_UI.editorX+W/sc)/V)+1);
   for(let y=0;y<ROWS;y++)for(let x=first;x<last;x++){
     const mat=E.g[idx(x,y)];if(mat)ctx.drawImage(SPR[mat][hsh(x,y)&3][0],x*V,y*V);
   }
@@ -4764,14 +4764,14 @@ function drawMobileEditor(){
   }
   ctx.restore();
   ctx.fillStyle='rgba(12,17,34,.92)';ctx.fillRect(0,surface,W,H-surface);
-  btn(10,surface+8,120,48,'< PAN',()=>{MOBILE.editorX=Math.max(0,MOBILE.editorX-150)},{size:18});
-  txt('COL '+(Math.floor(MOBILE.editorX/V)+1)+'–'+
-    Math.min(COLS,Math.ceil((MOBILE.editorX+W/sc)/V)),
+  btn(10,surface+8,120,48,'< PAN',()=>{WEB_UI.editorX=Math.max(0,WEB_UI.editorX-150)},{size:18});
+  txt('COL '+(Math.floor(WEB_UI.editorX/V)+1)+'–'+
+    Math.min(COLS,Math.ceil((WEB_UI.editorX+W/sc)/V)),
     W/2,surface+38,16,'#ffd23f','center');
   btn(W-130,surface+8,120,48,'PAN >',()=>{
-    MOBILE.editorX=Math.min(Math.max(0,WW-W/sc),MOBILE.editorX+150)
+    WEB_UI.editorX=Math.min(Math.max(0,WW-W/sc),WEB_UI.editorX+150)
   },{size:18});
-  const y=surface+66,p=!!MOBILE.page.edit,cols=5,cw=(W-24-4*6)/cols;
+  const y=surface+66,p=!!WEB_UI.page.edit,cols=5,cw=(W-24-4*6)/cols;
   if(!p){
     const mats=['ERASE',...MAT.slice(1).map(m=>m.n.toUpperCase()),'LANDLORD'];
     mats.forEach((name,i)=>{
@@ -4810,7 +4810,7 @@ function drawMobileEditor(){
       W/2,Math.min(H-76,y+164),17,'#ffd23f','center');
   }
   btn(30,H-57,W-60,50,p?'< BRUSH TOOLS':'LEVEL ACTIONS >',()=>{
-    MOBILE.page.edit=p?0:1
+    WEB_UI.page.edit=p?0:1
   },{size:18,on:!p,col:'#7dff5a'});
 }
 function drawMobileScreen(){
