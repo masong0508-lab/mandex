@@ -324,6 +324,9 @@ static void on_events(void){
     case EV_HURT: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, "OUCH!", RGB(255, 107, 107)); if(!e->m){ dragging = 0; pad_used = 0; } break;
     case EV_OOF: for(int k = 0; k < 6; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, e->m ? "CRACK!" : "OOF!", RGB(255, 210, 63)); break;
     case EV_HEAL: popup(x, y - 6, "+HP", RGB(255, 255, 255)); break;
+    case EV_SURVIVOR:
+      for(int k=0;k<6;k++)spawn(x,y,(rand()%11-5)*.2f,-(rand()%6)*.25f,22,RGB(245,211,124));
+      popup(x,y-9,"SOMEHOW ALIVE!",RGB(255,210,63)); break;
     case EV_DISTRICT: cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1; dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts);
 #if MX_N3DS_PARTICLE_HINT
       part_free_hint = 0;
