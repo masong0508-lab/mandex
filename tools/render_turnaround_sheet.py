@@ -74,7 +74,7 @@ def build(destination: Path):
             rgb[start:stop] = ink * max(0, min(width,x1) - max(0,x0))
     manifest = ["MANDEX — actual compiled console atlas turnaround",
                 "Columns share the same image-space origin at sprite.ax / sprite.ay.",
-                "No transparency, palette, offsets, width or height changed."]
+                "Same atlas palette, frame bounds and pivots; intentional micro-pinholes filled."]
     for row, (label, names) in enumerate(ROWS):
         manifest.append(f"row {row+1}: {label}")
         for col, name in enumerate(names):
