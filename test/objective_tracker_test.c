@@ -39,6 +39,28 @@ int main(void){
   CHECK(snap().phase==MX_OBJ_COMPLETE,"completed game state overrides settling");
   w.state=MX_LOSE;
   CHECK(snap().phase==MX_OBJ_FAILED,"loss overrides any remaining landlord counts");
+  /* Edge hints are evaluated in screen pixels, independently of camera
+     scale and stereo projection. Never draw a cue over a visible actor. */
+  MxObjectiveEdge e=mx_objective_edge(110,110,256,192,64,12);
+  CHECK(e.dir==MX_EDGE_NONE,"visible final landlord receives no compass");
+  e=mx_objective_edge(-40,110,256,192,64,12);
+  CHECK(e.dir==MX_EDGE_LEFT && e.x==22 && e.y==110,"offscreen left");
+  e=mx_objective_edge(330,105,256,192,64,12);
+  CHECK(e.dir==MX_EDGE_RIGHT && e.x==234,"offscreen right");
+  e=mx_objective_edge(100,-80,256,192,64,12);
+  CHECK(e.dir==MX_EDGE_UP && e.y==73,"above the camera/header");
+  e=mx_objective_edge(180,330,256,192,64,12);
+  CHECK(e.dir==MX_EDGE_DOWN && e.y==170,"below playfield/controls");
+  e=mx_objective_edge(-42,340,256,192,64,12);
+  CHECK(e.dir==MX_EDGE_LEFT && e.y==170,"diagonal target clamps safely");
+  e=mx_objective_edge(100,100,30,192,64,12);
+  CHECK(e.dir==MX_EDGE_NONE,"very narrow screen disables unsafe locator");
+  w.state=MX_PLAY;w.level=0;w.men=3;w.man.mode=MAN_AIM;
+  w.targets[2].alive=1;
+  CHECK(snap().target_index==2,"last landlord index points to actual live NPC");
+  w.targets[2].alive=0;
+  CHECK(snap().remaining==0 && snap().target_index==-1,
+        "no stale locator after final eviction");
   CHECK(strcmp(mx_objective_label(MX_OBJ_LAST),"LAST LANDLORD")==0,
         "shared, understandable short label");
   CHECK(strcmp(mx_objective_label(MX_OBJ_DISTRICT),"NEXT DISTRICT")==0,
