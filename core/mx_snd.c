@@ -55,6 +55,7 @@ int mx_event_sfx(const MxEvent *e, int *o){
   case EV_HURT:    o[0] = SFX_GRUNT; o[1] = SFX_THUD; return 2;
   case EV_BONK:    o[0] = SFX_SLAP; o[1] = SFX_CRUNCH; return 2;
   case EV_OOF:     o[0] = SFX_CRUNCH; return 1;
+  case EV_SURVIVOR: o[0] = SFX_THUD; return 1;
   case EV_HEAL: case EV_TARGET: o[0] = SFX_TARGET; return 1;
   case EV_THUD:    if(e->a > R(0.3)){ o[0] = SFX_THUD; return 1; } return 0;  /* a=strength, b=0: previously all rubble thuds were silent */
   case EV_BOOM: case EV_AIRPOP: o[0] = SFX_BOOM; return 1;
