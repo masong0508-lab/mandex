@@ -706,12 +706,34 @@ static void blit_frame_rot(u8 *b, const MsFrame *fr, int x, int y, int ppc, int 
 #else
   int row0=-rad,row1=rad,col0=-rad,col1=rad;
 #endif
+#ifndef MX_DS_ROT_INCREMENTAL
+#define MX_DS_ROT_INCREMENTAL 1
+#endif
   for(int j=row0;j<=row1;j++){
     int py=y+j;
 #if !MX_DS_CLIP_ROT
     if((unsigned)py>=192u)continue;
 #endif
     u8 *d=&b[py*256];
+#if MX_DS_ROT_INCREMENTAL
+    /* With no live jiggle/squash, inverse rotation is affine.
+       Advance numerators by (cs,-sn) per pixel, then perform the same
+       signed >>12 and source rounding as the original computation.
+       This is exact even for negative angles and offscreen clipping;
+       deformed poses retain the reference renderer unchanged. */
+    if(!jl && ss==256 && st==256){
+      int numer_u=col0*cs+j*sn, numer_v=j*cs-col0*sn;
+      for(int i=col0;i<=col1;i++,numer_u+=cs,numer_v-=sn){
+        int u=(numer_u>>12)+ax, v=(numer_v>>12)+ay;
+        if(u<0 || v<0)continue;
+        int sx=(u*inv)>>12,sy=(v*inv)>>12;
+        if(sx>=w||sy>=h)continue;
+        u8 c=fr->px[sy*w+(f>0?sx:w-1-sx)];
+        if(c)d[x+i]=(u8)(C_MAN0+c-1);
+      }
+      continue;
+    }
+#endif
     for(int i=col0;i<=col1;i++){
       int px=x+i;
 #if !MX_DS_CLIP_ROT
