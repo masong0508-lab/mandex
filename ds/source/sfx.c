@@ -1,11 +1,10 @@
 /*
  * MANDEX DS - sound.
  *
- * Every effect is a short list of notes (optionally gliding between them) played on a PSG or
- * noise channel through libnds' soundPlayPSG / soundPlayNoise.  There are only 6 PSG + 2 noise
- * channels on the hardware, so effects are rate-limited per type and silently dropped when no
- * channel is free (the libnds calls return a negative id in that case).
- * One PSG channel is reserved for the music loop.
+ * Effects are short lists of PCM-wave notes or noise segments.  Six software
+ * voices share the ARM7 hardware channels with two PCM music voices; effects
+ * are rate-limited and gracefully skipped when hardware voices are exhausted.
+ * Catch-up ticks advance state without submitting pitches already in the past.
  */
 #include <nds.h>
 #include "sfx.h"
@@ -14,7 +13,7 @@
 #include "mus_tab.h"
 
 #define NV 6
-static struct { int id, seg, left, freq, active; const Sfx *s; } vo[NV];
+static struct { int id, seg, left, freq, active, pitch_pending; const Sfx *s; } vo[NV];
 static int cool[SFX_COUNT];
 
 #ifdef MX_NOSOUND
@@ -40,7 +39,11 @@ void sfx_play(int id, int pan){
   for(int i = 0; i < NV; i++) if(!vo[i].active){
     int h = s->noise ? soundPlayNoise(s->f[0] * 3 / 5, s->vol * 11 / 20, (u8)pan) : soundPlayWave(MUS_WAVE, (u16)sfx_fcap(s->f[0]), s->vol * 11 / 20, (u8)pan);   /* tones: the soft wave, not a square */
     if(h < 0) return;                                 /* no free hardware channel */
-    vo[i].id = h; vo[i].seg = 0; vo[i].left = s->len[0]; vo[i].freq = s->f[0]; vo[i].s = s; vo[i].active = 1;
+    vo[i].id = h; vo[i].seg = 0; vo[i].left = s->len[0];
+    /* Track the pitch the hardware was actually started at, not the raw
+       source-note pitch: noise is scaled and upper PCM notes are capped. */
+    vo[i].freq = s->noise ? s->f[0] * 3 / 5 : sfx_fcap(s->f[0]);
+    vo[i].s = s; vo[i].active = 1; vo[i].pitch_pending = 0;
     return;
   }
 }
@@ -82,11 +85,20 @@ static void sfx_step(int commit_audio){
     if(--vo[i].left <= 0){
       if(++vo[i].seg >= s->n){ soundKill(vo[i].id); vo[i].active = 0; continue; }
       vo[i].left = s->len[vo[i].seg];
-      if(!s->glide){ vo[i].freq = s->noise ? s->f[vo[i].seg] * 3 / 5 : sfx_fcap(s->f[vo[i].seg]); soundSetFreq(vo[i].id, vo[i].freq); }
+      if(!s->glide){
+        vo[i].freq = s->noise ? s->f[vo[i].seg] * 3 / 5 : sfx_fcap(s->f[vo[i].seg]);
+        vo[i].pitch_pending = 1;
+      }
     } else if(s->glide && vo[i].seg + 1 < s->n){
       int target = s->noise ? s->f[vo[i].seg + 1] * 3 / 5 : sfx_fcap(s->f[vo[i].seg + 1]), cur = vo[i].freq;      /* glide toward the next note over the segment */
       vo[i].freq = cur + (target - cur) / (vo[i].left + 1);
-      if(commit_audio) soundSetFreq(vo[i].id, vo[i].freq);
+      vo[i].pitch_pending = 1;
+    }
+    /* When several audio ticks follow one late visual frame, send only the
+       current segment/glide pitch. Intermediate pitches have expired. */
+    if(commit_audio && vo[i].pitch_pending){
+      soundSetFreq(vo[i].id, vo[i].freq);
+      vo[i].pitch_pending = 0;
     }
   }
   if(mus_on){
