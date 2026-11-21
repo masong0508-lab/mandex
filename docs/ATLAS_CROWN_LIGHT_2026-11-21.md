@@ -36,3 +36,7 @@ The original offline turnaround preview drew Wolfman sprites using the default t
 ## Sprite anchor stability
 
 A new compiled-art regression fixture, `test/sprite_turn_anchor_test.py`, verifies the top of the skull and the floor-contact pixel across all 48 human and Wolfman turnaround poses. The turnaround contact sheet additionally draws a thin floor guide beneath only the grounded turning rows, making floating feet and inconsistent vertical scaling easier to identify. The guide is **review-only** and not an in-game sprite or gameplay effect.
+
+## Wolfman upper head, arm and shoulder lighting
+
+The lower Wolfman body already had flat-to-rounded cel-shading, while his upper head, lifted arms, shoulder and rear-quarter surfaces remained mostly one shade of fur. The new offline `tools/wolf_upper_volume.py` restores a modest two-sided key light to **874 existing skin/fur pixels across all 71 Wolfman frames** above the torso pivot. The outline, eyebrows, ear-pink, muzzle/eye details, alpha and existing palette are unchanged; only interior fur colors switch among the existing SK/SKD/SKH values. The tool is idempotent and runs during canonical sprite generation. Its `--check` mode is part of both full host tests and the preview/rebake pipelines. This remains an indexed DS/3DS art change; Dreamcast HD RGB finishing remains in the separate offline baker.
