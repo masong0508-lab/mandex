@@ -28,3 +28,7 @@ Use `python3 tools/render_turnaround_sheet.py out/art-review/turnaround.ppm` to 
 - Applies a restrained key/fill light to the visible torso contours, **starting below the sprite's body anchor** so eyes, muzzle, ears and teeth retain their canonical source look.
 - The alpha channel, rectangle dimensions, atlas UVs and packing order remain unchanged. This changes only RGB values in the **next generated** `art/dcart.h`; the presently committed Dreamcast HD texture hasn't been rebaked in this PR.
 - `test/hd_wolf_volume_test.py` exercises the real offline function with synthetic RGBA rows, checking head pixels, transparent/translucent edges, contour lighting and zero alpha movement. The rebake workflow will run that test and regenerate/review the real HD texture before publishing.
+
+## Runtime-accurate review coloring
+
+The original offline turnaround preview drew Wolfman sprites using the default tan `MS_PAL` skin shades. Actual DS and 3DS gameplay remap those colors to grey fur when the Wolfman outfit is selected. The contact sheet now reads the four `FUR` RGB values from the real `mx_outfit_skin()` implementation in `core/mx_meta.c` and substitutes them **only in preview output**. Both the indexed sprite bytes and the default human palette remain unchanged. `test/turnaround_preview_palette_test.py` checks the exact PPM pixels for both variants, preventing misleading artwork reviews.
