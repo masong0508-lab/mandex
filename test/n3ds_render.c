@@ -279,6 +279,37 @@ static int n3_sprite_volume_probe(void){
   const u32 bg=RGB(7,34,61);
   top.fb=fb_top[0];top.w=400;top.h=240;
   apply_outfit(0);
+  /* Exercise the production walking renderer, not only standalone sprites.
+     With vx=0 the grounded and airborne frames are identical except for the
+     deliberately anchored foot shadow. Test each stereo eye projection. */
+  MxMan prior=world.man;
+  world.man.mode=MAN_WALK;world.man.walked=1;world.man.face=1;
+  world.man.x=R(60);world.man.y=R(40);world.man.vx=0;
+  world.man.gait=0;world.man.pT=0;world.man.hurtCd=0;
+  for(int eye=0;eye<2;eye++){
+    View walkview={&top,4,20+eye*2,5,0,0};
+    world.man.gr=1;
+    rect(&top,0,0,400,240,bg);draw_man(&walkview);
+    unsigned contact=n3_hash(top.fb,(size_t)top.w*top.h*3);
+    world.man.gr=0;
+    rect(&top,0,0,400,240,bg);draw_man(&walkview);
+    unsigned airborne=n3_hash(top.fb,(size_t)top.w*top.h*3);
+    if(contact==airborne){
+      fprintf(stderr,"FAIL: 3DS walking contact shadow invisible in eye %d\\n",eye);
+      return 1;
+    }
+    world.man.gr=1;world.man.pT=R(0.1);
+    rect(&top,0,0,400,240,bg);draw_man(&walkview);
+    unsigned punch=n3_hash(top.fb,(size_t)top.w*top.h*3);
+    if(punch==contact){
+      fprintf(stderr,"FAIL: 3DS punch animation invisible in eye %d\\n",eye);
+      return 1;
+    }
+    printf("N3_WALK_IMPACT eye=%d ground=%08x air=%08x punch=%08x\\n",
+           eye,contact,airborne,punch);
+    world.man.pT=0;
+  }
+  world.man=prior;
   u32 original=man_tone[0][5],shadow=man_tone[2][5];
   if(original==shadow){puts("FAIL: 3DS contour palette lacks shaded side");return 1;}
   apply_outfit(3);
