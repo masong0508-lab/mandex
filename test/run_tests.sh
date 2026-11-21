@@ -50,6 +50,14 @@ echo "--- Browser walk physics parity, reusable touch controls and character-det
 if command -v node >/dev/null 2>&1;then node browser_walk_memory_test.js;fi
 echo "--- Browser side -> rear -> side pose coherence at 60Hz ---"
 if command -v node >/dev/null 2>&1;then node browser_turn_pose_test.js;fi
+echo "--- read-only shot readiness and actual power stock (float/fixed/browser) ---"
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core tool_feedback_test.c ../core/mx.c ../core/cloth.c -lm -o tool_feedback_$mode
+  ./tool_feedback_$mode
+done
+if command -v node >/dev/null 2>&1;then node browser_tool_feedback_test.js;fi
 echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
 if command -v node >/dev/null 2>&1; then
   node -e 'const fs=require("fs");const h=fs.readFileSync("../web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<a)throw Error("game script missing");const s=h.slice(a+8,b);new Function(s);for(const sym of ["function cgRearPanel","function cgHotTake","function cgMoonlitKiss"])if(!s.includes(sym))throw Error(sym+" missing");console.log("ok: browser script parses and cutscene effects are present")'
