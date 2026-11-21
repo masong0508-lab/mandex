@@ -5,6 +5,8 @@ on:
     paths:
       - "art/manspr.h"
       - "tools/gen_manspr.py"
+      - "tools/manhead.py"
+      - "test/head_turnaround_test.py"
       - "web/index.html"
       - "ds/source/main.c"
       - "ds/source/intro.c"
@@ -24,6 +26,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Canonical front, quarter, profile and rear-turn identity checks
+        run: python3 test/head_turnaround_test.py
       - name: Sprite geometry, material shading, zero-heap and gait invariants
         run: python3 test/sprite_surface_test.py
       - name: Landlord art animation and zero-frame-allocation invariants
