@@ -118,6 +118,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate latest canonical head-turn sprites and all 71 Wolfman atlas frames
+        run: |
+          set -eu
+          python3 test/character_turnaround_test.py
+          python3 test/head_turnaround_test.py
+          python3 test/dreamcast_wolf_atlas_test.py
       - uses: actions/download-artifact@v4
         with: { name: rom-nds, path: pack }
       - uses: actions/download-artifact@v4
