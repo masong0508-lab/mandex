@@ -3,7 +3,7 @@
 <title>MANDEX</title>
 <style>
 html,body{margin:0;background:#0d0d14;width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
-body{display:flex;align-items:center;justify-content:center}
+body{display:flex;align-items:center;justify-content:center;height:100dvh}
 canvas{display:block;touch-action:none;border-radius:8px;box-shadow:0 0 50px rgba(0,0,0,.65);cursor:crosshair;outline:none}
 @media (pointer:coarse){canvas{border-radius:0;box-shadow:none}}
 </style></head><body>
@@ -4939,7 +4939,7 @@ function drawMobileEditor(){
   btn(188,yy,154,46,'SHARE',()=>{if(!E.t.length){toast('ach','Add a landlord first','');return}
     exportCode({n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t})},{size:16});
   btn(350,yy,180,46,'LEVELS',goSelect,{size:16});
-  txt('Drag to build · PAN moves the map · Rotate for full desktop tools',W/2,H-14,12,'#ddd','center');
+  if(H>yy+80)txt('Drag to build · PAN moves the map · Rotate for full desktop tools',W/2,H-14,12,'#ddd','center');
 }
 function drawEditor(){
   if(mobilePortrait){drawMobileEditor();return}
