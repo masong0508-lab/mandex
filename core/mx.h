@@ -225,6 +225,16 @@ static inline real mx_walk_foot_lift(const MxMan *m){
   if(g>RI(1)) g=RI(2)-g;
   return rmul(g,R(0.3));
 }
+/* A short, purely visual punch lunge with anticipation and recovery.
+   It is evaluated from the existing 0.2s punch timer, so every render
+   frequency sees the same continuous motion.  No new pose state, body
+   collision, save fields or sprites. Peak is 0.30 world cells. */
+static inline real mx_walk_punch_lunge(const MxMan *m){
+  if(m->mode != MAN_WALK || m->pT <= 0 || m->turn_ticks) return 0;
+  real t = rclamp(m->pT, 0, R(0.2));
+  if(t > R(0.1)) t = R(0.2) - t;
+  return rmul(t, RI(3));
+}
 /* Avoid single-frame left/right sprite flips when flying near zero horizontal
    speed. The existing face byte is cosmetic until the player walks. */
 static inline void mx_flight_face_update(MxMan *m){
