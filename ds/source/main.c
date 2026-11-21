@@ -390,7 +390,7 @@ static void on_events(void){
       ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
       break; }
     case EV_DISTRICT:                                       /* Landlord HQ: the next district is built in the same grid, with fresh men */
-      cells0 = mx_cells_left(&world); dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); ev_ft = 0;
+      cells0 = mx_cells_left(&world); dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts); part_high_water = 0; memset(pops, 0, sizeof pops); ev_ft = 0;
 #if MX_DS_PARTICLE_HINT
       part_free_hint = 0;
 #endif
@@ -1054,7 +1054,7 @@ static void draw_man(const View *v){
 }
 
 static void draw_parts(const View *v){
-  for(int i = 0; i < NPART; i++){
+  for(int i = 0; i < part_high_water; i++){
     const Part *p = &parts[i];
     if(p->life <= 0) continue;
     int px = (p->x * v->ppc >> 6) - v->cx, py = (p->y * v->ppc >> 6) - v->cy;
@@ -1362,7 +1362,7 @@ static void load_level(int l){
   mx_set_substeps(&world, world.substeps > MX_DS_MAX_SUBSTEPS ? MX_DS_MAX_SUBSTEPS : world.substeps);
   mx_set_wobble_budget(&world, wob_budget);
   cells0 = mx_cells_left(&world); disp_score = 0; end_t = 0; was_state = MX_PLAY; dragging = 0; pad_used = 0;
-  memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops);
+  memset(parts, 0, sizeof parts); part_high_water = 0; memset(pops, 0, sizeof pops);
 #if MX_DS_PARTICLE_HINT
   part_free_hint = 0;
 #endif
