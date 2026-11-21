@@ -219,7 +219,51 @@ void swiWaitForVBlank(void){
   int mode = world.man.mode;
   if(vf == 1 && !getenv("INTRO_TEST") && !getenv("INTRO_SKIP")) intro_seen = 1;
   if(vf == 1 && !getenv("END_TEST")) end_seen = 6;                  /* the other scripted runs press A on the title and expect level 1 at once */
-  if(getenv("PAUSE_DRAG_TEST")){
+  if(getenv("PAUSE_TOUCH_TEST")){
+    static int fails, starting_men;
+#define PAUSE_TOUCH_CHECK(c,msg) do{if(!(c)){fprintf(stderr,"FAIL: %s\n",msg);fails++;}else printf("ok: %s\n",msg);}while(0)
+    if(vf==2){
+      app=ST_PLAY;load_level(0);world.banner=0;
+      starting_men=world.men;
+      PAUSE_TOUCH_CHECK(pause_touch_action(&(touchPosition){.px=46,.py=175})==0,
+                        "resume button is tappable at its center");
+      PAUSE_TOUCH_CHECK(pause_touch_action(&(touchPosition){.px=128,.py=175})==1,
+                        "restart button is tappable at its center");
+      PAUSE_TOUCH_CHECK(pause_touch_action(&(touchPosition){.px=210,.py=175})==2,
+                        "menu button is tappable at its center");
+      PAUSE_TOUCH_CHECK(pause_touch_action(&(touchPosition){.px=128,.py=140})<0,
+                        "blank area cannot accidentally select an action");
+    }
+    if(vf==3) g_keys|=KEY_START;
+    if(vf==4){
+      PAUSE_TOUCH_CHECK(app==ST_PAUSE,"START enters the pause screen");
+      g_keys|=KEY_TOUCH;g_touch.px=46;g_touch.py=175;
+    }
+    if(vf==5){
+      PAUSE_TOUCH_CHECK(app==ST_PLAY && world.men==starting_men,
+                        "tap RESUME preserves progress and returns to play");
+      world.score=1234;g_keys|=KEY_START;
+    }
+    if(vf==6){
+      PAUSE_TOUCH_CHECK(app==ST_PAUSE,"reopen pause for touch restart");
+      g_keys|=KEY_TOUCH;g_touch.px=128;g_touch.py=175;
+    }
+    if(vf==7){
+      PAUSE_TOUCH_CHECK(app==ST_PLAY && world.score==0 && world.men==starting_men,
+                        "tap RESTART resets the level instead of resuming stale game state");
+      g_keys|=KEY_START;
+    }
+    if(vf==8){
+      PAUSE_TOUCH_CHECK(app==ST_PAUSE,"reopen pause for touch menu");
+      g_keys|=KEY_TOUCH;g_touch.px=210;g_touch.py=175;
+    }
+    if(vf==9){
+      PAUSE_TOUCH_CHECK(app==ST_TITLE && sel_level==0,
+                        "tap MENU safely returns to the title screen");
+      printf(fails?"pause touchscreen: %d FAILED\n":"pause touchscreen: all passed\n",fails);
+      exit(fails!=0);
+    }
+  } else if(getenv("PAUSE_DRAG_TEST")){
     static int fails, initial_men, initial_music;
 #define PAUSE_CHECK(c,msg) do{if(!(c)){printf("FAIL: %s\n",msg);fails++;}else printf("ok: %s\n",msg);}while(0)
     /* Exercise real title-to-play input handling, not a simulated press
