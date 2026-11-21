@@ -51,3 +51,15 @@ jobs:
             ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o /tmp/mx_ds_quick_render
           DS_WALK_PHASE_PROBE=1 /tmp/mx_ds_quick_render
           DS_PARTICLE_PROBE=1 /tmp/mx_ds_quick_render
+      - name: Compare original and unclipped window pixels at every district transition
+        run: |
+          set -eu
+          gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED \
+            -DMX_DS_FACADE_FAST_RECT=1 \
+            -Itest/stubs -Icore -Iart -Ids/source \
+            test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+            core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mx_ds_fast_window
+          DS_FACADE_DISTRICT_PROBE=1 /tmp/mx_ds_quick_render > /tmp/mx_ds_facade_ref.txt
+          DS_FACADE_DISTRICT_PROBE=1 /tmp/mx_ds_fast_window > /tmp/mx_ds_facade_new.txt
+          diff -u /tmp/mx_ds_facade_ref.txt /tmp/mx_ds_facade_new.txt
+          cat /tmp/mx_ds_facade_new.txt
