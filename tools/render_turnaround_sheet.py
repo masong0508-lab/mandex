@@ -96,6 +96,7 @@ def build(destination: Path):
     manifest = ["MANDEX — actual compiled console atlas turnaround",
                 "Columns share the same image-space origin at sprite.ax / sprite.ay.",
                 "Wolfman rows show the production grey-fur palette from mx_outfit_skin().",
+                "Turn rows have a 1-pixel floor-reference guide (not in-game art).",
                 "Same frame bounds and pivots; intentional micro-pinholes filled."]
     for row, (label, names) in enumerate(ROWS):
         manifest.append(f"row {row+1}: {label}")
@@ -107,6 +108,13 @@ def build(destination: Path):
             rect(cellx+2, celly+3, cellx+CELL_W-3, celly+CELL_H-4, BASE)
             rect(cellx+2, celly+3, cellx+CELL_W-3, celly+6, SEPARATOR)
             cx, cy = cellx + CELL_W//2, celly + CELL_H//2 + 13
+            if row < 4:
+                # One thin, behind-the-sprite visual floor reference only
+                # for grounded turns; airborne flight poses get no floor.
+                # The world foot plane is +23 source px below the sprite pivot.
+                ground_y = cy + 23*SCALE
+                rect(cellx+5, ground_y, cellx+CELL_W-5,
+                     ground_y+1, SEPARATOR)
             # Alignment to the ACTUAL gameplay pivot makes head-height
             # pops, hip/torso shifts and hair-mass inconsistencies obvious.
             x0, y0 = cx - ax*SCALE, cy - ay*SCALE
