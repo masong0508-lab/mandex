@@ -1060,7 +1060,8 @@ function drawWalkMan(m){
 function releaseWalkTouch(id){
   const key=TID[id];if(!key)return;
   delete TID[id];
-  KEYS[key]=Object.values(TID).includes(key);
+  KEYS[key]=false;
+  for(const p in TID)if(TID[p]===key){KEYS[key]=true;break;}
 }
 function walkTouch(x,y,id){
   for(const b of walkBtns())if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){
