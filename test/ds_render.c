@@ -677,6 +677,25 @@ static int target_visibility_probe(void){
           hash=(hash^(unsigned)buf_top[i])*16777619u;
           ink+=(buf_top[i]!=0);
         }
+#if !MX_DS_CULL_TARGETS
+        /* Reference painter must NOT produce ink in a region rejected
+           by the culler. Diagnose the exact pose/edge if it does. */
+        if(ink){
+          real ox,oy; mx_target_offset(&world,t,&ox,&oy);
+          int sx=vx(&view,t->x+ox),sy=vy(&view,t->y+oy);
+          int pad=ppc*10;
+          if(t->hpmax>1){
+            int bar=(t->hpmax*(ppc*7/8>1?ppc*7/8:1))/2+3;
+            if(bar>pad)pad=bar;
+          }
+          if(sx < -pad || sx >= 256+pad ||
+             sy < -ppc*12 || sy >= 192+ppc*7){
+            fprintf(stderr,"DS_TARGET_BOUNDS_LEAK ppc=%d kind=%d variant=%d facing=%d axis=%u pos=%u anchor=(%d,%d) sprite=(%d,%d) pad=%d pixels=%u\n",
+                    ppc,kind,variant,facing,axis,pos,ax,ay,sx,sy,pad,ink);
+            return 1;
+          }
+        }
+#endif
         painted+=(ink!=0);
         samples++;
       }
