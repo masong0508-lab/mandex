@@ -9,3 +9,5 @@
 - `node test/browser_creator_codec_test.js`: real browser source, intact Unicode, legacy MX1 compatibility, 14 malformed-data gates and no partial save mutation.
 - Existing `browser_orientation_test.js`, `browser_multitouch_test.js`, `browser_walk_memory_test.js`, and all host core tests must remain passing.
 - Test in actual Android/iOS browser: paste, edit, play, save, share, rotate, and navigate back. Hardware/device verification is separate from Node tests.
+
+- The codec and editor reset to the canonical **120-column** custom-grid geometry after the 360-column finale; importing or sharing a level cannot silently change its dimensions based on the previous campaign chapter. The regression directly sets the active world width to 360 before decoding a normal share code.
