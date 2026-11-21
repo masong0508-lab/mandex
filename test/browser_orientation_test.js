@@ -22,7 +22,7 @@ const cases=[
   [390,844,'ach',540,1169,true],
   [390,844,'outfit',540,1169,true],
   [390,844,'cutscene',960,540,false],
-  [390,844,'edit',960,540,false]
+  [390,844,'edit',540,1169,true]
 ];
 for(const [vw,vh,mode,sw,sh,portrait]of cases){
   const o=webViewport(vw,vh,mode);
