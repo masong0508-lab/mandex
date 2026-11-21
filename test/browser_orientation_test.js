@@ -11,6 +11,8 @@ function extract(start,end){
 const script=extract('<script>','</script>').slice(8);
 new Function(script); /* Fail immediately on duplicate declarations or syntax. */
 assert(html.includes('viewport-fit=cover'),'respect phone safe areas');
+assert(html.includes('MOBILE.includes(t.kind)')&&!html.includes('WEB_UI.includes(t.kind)'),
+  'landlord AI mobile unit roster must never be replaced by responsive UI state');
 assert(html.includes('height:100dvh'),'use dynamically resized mobile viewport');
 const cv={width:960,height:540,style:{},getBoundingClientRect(){
   return {left:10,top:20,width:parseFloat(this.style.width)||960,
