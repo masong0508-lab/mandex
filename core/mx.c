@@ -178,22 +178,9 @@ static int ev_is_critical(int type){
          type==EV_LAUNCH || type==EV_HURT || type==EV_AIRPOP;
 }
 static void ev(MxWorld *w, int type, real x, real y, int m, real a, real b){
-  if(w->nev >= MX_MAX_EVENTS){
-    if(!ev_is_critical(type)) return;
-    /* Evict the latest cosmetic event, not an earlier objective or
-       already-queued survivor. Shift the surviving tail forward in time
-       so front-ends still consume events in their original causal order.
-       At most 96 small records are inspected, only on queue saturation. */
-    int victim=-1;
-    for(int k=MX_MAX_EVENTS-1;k>=0;k--){
-      if(!ev_is_critical(w->ev[k].type)){victim=k;break;}
-    }
-    if(victim<0) return; /* A pathological all-critical queue is still bounded. */
-    for(int k=victim;k<MX_MAX_EVENTS-1;k++) w->ev[k]=w->ev[k+1];
-    w->nev=MX_MAX_EVENTS-1;
-  }
-  MxEvent *e = &w->ev[w->nev++];
-  e->type = (uint8_t)type; e->m = (uint8_t)m; e->x = x; e->y = y; e->a = a; e->b = b;
+  /* Physics/AI consequences must not depend on room in the cosmetic FX
+     queue. An overloaded demolition frame can discard an explosion sound
+     or particle effect, but nearby landlords still react to that hazard. */
 #if MX_LORD_SHOCK_REACT
   /* A nearby explosion, snapping girder, or severe rubble impact spooks
      the landlords.  Walkers, sprinters, shields and healers attempt to
@@ -217,6 +204,23 @@ static void ev(MxWorld *w, int type, real x, real y, int m, real a, real b){
     }
   }
 #endif
+  if(w->nev >= MX_MAX_EVENTS){
+    if(!ev_is_critical(type)) return;
+    /* Evict the latest cosmetic event, not an earlier objective or
+       already-queued survivor. Shift the surviving tail forward in time
+       so front-ends still consume events in their original causal order.
+       At most 96 small records are inspected, only on queue saturation. */
+    int victim=-1;
+    for(int k=MX_MAX_EVENTS-1;k>=0;k--){
+      if(!ev_is_critical(w->ev[k].type)){victim=k;break;}
+    }
+    if(victim<0) return; /* A pathological all-critical queue is still bounded. */
+    for(int k=victim;k<MX_MAX_EVENTS-1;k++) w->ev[k]=w->ev[k+1];
+    w->nev=MX_MAX_EVENTS-1;
+  }
+  MxEvent *e = &w->ev[w->nev++];
+  e->type = (uint8_t)type; e->m = (uint8_t)m; e->x = x; e->y = y; e->a = a; e->b = b;
+
 }
 
 /* ===================================================== destruction core */
