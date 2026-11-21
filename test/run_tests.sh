@@ -108,6 +108,22 @@ gcc -std=gnu99 -O2 -Wall -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm
 gcc -std=gnu99 -O2 -Wall -DMX_FIXED -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm -o cloth_fixed && ./cloth_fixed | grep -v "^  p"
 echo "--- DS front-end: real main loop on stub libnds, scripted stylus play on levels 1, 4, 6, 7 ---"
 gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Istubs -I../core -I../art -I../ds/source ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_render
+echo "--- DS landlords: 3-scale, 8-kind, 6-state, both-facing offscreen pixel parity + gameplay checks ---"
+for mode in 0 1; do
+  gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_CULL_TARGETS=$mode \
+    -Istubs -I../core -I../art -I../ds/source \
+    ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c \
+    ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_target_cull_$mode
+  DS_TARGET_CULL_PROBE=1 ./ds_target_cull_$mode > ds_target_cull_$mode.txt
+done
+cmp ds_target_cull_0.txt ds_target_cull_1.txt
+cat ds_target_cull_1.txt
+for L in 0 9 19 20 29 39 40 59; do
+  DS_PERF_BENCH=1 ./ds_target_cull_0 /tmp/ds_target_ref 360 "$L" | grep '^DS_FRAME_HASH ' > ds_target_ref.txt
+  DS_PERF_BENCH=1 ./ds_target_cull_1 /tmp/ds_target_opt 360 "$L" | grep '^DS_FRAME_HASH ' > ds_target_opt.txt
+  cmp ds_target_ref.txt ds_target_opt.txt
+  echo "DS_TARGET_CULL_PASS level=$((L+1)) pixel_identical=1"
+done
 echo "--- DS furniture offscreen culling: 3 HQ districts plus 8 gameplay frame-hash A/B checks ---"
 gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_FURNITURE_VIEW_CULL=0 \
   -Istubs -I../core -I../art -I../ds/source \
