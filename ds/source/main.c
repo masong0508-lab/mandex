@@ -20,6 +20,7 @@
 #include <string.h>
 #include "mx.h"
 #include "mx_meta.h"
+#include "mx_objective.h"
 #include "gfx.h"
 #include "sfx.h"
 #include "intro.h"
@@ -994,6 +995,7 @@ static int ds_target_walk_phase(real wk){
 }
 static void draw_targets(const View *v){
   const MxMan *m = &world.man;
+  const int last_target=world.state==MX_PLAY && mx_targets_alive(&world)==1;
   for(int i=0;i<world.ntargets;i++){
     const MxTarget *t=&world.targets[i];
     if(!t->alive)continue;
@@ -1016,8 +1018,12 @@ static void draw_targets(const View *v){
       int bar=(t->hpmax*(v->ppc*7/8>1?v->ppc*7/8:1))/2+3;
       if(bar>pad_x)pad_x=bar;
     }
+    /* The LAST marker is 9 cells above the actor and has a 1px outlined
+       glyph. Do not cull the landlord while that text can still be seen
+       through the lower viewport edge (the same as survivor warnings). */
     int pad_bottom=(t->collapse_rolled==2 && v->ppc>=3)?
-                   v->ppc*13 : v->ppc*8;
+                   v->ppc*13 : last_target && t->collapse_rolled!=2 && v->ppc>=2 ?
+                   v->ppc*11 : v->ppc*8;
     if(sx < -pad_x || sx >= 256+pad_x ||
        sy < -v->ppc*12 || sy >= 192+pad_bottom)continue;
 #endif
@@ -1034,6 +1040,10 @@ static void draw_targets(const View *v){
        can still locate the unfinished objective after the popup fades. */
     if(t->collapse_rolled==2 && v->ppc>=3)
       gfx_text_c(v->buf,sx,sy-v->ppc*11,"!",C_GOLD,C_BLACK,1);
+    /* Mark the single remaining objective, not every landlord. The tag
+       sits inside the conservative existing sprite-culling margins. */
+    if(last_target && t->collapse_rolled!=2 && v->ppc>=2)
+      gfx_text_c(v->buf,sx,sy-v->ppc*9,"LAST",C_PINK,C_BLACK,1);
   }
 }
 
@@ -1345,6 +1355,25 @@ static void draw_hats(u8 *b, int x, int y){
 }
 static int demolished_pct(void){ return gfx_clamp(100 - mx_cells_left(&world) * 100 / (cells0 ? cells0 : 1), 0, 100); }
 
+/* One projected locator on the top camera, ONLY for the final landlord
+   when the actor has left the usable view. Top 64px contain objective/header
+   labels; bottom 12px are kept clear of camera and gameplay affordances. */
+static void draw_objective_edge(const View *v){
+  if(world.state!=MX_PLAY)return;
+  MxObjective obj=mx_objective_snapshot(&world);
+  if(obj.phase!=MX_OBJ_LAST||obj.target_index<0)return;
+  const MxTarget *t=&world.targets[obj.target_index];
+  real ox,oy;mx_target_offset(&world,t,&ox,&oy);
+  MxObjectiveEdge edge=mx_objective_edge(vx(v,t->x+ox),vy(v,t->y+oy),
+                                         256,192,64,12);
+  if(!edge.dir)return;
+  const char *label=edge.dir==MX_EDGE_LEFT?"< LAST":
+                    edge.dir==MX_EDGE_RIGHT?"LAST >":
+                    edge.dir==MX_EDGE_UP?"LAST UP":"LAST DN";
+  gfx_rect(v->buf,edge.x-21,edge.y-8,42,13,C_UIBG);
+  gfx_rect(v->buf,edge.x-21,edge.y-8,42,1,C_PINK);
+  gfx_text_c(v->buf,edge.x,edge.y-5,label,C_PINK,C_BLACK,1);
+}
 static void top_hud(u8 *b){
   const char *nm = mx_level_name(world.level);
   gfx_rect(b, 0, 0, 256, 11, C_UIBG); gfx_rect(b, 0, 11, 256, 1, C_UILINE);
@@ -1365,6 +1394,26 @@ static void top_hud(u8 *b){
     gfx_rect(b, 140, 28, (int)(rmul(world.combo_left, RI(110)) / R(2.5)), 2, C_GOLD); }
   gfx_text_o(b, 4, 24, "LANDLORDS", C_WHITE, C_BLACK, 1);
   draw_hats(b, 46, 28);
+  /* WRECKED is a bonus meter; the actual win condition is evicting every
+     landlord. Keep a concise objective cue visible while aiming or walking.
+     Only existing tiny glyphs, no new sprite atlas or framebuffer. */
+  if(world.state == MX_PLAY){
+    MxObjective obj=mx_objective_snapshot(&world);
+    const char *goal=mx_objective_label(obj.phase);
+    int px=4, y=47;
+    gfx_text_o(b, px, y, goal, obj.phase==MX_OBJ_LAST ? C_PINK : C_GOLD, C_BLACK, 1);
+    px+=gfx_text_w(goal,1)+5;
+    if(obj.phase==MX_OBJ_EVICT){
+      const char *left=gfx_int(obj.remaining);
+      gfx_text_o(b,px,y,left,C_WHITE,C_BLACK,1);
+      px+=gfx_text_w(left,1)+1;
+      gfx_text_o(b,px,y,"/",C_WHITE,C_BLACK,1);
+      px+=4;
+      gfx_text_o(b,px,y,gfx_int(obj.total),C_WHITE,C_BLACK,1);
+    }else if(obj.phase==MX_OBJ_LAST && obj.direction){
+      gfx_text_o(b,px,y,obj.direction<0?"<":">",C_PINK,C_BLACK,1);
+    }
+  }
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                      /* walk levels: the clock, and what the buttons do */
     int k = gfx_clamp((int)((world.man.wt * 100 / MX_WALK_T) >> 12), 0, 100);
     gfx_rect(b, 4, 36, 82, 7, C_UIBG); gfx_rect(b, 5, 37, 80, 5, C_DARK); gfx_rect(b, 5, 37, k * 80 / 100, 5, k > 30 ? C_GOO : C_RED);
@@ -2174,6 +2223,7 @@ int main(void){
       draw_world(&top, 1);
       draw_popups(&top, 2);
       top_hud(buf_top);
+      draw_objective_edge(&top);
       banner(buf_top);
       end_panel(buf_top);
       ds_draw_top_ticks=(int)cpuEndTiming();

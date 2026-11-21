@@ -31,6 +31,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "mx.h"
+#include "mx_objective.h"
 #include "mx_fps_meter.h"
 #include "mx_meta.h"
 #include "cloth.h"
@@ -817,6 +818,7 @@ static void draw_all(void){
   /* Cull whole offscreen rubble chunks before their per-cell draw. */
   draw_rubble_chunks();
   /* landlords */
+  const int last_target=world.state==MX_PLAY && mx_targets_alive(&world)==1;
   for(int i = 0; i < world.ntargets; i++){
     const MxTarget *t = &world.targets[i];
     if(!t->alive) continue;
@@ -825,6 +827,8 @@ static void draw_all(void){
     draw_landlord(tx,ty,Z_TARGET,t);
     if(t->collapse_rolled==2) /* survivor remains an objective after smoke fades */
       text("!",tx,ty-44,18,argb(255,210,63,255),1,Z_TARGET+0.75f);
+    if(last_target && t->collapse_rolled!=2)
+      text("LAST",tx,ty-54,14,argb(255,126,176,255),1,Z_TARGET+0.8f);
   }
   /* briefcases in the air (Batter Up) and the pink bounce pads of the walk levels */
   for(int i = 0; i < MX_MAX_CASES; i++){
@@ -940,11 +944,48 @@ static void draw_all(void){
   nm[n] = 0;
   snprintf(buf, sizeof buf, "LV %d  %s", world.level + 1, nm);
   text(buf, 12, 26, 16, argb(255, 210, 63, 255), 0, Z_HUD + 0.1f);
-  int alive = 0; for(int i = 0; i < world.ntargets; i++) alive += world.targets[i].alive;
-  snprintf(buf, sizeof buf, "LANDLORDS %d/%d", alive, world.ntargets);
+  MxObjective objective=mx_objective_snapshot(&world);
+  int alive=objective.remaining;
+  snprintf(buf, sizeof buf, "LANDLORDS %d/%d", alive, objective.total);
   text(buf, 440, 26, 15, alive ? argb(255, 138, 138, 255) : argb(125, 255, 90, 255), 0, Z_HUD + 0.1f);
+  /* The wreck percentage affects score, but only eviction wins the level.
+     One small HUD strip shows objective progress without obscuring the
+     camera, allocating new textures or scanning the voxel grid again. */
+  if(world.state==MX_PLAY){
+    const char *name=mx_objective_label(objective.phase);
+    if(objective.phase==MX_OBJ_EVICT)
+      snprintf(buf,sizeof buf,"GOAL: %s %d/%d",name,alive,objective.total);
+    else if(objective.phase==MX_OBJ_LAST && objective.direction)
+      snprintf(buf,sizeof buf,"GOAL: %s %c",name,objective.direction<0?'<':'>');
+    else snprintf(buf,sizeof buf,"GOAL: %s",name);
+    quad(12,43,305,23,Z_HUD,argb(15,18,30,206));
+    text(buf,21,60,15,objective.phase==MX_OBJ_LAST?argb(255,126,176,255):
+      objective.phase==MX_OBJ_SECURE||objective.phase==MX_OBJ_DISTRICT?
+        argb(125,255,90,255):argb(255,210,63,255),0,Z_HUD+0.1f);
+  }
   { static float shown; shown += (world.score - shown) * 0.12f; if(fabsf(world.score - shown) < 0.6f) shown = (float)world.score;
     snprintf(buf, sizeof buf, "%06d", (int)(shown + 0.5f)); text(buf, 634, 27, 14, WHITE, 2, Z_HUD + 0.1f); }
+  /* Final-target-only edge hint: project with the same world camera as
+     the actor, then clip to the unobscured action view. Does not follow
+     world movement when the target is already visible on screen. */
+  if(objective.phase==MX_OBJ_LAST && objective.target_index>=0){
+    const MxTarget *t=&world.targets[objective.target_index];
+    float ox,oy;mx_target_offset(&world,t,&ox,&oy);
+    MxObjectiveEdge edge=mx_objective_edge(
+      (int)X(t->x+ox),(int)Y(t->y+oy),640,480,74,34);
+    if(edge.dir){
+      const char *hint=edge.dir==MX_EDGE_LEFT?"< LAST":
+                       edge.dir==MX_EDGE_RIGHT?"LAST >":
+                       edge.dir==MX_EDGE_UP?"LAST UP":"LAST DOWN";
+      int cx=edge.x<44?44:edge.x>596?596:edge.x;
+      quad((float)cx-43,(float)edge.y-13,86,25,Z_HUD+0.06f,
+           argb(15,18,30,222));
+      quad((float)cx-43,(float)edge.y-13,86,2,Z_HUD+0.07f,
+           argb(255,126,176,255));
+      text(hint,(float)cx,(float)edge.y+5,15,
+           argb(255,126,176,255),1,Z_HUD+0.11f);
+    }
+  }
   text("MEN", 292, 25, 11, argb(190, 190, 190, 255), 0, Z_HUD + 0.1f);
   for(int i = 0; i < world.men; i++) atl(324 + i * 15, 11, 15, 16, DCA_ICON, Z_HUD + 0.1f, WHITE);
   if(world.combo > 1 && world.combo_left > 0){

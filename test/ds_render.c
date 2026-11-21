@@ -790,7 +790,9 @@ static int target_visibility_probe(void){
             int bar=(t->hpmax*(ppc*7/8>1?ppc*7/8:1))/2+3;
             if(bar>pad)pad=bar;
           }
-          int pad_bottom=(t->collapse_rolled==2 && ppc>=3)?ppc*13:ppc*8;
+          int pad_bottom=(t->collapse_rolled==2 && ppc>=3)?ppc*13:
+            (world.state==MX_PLAY && mx_targets_alive(&world)==1 &&
+             t->collapse_rolled!=2 && ppc>=2)?ppc*11:ppc*8;
           if(sx < -pad || sx >= 256+pad ||
              sy < -ppc*12 || sy >= 192+pad_bottom){
             fprintf(stderr,"DS_TARGET_BOUNDS_LEAK ppc=%d kind=%d variant=%d facing=%d axis=%u pos=%u anchor=(%d,%d) sprite=(%d,%d) pad=%d pixels=%u\n",
@@ -1032,7 +1034,73 @@ static int chunk_damage_probe(void){
   printf("DS_RUBBLE_DAMAGE_PASS intact=%08x damaged=%08x\n",pristine,cracked);
   return 0;
 }
+/* Render the REAL 256x192 top-screen HUD and final-target world painter.
+   Verifies the mission phase visibly changes and the last-target tag is
+   attached to the only on-screen landlord (not an offscreen second one).
+   No screenshot dependency, no hardware, no new rendering code. */
+static unsigned objective_rect_hash(int x0,int y0,int x1,int y1){
+  unsigned h=2166136261u;
+  for(int y=y0;y<y1;y++)for(int x=x0;x<x1;x++)
+    h=(h^(unsigned)buf_top[y*256+x])*16777619u;
+  return h;
+}
+static int ds_objective_probe(void){
+  gfx_init();mx_meta_init(&stats);mx_options_default(&opt);
+  load_level(0);
+  frame=80;toast_t=-1;toast_nq=0;
+  world.state=MX_PLAY;world.men=3;world.man.mode=MAN_AIM;
+  world.man.x=RI(20);world.ntargets=2;
+  world.targets[0].alive=1;world.targets[1].alive=1;
+  memset(buf_top,0,sizeof buf_top);top_hud(buf_top);
+  unsigned many=objective_rect_hash(0,44,180,58);
+  world.targets[1].alive=0;
+  memset(buf_top,0,sizeof buf_top);top_hud(buf_top);
+  unsigned last=objective_rect_hash(0,44,180,58);
+  world.targets[0].alive=0;
+  memset(buf_top,0,sizeof buf_top);top_hud(buf_top);
+  unsigned secure=objective_rect_hash(0,44,180,58);
+  if(many==last || last==secure || many==secure){
+    fprintf(stderr,"DS_OBJECTIVE_FAIL HUD phases unchanged %08x %08x %08x\n",
+            many,last,secure);return 1;
+  }
+  /* Draw the same first landlord with an unreachable offscreen second
+     landlord alive, then with that second landlord evicted. The ONLY
+     difference on screen should be the final-target locator. */
+  world.targets[0].alive=1;world.targets[0].x=RI(40);world.targets[0].y=RI(25);
+  world.targets[0].collapse_rolled=0;
+  world.targets[1].alive=1;world.targets[1].x=RI(700);world.targets[1].y=RI(25);
+  View v={buf_top,3,40*3-128,25*3-96};
+  memset(buf_top,0,sizeof buf_top);draw_targets(&v);
+  unsigned unmarked=objective_rect_hash(0,0,256,192);
+  world.targets[1].alive=0;
+  memset(buf_top,0,sizeof buf_top);draw_targets(&v);
+  unsigned marked=objective_rect_hash(0,0,256,192);
+  if(unmarked==marked){
+    fprintf(stderr,"DS_OBJECTIVE_FAIL missing final target marker %08x\n",marked);
+    return 1;
+  }
+  /* The final NPC has moved beyond the right camera edge. Verify that
+     the new screen-space cue paints where visible in the 256x192 buffer,
+     while no cue appears when the target is still within the view. */
+  memset(buf_top,0,sizeof buf_top);draw_objective_edge(&v);
+  unsigned nearcue=objective_rect_hash(0,0,256,192);
+  world.targets[0].x=RI(400);
+  memset(buf_top,0,sizeof buf_top);draw_objective_edge(&v);
+  unsigned farcue=objective_rect_hash(0,0,256,192);
+  world.targets[1].alive=1;
+  memset(buf_top,0,sizeof buf_top);draw_objective_edge(&v);
+  unsigned manycue=objective_rect_hash(0,0,256,192);
+  if(nearcue!=manycue || farcue==nearcue){
+    fprintf(stderr,"DS_OBJECTIVE_FAIL offscreen hint visibility %08x %08x %08x\n",
+            nearcue,farcue,manycue);return 1;
+  }
+  printf("DS_OBJECTIVE_EDGE_PASS visible=%08x offscreen=%08x\n",nearcue,farcue);
+  printf("DS_OBJECTIVE_RENDER_PASS multi=%08x last=%08x securing=%08x mark=%08x\n",
+         many,last,secure,marked);
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("DS_OBJECTIVE_PROBE"))return ds_objective_probe();
   if(getenv("DS_PARTICLE_EDGE_PROBE"))return particle_edge_probe();
   if(getenv("DS_RUBBLE_DAMAGE_PROBE"))return chunk_damage_probe();
   if(getenv("DS_CHUNK_VIS_PROBE"))return chunk_visibility_probe();

@@ -559,6 +559,47 @@ function nextMan(){
   else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};
 }
 const aliveTargets=()=>targets.reduce((n,t)=>n+(t.alive?1:0),0);
+// Objective text is the same across web, DS, 3DS and Dreamcast. Reuse a
+// single record for the browser HUD; do not allocate an object each frame.
+const OBJECTIVE_UI={phase:'evict',remaining:0,total:0,direction:0,target:null};
+const OBJECTIVE_EDGE={dir:0,x:0,y:0};
+// Returns the same scratch record. Screen-space navigation exists only
+// when the last landlord is outside the usable camera rectangle.
+function objectiveScreenEdge(sx,sy,w,h,top,bottom){
+  const o=OBJECTIVE_EDGE;o.dir=0;
+  const floor=h-bottom;
+  if(w<48||h<48||top+bottom+28>=h)return o;
+  if(sx>=0&&sx<w&&sy>=top&&sy<floor)return o;
+  o.dir=sx<0?1:sx>=w?2:sy<top?3:4;
+  o.x=Math.max(42,Math.min(w-42,sx));
+  o.y=Math.max(top+15,Math.min(floor-15,sy));
+  return o;
+}
+function objectiveSnapshot(){
+  const o=OBJECTIVE_UI;let last=null;o.remaining=0;o.total=targets.length;o.direction=0;o.target=null;
+  for(let i=0;i<targets.length;i++)if(targets[i].alive){o.remaining++;last=targets[i]}
+  if(state==='win')o.phase='complete';
+  else if(state==='lose')o.phase='failed';
+  else if(!o.remaining)o.phase='secure';   // 1.6s win confirmation after last eviction
+  else if(men<=0&&man.mode==='none')o.phase='no_men';
+  else if(o.remaining===1){
+    o.phase='last';
+    if(last.x<man.x-2*V)o.direction=-1;
+    else if(last.x>man.x+2*V)o.direction=1;
+  }else o.phase='evict';
+  o.target=o.phase==='last'?last:null;
+  return o;
+}
+function objectiveLabel(o){
+  switch(o.phase){
+    case 'last':return 'LAST LANDLORD';
+    case 'secure':return 'SECURING AREA';
+    case 'complete':return 'EVICTION COMPLETE';
+    case 'failed':return 'OUT OF MEN';
+    case 'no_men':return 'NO MEN LEFT';
+    default:return 'EVICT LANDLORDS';
+  }
+}
 
 // =====================================================================
 //  DESTRUCTION CORE
@@ -3367,7 +3408,15 @@ function draw(){
     }
     ctx.restore();
   }
-  for(const t of targets)if(t.alive){const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);ctx.restore()}
+  const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';
+  for(const t of targets)if(t.alive){
+    const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);
+    // A compact locator above the surviving actor, positioned in the same
+    // transformed world coordinate system as the actual landlord artwork.
+    if(lastTargetVisible && t.collapseRolled!==2)
+      txt('LAST',t.x,t.y-63,12,'#ff9ec8','center');
+    ctx.restore();
+  }
   if(cases.length)drawCases();
   if(man&&man.mode==='aim'&&man.stun>0){const q=Math.sin(time*14);txt('DAZED...',SX,SY-48+q*2,16,'#ffd23f','center');for(let i=0;i<3;i++){const a=time*7+i*2.1;txt('*',SX+Math.cos(a)*18,SY-28+Math.sin(a)*5,18,'#fff','center')}}
   if(tubes.length)drawTubes();
@@ -3383,14 +3432,56 @@ function draw(){
   if(camOn)ctx.restore();
   grade();
   if(flash>0){ctx.fillStyle=`rgba(255,240,200,${flash*.9})`;ctx.fillRect(0,0,W,H)}
-  drawHUD();drawToasts(frameDt)}
+  drawHUD();drawObjectiveEdge();drawToasts(frameDt)}
+// Screen-space HUD cue; does not pan, collide with or change the final
+// landlord. Skip it entirely if the actor is already in the camera view.
+function drawObjectiveEdge(){
+  if(state!=='play')return;
+  const o=objectiveSnapshot();
+  if(o.phase!=='last'||!o.target)return;
+  const t=o.target,off=targetOffset(t);
+  const sx=CAM.on?(t.x+off[0]-CAM.x)*CAM.z:t.x+off[0];
+  const sy=CAM.on?(t.y+off[1]-CAM.y)*CAM.z:t.y+off[1];
+  const top=W<700?138:76;
+  const edge=objectiveScreenEdge(sx,sy,W,H,top,56);
+  if(!edge.dir)return;
+  const label=edge.dir===1?'< LAST':edge.dir===2?'LAST >':
+    edge.dir===3?'LAST UP':'LAST DOWN';
+  ctx.fillStyle='rgba(15,18,30,.88)';
+  ctx.fillRect(edge.x-41,edge.y-14,82,28);
+  ctx.fillStyle='#ff9ec8';ctx.fillRect(edge.x-41,edge.y-14,82,3);
+  txt(label,edge.x,edge.y+5,14,'#ff9ec8','center');
+}
 function drawHUD(){
   drawWalkHUD();
   const P=W<700;ctx.fillStyle='rgba(15,18,30,.72)';ctx.fillRect(0,0,W,P?62:34);ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(0,0,W,2);
   {const nm=`${CL.custom?'CUSTOM':'LV '+(level+1)}  ${CL.name.toUpperCase()}`;let sz=18;{while(sz>11){ctx.font=`bold ${sz}px "Trebuchet MS",Impact,sans-serif`;if(ctx.measureText(nm).width<=(P?285:250))break;sz--}}txt(nm,12,24,sz,'#ffd23f','left')}
-  const lb=aliveTargets();txt(`LANDLORDS ${lb}/${targets.length}`,P?12:Math.max(430,300+men*Math.min(20,230/Math.max(1,men))+24),P?54:24,18,lb?'#ff8a8a':'#7dff5a','left');
+  const objective=objectiveSnapshot(),lb=objective.remaining;
+  txt(`LANDLORDS ${lb}/${objective.total}`,P?12:Math.max(430,300+men*Math.min(20,230/Math.max(1,men))+24),P?54:24,18,lb?'#ff8a8a':'#7dff5a','left');
+  if(state==='play'){
+    // Never mistake the wreckage meter for the win condition. In portrait
+    // and landscape the objective lives below the header, not over controls.
+    const label=objectiveLabel(objective);
+    const note=objective.phase==='evict'?`${label} ${lb}/${objective.total}`:
+      objective.phase==='last'&&objective.direction?
+      `${label} ${objective.direction<0?'<':'>'}`:label;
+    const oy=P?66:38;
+    ctx.fillStyle='rgba(15,18,30,.78)';ctx.fillRect(7,oy,Math.min(304,W-14),28);
+    ctx.fillStyle=objective.phase==='last'?'#ff9ec8':
+      objective.phase==='secure'?'#7dff5a':'#ffd23f';
+    ctx.fillRect(7,oy,3,28);
+    txt('GOAL: '+note,18,oy+19,14,ctx.fillStyle,'left');
+  }
   txt(String(Math.round(shownScore)).padStart(6,'0'),W-12,24,20,'#fff','right');
-  if(combo>1&&state==='play'){const q=Math.min(1,comboLeft/2.5);ctx.fillStyle='rgba(40,12,47,.86)';ctx.fillRect(W-170,P?67:39,158,30);txt('x'+combo+'  EVICTION STREAK',W-91,P?87:59,15,'#ff9ec8','center');ctx.fillStyle='#ff9ec8';ctx.fillRect(W-168,P?95:67,154*q,2)}
+  if(combo>1&&state==='play'){
+    const q=Math.min(1,comboLeft/2.5);
+    // Portrait: the streak sits BELOW the 28px mission strip (66..94),
+    // not on top of the last-target direction or objective label.
+    const cy=P?100:39;
+    ctx.fillStyle='rgba(40,12,47,.86)';ctx.fillRect(W-170,cy,158,30);
+    txt('x'+combo+'  EVICTION STREAK',W-91,cy+20,15,'#ff9ec8','center');
+    ctx.fillStyle='#ff9ec8';ctx.fillRect(W-168,cy+28,154*q,2);
+  }
   const mstp=Math.min(P?16:20,(P?190:230)/Math.max(1,men));   // a long row of men squeezes together (the wide finale can have 17)
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
