@@ -4593,7 +4593,54 @@ function setVolFromX(x){const o=OPT();o.vol=clamp(Math.round((x-sliX)/sliW*20)/2
 const GUIDES=['OFF','SHORT','FULL'],SHAKES=[['OFF',0],['LOW',.5],['FULL',1]];
 function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX'])delete o[k];o.tool='none';muted=false;webEcoFX=false;applyVol();pdTouch();pdSave()}
 function progReset(){PD.stars={};PD.best={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
+function drawMobileOptions(){
+  mobileHeader('OPTIONS',goMenu);
+  const o=OPT(),tabs=['GAMEPLAY','SOUND & SCREEN','DATA'],page=mobileOptionsPage;
+  for(let k=0;k<3;k++)btn(12+k*(W-24)/3,94,(W-36)/3,43,tabs[k],
+    ()=>{mobileOptionsPage=k},{size:k===1?12:15,on:page===k});
+  let y=160;const width=W-48,row=(label,val,action,active)=>{
+    btn(24,y,width,56,label+(val?'  '+val:''),action,{size:17,on:active,col:'#9fd8ff'});y+=65;
+  };
+  if(page===0){
+    row('COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',
+      ()=>{o.collapse=!o.collapse;pdTouch();pdSave()},!!o.collapse);
+    row('START TOOL',toolName(),()=>{toolCycle();pdTouch();pdSave()},true);
+    row('AIM GUIDE',GUIDES[o.guide==null?2:o.guide],
+      ()=>{o.guide=((o.guide==null?2:o.guide)+1)%3;pdTouch();pdSave()},(o.guide==null?2:o.guide)>0);
+    row('BURP CHARGE',o.burpCharge?'ON':'OFF',
+      ()=>{o.burpCharge=!o.burpCharge;pdTouch();pdSave()},!!o.burpCharge);
+    row('STOMACH NEVER BURSTS',o.noBurst?'ON':'OFF',
+      ()=>{o.noBurst=!o.noBurst;pdTouch();pdSave()},!!o.noBurst);
+    row('LANDLORDS FIGHT BACK',o.fight===false?'OFF':'ON',
+      ()=>{o.fight=o.fight===false?true:false;pdTouch();pdSave()},o.fight!==false);
+  }else if(page===1){
+    row('SOUND',muted?'OFF':'ON',()=>{audioInit();setMuted(!muted)},!muted);
+    txt('VOLUME   '+Math.round(optVol()*100)+'%',W/2,y+20,20,'#fff','center');
+    y+=32;sliX=112;sliW=W-224;
+    btn(24,y,76,55,'−',()=>{o.vol=clamp(optVol()-.1,0,1);applyVol();pdTouch();pdSave()},{size:28});
+    btn(W-100,y,76,55,'+',()=>{o.vol=clamp(optVol()+.1,0,1);applyVol();pdTouch();pdSave()},{size:28});
+    btn(112,y,sliW,55,'SET VOLUME',()=>{setVolFromX(mouseX);pdSave()},{size:15});y+=70;
+    row('SCREEN SHAKE',(SHAKES.find(a=>a[1]===(o.shake==null?1:o.shake))||SHAKES[2])[0],
+      ()=>{const i=SHAKES.findIndex(a=>a[1]===(o.shake==null?1:o.shake));
+        o.shake=SHAKES[(i+1)%3][1];pdTouch();pdSave()},(o.shake==null?1:o.shake)>0);
+    row('DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',
+      ()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX;pdTouch();pdSave()},!webEcoFX);
+    txt('Fewer particles may improve performance on older phones.',W/2,y+15,13,'#ddd','center');
+  }else{
+    txt('Your created levels are preserved when resetting progress.',W/2,y+10,16,'#ddd','center');y+=46;
+    const now=performance.now(),armed=now<armReset,armed2=now<armProg;
+    row(armed?'CONFIRM RESET OPTIONS':'RESET OPTIONS','',
+      ()=>{if(performance.now()<armReset){optsReset();armReset=0}
+        else{armReset=performance.now()+3000;armProg=0}},armed);
+    row(armed2?'CONFIRM ERASE PROGRESS':'RESET PROGRESS','',
+      ()=>{if(performance.now()<armProg){progReset();armProg=0}
+        else{armProg=performance.now()+3000;armReset=0}},armed2);
+    txt('Tap the reset button twice within three seconds.',W/2,y+20,15,'#ffb03a','center');
+  }
+  txt('Changes save automatically',W/2,H-22,15,'#ddd','center');
+}
 function drawOptions(){
+  if(mobilePortrait){drawMobileOptions();return}
   ctx.fillStyle='rgba(10,14,30,.62)';ctx.fillRect(0,0,W,H);
   txt('OPTIONS',W/2,56,40,'#ffd23f','center','#7a1a1a');btn(16,14,90,36,'< MENU',goMenu,{size:16});
   const o=OPT(),now=performance.now(),cw=430,lx=40,rx=W-40-cw,rh=46,gap=8;let y=98,ry=98;
@@ -4674,6 +4721,22 @@ function drawSelect(){
     if(!cu.length)txt('Make a level in the creator and it shows up here.',W/2,H-30,15,'#cfd','center')}}
 function confirmDel(L){try{return confirm('Delete "'+L.n+'"?')}catch(e){return true}}
 function drawAch(){
+  if(mobilePortrait){
+    mobileHeader('ACHIEVEMENTS',goMenu);
+    txt(achCount()+' / '+ACH.length+' COMPLETED',W/2,103,18,'#fff','center');
+    const y0=136,step=83,per=Math.max(3,Math.floor((H-y0-110)/step));
+    const pages=Math.max(1,Math.ceil(ACH.length/per));
+    mobileAchPage=Math.min(mobileAchPage,pages-1);
+    ACH.slice(mobileAchPage*per,(mobileAchPage+1)*per).forEach((a,j)=>{
+      const y=y0+j*step,got=PD.ach[a.id];
+      panel(16,y,W-32,76);
+      txt((got?'★ ':'○ ')+a.n,34,y+27,18,got?'#ffd23f':'#cdd','left');
+      txt(a.d,34,y+50,13,got?'#fff':'#aaa','left');
+      if(!got&&a.p){const[q,m]=a.p();txt(Math.min(q,m)+'/'+m,W-28,y+69,13,'#ffd23f','right')}
+    });
+    mobilePager(mobileAchPage,pages,i=>{mobileAchPage=i});
+    return;
+  }
   ctx.fillStyle='rgba(10,14,30,.6)';ctx.fillRect(0,0,W,H);
   txt('ACHIEVEMENTS',W/2,50,38,'#ffd23f','center','#7a1a1a');txt(`${achCount()} / ${ACH.length}`,W-20,40,22,'#fff','right');
   btn(16,14,90,36,'< MENU',goMenu,{size:16});
@@ -4684,6 +4747,26 @@ function drawAch(){
     txt(a.n,x+40,y+15,15,got?'#fff':'#aab','left');txt(a.d,x+40,y+30,11,got?'#cfd':'#889','left');
     if(!got&&a.p){const[p,m]=a.p();txt(`${Math.min(p,m)}/${m}`,x+rw-10,y+22,13,'#ffd23f','right')}ctx.restore()})}
 function drawOutfits(){
+  if(mobilePortrait){
+    mobileHeader('OUTFITS',goMenu);
+    txt('CURRENTLY WEARING: '+outfitCur.n,W/2,103,17,'#fff','center');
+    const cols=2,tw=(W-38)/2,th=83,step=94,y0=140;
+    const rows=Math.max(2,Math.floor((H-y0-110)/step)),per=rows*cols;
+    const pages=Math.max(1,Math.ceil(OUTFITS.length/per));
+    mobileOutfitPage=Math.min(mobileOutfitPage,pages-1);
+    OUTFITS.slice(mobileOutfitPage*per,(mobileOutfitPage+1)*per).forEach((o,j)=>{
+      const i=mobileOutfitPage*per+j,x=12+(j%cols)*(tw+14),y=y0+((j/cols)|0)*step;
+      const own=!!PD.own[o.id],sel=outfitCur===o;
+      btn(x,y,tw,th,o.n,()=>{if(own){equip(o);SFX.ding()}else SFX.pop()},
+        {size:16,on:sel,col:'#7dff5a'});
+      ctx.fillStyle=o.thong?o.tg:o.br;ctx.fillRect(x+11,y+11,34,12);
+      txt(own?(sel?'WEARING':'TAP TO WEAR'):'LOCKED',x+tw/2,y+th-10,12,own?'#cfd':'#aab','center');
+      void i;
+    });
+    mobilePager(mobileOutfitPage,pages,i=>{mobileOutfitPage=i});
+    txt(ownedCount()+'/'+OUTFITS.length+' UNLOCKED',W/2,H-18,14,'#fff','center');
+    return;
+  }
   ctx.fillStyle='rgba(10,14,30,.62)';ctx.fillRect(0,0,W,H);
   txt('OUTFITS',W/2,50,38,'#ffd23f','center','#7a1a1a');btn(16,14,90,36,'< MENU',goMenu,{size:16});
   panel(30,70,330,430);
