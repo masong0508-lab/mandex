@@ -89,7 +89,7 @@ jobs:
     timeout-minutes: 15
     continue-on-error: true
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: rom-nds }
       - name: Launch in DeSmuME
         run: |
@@ -124,11 +124,11 @@ jobs:
           python3 test/character_turnaround_test.py
           python3 test/head_turnaround_test.py
           python3 test/dreamcast_wolf_atlas_test.py
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: rom-nds, path: pack }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: rom-dreamcast, path: pack }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: mandex-3ds, path: pack/3ds }
       - name: Zip all console builds and standalone browser game
         run: |
