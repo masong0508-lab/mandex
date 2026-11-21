@@ -51,6 +51,19 @@ jobs:
             ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o /tmp/mx_ds_quick_render
           DS_WALK_PHASE_PROBE=1 /tmp/mx_ds_quick_render
           DS_PARTICLE_PROBE=1 /tmp/mx_ds_quick_render
+      - name: Expanding rings and smoke - exact particle edge pixels against unculled reference
+        run: |
+          set -eu
+          for mode in 0 1; do
+            gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED \
+              -DMX_DS_PARTICLE_VIEW_CULL=$mode \
+              -Itest/stubs -Icore -Iart -Ids/source \
+              test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
+              core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mx_ds_particle_edge_$mode
+            DS_PARTICLE_EDGE_PROBE=1 /tmp/mx_ds_particle_edge_$mode > /tmp/mx_ds_particle_edge_$mode.txt
+          done
+          diff -u /tmp/mx_ds_particle_edge_0.txt /tmp/mx_ds_particle_edge_1.txt
+          cat /tmp/mx_ds_particle_edge_1.txt
       - name: Landlord visibility - full sprite bounds across 9,792 poses and screen edges
         run: |
           set -eu
