@@ -1262,6 +1262,10 @@ static void button(u8 *b, int x, int y, int w, int h, const char *s){
   gfx_rect(b, x + 1, y + h - 2, w - 2, 1, C_UIBG);
   gfx_text_c(b, x + w / 2, y + (h - 5) / 2, s, C_WHITE, C_UIBG, 1);
 }
+/* Match the visible one-line help to actual DS button bindings. The
+   3x5 font is four pixels per character, so this 59-character line stays
+   within 256 pixels, including the outline, at the native DS scale. */
+#define DS_WALK_HELP "PAD MOVE A/UP JUMP B/Y PUNCH X/DOWN SLAM L EXIT START PAUSE"
 /* walk levels: the touch screen shows these buttons while he is on foot (the stylus can only press one; the d-pad and A/B/Y/X play the same moves) */
 static const struct { int x, w; const char *s; } WB[6] = { { 4, 22, "<" }, { 28, 22, ">" }, { 58, 44, "JUMP" }, { 104, 50, "PUNCH" }, { 156, 44, "SLAM" }, { 204, 48, "GIVE UP" } };
 static int walk_btn_at(const touchPosition *t){ for(int i = 0; i < 6; i++) if(hit(t, WB[i].x, 168, WB[i].w, 20)) return i; return -1; }
@@ -1300,7 +1304,7 @@ static void top_hud(u8 *b){
     int k = gfx_clamp((int)((world.man.wt * 100 / MX_WALK_T) >> 12), 0, 100);
     gfx_rect(b, 4, 36, 82, 7, C_UIBG); gfx_rect(b, 5, 37, 80, 5, C_DARK); gfx_rect(b, 5, 37, k * 80 / 100, 5, k > 30 ? C_GOO : C_RED);
     gfx_text_o(b, 90, 36, "TIME", C_WHITE, C_BLACK, 1);
-    gfx_text_c(b, 128, 183, "PAD MOVE  A JUMP  B PUNCH  DOWN SLAM  L GIVE UP", C_WHITE, C_BLACK, 1);
+    gfx_text_c(b, 128, 183, DS_WALK_HELP, C_WHITE, C_BLACK, 1);
   }
   toast_tick();
   if(toast_t >= 0){                                                             /* achievement popup: drops in, gold frame, star badge, time bar */
