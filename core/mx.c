@@ -1859,13 +1859,16 @@ static void upd_targets(MxWorld *w, real dt){
       if(t->vy > R(37.5) && t->inv <= 0){ t->stun = R(0.8); t->inv = R(0.8); ev(w, EV_OOF, t->x, t->y, 0, RI(t->hp), 0); }   /* a hard one only stuns */
       t->vy = 0; }
     else { t->vy += rmul(GRAV, dt); t->y += rmul(t->vy, dt); }
+    /* A successful escape has a short window to get clear before another
+       pile-up can re-bury the same location. Once immunity expires, ordinary
+       crushing and impact rules resume in full. */
+    if(t->collapse_rolled==2 && t->inv>0)continue;
     if(solid_at(w, t->x, t->y)){      /* buried by settling rubble: dig out if there is air within 3 cells above (a light collapse), else crushed */
       real up = 0;
       for(real d = R(0.25); d <= RI(3); d += R(0.25)) if(!solid_at(w, t->x, t->y - d) && !solid_at(w, t->x, t->y - d - r)){ up = d; break; }
       if(up){ t->y -= up; t->vy = 0; t->stun = RI(1); t->inv = RI(1); }
       else { if(!collapse_survive(w,t))kill_hard(w,t); continue; }
     }
-    if(t->collapse_rolled==2 && t->inv>0)continue; /* one brief escape grace, not permanent invulnerability */
     for(int c = 0; c < MX_MAX_CHUNKS && t->alive; c++){
       MxChunk *ch = &w->chunks[c];
       if(!ch->active) continue;
