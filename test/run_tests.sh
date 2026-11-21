@@ -353,6 +353,27 @@ rot_ref=$(awk '/^N3_ROT_TIGHT_WORK /{split($2,a,"=");print a[2]}' n3d_rot_bounds
 rot_new=$(awk '/^N3_ROT_TIGHT_WORK /{split($2,a,"=");print a[2]}' n3d_rot_bounds_1.txt)
 test "$rot_new" -lt "$rot_ref"
 echo "N3_ROT_TIGHT_PASS exact_pixels=1 candidates=$rot_new reference=$rot_ref"
+echo "--- 3DS four-tap sampler: bit-identical fast positive coordinates and opaque RGB ---"
+for config in reference fast opaque; do
+  case "$config" in
+    reference) defs="-DMX_N3DS_ROT_FAST_SAMPLE=0 -DMX_N3DS_ROT_OPAQUE_SHORTCUT=0";;
+    fast) defs="-DMX_N3DS_ROT_FAST_SAMPLE=1 -DMX_N3DS_ROT_OPAQUE_SHORTCUT=0";;
+    opaque) defs="-DMX_N3DS_ROT_FAST_SAMPLE=1 -DMX_N3DS_ROT_OPAQUE_SHORTCUT=1";;
+  esac
+  gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ \
+    -DMX_N3DS_ROT_WORK_COUNT=1 -DMX_N3DS_ROT_TIGHT_BOUNDS=1 $defs \
+    -I../3ds/shim -Istubs -I../core -I../art -I../ds/source \
+    n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3d_rot_sampler_$config
+  N3DS_ROT_TIGHT_PROBE=1 ./n3d_rot_sampler_$config > n3d_rot_sampler_$config.txt
+  grep '^N3_ROT_TIGHT_HASH ' n3d_rot_sampler_$config.txt > n3d_sampler_hash_$config.txt
+done
+cmp n3d_sampler_hash_reference.txt n3d_sampler_hash_fast.txt
+cmp n3d_sampler_hash_reference.txt n3d_sampler_hash_opaque.txt
+grep -Eq '^N3_ROT_SAMPLER_WORK floors=[1-9][0-9]* opaque=[1-9][0-9]*$' n3d_rot_sampler_reference.txt
+grep -Eq '^N3_ROT_SAMPLER_WORK floors=0 opaque=[1-9][0-9]*$' n3d_rot_sampler_fast.txt
+grep -Eq '^N3_ROT_SAMPLER_WORK floors=0 opaque=[1-9][0-9]*$' n3d_rot_sampler_opaque.txt
+cat n3d_rot_sampler_opaque.txt
+echo "N3_ROT_SAMPLER_PASS exact_pixels=1 no_floor_calls=1 no_bg_reads_for_opaque=1"
 echo "--- 3DS stereo/bottom particle culling: pixel parity and measured raster work ---"
 for mode in 0 1; do
   gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -DMX_N3DS_PARTICLE_BENCH=1 -DMX_N3DS_PARTICLE_VIEW_CULL=$mode \

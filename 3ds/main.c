@@ -417,9 +417,6 @@ static inline int fdiv4(int a){ return a >= 0 ? a / 4 : -((-a + 3) / 4); }
    stable light from upper left. Hair/face silhouettes and boxer colors are
    preserved; dark ink stays ink. The caller already checked c != 0. */
 static inline u32 man_surface_color(const MsFrame *f,int sx,int sy,int face,int c){
-  /* In host intro/gag previews the renderer is sometimes used before
-     n3ds_main(). Seed the same Classic Red defaults once, never a black man. */
-  if(!man_tone_ready) apply_outfit(0);
   if(!MX_N3DS_SPRITE_VOLUME || c==1)return man_tone[0][c-1];
   int row=sy*f->w;
   int right=sx+(face>0?1:-1),left=sx-(face>0?1:-1);
@@ -431,6 +428,9 @@ static inline u32 man_surface_color(const MsFrame *f,int sx,int sy,int face,int 
   return man_tone[0][c-1];
 }
 static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
+  /* A host/cutscene may draw before main(). Initialize once per sprite,
+     rather than repeating the check for every color texel. */
+  if(!man_tone_ready) apply_outfit(0);
   if(man_fur && fr < MSF_NBASE) fr += MSF_NBASE;                             /* the Wolfman's frames follow the human ones */
   const MsFrame *f = &MS_FRAMES[fr];
   for(int sy = 0; sy < f->h; sy++){
@@ -463,10 +463,22 @@ static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
 #ifndef MX_N3DS_ROT_TIGHT_BOUNDS
 #define MX_N3DS_ROT_TIGHT_BOUNDS 1
 #endif
+/* Non-negative float truncation is exactly floorf(). Reject negatives
+   before conversion and eliminate eight libm floors per four-texel tap. */
+#ifndef MX_N3DS_ROT_FAST_SAMPLE
+#define MX_N3DS_ROT_FAST_SAMPLE 1
+#endif
+/* Four covered samples need no background reads (source is fully opaque).
+   Preserve the original +2 rounding for byte-identical BGR8 colors. */
+#ifndef MX_N3DS_ROT_OPAQUE_SHORTCUT
+#define MX_N3DS_ROT_OPAQUE_SHORTCUT 1
+#endif
 #ifdef MX_N3DS_ROT_WORK_COUNT
 static unsigned man_rot_candidate_pixels,man_rot_sampled_pixels;
+static unsigned man_rot_floor_calls,man_rot_opaque_pixels;
 #endif
 static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, float a){
+  if(!man_tone_ready) apply_outfit(0);
   if(man_fur && fr < MSF_NBASE) fr += MSF_NBASE;
   const MsFrame *f=&MS_FRAMES[fr];
   float ca=cosf(a),sa=sinf(a),q=4.0f/ppc;
@@ -523,17 +535,45 @@ static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, fl
 #endif
       unsigned r=0,g=0,b=0,n=0;
       for(int k=0;k<4;k++){
-        int sx=(int)floorf(su+du[k]+.5f),sy=(int)floorf(sv+dv[k]+.5f);
+        int sx,sy;
+#if MX_N3DS_ROT_FAST_SAMPLE
+        float tx=su+du[k]+.5f,ty=sv+dv[k]+.5f;
+        /* For tx,ty >= 0, truncation is floor exactly. The original
+           floorf() yields a negative out-of-frame index for negatives;
+           reject those BEFORE casting, including tiny negative values. */
+        if(!(tx>=0.f && tx<f->w && ty>=0.f && ty<f->h))continue;
+        sx=(int)tx;sy=(int)ty;
+#else
+#ifdef MX_N3DS_ROT_WORK_COUNT
+        man_rot_floor_calls+=2; /* eight former floors per candidate pixel */
+#endif
+        sx=(int)floorf(su+du[k]+.5f);
+        sy=(int)floorf(sv+dv[k]+.5f);
         if((unsigned)sx >= (unsigned)f->w || (unsigned)sy >= (unsigned)f->h)continue;
+#endif
         int index=f->px[sy*f->w+sx];if(!index)continue;
         u32 rgb=man_surface_color(f,sx,sy,face,index);
         r+=(rgb>>16)&255u;g+=(rgb>>8)&255u;b+=rgb&255u;n++;
       }
       if(!n)continue;
+#ifdef MX_N3DS_ROT_WORK_COUNT
+      if(n==4)man_rot_opaque_pixels++;
+#endif
       u8 *dst=s->fb+(x*s->h+(s->h-1-y))*3;
-      dst[0]=(u8)((b+(4-n)*dst[0]+2)>>2);
-      dst[1]=(u8)((g+(4-n)*dst[1]+2)>>2);
-      dst[2]=(u8)((r+(4-n)*dst[2]+2)>>2);
+#if MX_N3DS_ROT_OPAQUE_SHORTCUT
+      if(n==4){
+        /* Interior of the silhouette: the original compositing weights
+           the background by ZERO; avoid reading it on slow BGR8 VRAM. */
+        dst[0]=(u8)((b+2)>>2);
+        dst[1]=(u8)((g+2)>>2);
+        dst[2]=(u8)((r+2)>>2);
+      }else
+#endif
+      {
+        dst[0]=(u8)((b+(4-n)*dst[0]+2)>>2);
+        dst[1]=(u8)((g+(4-n)*dst[1]+2)>>2);
+        dst[2]=(u8)((r+(4-n)*dst[2]+2)>>2);
+      }
     }
   }
 #else

@@ -349,6 +349,7 @@ static int n3_rot_tight_bounds_probe(void){
   unsigned long long digest=1469598103934665603ull;
   unsigned cases=0;
   man_rot_candidate_pixels=man_rot_sampled_pixels=0;
+  man_rot_floor_calls=man_rot_opaque_pixels=0;
   for(int viewport=0;viewport<2;viewport++){
     Scr *screen=viewport?&bot:&top;
     screen->fb=viewport?fb_bot:fb_top[0];
@@ -376,6 +377,8 @@ static int n3_rot_tight_bounds_probe(void){
   printf("N3_ROT_TIGHT_HASH %016llx cases=%u\n",digest,cases);
   printf("N3_ROT_TIGHT_WORK candidate=%u sampled=%u\n",
          man_rot_candidate_pixels,man_rot_sampled_pixels);
+  printf("N3_ROT_SAMPLER_WORK floors=%u opaque=%u\n",
+         man_rot_floor_calls,man_rot_opaque_pixels);
   return 0;
 }
 #endif
