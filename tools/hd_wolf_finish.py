@@ -22,7 +22,7 @@ def finish_hd_wolf_volume(rgba, anchor_y):
             while x < width and int(rgba[y][x][3]) >= 128:
                 x += 1
             size = x - first
-            if size < 7:
+            if size < 9:
                 continue
             for side, depth in ((0, 4), (1, 4), (2, 4), (3, 4),
                                 (size - 4, -4), (size - 3, -4),
