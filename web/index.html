@@ -1371,17 +1371,19 @@ function updTargets(dt){
     if(solidAt(t.x,t.y)){   // buried by settling rubble: dig out if there is air within 3 cells above (a light collapse), else crushed
       let up=0;for(let d=2;d<=V*3;d+=2)if(!solidAt(t.x,t.y-d)&&!solidAt(t.x,t.y-d-t.r)){up=d;break}
       if(up){t.y-=up;t.vy=0;t.stun=1;t.inv=1;popText(t.x,t.y-38,'PHEW!','#7dff5a',16)}else{if(!collapseSurvive(t))killTarget(t,true);continue}}
-    /* Rubble can hold hundreds of cells. Test squared proximity before
-       entering each particle collision: there is no need for Math.hypot
-       until a cell actually strikes a landlord and impact speed matters. */
+    /* A fallen room may contain hundreds of voxels. The collision radius
+       is constant for this landlord: calculate it once, use an AABB to reject
+       almost every far-away cell before even multiplying the distances. The
+       precise circle hit and rubble velocity still decide actual impacts. */
+    const radius=t.r+RC,rad2=radius*radius;
     for(const ch of chunks){
       const cdx=ch.x-t.x,cdy=ch.y-t.y,cr=ch.rad+t.r+4;
       if(cdx*cdx+cdy*cdy>cr*cr)continue;
       let dead=false;
-      const radius=t.r+RC,rad2=radius*radius;
       for(const a of ch.cells){
         if(a.dead)continue; // no invisible impacts from shattered rubble
         const dx=a.wx-t.x,dy=a.wy-t.y;
+        if(Math.abs(dx)>=radius||Math.abs(dy)>=radius)continue;
         if(dx*dx+dy*dy<rad2){
           const sp=Math.hypot(ch.vx-ch.w*(a.wy-ch.y),ch.vy+ch.w*(a.wx-ch.x));
           if(sp>70){
