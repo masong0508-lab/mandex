@@ -43,7 +43,7 @@ static int level;
 static void script(void){
   static int st, f0, x0, y0;
   if(level == 99){ if(vf == 2) g_keys |= KEY_Y; return; }
-  if(level == 98){ /* full 3DS touchscreen pause / input-conflict script */
+  if(level == 98){ /* real 3DS touch pickup, pause, and music script */
     static int first_men;
     if(vf == 2){
       app=ST_PLAY;sel=0;load_level(0);world.banner=0;mus_pref=1;
@@ -53,36 +53,42 @@ static void script(void){
       CHECK(pause3_touch_at(160,180)<0 && pause3_touch_at(1,212)<0,
             "touches outside the pause toolbar do not trigger a menu action");
     }
-    if(vf == 3){g_keys=KEY_TOUCH;g_touch.px=160;g_touch.py=181;}
-    if(vf == 4){g_keys=KEY_TOUCH;g_touch.px=120;g_touch.py=196;}
-    if(vf == 5){
-      CHECK(dragging && world.man.mode==MAN_AIM,"3DS stylus can pull back the sling");
+    if(vf == 3){g_keys=KEY_TOUCH;g_touch.px=10;g_touch.py=10;}
+    if(vf == 4)
+      CHECK(!dragging && world.man.x==MX_ANCHOR_X &&
+            world.man.y==MX_ANCHOR_Y,
+            "remote 3DS tap does not teleport the player or start a drag");
+    if(vf == 5){g_keys=KEY_TOUCH;g_touch.px=160;g_touch.py=181;}
+    if(vf == 6){g_keys=KEY_TOUCH;g_touch.px=120;g_touch.py=196;}
+    if(vf == 7){
+      CHECK(dragging && world.man.mode==MAN_AIM,
+            "3DS stylus picks up the character and pulls the sling");
       g_keys=KEY_START|KEY_TOUCH;g_touch.px=120;g_touch.py=196;
     }
-    if(vf == 6){
+    if(vf == 8){
       CHECK(app==ST_PAUSE && !dragging && !pad_used,
             "3DS START pauses without leaving a stale touch or D-pad latch");
       CHECK(world.man.x==MX_ANCHOR_X && world.man.y==MX_ANCHOR_Y &&
             world.man.mode==MAN_AIM && world.men==first_men,
             "pausing a 3DS pull safely resets aim without spending a life");
     }
-    if(vf == 7){g_keys=KEY_TOUCH;g_touch.px=50;g_touch.py=212;}
-    if(vf == 8)CHECK(app==ST_PLAY && world.men==first_men,
-                   "3DS touch RESUME preserves the current level");
-    if(vf == 9)g_keys=KEY_Y;
-    if(vf == 10)CHECK(mus_pref==0,"3DS Y toggles music while aiming");
+    if(vf == 9){g_keys=KEY_TOUCH;g_touch.px=50;g_touch.py=212;}
+    if(vf == 10)CHECK(app==ST_PLAY && world.men==first_men,
+                    "3DS touch RESUME preserves the current level");
     if(vf == 11)g_keys=KEY_Y;
-    if(vf == 12){CHECK(mus_pref==1,"3DS Y re-enables music");world.score=1234;}
-    if(vf == 13)g_keys=KEY_SELECT;
-    if(vf == 14)CHECK(app==ST_PLAY && world.score==0 && world.men==first_men &&
+    if(vf == 12)CHECK(mus_pref==0,"3DS Y toggles music while aiming");
+    if(vf == 13)g_keys=KEY_Y;
+    if(vf == 14){CHECK(mus_pref==1,"3DS Y re-enables music");world.score=1234;}
+    if(vf == 15)g_keys=KEY_SELECT;
+    if(vf == 16)CHECK(app==ST_PLAY && world.score==0 && world.men==first_men &&
                     mus_pref==1,"3DS SELECT restarts without accidentally toggling music");
-    if(vf == 15)g_keys=KEY_START;
-    if(vf == 16){g_keys=KEY_TOUCH;g_touch.px=160;g_touch.py=212;}
-    if(vf == 17)CHECK(app==ST_PLAY && world.score==0 && world.men==first_men,
+    if(vf == 17)g_keys=KEY_START;
+    if(vf == 18){g_keys=KEY_TOUCH;g_touch.px=160;g_touch.py=212;}
+    if(vf == 19)CHECK(app==ST_PLAY && world.score==0 && world.men==first_men,
                     "3DS touch RESTART resets the world and resumes");
-    if(vf == 18)g_keys=KEY_START;
-    if(vf == 19){g_keys=KEY_TOUCH;g_touch.px=264;g_touch.py=212;}
-    if(vf == 20){
+    if(vf == 20)g_keys=KEY_START;
+    if(vf == 21){g_keys=KEY_TOUCH;g_touch.px=264;g_touch.py=212;}
+    if(vf == 22){
       CHECK(app==ST_TITLE && sel==0,"3DS touch MENU safely exits to the title");
       g_left=0;
     }
