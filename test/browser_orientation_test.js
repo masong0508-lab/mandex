@@ -77,7 +77,7 @@ const env={
   state:'menu',time:1,frameDt:.016,muted:false,webEcoFX:false,
   hits:records,ACH:Array.from({length:17},(_,i)=>({id:'a'+i,n:'Achievement '+i,d:'Earn '+i})),
   OUTFITS:Array.from({length:16},(_,i)=>({id:'look'+i,n:'Outfit '+i})),
-  outfitCur:{n:'Classic Red'},PD:{stars:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
+  outfitCur:{n:'Classic Red'},PD:{stars:{},ach:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
   LEVELS:Array.from({length:60},(_,i)=>({name:'District Building '+i})),
   CH1:20,CH2:40,selTab:0,
   GUIDES:['OFF','SHORT','FULL'],SHAKES:[['OFF',0],['LOW',.5],['FULL',1]],
