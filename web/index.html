@@ -655,7 +655,7 @@ function lordShock(x,y,reach,seconds){
   for(const t of targets){
     if(!t.alive||Math.abs(t.x-x)>reach||Math.abs(t.y-y)>56)continue;
     t.pan=Math.max(t.pan||0,.65);
-    if(WEB_UI.includes(t.kind)&&!(t.dodge>0)){
+    if(MOBILE.includes(t.kind)&&!(t.dodge>0)){
       t.dd=t.x>=x?1:-1;t.dodge=seconds;
     }
   }
