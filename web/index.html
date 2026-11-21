@@ -4598,7 +4598,13 @@ function drawMobileCutscene(){
   ctx.save();ctx.beginPath();ctx.rect(0,108,W,frameH);ctx.clip();
   ctx.translate(0,108);ctx.scale(scale,scale);
   ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);
-  ctx.translate(-cs.x,-cs.y);sc.draw(cutT);ctx.restore();
+  ctx.translate(-cs.x,-cs.y);
+  /* Existing cutscene staging is authored at 960x540. Keep that virtual
+     stage even on a portrait canvas, instead of letting W=540 crop sky,
+     actors and cinematic effects before the frame is scaled to fit. */
+  const portraitW=W,portraitH=H;
+  try{W=960;H=540;sc.draw(cutT)}
+  finally{W=portraitW;H=portraitH;ctx.restore()}
   txt('SCENE '+(cutI+1)+' / '+CUTS.length,W/2,45,20,'#ffd23f','center');
   btn(W-118,12,106,42,'SKIP >>',endCut,{size:15});
   const boxY=frameH+128,read=Math.max(0,Math.min(1,(cutT-.4)*CPS/Math.max(1,cutTotal())));
