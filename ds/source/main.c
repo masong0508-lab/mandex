@@ -958,8 +958,11 @@ static void draw_targets(const View *v){
     /* Conservatively bound ALL landlord ink: the outstretched club,
        thrown briefcase, warning glyph, 1px dazed stars, top hat, and
        persistent survivor marker. gfx.c's S(n) is n*ppc/8, so these
-       +/-10, -12/+7 CELL margins exceed the painter's eighth-cell
-       offsets. Expand x for arbitrarily wide multi-hit health bars.
+       +/-10, -12/+8 CELL margins enclose the usual painter.
+       The escape-survivor's '!' sits eleven cells above the actor;
+       thirteen cells of lower-edge headroom keep it visible when the
+       character stands below the camera.
+       Expand x for arbitrarily wide multi-hit health bars.
        Only skip when the ENTIRE possible image is offscreen; every
        visible pixel keeps the exact same detailed drawing path.
        Target simulation, hit boxes and NPC AI are unaffected. */
@@ -968,8 +971,10 @@ static void draw_targets(const View *v){
       int bar=(t->hpmax*(v->ppc*7/8>1?v->ppc*7/8:1))/2+3;
       if(bar>pad_x)pad_x=bar;
     }
+    int pad_bottom=(t->collapse_rolled==2 && v->ppc>=3)?
+                   v->ppc*13 : v->ppc*8;
     if(sx < -pad_x || sx >= 256+pad_x ||
-       sy < -v->ppc*12 || sy >= 192+v->ppc*7)continue;
+       sy < -v->ppc*12 || sy >= 192+pad_bottom)continue;
 #endif
     int scared=((m->mode==MAN_FLY||m->mode==MAN_STUCK)&&rabs(t->x-m->x)<RI(26))||t->pan>0;
     int st=(t->stun>0?1:0)|(t->wind>0?2:0)|(t->swing>0?4:0)|
