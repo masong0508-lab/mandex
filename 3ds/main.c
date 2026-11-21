@@ -290,6 +290,11 @@ static void itoa_(int v, char *o){ sprintf(o, "%d", v); }
 typedef struct { float x, y, vx, vy; int life; u32 c; int kind; } Part;     /* kind 0 = dust/debris, 1 = heart, 2 = sparkle (the last two float: no gravity) */
 #define NP 160
 static Part parts[NP];
+#ifndef MX_N3DS_PARTICLE_BOUNDS
+#define MX_N3DS_PARTICLE_BOUNDS 1
+#endif
+/* Highest occupied particle slot; no per-particle bytes or secondary pool. */
+static int part_high_water;
 #ifndef MX_N3DS_PARTICLE_HINT
 #define MX_N3DS_PARTICLE_HINT 1
 #endif
@@ -302,10 +307,14 @@ static int part_free_hint;
 static void spawn_k(float x, float y, float vx, float vy, int life, u32 c, int kind){
 #if MX_N3DS_PARTICLE_HINT
   for(int i = part_free_hint; i < NP; i++) if(parts[i].life <= 0){
-    parts[i] = (Part){x, y, vx, vy, life, c, kind}; part_free_hint = i + 1; return;
+    parts[i] = (Part){x, y, vx, vy, life, c, kind}; part_free_hint = i + 1;
+    if(part_high_water < i + 1) part_high_water = i + 1;
+    return;
   }
 #else
-  for(int i = 0; i < NP; i++) if(parts[i].life <= 0){ parts[i] = (Part){x, y, vx, vy, life, c, kind}; return; }
+  for(int i = 0; i < NP; i++) if(parts[i].life <= 0){ parts[i] = (Part){x, y, vx, vy, life, c, kind};
+    if(part_high_water < i + 1) part_high_water = i + 1;
+    return; }
 #endif
 }
 static void spawn(float x, float y, float vx, float vy, int life, u32 c){ spawn_k(x, y, vx, vy, life, c, 0); }
@@ -350,7 +359,7 @@ static void on_events(void){
     case EV_SURVIVOR:
       for(int k=0;k<6;k++)spawn(x,y,(rand()%11-5)*.2f,-(rand()%6)*.25f,22,RGB(245,211,124));
       popup(x,y-9,"SOMEHOW ALIVE!",RGB(255,210,63)); break;
-    case EV_DISTRICT: cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1; dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts);
+    case EV_DISTRICT: cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1; dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts); part_high_water = 0;
 #if MX_N3DS_PARTICLE_HINT
       part_free_hint = 0;
 #endif   /* Landlord HQ: next district, fresh men */
@@ -367,13 +376,15 @@ static void popup(float x, float y, const char *s, u32 c){
   for(int i = 0; i < 4; i++) if(pops[i].life <= 0){ pops[i] = (Pop){x, y, 70, s, c}; return; }
 }
 static void tick_parts(void){
-  for(int i = 0; i < NP; i++) if(parts[i].life > 0){
+  for(int i = 0; i < (MX_N3DS_PARTICLE_BOUNDS ? part_high_water : NP); i++) if(parts[i].life > 0){
     Part *p = &parts[i]; if(!p->kind) p->vy += .06f;
     p->x += p->vx * .1f; p->y += p->vy * .1f; p->life--;
 #if MX_N3DS_PARTICLE_HINT
     if(p->life <= 0 && i < part_free_hint) part_free_hint = i;
 #endif
   }
+  while(part_high_water && parts[part_high_water-1].life <= 0)
+    part_high_water--;
   for(int i = 0; i < 4; i++) if(pops[i].life > 0){ pops[i].y -= .05f; pops[i].life--; }
 }
 
@@ -1003,7 +1014,7 @@ static void draw_aim(const View *v){
 static unsigned n3_particles_rasterized; /* host diagnostic; zero runtime cost */
 #endif
 static void draw_parts(const View *v){
-  for(int i = 0; i < NP; i++) if(parts[i].life > 0){
+  for(int i = 0; i < (MX_N3DS_PARTICLE_BOUNDS ? part_high_water : NP); i++) if(parts[i].life > 0){
     const Part *q = &parts[i]; int x = VX(v, q->x), y = VY(v, q->y), k = v->ppc >= 4 ? 2 : 1;
 #if MX_N3DS_PARTICLE_VIEW_CULL
     /* Hearts are <=10 px wide and glints have <=9 px arms.
@@ -1156,7 +1167,7 @@ static int pause3_touch_at(int x,int y){
 }
 static void load_level(int l){
   mx_load(&world, l); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); valve_equipped=0; world.valve_ok=0;
-  memset(parts, 0, sizeof parts); memset(pops, 0, sizeof pops); mi_reset(&mi);
+  memset(parts, 0, sizeof parts); part_high_water=0; memset(pops, 0, sizeof pops); mi_reset(&mi);
 #if MX_N3DS_PARTICLE_HINT
   part_free_hint = 0;
 #endif
