@@ -5000,8 +5000,8 @@ function drawMobileEditor(){
       ()=>eApplyStarter(i),{size:16}));
   }else{
     const actions=[
-      ['MEN -',()=>{E.men=Math.max(1,E.men-1)}],
-      ['MEN +',()=>{E.men=Math.min(12,E.men+1)}],
+      ['MEN -',()=>eAdjustMen(-1)],
+      ['MEN +',()=>eAdjustMen(1)],
       ['UNDO',eUndo],['REDO',eRedo],
       ['CLEAR',()=>{eSnap();E.g=new Uint8Array(COLS*ROWS);E.t=[]}],
       ['TEST PLAY',eTest],['SAVE',eSave],
@@ -5279,6 +5279,12 @@ function eRestore(s){E.g=s[0];E.t=s[1];E.id=s[2];E.name=s[3];E.men=s[4];E.drag=n
 function eSnap(){E.undo.push(eState());if(E.undo.length>24)E.undo.shift();E.redo.length=0}
 function eUndo(){const s=E.undo.pop();if(!s)return;E.redo.push(eState());eRestore(s)}
 function eRedo(){const s=E.redo.pop();if(!s)return;E.undo.push(eState());eRestore(s)}
+// Character-count edits are world edits: make them reversible on desktop and touch.
+function eAdjustMen(delta){
+  const next=Math.max(1,Math.min(12,E.men+delta));
+  if(next===E.men)return false; // No phantom undo state at the limits.
+  eSnap();E.men=next;return true;
+}
 // Deterministic starter structures: no generated textures, random levels,
 // extra draw calls or terrain outside the canonical 120x60 creator grid.
 const E_STARTERS=['THREE-STOREY TOWER','BREAKAWAY BRIDGE','FACTORY WORKSHOP'];
@@ -5432,7 +5438,7 @@ function drawEditor(){
   btn(x+4,y1,100,24,'LANDLORD',()=>{E.tool='lord'},{size:12,on:E.tool==='lord',col:'#ff8a8a'});x+=112;
   btn(x,y1,56,24,E.shape==='pen'?'PEN':'RECT',()=>{E.shape=E.shape==='pen'?'rect':'pen'},{size:12});x+=62;
   const y2=y1+28;x=8;
-  btn(x,y2,26,24,'-',()=>{E.men=Math.max(1,E.men-1)},{size:16});txt('MEN '+E.men,x+62,y2+17,14,'#fff','center');btn(x+98,y2,26,24,'+',()=>{E.men=Math.min(12,E.men+1)},{size:16});x+=134;
+  btn(x,y2,26,24,'-',()=>eAdjustMen(-1),{size:16});txt('MEN '+E.men,x+62,y2+17,14,'#fff','center');btn(x+98,y2,26,24,'+',()=>eAdjustMen(1),{size:16});x+=134;
   btn(x,y2,64,24,'UNDO',eUndo,{size:12});x+=70;
   btn(x,y2,64,24,'REDO',eRedo,{size:12});x+=70;
   btn(x,y2,64,24,'CLEAR',()=>{eSnap();E.g=new Uint8Array(COLS*ROWS);E.t=[]},{size:12});x+=70;
