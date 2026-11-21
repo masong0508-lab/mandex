@@ -5154,8 +5154,23 @@ function drawOutfits(){
 // ---------- custom levels ----------
 let CL=LEVELS[0],testing=false;
 function encodeCells(g){const out=[];let cur=g[0],n=0;for(let i=0;i<g.length;i++){if(g[i]===cur)n++;else{out.push(cur,n);cur=g[i];n=1}}out.push(cur,n);return out}
-function decodeCells(a){const g=new Uint8Array(COLS*ROWS);let p=0;for(let i=0;i<a.length;i+=2){const m=a[i]|0,n=a[i+1]|0;for(let k=0;k<n&&p<g.length;k++)g[p++]=m>8?0:m}return g}
-function levelFromData(L){const g=decodeCells(L.c);return{name:L.n,men:Math.max(1,Math.min(12,L.m|0||5)),custom:true,build(){for(let i=0;i<g.length;i++)if(g[i])set(i%COLS,(i/COLS)|0,g[i]);for(const[cx,row]of L.t)tgt(cx,row)}}}
+// Custom levels retain their fixed 120-column geometry after the wide finale.
+function decodeCells(a,width=COLS){
+  const g=new Uint8Array(width*ROWS);let p=0;
+  for(let i=0;i<a.length;i+=2){
+    const m=a[i]|0,n=a[i+1]|0;
+    for(let k=0;k<n&&p<g.length;k++)g[p++]=m>8?0:m;
+  }
+  return g;
+}
+function levelFromData(L){
+  const width=120,g=decodeCells(L.c,width);
+  return {cols:width,name:L.n,men:Math.max(1,Math.min(12,L.m|0||5)),
+    custom:true,build(){
+      for(let i=0;i<g.length;i++)if(g[i])set(i%width,(i/width)|0,g[i]);
+      for(const[cx,row]of L.t)tgt(cx,row);
+    }};
+}
 function startCustom(k){testing=false;load(-1,levelFromData(PD.custom[k]))}
 // Shared-code validation is deliberately done only on import/export. The
 // gameplay renderer, native ports, and 60 Hz simulation do not pay for it.
@@ -5253,7 +5268,7 @@ function openEditor(back,which){
   // Editor grids are always 120×60, even after the 360-column finale.
   if(COLS!==120)setWorld(120);
   if(back)return;
-  if(which!==undefined&&which>=0){const L=PD.custom[which];E.g=decodeCells(L.c);E.t=L.t.map(p=>p.slice());E.men=L.m|0||5;E.id=which;E.name=L.n}
+  if(which!==undefined&&which>=0){const L=PD.custom[which];E.g=decodeCells(L.c,120);E.t=L.t.map(p=>p.slice());E.men=L.m|0||5;E.id=which;E.name=L.n}
   else{E.g=new Uint8Array(COLS*ROWS);E.t=[];E.men=5;E.id=-1;E.name=''}
   E.undo=[];E.redo=[];E.starters=false;E.pointer=null;E.drag=null;E.mat=1;E.tool='mat';E.shape='pen';E.bk=0;E.bs=0;E.bt=1}
 
