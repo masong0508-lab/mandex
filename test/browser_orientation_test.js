@@ -91,4 +91,22 @@ for(const s of ['menu','select'])for(const height of [780,960,1240]){
       'portrait main menu touch rect visible');
   }
 }
-console.log('WEB_ORIENTATION_PASS viewport=portrait+landscape states=10 menu=touch select=paged');
+/* Editing in portrait uses 1:1 world pixels with horizontal pan;
+   ensure every screen touch writes the SAME cell as landscape editor. */
+const cellCode=between('let mobileEditorPan=0;', 'function eClearLord(');
+const cellFactory=new Function('V','let mobilePortrait=false,state="edit";\n'+cellCode+
+  '\nreturn {get:eCell,pan:x=>{mobileEditorPan=x},context:(por,mode)=>{mobilePortrait=por;state=mode}};');
+const cells=cellFactory(8);
+cells.context(true,'edit');
+for(const pan of [0,128,256,420]){
+  cells.pan(pan);
+  for(const x of [0,8,99,269,539])
+    assert.deepStrictEqual(cells.get(x,144),[Math.floor((x+pan)/8),18],
+      'portrait paint coordinate exactly tracks horizontal pan');
+}
+cells.context(false,'edit');cells.pan(256);
+assert.deepStrictEqual(cells.get(80,144),[10,18],
+  'returning to landscape preserves the original world coordinates');
+assert(html.includes('function drawMobileEditor()'),'phone-native editor must exist');
+assert(html.includes('ctx.translate(-mobileEditorPan,0)'),'world drawing and inputs share the same pan offset');
+console.log('WEB_ORIENTATION_PASS viewport=portrait+landscape states=10 menu=touch select=paged editor=worldpan');
