@@ -119,23 +119,67 @@ SIDE_BASE = [      # thinning, like the front view: a bare shiny crown, a tuft b
 ]
 def _pad(rows, w=17): return [r.ljust(w, '.') for r in rows]
 SIDE_BASE = _pad(SIDE_BASE)
-SIDE_EYES = {
-    "fly":  {5: ".ohhhhhhhhSSSwBo."[:17], 6: ".ohhhhhhhHHHwwBo."[:17]},
+# One canonical profile for flying, tumbling and the centre of every turn.
+# Its silhouette is the same for each expression.  Crown hair is sparse,
+# with a short rear tuft and the same combed sweep as the frontal head.
+# Landmarks are in skull-local pixels, rather than drifting with the pose.
+# In particular the ear (x=5) sits BEHIND the eye (x=12), the nose bridge
+# remains at the leading edge (x=15), and the mouth remains below the moustache.
+SIDE_LANDMARKS = {
+    "crown": (8, 2), "ear": (5, 8), "brow": (12, 5),
+    "eye": (12, 7), "nose": (15, 8), "moustache": (12, 9),
+    "mouth": (12, 10), "chin": (12, 12),
 }
-SIDE_OVER = {
-    # fly: eyebrow, wide eye, mustache and a screaming mouth
-    "fly":  {5: ".ohhhhhhhhHHHHSo.", 6: ".ohhhhhhhSSwwBSSo", 7: ".ohhhhhhhSSwBBSSo", 9: "..ohhhhSSSSHHHHHo", 10: "...ohhhSSSSmmmmmo", 11: "...oohhSSSSmmtmo.", 12: ".....oSSSSSmmmo.."},
-    # dive: squinting, grinning
-    "dive": {5: ".ohhhhhhhhHHHHSo.", 6: ".ohhhhhhhSSBBBSSo", 7: ".ohhhhhhhSSSSSSSo", 9: "..ohhhhSSSSHHHHHo", 10: "...ohhhSSSSwwwwSo", 11: "...oohhSSSSSmmmo."},
+SIDE_FEATURES = {
+    "fly": {
+        2: {7: "l", 8: "h"},
+        5: {10: "H", 11: "H", 12: "H", 13: "H"},
+        6: {11: "w", 12: "w", 13: "B", 14: "w"},
+        7: {11: "w", 12: "i", 13: "B"},
+        8: {5: "k", 6: "s", 15: "k"},
+        9: {5: "s", 11: "H", 12: "H", 13: "H", 14: "H"},
+        10: {11: "S", 12: "m", 13: "m", 14: "m"},
+        11: {11: "S", 12: "m", 13: "t"},
+        12: {10: "S", 11: "s"},
+    },
+    "dive": {
+        2: {7: "l", 8: "h"},
+        5: {10: "H", 11: "H", 12: "H", 13: "H"},
+        6: {11: "B", 12: "B", 13: "B", 14: "B"},
+        7: {11: "s", 12: "S", 13: "S"},
+        8: {5: "k", 6: "s", 15: "k"},
+        9: {5: "s", 11: "H", 12: "H", 13: "H", 14: "H"},
+        10: {11: "S", 12: "w", 13: "w", 14: "w"},
+        11: {11: "S", 12: "m", 13: "m"},
+        12: {10: "S", 11: "s"},
+    },
 }
 def side_head(kind):
+    """Same skull/hair contour for every profile expression; eyes and lips vary."""
     rows = [list(r) for r in SIDE_BASE]
-    for y, s in SIDE_OVER[kind].items():
-        s = s.ljust(17, '.')
-        for x, ch in enumerate(s):
-            if ch == 'h' and x > 4: ch = 'S'                      # thinning like the front view: hair only in the tuft behind the ear
-            if ch != '.': rows[y][x] = ch
+    for y, points in SIDE_FEATURES[kind].items():
+        for x, ch in points.items():
+            assert rows[y][x] != '.', (kind, y, x)  # never create a floating detail
+            rows[y][x] = ch
     return ["".join(r) for r in rows]
+
+def turn_head(angle, kind="dive"):
+    """A continuous-width turnaround, retaining the front head's height.
+
+    A 14-row side head used to pop upward on the 55-degree frame while
+    19-row front heads stayed planted.  Resample the profile at 19 rows
+    and keep the original brow/mouth heights through the turn.  The
+    flattened front/head width is monotone (19->14) instead of ballooning
+    back out at the side.  The returned grid is still pure 1-byte palette
+    symbols; renderer memory and sprite frame count never increase.
+    """
+    a = min(125, max(0, abs(float(angle))))
+    if a < 38:
+        width = 19 if a < 18 else 17
+        return scaled(head("open", "grin"), width, 19)
+    if a < 56:
+        return scaled(head("open", "grin"), 14, 19)
+    return scaled(side_head(kind), 14, 19)
 
 # how much each character wins a tie when several source pixels are squeezed into one: eyes, mouths and rims must survive the shrink
 _PRI = {'B': 2.8, 'i': 1.7, 'w': 1.5, 'm': 1.9, 't': 1.7, 'T': 1.5, 'L': 1.5, 'G': 0.9, 'g': 0.8, 'H': 1.5, 'o': 1.35, 'r': 1.4, '.': 0.9}
