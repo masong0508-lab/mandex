@@ -249,15 +249,18 @@ def paint_face(name, idx, ax, ay, PI, ppu=0.36, head=None):
     hx, hy = (int(round(ax + head[0] * ppu)), int(round(ay + head[1] * ppu))) if head else (ax, ay - 16)   # head centre
     if spiny(name) and name not in ("SPIN_BL", "SPIN_BR"):   # the turn: the head has its own angle (th + lead); front, narrowing, profile, then the back
         th, ld = spin_th(name); a = abs(th + ld)
-        if a < 125:
+        if a < 158:
             hk = {k: PI[v] for k, v in manhead.KEY.items()}
             # Every view is 19 high and the head width moves smoothly
             # 19 -> 17 -> 14 pixels.  The old side switch at 56 degrees
             # was a 14-high head with a different chin/head pivot, which
             # made the hairline and mouth visibly snap up during a turn.
             rows = manhead.turn_head(a, "dive")
+            # The same skull-local anchor is used for every non-back turn.
+            # Head changes affect neither frame atlas dimensions nor blobs.
+            assert len(rows) == 19 and 14 <= len(rows[0]) <= 19
             wipe_head(idx, hx, hy, ppu)
-            if WOLFMODE and a >= 56:                  # wolf muzzle uses its own profile
+            if WOLFMODE and 56 <= a < 125:          # forward wolf profile; rear-quarter rotates its fur mass
                 WSIDE = True
                 stamp(idx, manhead.wolf_side_head("snarl"), hx - 8, hy - 9, hk)
                 WSIDE = False
