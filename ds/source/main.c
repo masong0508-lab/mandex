@@ -916,15 +916,38 @@ static void draw_voxels(const View *v){
   }
 }
 
+/* The upper and lower DS cameras can see very different pieces of the
+   collapse. Skip an entire offscreen chunk before walking up to 512 cells;
+   then reject offscreen individual tiles before calling the tile renderer.
+   Bounds use the body's conservative radius plus two tile widths, leaving
+   integer-rounding safety margin. No heap, sprite changes or extra buffers.
+   Disable for a pixel-exact reference build with -DMX_DS_CHUNK_VIEW_CULL=0. */
+#ifndef MX_DS_CHUNK_VIEW_CULL
+#define MX_DS_CHUNK_VIEW_CULL 1
+#endif
 static void draw_chunks(const View *v){
-  int h = v->ppc / 2;
-  for(int c = 0; c < MX_MAX_CHUNKS; c++){
-    const MxChunk *ch = &world.chunks[c];
-    if(!ch->active) continue;
-    for(int k = 0; k < ch->count; k++){
-      const MxCell *a = &ch->cells[k];
-      if(a->dead) continue;
-      gfx_tile(v, a->m, 0, k & 1, vx(v, a->wx) - h, vy(v, a->wy) - h);
+  const int ppc=v->ppc, h=ppc/2;
+  for(int c=0;c<MX_MAX_CHUNKS;c++){
+    const MxChunk *ch=&world.chunks[c];
+    if(!ch->active)continue;
+#if MX_DS_CHUNK_VIEW_CULL
+    const int cx=vx(v,ch->x),cy=vy(v,ch->y);
+    const int reach=(ch->rad*ppc>>12)+ppc*2+2;
+    if(cx+reach<=0 || cx-reach>=256 || cy+reach<=0 || cy-reach>=192)
+      continue;
+#endif
+    for(int k=0;k<ch->count;k++){
+      const MxCell *a=&ch->cells[k];
+      if(a->dead)continue;
+#if MX_DS_CHUNK_VIEW_CULL
+      int sx=vx(v,a->wx)-h;
+      if(sx+ppc<=0 || sx>=256)continue;
+      int sy=vy(v,a->wy)-h;
+      if(sy+ppc<=0 || sy>=192)continue;
+      gfx_tile(v,a->m,0,k&1,sx,sy);
+#else
+      gfx_tile(v,a->m,0,k&1,vx(v,a->wx)-h,vy(v,a->wy)-h);
+#endif
     }
   }
 }
