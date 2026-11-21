@@ -442,6 +442,10 @@ def main():
                 idx = new
         if name.startswith("BACK") or name.startswith("FART") or name.startswith("SPIN_"): shade_butt(idx, PI, int(ay))
         finish_cel_shading(idx, PI, int(ay), name)   # (the oops frames keep the HTML's own bare / boxer shading)
+        # Final crown highlight stays put as the shared skull rotates. This
+        # identical stdlib helper also polishes the checked-in compiled atlas.
+        import turn_hair_finish
+        turn_hair_finish.finish_grid(idx, int(ay), name)
         ys, xs = np.nonzero(idx); y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
         idx = idx[y0:y1, x0:x1]; ax -= x0; ay -= y0; h, w = idx.shape
         (bx, by, br), (rx, ry, rr) = BLOBS[family(name)]
