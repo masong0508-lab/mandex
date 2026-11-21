@@ -115,6 +115,34 @@ static int dc_fastpath_probe(void){
                        cosf(k*.4f),sinf(k*.4f),MX_WOOD,k&3,0,Z_CHUNK);
     }
     printf("DC_FAST_RUBBLE=%08x\n",dc_hash(fb,sizeof fb));
+    /* Compare the actual renderer's whole-chunk painter under clipping.
+       One body in view, one beyond view and one crossing the right edge. */
+    memset(world.chunks,0,sizeof world.chunks);
+    for(int m=1;m<MX_NMAT;m++)MAXHP[m]=(float)mx_material_hp(m);
+    MxChunk *near=&world.chunks[0];
+    near->active=1;near->count=18;near->x=53;near->y=22;near->rad=26;near->ang=0.41f;
+    for(int k=0;k<18;k++){
+      MxCell *c=&near->cells[k];c->m=(k&1)?MX_STONE:MX_WOOD;
+      c->h=mx_material_hp(c->m);c->wx=41+(k*7)%24;c->wy=12+(k*11)%19;
+      c->lx=c->wx-near->x;c->ly=c->wy-near->y;
+    }
+    MxChunk *off=&world.chunks[1];
+    off->active=1;off->count=2;off->x=500;off->y=300;off->rad=5;
+    for(int k=0;k<2;k++){
+      off->cells[k].m=MX_STONE;off->cells[k].h=mx_material_hp(MX_STONE);
+      off->cells[k].wx=500+k;off->cells[k].wy=300+k;
+    }
+    MxChunk *edge=&world.chunks[2];
+    edge->active=1;edge->count=2;edge->x=124;edge->y=30;edge->rad=8;edge->ang=1.3f;
+    for(int k=0;k<2;k++){
+      edge->cells[k].m=MX_WOOD;edge->cells[k].h=mx_material_hp(MX_WOOD);
+      edge->cells[k].wx=118+k*6;edge->cells[k].wy=29+k;
+      edge->cells[k].lx=edge->cells[k].wx-edge->x;
+      edge->cells[k].ly=edge->cells[k].wy-edge->y;
+    }
+    memset(fb,0,sizeof fb);cur_hdr=0;nq=0;
+    draw_rubble_chunks();
+    printf("DC_FAST_RUBBLE_CHUNKS=%08x\n",dc_hash(fb,sizeof fb));
   }
   return 0;
 }

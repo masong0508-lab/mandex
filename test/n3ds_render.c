@@ -165,11 +165,24 @@ static int n3_fastpath_probe(void){
      artificial chunks that straddle all four screen edges. Both render
      variants must hash to precisely identical stereo+bottom bytes. */
   {
+    memset(world.chunks,0,sizeof world.chunks);
     MxChunk *ch=&world.chunks[0];
     ch->active=1;ch->count=24;
+    ch->x=R(77);ch->y=R(40);ch->rad=R(95); /* bound the synthetic cells */
     for(int k=0;k<24;k++){
       MxCell *a=&ch->cells[k];a->dead=0;a->m=(k&1)?MX_STONE:MX_WOOD;
       a->wx=R((k*13)%157);a->wy=R((k*11)%79);
+    }
+    /* Completely remote rubble plus a chunk crossing the screen edge. */
+    MxChunk *far=&world.chunks[1];
+    far->active=1;far->count=3;far->x=R(400);far->y=R(300);far->rad=R(5);
+    for(int k=0;k<3;k++){
+      far->cells[k].m=MX_STONE;far->cells[k].wx=R(398+k);far->cells[k].wy=R(300+k);
+    }
+    MxChunk *edge=&world.chunks[2];
+    edge->active=1;edge->count=3;edge->x=R(15);edge->y=R(18);edge->rad=R(18);
+    for(int k=0;k<3;k++){
+      edge->cells[k].m=MX_WOOD;edge->cells[k].wx=R(3+k*12);edge->cells[k].wy=R(18);
     }
     View vc={&top,4,120,50,45,18};
     View vr={&top,4,122,50,45,18};

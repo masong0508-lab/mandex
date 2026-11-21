@@ -22,6 +22,18 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 20: offscreen destruction draw budget
+
+- On 3DS, both stereoscopic eyes skip entire rigid rubble chunks that cannot
+  overlap their screen, avoiding up to hundreds of per-voxel transforms per
+  body. Dreamcast skips the equivalent offscreen body before expensive
+  trigonometry and PVR polygon submission.
+- Large conservative bounds preserve partially visible or rotated fragments.
+  A/B host framebuffer tests draw visible, edge-crossing and distant chunks;
+  identical hashes are required for correctness. No extra image assets,
+  framebuffers, heap allocations or physics changes were introduced.
+- These are draw-work savings, not a confirmed real-device FPS improvement.
+
 ## Further gameplay and frame-cost pass
 
 - **Collapse aftermath:** rare HP- and structure-dependent survivors now

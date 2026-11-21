@@ -641,6 +641,30 @@ static void draw_clouds(void){
   }
 }
 
+/* A rigid chunk may carry hundreds of tiles entirely beyond the display.
+   Conservative radial culling happens before sin/cos and the PVR submits.
+   Partially visible bodies still draw every original visible fragment. */
+#ifndef MX_DC_CHUNK_VIS_CULL
+#define MX_DC_CHUNK_VIS_CULL 1
+#endif
+static void draw_rubble_chunks(void){
+  for(int c=0;c<MX_MAX_CHUNKS;c++){
+    const MxChunk *ch=&world.chunks[c];
+    if(!ch->active)continue;
+#if MX_DC_CHUNK_VIS_CULL
+    const float cx=X(ch->x),cy=Y(ch->y),reach=ch->rad*PXC+10.0f;
+    if(cx+reach<0 || cx-reach>640 || cy+reach<0 || cy-reach>480)
+      continue;
+#endif
+    const float ca=cosf(ch->ang),sa=sinf(ch->ang);
+    for(int k=0;k<ch->count;k++){
+      const MxCell *a=&ch->cells[k];
+      if(a->dead)continue;
+      tile_rot_visible(X(a->wx),Y(a->wy),ca,sa,a->m,
+                       variant((int)(a->lx*7),(int)(a->ly*3)),dmg(a->h,a->m),Z_CHUNK);
+    }
+  }
+}
 static void draw_all(void){
   shx = shy = 0;
   if(world.shake > 0.05f){ shx = (frand() - 0.5f) * world.shake * 0.6f; shy = (frand() - 0.5f) * world.shake * 0.6f; }
@@ -665,18 +689,8 @@ static void draw_all(void){
     if(d == 0 && world.brk[i]) d = 1;
     tile(px, py, mt, variant(x, y), d, Z_VOX);
   }
-  /* rigid chunks: each voxel at its simulated position, turned with the chunk */
-  for(int c = 0; c < MX_MAX_CHUNKS; c++){
-    const MxChunk *ch = &world.chunks[c];
-    if(!ch->active) continue;
-    float ca = cosf(ch->ang), sa = sinf(ch->ang);
-    for(int k = 0; k < ch->count; k++){
-      const MxCell *a = &ch->cells[k];
-      if(a->dead) continue;
-      tile_rot_visible(X(a->wx), Y(a->wy), ca, sa, a->m,
-                       variant((int)(a->lx * 7), (int)(a->ly * 3)), dmg(a->h, a->m), Z_CHUNK);
-    }
-  }
+  /* Cull whole offscreen rubble chunks before their per-cell draw. */
+  draw_rubble_chunks();
   /* landlords */
   for(int i = 0; i < world.ntargets; i++){
     const MxTarget *t = &world.targets[i];

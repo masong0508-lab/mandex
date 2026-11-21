@@ -596,6 +596,12 @@ static void draw_tile(Scr *s, int sx, int sy, int p, int m, int v, int d, int dm
 #ifndef MX_N3DS_RUBBLE_CULL
 #define MX_N3DS_RUBBLE_CULL 1
 #endif
+/* Skip the full rigid chunk when its radius lies wholly outside the stereo
+   viewport. The 4-cell guard keeps edge fragments, rounding and wobble
+   silhouettes; visible cells retain the unmodified precise rasterizer. */
+#ifndef MX_N3DS_CHUNK_VIS_CULL
+#define MX_N3DS_CHUNK_VIS_CULL 1
+#endif
 static void draw_cells(const View *v){
 #if MX_N3DS_TILE_DIM_CACHE
   const int dim_normal=(int)(256 * g_dim);
@@ -631,6 +637,12 @@ static void draw_cells(const View *v){
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
     const MxChunk *ch = &world.chunks[c];
     if(!ch->active) continue;
+#if MX_N3DS_CHUNK_VIS_CULL
+    const int ccx=VX(v,RTOF(ch->x)),ccy=VY(v,RTOF(ch->y));
+    const int reach=(int)(RTOF(ch->rad)*p)+4*p+6;
+    if(ccx+reach<0 || ccx-reach>=sw || ccy+reach<0 || ccy-reach>=sh)
+      continue; /* no visible fragment in this rigid body */
+#endif
     for(int k = 0; k < ch->count; k++){
       const MxCell *a = &ch->cells[k];
       if(a->dead) continue;
