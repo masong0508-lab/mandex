@@ -5,6 +5,8 @@ cd "$(dirname "$0")"
 echo "--- Canonical face, hair and side-profile bake consistency (web and all console atlases) ---"
 python3 character_turnaround_test.py
 python3 head_turnaround_test.py
+echo "--- Dreamcast: all 71 Wolfman profiles use independent HD UV rectangles ---"
+python3 dreamcast_wolf_atlas_test.py
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c host_test.c -lm -o test_float
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c host_test.c -lm -o test_fixed
 ./test_float > float.txt && tail -n 1 float.txt
