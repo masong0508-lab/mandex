@@ -901,8 +901,9 @@ static void draw_man(const View *v){
   if(m->mode == MAN_WALK){                                                   /* on his own feet: the turning frames step him along, three quarters of the sling size */
     if(m->hurtCd > 0 && (frame & 2)) return;
     int q = (p * 3 + 2) / 4, phase = mx_walk_anim_phase(m);
-    int wf = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
-    int fc = m->face < 0 ? -1 : 1;
+    int wf = MSF_SPIN_6 + (m->turn_ticks ? mx_walk_turn_offset(m) :
+                              phase == 0 ? -1 : phase == 2 ? 1 : 0);
+    int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
     const MsFrame *f = &MS_FRAMES[wf + (man_fur ? MSF_NBASE : 0)];
     int fy = VY(v, RTOF(m->y) + 2.375f) - (int)lroundf(RTOF(mx_walk_foot_lift(m)) * p);
     blit_frame(v->s, wf, x, fy - fdiv4((f->h - f->ay) * q), q, fc);
