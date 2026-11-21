@@ -3439,7 +3439,15 @@ function drawHUD(){
     txt('GOAL: '+note,18,oy+19,14,ctx.fillStyle,'left');
   }
   txt(String(Math.round(shownScore)).padStart(6,'0'),W-12,24,20,'#fff','right');
-  if(combo>1&&state==='play'){const q=Math.min(1,comboLeft/2.5);ctx.fillStyle='rgba(40,12,47,.86)';ctx.fillRect(W-170,P?67:39,158,30);txt('x'+combo+'  EVICTION STREAK',W-91,P?87:59,15,'#ff9ec8','center');ctx.fillStyle='#ff9ec8';ctx.fillRect(W-168,P?95:67,154*q,2)}
+  if(combo>1&&state==='play'){
+    const q=Math.min(1,comboLeft/2.5);
+    // Portrait: the streak sits BELOW the 28px mission strip (66..94),
+    // not on top of the last-target direction or objective label.
+    const cy=P?100:39;
+    ctx.fillStyle='rgba(40,12,47,.86)';ctx.fillRect(W-170,cy,158,30);
+    txt('x'+combo+'  EVICTION STREAK',W-91,cy+20,15,'#ff9ec8','center');
+    ctx.fillStyle='#ff9ec8';ctx.fillRect(W-168,cy+28,154*q,2);
+  }
   const mstp=Math.min(P?16:20,(P?190:230)/Math.max(1,men));   // a long row of men squeezes together (the wide finale can have 17)
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
