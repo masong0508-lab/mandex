@@ -1133,8 +1133,9 @@ static void draw_man(const View *v){
   if(m->mode == MAN_WALK){                                                                  /* on his own feet: the turning-round frames step him along, three quarters of the sling size */
     if(m->hurtCd > 0 && (frame & 2)) return;                                                  /* blinks while he is protected after a hit */
     int p = v->ppc * 3 / 4, phase = mx_walk_anim_phase(m);
-    int fr = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
-    int face = m->face < 0 ? -1 : 1;
+    int fr = MSF_SPIN_6 + (m->turn_ticks ? mx_walk_turn_offset(m) :
+                              phase == 0 ? -1 : phase == 2 ? 1 : 0);
+    int face = mx_walk_render_face(m) < 0 ? -1 : 1;
     int foot_lift = (int)((rmul(mx_walk_foot_lift(m),RI(v->ppc)) + R(0.5)) >> 12);
     int fy = vy(v, m->y + R(2.375)) - foot_lift;
     spr_man_walk(v->buf, x, fy, p < 1 ? 1 : p, face, fr, 0);
