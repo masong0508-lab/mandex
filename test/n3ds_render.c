@@ -202,7 +202,32 @@ static int n3_fastpath_probe(void){
   }
   return 0;
 }
+/* Verify a detached 3DS wall fragment retains its existing damage
+   texture rather than snapping back to a pristine masonry sprite. */
+static int n3_rubble_damage_probe(void){
+  gfx_init();g_dim=1.0f;
+  top.fb=fb_top[0];top.w=400;top.h=240;
+  memset(world.grid,0,sizeof world.grid);
+  memset(world.chunks,0,sizeof world.chunks);
+  MxChunk *ch=&world.chunks[0];
+  ch->active=1;ch->count=1;ch->x=R(40);ch->y=R(25);ch->rad=R(2);
+  MxCell *a=&ch->cells[0];
+  a->m=MX_WOOD;a->wx=ch->x;a->wy=ch->y;
+  View view={&top,4,20,5,0,0};
+  memset(fb_top[0],0,sizeof fb_top[0]);
+  a->h=R(mx_material_hp(MX_WOOD));
+  draw_cells(&view);
+  unsigned intact=n3_hash(fb_top[0],sizeof fb_top[0]);
+  memset(fb_top[0],0,sizeof fb_top[0]);
+  a->h=R(1);
+  draw_cells(&view);
+  unsigned cracked=n3_hash(fb_top[0],sizeof fb_top[0]);
+  if(intact==cracked){fputs("FAIL: 3DS damaged rubble reuses pristine texture\n",stderr);return 1;}
+  printf("N3_RUBBLE_DAMAGE_PASS intact=%08x damaged=%08x\n",intact,cracked);
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("N3DS_RUBBLE_DAMAGE_PROBE"))return n3_rubble_damage_probe();
   if(getenv("N3DS_FASTPATH_PROBE"))return n3_fastpath_probe();
   if(argc > 1) OUT = argv[1];
   g_slider = argc > 2 ? (float)atof(argv[2]) : 0.f;
