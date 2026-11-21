@@ -19,7 +19,7 @@ int main(void){
   CK(mx_walk_anim_phase(&m)==3,"existing sprite stride order is unchanged");
   /* Twelve held atlas offsets turn through the BACK, never through
      a face/body mirror pop or new geometry. Reverse input remains instant. */
-  { static const int offsets[12]={1,2,3,4,5,6,6,5,4,3,2,1};
+  { static const int offsets[12]={1,1,2,3,4,5,6,5,4,3,2,1};
     m.face=-1; m.mode=MAN_WALK;
     for(int tick=12;tick>=1;tick--){
       m.turn_ticks=(uint8_t)tick;
@@ -27,6 +27,8 @@ int main(void){
       CK(mx_walk_render_face(&m)==(tick>6?1:-1),"render side swaps behind the shoulders");
       CK(mx_walk_foot_lift(&m)==0,"feet remain planted while the body turns");
     }
+    m.turn_ticks=11;
+    CK(mx_walk_turn_offset(&m)==1, "first visible turn frame advances only 15 degrees");
     m.turn_ticks=0;
     CK(mx_walk_turn_offset(&m)==0 && mx_walk_render_face(&m)==-1,
        "back turn resolves into the requested side view");
