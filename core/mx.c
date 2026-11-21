@@ -340,8 +340,7 @@ static void kill_target_ex(MxWorld *w, MxTarget *t, int hard){
   /* BANK SHOT: one +1500 per rubber rebound, only when the flying man
      personally reaches a landlord within two wall-clock seconds. Rubble,
      TNT, offscreen evictions and walking kills cannot claim this bonus. */
-  int bank = w->bank_left > 0 && w->man.mode == MAN_FLY &&
-             rabs(t->x - w->man.x) < RI(4) && rabs(t->y - w->man.y) < RI(4);
+  int bank = w->bank_left > 0 && w->bank_contact && w->man.mode == MAN_FLY;
   if(bank){ bonus += 1500; w->bank_left = 0; }
   w->score += 5000 + bonus; w->slow = R(0.25);
   if(w->man.mode == MAN_WALK){ w->man.wt += RI(3); if(w->man.wt > RI(MX_WALK_T + 15)) w->man.wt = RI(MX_WALK_T + 15); }   /* on foot, every landlord is worth +3 s */
