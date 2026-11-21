@@ -12,6 +12,7 @@ on:
       - "web/index.html"
       - "test/vmu_save_test.c"
       - "test/journal_test.c"
+      - "test/collapse_survivor_web_test.js"
       - "test/collapse_survivor_test.c"
       - "test/bank_shot_test.c"
       - "test/landlord_shock_test.c"
