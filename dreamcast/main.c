@@ -12,6 +12,8 @@
  *   X            : cycle the power-up
  *   START        : start from the title; pause / resume; next level after a win, retry after a loss
  *   Y            : restart the level (the DS and 3DS use SELECT)
+ *   paused       : D-pad LEFT returns to title; START resumes
+ *   end panel    : START advances/retries; B returns to title
  *   title        : D-pad left/right = level, triggers = outfit
  *
  * Not done yet: sound via AICA, and the real-3D voxel upgrade described in MANDEX_DESIGN.md.
@@ -897,6 +899,7 @@ static void draw_all(void){
     if(win){ int st = world.men >= 2 ? 3 : world.men >= 1 ? 2 : 1;
       for(int i = 0; i < 3; i++) atl(320 - 105 + i * 70 - 31, 215, 62, 62, &DCA_STARS[i < st ? 0 : 4], Z_END + 2, WHITE); }
     man_zoom = 1.0f;
+    text("B: RETURN TO TITLE",320,435,21,WHITE,1,Z_END+2);
     snprintf(buf, sizeof buf, "SCORE  %d", world.score);
     text(buf, 320, 330, 34, WHITE, 1, Z_END + 2);
     if(((fcount >> 5) & 1) == 0 || fcount > 0) text(win ? (world.level == MX_NUM_LEVELS - 1 ? "THE END - THANKS FOR PLAYING!" : "PRESS START: NEXT LEVEL") : "PRESS START: TRY AGAIN", 320, 390, 24, argb(255, 210, 63, 120 + (int)(120 * (0.5f + 0.5f * sinf(fcount * 0.1f)))), 1, Z_END + 2);
@@ -956,6 +959,12 @@ static void dc_advance_after_end(void){
     end_seen|=1<<ce;intro_level=next;in_intro=1;intro_start_end(ce);
   }else load_level(next);
 }
+static void dc_end_input(uint32 pressed){
+  /* Same back-to-title behavior as the other console ports. The B action
+     takes precedence over START when both are pressed together. */
+  if(pressed & CONT_B)dc_return_to_title(world.level);
+  else if(pressed & CONT_START)dc_advance_after_end();
+}
 
 int main(int argc, char **argv){
   (void)argc; (void)argv;
@@ -994,7 +1003,7 @@ int main(int argc, char **argv){
           else if(title_lv == MX_CH3_START && !wolf_seen && tx_ic_top && tx_ic_bot){ wolf_seen = 1; intro_level = title_lv; in_intro = 1; intro_start_wolf(); }
           else load_level(title_lv); }
       } else if(world.state != MX_PLAY){
-        if(pressed & CONT_START)dc_advance_after_end();
+        dc_end_input(pressed);
       } else if(paused){
         /* Only one action can fire per press; LEFT is the reliable
            back-to-title path missing from the original Dreamcast port. */
