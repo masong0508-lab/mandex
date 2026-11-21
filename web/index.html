@@ -1760,9 +1760,18 @@ function frontHair(){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
   ctx.strokeStyle=HAIR;ctx.lineWidth=1.25;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(-10.4,-47-k*2.2);ctx.quadraticCurveTo(-1+k,-62.5+k*.5,10.6,-51.5+k*1.6);ctx.stroke()}   // the comb-over
   ctx.restore()}
 let NOHEAD=false;   // the sprite generator draws the fly / dive frames without the head and pixels its own
-function sideHair(cx,cy,r,o){o=o||{};   // profile hair, the same thinning as frontHair: a tuft behind the ear, a bare shiny crown, a few combed-over strands
+function sideHair(cx,cy,r,o){o=o||{};   // one recognizable swept crown from the front through side profile; temple tuft remains behind the ear
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(cx,cy,r*1.02,2.75,4.55);ctx.arc(cx,cy,r*.74,4.55,2.75,true);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.2;ctx.stroke();
+  // Continue the FRONT comb-over across the near crown, rather than
+  // abruptly losing almost all of it at 90 degrees. Keep forehead, eye
+  // and nose outside this patch, so the profile remains expressive.
+  ctx.fillStyle=HAIR;ctx.beginPath();
+  ctx.moveTo(cx-r*.78,cy-r*.38);
+  ctx.bezierCurveTo(cx-r*.93,cy-r*1.11,cx+r*.18,cy-r*1.18,cx+r*.64,cy-r*.73);
+  ctx.quadraticCurveTo(cx+r*.34,cy-r*.58,cx-r*.06,cy-r*.60);
+  ctx.quadraticCurveTo(cx-r*.53,cy-r*.51,cx-r*.78,cy-r*.38);
+  ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.05;ctx.stroke();
   ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(cx+r*.12,cy-r*.8,r*.3,r*.13,-.15,0,6.3);ctx.fill();
   ctx.strokeStyle=HAIR;ctx.lineWidth=1.15;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(cx-r*.74,cy-r*(.5+k*.04));ctx.quadraticCurveTo(cx-r*.1+k*r*.07,cy-r*(1.12-k*.03),cx+r*.62,cy-r*(.62-k*.02));ctx.stroke()}
   ctx.restore()}
