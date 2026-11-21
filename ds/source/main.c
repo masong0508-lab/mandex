@@ -1789,7 +1789,11 @@ int main(void){
       combo_held = 1; stats.unlock_all = !stats.unlock_all; cheat_t = 120; sfx_play(SFX_TARGET, 64);       /* never saved (port 5 must leave unlock_all out) */
     }
     if(app == ST_TITLE){ if((up & KEY_L) && !combo_held) debug_on = !debug_on; }      /* on the title L and R act on release, so a held L+R+SELECT never trips the profiler or the outfit cycle first */
-    else if(down & KEY_L) debug_on = !debug_on;
+    /* On-foot L already means give up this walk and return to the sling.
+       It must not also change the debug overlay (or saved view preference). */
+    else if((down & KEY_L) &&
+            !(app == ST_PLAY && world.state == MX_PLAY && world.man.mode == MAN_WALK))
+      debug_on = !debug_on;
 
     /* ---------------- input ---------------- */
     if(app == ST_TITLE && ach_open){
