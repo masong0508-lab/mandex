@@ -309,6 +309,7 @@ static void apply_impulse(MxChunk *ch, real px, real py, real jx, real jy){
 /* A bounded arcade combo: reset between volleys, cap bonus at +4000 per landlord.
    Keeping the timer in game state (not per-target) makes rubble/TNT chains count. */
 static void combo_tick(MxWorld *w, real dt){
+  if(w->bank_left > 0){ w->bank_left -= dt; if(w->bank_left < 0) w->bank_left = 0; }
   if(w->combo_left > 0){
     w->combo_left -= dt;
     if(w->combo_left <= 0){ w->combo_left = 0; w->combo = 0; }
@@ -336,9 +337,15 @@ static void kill_target_ex(MxWorld *w, MxTarget *t, int hard){
   if(w->combo > w->combo_peak) w->combo_peak = w->combo;
   w->combo_left = R(2.5);
   int bonus = (w->combo - 1) * 1000;
+  /* BANK SHOT: one +1500 per rubber rebound, only when the flying man
+     personally reaches a landlord within two wall-clock seconds. Rubble,
+     TNT, offscreen evictions and walking kills cannot claim this bonus. */
+  int bank = w->bank_left > 0 && w->man.mode == MAN_FLY &&
+             rabs(t->x - w->man.x) < RI(4) && rabs(t->y - w->man.y) < RI(4);
+  if(bank){ bonus += 1500; w->bank_left = 0; }
   w->score += 5000 + bonus; w->slow = R(0.25);
   if(w->man.mode == MAN_WALK){ w->man.wt += RI(3); if(w->man.wt > RI(MX_WALK_T + 15)) w->man.wt = RI(MX_WALK_T + 15); }   /* on foot, every landlord is worth +3 s */
-  ev(w, EV_TARGET, t->x, t->y, w->combo, RI(bonus), 0);
+  ev(w, EV_TARGET, t->x, t->y, w->combo, RI(bonus), bank ? RI(1) : 0);
 }
 
 static void shockwave(MxWorld *w, real px, real py, real rad, real power){
@@ -1210,7 +1217,7 @@ static void bounce_rubber(MxWorld *w){
       real k = rmul(RI(1) + R(0.92), vn);
       m->vx -= rmul(k, nx); m->vy -= rmul(k, ny);
       wob_kick(w, x, y, 5, rmul(nx, rmul(vn, R(0.55))), rmul(ny, rmul(vn, R(0.55))));
-      if(m->hitCd <= 0){ m->hitCd = R(0.1); ev(w, EV_BOUNCE, m->x, m->y, 0, -vn, 0); }
+      if(m->hitCd <= 0){ m->hitCd = R(0.1); w->bank_left = RI(2); ev(w, EV_BOUNCE, m->x, m->y, 0, -vn, 0); }
       if(w->shake < R(2)) w->shake = R(2);
     }
   }
@@ -1340,6 +1347,7 @@ static void man_step(MxWorld *w, real dt){
 }
 
 static void next_man(MxWorld *w){
+  w->bank_left = 0;
   memset(&w->man, 0, sizeof w->man);
   if(w->men > 0){ w->man.mode = MAN_AIM; w->man.x = MX_ANCHOR_X; w->man.y = MX_ANCHOR_Y; }
   else w->man.mode = MAN_NONE;
