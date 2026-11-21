@@ -17,9 +17,9 @@ int main(void){
   }
   m.gait=RI(3);
   CK(mx_walk_anim_phase(&m)==3,"existing sprite stride order is unchanged");
-  /* The six 15-degree atlas offsets turn through the BACK, never through
+  /* Twelve held atlas offsets turn through the BACK, never through
      a face/body mirror pop or new geometry. Reverse input remains instant. */
-  { static const int offsets[12]={1,1,3,3,5,5,5,5,3,3,1,1};
+  { static const int offsets[12]={1,1,2,3,4,5,6,5,4,3,2,1};
     m.face=-1; m.mode=MAN_WALK;
     for(int tick=12;tick>=1;tick--){
       m.turn_ticks=(uint8_t)tick;
@@ -27,10 +27,29 @@ int main(void){
       CK(mx_walk_render_face(&m)==(tick>6?1:-1),"render side swaps behind the shoulders");
       CK(mx_walk_foot_lift(&m)==0,"feet remain planted while the body turns");
     }
+    m.turn_ticks=11;
+    CK(mx_walk_turn_offset(&m)==1, "first visible turn frame advances only 15 degrees");
     m.turn_ticks=0;
     CK(mx_walk_turn_offset(&m)==0 && mx_walk_render_face(&m)==-1,
        "back turn resolves into the requested side view");
   }
+  /* Punch silhouette should ease forward then recover on the original
+     timer; it must not move the real player body or turn frames. */
+  m.mode=MAN_WALK;m.turn_ticks=0;m.pT=R(0.2);
+  CK(near(mx_walk_punch_lunge(&m),0), "punch begins without a teleport");
+  m.pT=R(0.15);
+  CK(near(mx_walk_punch_lunge(&m),0.15), "punch anticipates at quarter-time");
+  m.pT=R(0.1);
+  CK(near(mx_walk_punch_lunge(&m),0.3), "punch reaches bounded forward lunge");
+  m.pT=R(0.05);
+  CK(near(mx_walk_punch_lunge(&m),0.15), "punch recovers smoothly");
+  m.pT=0;
+  CK(near(mx_walk_punch_lunge(&m),0), "punch returns to exact body anchor");
+  m.pT=R(0.1);m.turn_ticks=4;
+  CK(mx_walk_punch_lunge(&m)==0, "rear turn cannot slide while punching");
+  m.turn_ticks=0;m.mode=MAN_FLY;
+  CK(mx_walk_punch_lunge(&m)==0, "airborne animation does not inherit grounded lunge");
+  m.mode=MAN_WALK;m.pT=0;
   m.vx=0;CK(mx_walk_foot_lift(&m)==0,"stationary foot lift disappears");
   m.vx=RI(9);m.gr=0;CK(mx_walk_foot_lift(&m)==0,"airborne lift stays anchored");
   m.gr=1;m.mode=MAN_FLY;CK(mx_walk_foot_lift(&m)==0,"non-walk modes do not bob");

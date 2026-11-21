@@ -1080,8 +1080,18 @@ static void draw_man(const View *v){
                               phase == 0 ? -1 : phase == 2 ? 1 : 0);
     int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
     const MsFrame *f = &MS_FRAMES[wf + (man_fur ? MSF_NBASE : 0)];
-    int fy = VY(v, RTOF(m->y) + 2.375f) - (int)lroundf(RTOF(mx_walk_foot_lift(m)) * p);
-    blit_frame(v->s, wf, x, fy - fdiv4((f->h - f->ay) * q), q, fc);
+    int ground_y = VY(v, RTOF(m->y) + 2.375f);
+    int fy = ground_y - (int)lroundf(RTOF(mx_walk_foot_lift(m)) * p);
+    /* Keep a planted contact cue beneath the walking body while gait and
+       punch lunge move the rendered sprite. Project separately in each eye. */
+    if(m->gr){
+      int half = p * 3 / 2;
+      if(half < 1) half = 1;
+      rect(v->s, x - half, ground_y + 1, half * 2 + 1, 2,
+           RGB(44, 44, 56));
+    }
+    int lunge = (int)lroundf(RTOF(mx_walk_punch_lunge(m)) * p);
+    blit_frame(v->s, wf, x + fc*lunge, fy - fdiv4((f->h - f->ay) * q), q, fc);
     if(m->pT > 0){ for(int k = -3; k <= 3; k++) px(v->s, x + fc * (p * 5 - k * k * p * 5 / 18) + fc * p * 4, y + k * p * 3 / 4, RGB(255, 255, 255)); }
     return;
   }

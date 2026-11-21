@@ -205,15 +205,18 @@ static inline int mx_walk_anim_phase(const MxMan *m){
 }
 /* Half-stride lift: continuous 0 -> peak -> 0 in each two-cell step,
    aligned to the EXISTING side-profile sprites. No stored animation state. */
-/* A turn follows the existing 15-degree sprite atlas through the back:
-   facing old direction: 105,135,165 degrees; new: 195,225,255.
-   One frame per two simulation ticks, no overlay sprite or extra bitmap. */
+/* A turn follows the existing 15-degree atlas through the back, using
+   all six profile-to-rear offsets per side at one sample per simulation tick.
+   The mirrored halves meet on the rear silhouette, without new sprites. */
 static inline int mx_walk_turn_offset(const MxMan *m){
   if(!m->turn_ticks || m->mode!=MAN_WALK) return 0;
-  int step=(12-(int)m->turn_ticks)/2;
+  /* walk_step() decrements turn_ticks before the frame is drawn; at
+     the first visible frame it is 11, not 12. Start at the nearest 15deg
+     atlas view to avoid a 30deg snap, then pass through the rear view. */
+  int step=11-(int)m->turn_ticks;
   if(step<0)step=0;
-  if(step>5)step=5;
-  return step<3?1+2*step:1+2*(5-step);
+  if(step>10)step=10;
+  return step<6 ? step+1 : 11-step;
 }
 static inline int mx_walk_render_face(const MxMan *m){
   return m->turn_ticks>6 && m->mode==MAN_WALK?-m->face:m->face;
@@ -224,6 +227,16 @@ static inline real mx_walk_foot_lift(const MxMan *m){
   if(g>=RI(2)) g-=RI(2);
   if(g>RI(1)) g=RI(2)-g;
   return rmul(g,R(0.3));
+}
+/* A short, purely visual punch lunge with anticipation and recovery.
+   It is evaluated from the existing 0.2s punch timer, so every render
+   frequency sees the same continuous motion.  No new pose state, body
+   collision, save fields or sprites. Peak is 0.30 world cells. */
+static inline real mx_walk_punch_lunge(const MxMan *m){
+  if(m->mode != MAN_WALK || m->pT <= 0 || m->turn_ticks) return 0;
+  real t = rclamp(m->pT, 0, R(0.2));
+  if(t > R(0.1)) t = R(0.2) - t;
+  return rmul(t, RI(3));
 }
 /* Avoid single-frame left/right sprite flips when flying near zero horizontal
    speed. The existing face byte is cosmetic until the player walks. */

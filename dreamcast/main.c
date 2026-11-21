@@ -331,8 +331,17 @@ static void handle_events(void){
       spawn(e->x, e->y, argb(175, 165, 145, 235), 190); break;
     case EV_CRUMBLE: {
       int tier=mx_crumble_tier(e->a);
-      for(int k=0;k<8+2*tier;k++)
-        spawn(e->x,e->y,k&1?argb(191,181,162,240):argb(140,134,127,240),280);
+      /* The old collapse emitted every chip at exactly one point, so even
+         a large building read as a small smoky dot. Spread the SAME bounded
+         8-14 particles over two visible facade layers. This is deterministic
+         placement only; the normal lifetime and motion remain unchanged. */
+      float reach=tier>=2?5.5f:2.5f;
+      for(int k=0;k<8+2*tier;k++){
+        float dx=((k%7)-3)*(reach/3.0f);
+        float dy=((k/7)-1)*(tier>=2?2.0f:1.0f);
+        spawn(e->x+dx,e->y+dy,
+              k&1?argb(191,181,162,240):argb(140,134,127,240),280);
+      }
       if(tier>=2) collapse_toast_t=75+12*tier;
       break; }
     case EV_BOUNCE: for(int k = 0; k < 10; k++) spawn(e->x, e->y, k & 1 ? argb(255, 126, 176, 255) : argb(255, 255, 255, 255), 420); break;
@@ -891,8 +900,14 @@ static void draw_all(void){
                                    phase == 0 ? -1 : phase == 2 ? 1 : 0);
         int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
         const short *f = DCM_FR[wf + (man_fur ? MSF_NBASE : 0)]; float zm = man_zoom; man_zoom = zm * 0.75f;
-        float foot = Y(m->y + 2.375f) - RTOF(mx_walk_foot_lift(m))*PXC;
-        draw_frame(wf, x, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
+        float ground_y = Y(m->y + 2.375f);
+        float foot = ground_y - RTOF(mx_walk_foot_lift(m))*PXC;
+        /* Keep the translucent floor contact beneath the character while
+           its animated sprite lifts or lunges; no added texture storage. */
+        if(m->gr) quad(x - 13.0f, ground_y + 1.0f, 26.0f, 3.0f,
+                       Z_MAN - 0.15f, argb(0, 0, 0, 85));
+        float lunge = RTOF(mx_walk_punch_lunge(m)) * PXC;
+        draw_frame(wf, x + fc*lunge, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
         man_zoom = zm;
         if(m->pT > 0) for(int k = -3; k <= 3; k++) puff(x + fc * (24 - k * k * 1.4f) + fc * 18, y + k * 3.4f, 1.8f, Z_MAN + 0.3f, WHITE);
       }
