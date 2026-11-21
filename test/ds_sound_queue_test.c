@@ -69,6 +69,27 @@ int main(void){
   CHECK(MX_IPC->head == ((gain_start + 1) & 63u),
         "retried PCM gain was queued twice");
 
+  /* Pitch glides also spend many frames at the same integer frequency.
+     Deduplicate already-queued pitches, but retry a pitch dropped for space. */
+  unsigned freq_start = MX_IPC->head;
+  soundSetFreq(0, 330); /* second wave's initial frequency */
+  CHECK(MX_IPC->head == freq_start, "initial PCM pitch redundantly queued");
+  soundSetFreq(0, 331);
+  CHECK(MX_IPC->head == ((freq_start + 1) & 63u) &&
+        (MX_IPC->ring[freq_start] >> 28) == C_FREQ,
+        "changed PCM pitch not queued");
+  freq_start = MX_IPC->head;
+  soundSetFreq(0, 331);
+  CHECK(MX_IPC->head == freq_start, "identical PCM pitch queued twice");
+  MX_IPC->tail = (MX_IPC->head + 4) & 63u;
+  soundSetFreq(0, 550);
+  CHECK(MX_IPC->head == freq_start && queued_freq[0] == 331,
+        "dropped PCM pitch incorrectly cached");
+  MX_IPC->tail = MX_IPC->head;
+  soundSetFreq(0, 550);
+  CHECK(MX_IPC->head == ((freq_start + 1) & 63u) && queued_freq[0] == 550,
+        "dropped PCM pitch not retried");
+
   /* A nearly-full queue drops cosmetic fades/glides to leave room for a
      necessary stop or a complete voice start. */
   MX_IPC->tail = (MX_IPC->head + 4) & 63u;  /* 3 slots free */
