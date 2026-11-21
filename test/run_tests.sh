@@ -108,6 +108,12 @@ gcc -std=gnu99 -O2 -Wall -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm
 gcc -std=gnu99 -O2 -Wall -DMX_FIXED -I../core ../core/cloth.c ../core/mx.c cloth_test.c -lm -o cloth_fixed && ./cloth_fixed | grep -v "^  p"
 echo "--- DS front-end: real main loop on stub libnds, scripted stylus play on levels 1, 4, 6, 7 ---"
 gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Istubs -I../core -I../art -I../ds/source ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_render
+echo "--- DS particle pool: 420-frame exhaustive 256x192 dual-view pixel parity vs full 128-slot reference ---"
+DS_PARTICLE_PROBE=1 ./ds_render > ds_particle_bounded.txt
+gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PARTICLE_BOUNDS=0 -Istubs -I../core -I../art -I../ds/source ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_render_particle_reference
+DS_PARTICLE_PROBE=1 ./ds_render_particle_reference > ds_particle_reference.txt
+cmp ds_particle_reference.txt ds_particle_bounded.txt
+cat ds_particle_bounded.txt
 echo "--- DS cartridge save: a win writes the stub chip, a second boot loads it, garbage means a clean start ---"
 rm -f /tmp/mx_save.sav; MX_SAVE_PATH=/tmp/mx_save.sav ./ds_render /tmp/dssave1 12000 0 | grep "^save:"
 MX_SAVE_PATH=/tmp/mx_save.sav ./ds_render /tmp/dssave2 400 0 | grep "^save:" | grep "file_valid=1" > /dev/null && echo "ok: second boot reads the first boot's progress"
