@@ -875,8 +875,9 @@ static void draw_all(void){
     if(m->mode == MAN_WALK){                                              /* on his own feet: the turning frame steps him along, three quarters of the sling size */
       if(!(m->hurtCd > 0 && (fcount & 2))){
         int phase = mx_walk_anim_phase(m);
-        int wf = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
-        int fc = m->face < 0 ? -1 : 1;
+        int wf = MSF_SPIN_6 + (m->turn_ticks ? mx_walk_turn_offset(m) :
+                                   phase == 0 ? -1 : phase == 2 ? 1 : 0);
+        int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
         const short *f = DCM_FR[wf + (man_fur ? MSF_NBASE : 0)]; float zm = man_zoom; man_zoom = zm * 0.75f;
         float foot = Y(m->y + 2.375f) - RTOF(mx_walk_foot_lift(m))*PXC;
         draw_frame(wf, x, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
