@@ -16,6 +16,7 @@ on:
       - "test/sprite_volume_continuity_test.py"
       - "test/hd_wolf_volume_test.py"
       - "test/turnaround_preview_palette_test.py"
+      - "test/sprite_turn_anchor_test.py"
       - "tools/render_turnaround_sheet.py"
       - ".github/workflows/preview-character-art.yml"
   workflow_dispatch:
@@ -63,6 +64,7 @@ jobs:
           python3 test/sprite_volume_continuity_test.py
           python3 test/hd_wolf_volume_test.py
           python3 test/turnaround_preview_palette_test.py
+          python3 test/sprite_turn_anchor_test.py
           python3 tools/turn_hair_finish.py --check
           python3 tools/sprite_pinhole_cleanup.py --check
           git diff --check
