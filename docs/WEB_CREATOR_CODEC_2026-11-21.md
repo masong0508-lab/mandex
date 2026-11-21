@@ -13,3 +13,6 @@
 - The codec and editor reset to the canonical **120-column** custom-grid geometry after the 360-column finale; importing or sharing a level cannot silently change its dimensions based on the previous campaign chapter. The regression directly sets the active world width to 360 before decoding a normal share code.
 
 - A dedicated **Browser creator and responsive play gates** workflow now exercises the real level-sharing codec, portrait editor, multitouch, camera controls, browser power labels and turning pose before merge; the complete host suite remains a separate release gate.
+
+## Editor preflight (next milestone)
+The **TEST** and **SAVE** actions now run the same bounded layout validation as importing/sharing a code. A landlord embedded in a wall, an empty/undersized structure, impossible coordinates, or an invalid player count produces an actionable error rather than entering a broken game or overwriting the last saved custom level. This work runs on button activation, not every rendering frame. The browser creator regression invokes the shipped preflight with valid and invalid editor grids and asserts the actual TEST/SAVE handlers call it.
