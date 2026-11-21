@@ -50,6 +50,8 @@ echo "--- Browser walk physics parity, reusable touch controls and character-det
 if command -v node >/dev/null 2>&1;then node browser_walk_memory_test.js;fi
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
 if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
+echo "--- Browser creator: bounded MX1 imports, Unicode share names and legacy codes ---"
+if command -v node >/dev/null 2>&1;then node browser_creator_codec_test.js;fi
 echo "--- Web: touch capture, landscape/portrait two-thumb controls, safe camera pan ---"
 if command -v node >/dev/null 2>&1;then node browser_multitouch_test.js;fi
 echo "--- read-only shot readiness and actual power stock (float/fixed/browser) ---"

@@ -5131,13 +5131,88 @@ function encodeCells(g){const out=[];let cur=g[0],n=0;for(let i=0;i<g.length;i++
 function decodeCells(a){const g=new Uint8Array(COLS*ROWS);let p=0;for(let i=0;i<a.length;i+=2){const m=a[i]|0,n=a[i+1]|0;for(let k=0;k<n&&p<g.length;k++)g[p++]=m>8?0:m}return g}
 function levelFromData(L){const g=decodeCells(L.c);return{name:L.n,men:Math.max(1,Math.min(12,L.m|0||5)),custom:true,build(){for(let i=0;i<g.length;i++)if(g[i])set(i%COLS,(i/COLS)|0,g[i]);for(const[cx,row]of L.t)tgt(cx,row)}}}
 function startCustom(k){testing=false;load(-1,levelFromData(PD.custom[k]))}
-function exportCode(L){const code='MX1.'+btoa(JSON.stringify({n:L.n,m:L.m,c:L.c,t:L.t}));ST().exported++;pdTouch();achCheck();
-  try{navigator.clipboard.writeText(code)}catch(e){}
-  try{prompt('Level code (copied if your browser allows). Send it to a friend:',code)}catch(e){}return code}
-function importCode(){let s=null;try{s=prompt('Paste a level code:')}catch(e){}if(!s)return;
-  try{s=s.trim();if(!s.startsWith('MX1.'))throw 0;const o=JSON.parse(atob(s.slice(4)));if(!Array.isArray(o.c)||!Array.isArray(o.t))throw 0;
-    PD.custom.push({n:String(o.n||'Imported').slice(0,24),m:o.m|0||5,c:o.c.map(v=>v|0),t:o.t.slice(0,16).map(p=>[p[0]|0,p[1]|0])});pdTouch();pdSave();toast('outfit','Level imported',String(o.n||'Imported').slice(0,24))}
-  catch(e){toast('ach','That code did not work','check you copied all of it')}}
+// Shared-code validation is deliberately done only on import/export. The
+// gameplay renderer, native ports, and 60 Hz simulation do not pay for it.
+const MX_CODE_MAX=100000;
+function validateSharedLevel(o){
+  if(!o||typeof o!=='object'||Array.isArray(o))throw Error('Invalid level data');
+  const c=o.c,t=o.t,total=COLS*ROWS;
+  if(!Array.isArray(c)||c.length<2||c.length>total*2||c.length%2)
+    throw Error('Invalid grid encoding');
+  const g=new Uint8Array(total);let cells=0,solids=0;
+  for(let i=0;i<c.length;i+=2){
+    const m=c[i],run=c[i+1];
+    if(!Number.isInteger(m)||m<0||m>8||
+       !Number.isInteger(run)||run<=0||run>total-cells)
+      throw Error('Invalid grid run');
+    if(m){for(let j=cells;j<cells+run;j++)
+      if(j%COLS<EMIN)throw Error('Sling area must be clear');
+      solids+=run;g.fill(m,cells,cells+run)}
+    cells+=run;
+  }
+  if(cells!==total||solids<8)throw Error('Level needs at least 8 solid cells');
+  if(!Array.isArray(t)||t.length<1||t.length>12)
+    throw Error('Place between 1 and 12 landlords');
+  const seen=new Set();
+  for(const pos of t){
+    if(!Array.isArray(pos)||pos.length!==2)throw Error('Invalid landlord position');
+    const x=pos[0],row=pos[1];
+    if(!Number.isInteger(x)||!Number.isInteger(row)||
+       x<EMIN||x>=COLS||row<1||row>ROWS||
+       g[(row-1)*COLS+x]!==0)
+      throw Error('Landlord outside playable empty space');
+    const key=(row-1)*COLS+x;
+    if(seen.has(key))throw Error('Duplicate landlord');
+    seen.add(key);
+  }
+  const men=o.m==null?5:o.m;
+  if(!Number.isInteger(men)||men<1||men>12)throw Error('Invalid player count');
+  if(o.n!=null&&typeof o.n!=='string')throw Error('Invalid level name');
+  return {n:(o.n||'Imported').trim().slice(0,24)||'Imported',
+          m:men,c:c.slice(),t:t.map(p=>p.slice())};
+}
+function encodeSharedLevel(L){
+  const v=validateSharedLevel(L);
+  const bytes=new TextEncoder().encode(JSON.stringify(v));
+  let binary='';
+  for(let i=0;i<bytes.length;i+=8192)
+    binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+  const code='MX1.'+btoa(binary);
+  if(code.length>MX_CODE_MAX)throw Error('Level code too large');
+  return code;
+}
+function decodeSharedLevel(code){
+  if(typeof code!=='string'||code.length>MX_CODE_MAX||
+     !code.startsWith('MX1.')||code.length<8)throw Error('Invalid level code');
+  const binary=atob(code.slice(4));
+  let json;
+  try{
+    const bytes=Uint8Array.from(binary,ch=>ch.charCodeAt(0));
+    json=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+  }catch(e){
+    // Older MX1 codes stored Latin-1 bytes directly, before UTF-8 export.
+    json=binary;
+  }
+  return validateSharedLevel(JSON.parse(json));
+}
+function exportCode(L){
+  let code;
+  try{code=encodeSharedLevel(L)}
+  catch(e){toast('ach','Cannot share this level',e.message);return ''}
+  ST().exported++;pdTouch();achCheck();
+  try{if(navigator.clipboard&&navigator.clipboard.writeText)
+    Promise.resolve(navigator.clipboard.writeText(code)).catch(()=>{})}catch(e){}
+  try{prompt('Level code (copied if your browser allows). Send it to a friend:',code)}catch(e){}
+  return code;
+}
+function importCode(){
+  let s=null;try{s=prompt('Paste a level code:')}catch(e){}if(!s)return;
+  try{
+    const L=decodeSharedLevel(s.trim());
+    PD.custom.push(L);pdTouch();pdSave();
+    toast('outfit','Level imported',L.n);
+  }catch(e){toast('ach','That code did not work',e.message||'Invalid code')}
+}
 
 // ---------- the editor ----------
 const E={g:new Uint8Array(COLS*ROWS),t:[],men:5,mat:1,tool:'mat',shape:'pen',bk:0,bs:0,bt:1,undo:[],id:-1,name:'',drag:null};
