@@ -4512,6 +4512,176 @@ function drawCutscene(){
 const ch2Unlocked=i=>PD.unlockAll||i===CH1||(PD.stars[i-1]||0)>0;
 const ch3Unlocked=i=>PD.unlockAll||(i===CH2?(PD.stars[CH2-1]||0)>0:(PD.stars[i-1]||0)>0);   // the first chapter 2 level is open; the rest unlock in order
 function storyUnlocked(i){return PD.unlockAll||i<3||(PD.stars[i-1]||0)>0}
+/* Portrait pages are deliberately drawn in the existing 2D canvas (and
+   share the same btn()/hitTest(), game actions and save model). These are
+   readable tap targets, not a 960x540 menu squashed into a phone. */
+function mobileHeader(title,detail,back){
+  ctx.fillStyle='rgba(10,14,30,.92)';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(255,210,63,.16)';ctx.fillRect(0,0,W,7);
+  txt(title,W/2,59,36,'#ffd23f','center','#7a1a1a');
+  if(detail)txt(detail,W/2,85,15,'#cfd','center');
+  if(back)btn(12,14,92,42,'< BACK',back,{size:16});
+}
+function mobilePager(kind,number,size,atY){
+  const pages=Math.max(1,Math.ceil(number/size));
+  const page=mobilePage(kind,number,size);
+  MOBILE.page[kind]=page;
+  if(pages>1){
+    const y=atY==null?H-58:atY;
+    btn(12,y,116,46,'< PREV',()=>{MOBILE.page[kind]=Math.max(0,page-1)},{size:16,disabled:page===0});
+    txt('PAGE '+(page+1)+' / '+pages,W/2,y+29,18,'#fff','center');
+    btn(W-128,y,116,46,'NEXT >',()=>{MOBILE.page[kind]=Math.min(pages-1,page+1)},{size:16,disabled:page===pages-1});
+  }
+  return page;
+}
+function mobileTab(x,y,w,label,fn,on){
+  btn(x,y,w,43,label,fn,{on,size:14,col:'#ffd23f'});
+}
+function drawMobileTitle(){
+  ctx.fillStyle='rgba(10,14,30,.44)';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.translate(W/2,H*.63);ctx.scale(1.8,1.8);drawSlamScene(time);ctx.restore();
+  txt('MANDEX',W/2,H*.24,78,'#ffd23f','center','#7a1a1a');
+  txt('THE LANDLORD SMASHER',W/2,H*.31,20,'#fff','center');
+  ctx.globalAlpha=.72+.28*Math.sin(time*4);
+  txt('TAP ANYWHERE TO START',W/2,H-95,23,'#fff','center');
+  ctx.globalAlpha=1;
+}
+function drawMobileCutscene(){
+  const sc=CUTS[cutI],cs=cutCam(cutI,cutT);
+  const frameH=Math.min(H*.47,420),scale=W/960;
+  ctx.fillStyle='#0b101e';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.beginPath();ctx.rect(0,108,W,frameH);ctx.clip();
+  ctx.translate(0,108);ctx.scale(scale,scale);
+  ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);
+  ctx.translate(-cs.x,-cs.y);sc.draw(cutT);ctx.restore();
+  txt('SCENE '+(cutI+1)+' / '+CUTS.length,W/2,45,20,'#ffd23f','center');
+  btn(W-118,12,106,42,'SKIP >>',endCut,{size:15});
+  const boxY=frameH+128,read=Math.max(0,Math.min(1,(cutT-.4)*CPS/Math.max(1,cutTotal())));
+  panel(18,boxY,W-36,Math.min(210,H-boxY-100));
+  ctx.fillStyle='#ffd23f';ctx.fillRect(34,boxY+9,(W-68)*read,4);
+  let left=Math.floor(Math.max(0,cutT-.4)*CPS);
+  for(let i=0;i<sc.lines.length;i++){
+    const words=sc.lines[i],visible=words.slice(0,Math.max(0,Math.min(words.length,left)));left-=words.length;
+    let fs=18;ctx.font='bold 18px sans-serif';
+    while(fs>12&&ctx.measureText(visible).width>W-82){fs--;ctx.font='bold '+fs+'px sans-serif'}
+    txt(visible,W/2,boxY+43+i*48,fs,i===sc.hl?'#ffd23f':'#fff','center');
+  }
+  btn(W/2-134,H-66,268,52,'TAP TO CONTINUE >',()=>cutClick(W/2,H-50),{size:18,on:true});
+}
+function drawMobileMenu(){
+  mobileHeader('MANDEX','THE LANDLORD SMASHER');
+  ctx.save();ctx.globalAlpha=.24;ctx.translate(W*.8,H*.72);ctx.scale(2,2);drawSlamScene(time);ctx.restore();
+  const y=H*.19,w=W-76,x=38,h=62,g=13;
+  btn(x,y,w,h,'PLAY',goSelect,{size:28,on:true,col:'#7dff5a'});
+  btn(x,y+(h+g),w,h,'LEVEL CREATOR',()=>openEditor(false),{size:24});
+  btn(x,y+2*(h+g),w,h,'ACHIEVEMENTS '+achCount()+'/'+ACH.length,()=>{state='ach';MOBILE.page.ach=0},{size:19});
+  btn(x,y+3*(h+g),w,h,'OUTFITS '+ownedCount()+'/'+OUTFITS.length,()=>{state='outfit';MOBILE.page.outfit=0},{size:21});
+  btn(x,y+4*(h+g),w,h,'OPTIONS',()=>{state='options';MOBILE.page.options=0},{size:21});
+  btn(x,H-130,w,52,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();setMuted(!muted)},{size:18});
+  txt(totalStars()+' ★ EARNED',W/2,H-28,18,'#ffd23f','center');
+}
+function mobileSelectItems(){
+  if(selTab===0)return LEVELS.slice(0,CH1).map((q,i)=>({label:(i+1)+'. '+q.name,stars:PD.stars[i]||0,locked:!storyUnlocked(i),fn:()=>startStory(i)}));
+  if(selTab===2)return LEVELS.slice(CH1,CH2).map((q,i)=>({label:(CH1+i+1)+'. '+q.name,stars:PD.stars[CH1+i]||0,locked:!ch2Unlocked(CH1+i),fn:()=>startStory(CH1+i)}));
+  if(selTab===3)return LEVELS.slice(CH2).map((q,i)=>({label:(CH2+i+1)+'. '+q.name,stars:PD.stars[CH2+i]||0,locked:!ch3Unlocked(CH2+i),fn:()=>startStory(CH2+i)}));
+  const items=[{label:'+ CREATE NEW LEVEL',fn:()=>openEditor(false)},
+    {label:'IMPORT LEVEL CODE',fn:importCode}];
+  PD.custom.forEach((q,i)=>items.push({label:(i+1)+'. '+q.n,custom:true,i,fn:()=>startCustom(i)}));
+  return items;
+}
+function drawMobileSelect(){
+  mobileHeader('SELECT LEVEL',selTab===1?'YOUR CUSTOM LEVELS':'CHOOSE A DISTRICT',goMenu);
+  const labels=['STORY','MY LEVELS','CHAPTER 2','CHAPTER 3'],tabs=[0,1,2,3];
+  for(let i=0;i<4;i++)mobileTab(12+(i%2)*264,101,252,labels[i],
+    ()=>{selTab=tabs[i];MOBILE.page.select=0},selTab===tabs[i]);
+  const items=mobileSelectItems(),top=208,rh=78,rowGap=8,cols=2,
+    visibleRows=Math.max(2,Math.floor((H-top-94)/(rh+rowGap))),size=visibleRows*cols,
+    page=mobilePage('select',items.length,size),start=page*size;
+  for(let j=start;j<Math.min(items.length,start+size);j++){
+    const it=items[j],k=j-start,x=12+(k%2)*264,y=top+Math.floor(k/2)*(rh+rowGap);
+    const label=it.locked?'LOCKED':it.label;
+    btn(x,y,252,rh,label,()=>{if(!it.locked)it.fn();else SFX.pop()},
+        {size:it.label.length>19?12:15,on:!it.locked&&it.stars>=2});
+    if(!it.locked&&it.stars)txt('★'.repeat(it.stars),x+126,y+rh-8,15,'#ffd23f','center');
+    if(it.custom&&it.i!=null){
+      btn(x+4,y+rh-31,76,26,'EDIT',()=>openEditor(false,it.i),{size:12});
+      btn(x+86,y+rh-31,70,26,'SHARE',()=>exportCode(PD.custom[it.i]),{size:12});
+      btn(x+162,y+rh-31,84,26,'DELETE',()=>{if(confirmDel(PD.custom[it.i])){PD.custom.splice(it.i,1);pdTouch();pdSave()}},{size:11});
+    }
+  }
+  mobilePager('select',items.length,size);
+}
+function drawMobileAchievements(){
+  mobileHeader('ACHIEVEMENTS',achCount()+' / '+ACH.length+' COMPLETE',goMenu);
+  const top=111,rh=60,size=Math.max(3,Math.floor((H-top-88)/rh)),page=mobilePage('ach',ACH.length,size);
+  ACH.slice(page*size,(page+1)*size).forEach((a,i)=>{
+    const y=top+i*rh,got=PD.ach[a.id];
+    panel(14,y,W-28,rh-6);
+    txt(got?'★':'?',43,y+36,28,got?'#ffd23f':'#889','center');
+    txt(a.n,77,y+25,17,got?'#fff':'#cbd','left');
+    txt(a.d,77,y+44,12,'#aab','left');
+    if(!got&&a.p){const[p,n]=a.p();txt(Math.min(p,n)+'/'+n,W-25,y+24,13,'#ffd23f','right')}
+  });
+  mobilePager('ach',ACH.length,size);
+}
+function drawMobileOutfits(){
+  mobileHeader('OUTFITS',ownedCount()+' / '+OUTFITS.length+' UNLOCKED',goMenu);
+  ctx.save();ctx.translate(W/2,198);ctx.scale(1.1,1.1);
+  if(outfitCur.rainbow)applyOutfit(outfitCur,time);
+  const sw=Math.sin(time*5);drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');
+  ctx.restore();txt(outfitCur.n,W/2,285,22,'#fff','center');
+  const top=310,rh=75,cols=2,size=Math.max(2,Math.floor((H-top-90)/(rh+9)))*cols;
+  const page=mobilePage('outfit',OUTFITS.length,size);
+  OUTFITS.slice(page*size,(page+1)*size).forEach((o,k)=>{
+    const x=12+(k%2)*264,y=top+Math.floor(k/2)*(rh+9),
+      own=!!PD.own[o.id],sel=outfitCur===o;
+    btn(x,y,252,rh,o.n,()=>{if(own){equip(o);SFX.ding()}else SFX.pop()},
+      {size:o.n.length>17?13:17,on:sel,disabled:!own});
+    txt(own?(sel?'WEARING':'TAP TO WEAR'):'LOCKED',x+126,y+rh-8,12,own?'#fff':'#889','center');
+  });
+  mobilePager('outfit',OUTFITS.length,size);
+}
+function drawMobileOptions(){
+  const page=MOBILE.page.options?1:0,o=OPT();
+  mobileHeader('OPTIONS',page?'SOUND, SCREEN & DATA':'GAMEPLAY',goMenu);
+  mobileTab(12,108,252,'GAMEPLAY',()=>{MOBILE.page.options=0},page===0);
+  mobileTab(276,108,252,'SOUND & DATA',()=>{MOBILE.page.options=1},page===1);
+  let y=169;const rh=58,gap=8;
+  function row(label,value,fn,on){
+    btn(20,y,W-40,rh,label+': '+value,()=>{fn();pdTouch();pdSave();SFX.pop()},
+        {size:label.length>20?15:17,on:!!on});
+    y+=rh+gap;
+  }
+  if(!page){
+    row('COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',()=>{o.collapse=!o.collapse},o.collapse);
+    row('START TOOL',toolName(),toolCycle,toolName()!=='NONE');
+    row('AIM GUIDE',GUIDES[o.guide==null?2:o.guide],()=>{o.guide=((o.guide==null?2:o.guide)+1)%3},(o.guide==null?2:o.guide)>0);
+    row('BURP CHARGE',o.burpCharge?'ON':'OFF',()=>{o.burpCharge=!o.burpCharge},o.burpCharge);
+    row('STOMACH NEVER BURSTS',o.noBurst?'ON':'OFF',()=>{o.noBurst=!o.noBurst},o.noBurst);
+    row('LANDLORDS FIGHT BACK',o.fight===false?'OFF':'ON',()=>{o.fight=o.fight===false?true:false},o.fight!==false);
+  }else{
+    row('SOUND',muted?'OFF':'ON',()=>{audioInit();setMuted(!muted)},!muted);
+    const val=Math.round(optVol()*100);
+    row('VOLUME',val+'%',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol()},val>0);
+    row('VOLUME DOWN',val+'%',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol()},false);
+    row('SCREEN SHAKE',SHAKES.find(s=>s[1]===(o.shake==null?1:o.shake))?.[0]||'FULL',()=>{let i=SHAKES.findIndex(s=>s[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1]},(o.shake==null?1:o.shake)>0);
+    row('DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX},!webEcoFX);
+    if(y+rh<H-72)row('RESET OPTIONS','DEFAULT',()=>{if(performance.now()<armReset){optsReset();armReset=0}else armReset=performance.now()+3000},false);
+    if(y+rh<H-68)row('ERASE PROGRESS','CONFIRM',()=>{if(performance.now()<armProg){progReset();armProg=0}else armProg=performance.now()+3000},false);
+  }
+  if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{MOBILE.page.options=1},{size:18});
+  else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{MOBILE.page.options=0},{size:18});
+}
+function drawMobileScreen(){
+  switch(state){
+    case 'menu':drawMobileMenu();break;
+    case 'select':drawMobileSelect();break;
+    case 'ach':drawMobileAchievements();break;
+    case 'outfit':drawMobileOutfits();break;
+    case 'options':drawMobileOptions();break;
+    case 'edit':drawMobileEditor();break;
+  }
+}
 function drawMenu(){
   ctx.fillStyle='rgba(10,14,30,.45)';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate(745,GY-4);ctx.scale(1.7,1.7);drawSlamScene(time);ctx.restore();
