@@ -20,6 +20,13 @@ echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
 if command -v node >/dev/null 2>&1; then
   node -e 'const fs=require("fs");const h=fs.readFileSync("../web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<a)throw Error("game script missing");const s=h.slice(a+8,b);new Function(s);for(const sym of ["function cgRearPanel","function cgHotTake","function cgMoonlitKiss"])if(!s.includes(sym))throw Error(sym+" missing");console.log("ok: browser script parses and cutscene effects are present")'
 fi
+echo "--- rare collapsed-room survivor: HP, frame support, trapped pocket, one-time roll (float/fixed) ---"
+for mode in float fixed; do
+  defs=""
+  test "$mode" = fixed && defs="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function $defs -I../core collapse_survivor_test.c -lm -o collapse_survivor_$mode
+  ./collapse_survivor_$mode
+done
 echo "--- BANK SHOT trick bonus: true rubber rebound, direct eviction only, 2s expiry (fixed/float) ---"
 for mode in float fixed; do
   defs=""
