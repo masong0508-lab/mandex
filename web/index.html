@@ -1286,6 +1286,12 @@ function lordAI(t,dt){
   // everybody flinches when a man comes screaming close (cosmetic: it never changes where they stand)
   if(m.mode==='fly'&&tm2<210*210){if(t.pan<=0&&t.say<=0)lordSay(t,SCARES[(t.t*7|0)%SCARES.length],'#ffb0b0');t.pan=.7}
   let moving=0;
+  if(t.collapseRolled===2){
+    if(t.stun>0){t.mv=0;return}
+    if(t.dodge>0){t.dodge-=dt;
+      if(lordStep(t,t.dd,75,dt)){t.face=t.dd;t.mv=2;return}
+    }
+  }
   if(MOBILE.includes(t.kind)&&t.stun<=0&&t.wind<=0){
     if(t.dodge>0)t.dodge-=dt;
     const dg=lordDanger(t);
@@ -1339,7 +1345,8 @@ function collapseSurvive(t){
   for(const [dx,dy] of COLLAPSE_POCKETS){
     const x=t.x+dx*V,y=t.y+dy*V;
     if(x<V||x>=WW-V||y<2*V||y>=GY)continue;
-    if(solidAt(x,y)||solidAt(x,y-t.r)||solidAt(x-V*.25,y)||solidAt(x+V*.25,y))continue;
+    if(solidAt(x,y)||solidAt(x,y-t.r)||solidAt(x-V*.25,y)||solidAt(x+V*.25,y)||
+       !solidAt(x,y+V))continue; // stable footing, never teleport to empty air
     px=x;py=y;found=true;break;
   }
   if(!found)return false;
@@ -1348,6 +1355,9 @@ function collapseSurvive(t){
   if(rnd()*4096>=chance)return false;
   t.collapseRolled=2;t.hp=Math.max(1,t.hp-1);t.armor=0;
   t.inv=1.5;t.stun=1.8;t.vy=0;t.x=px;t.y=py;
+  t.wind=t.swing=0;t.dodge=1.5;
+  t.dd=t.x>=(r.x+r.w/2)*V?1:-1;
+  t.pan=2; // after recovering, flee the damaged room
   popText(t.x,t.y-50,'SOMEHOW ALIVE!','#ffdf84',23);
   popText(t.x,t.y-25,t.hp+' HP LEFT','#ff9ec8',17);
   ring(t.x,t.y,37,'#ffd23f');spark(t.x,t.y-12,6,145);
