@@ -71,6 +71,18 @@ int main(void){
   w.rng=unlucky;
   CHECK(!collapse_survive(&w,t)&&t->collapse_rolled==1,"unlucky attempt must mark one-time use");
   CHECK(!collapse_survive(&w,t),"unsuccessful collapse escape rerolled");
+  /* A destroyed rubble cell must not hit an enemy from beyond the grave.
+     A live cell in exactly the same place, moving at the same speed, must. */
+  init(1); t=&w.targets[0];t->room_id=255;
+  MxChunk *ch=&w.chunks[0];
+  ch->active=1;ch->count=1;ch->rad=RI(2);
+  ch->x=t->x;ch->y=t->y;ch->vx=RI(30);
+  ch->cells[0].wx=t->x;ch->cells[0].wy=t->y;ch->cells[0].dead=1;
+  upd_targets(&w,R(0.016));
+  CHECK(t->alive,"a dead rubble cell killed a landlord (invisible collision)");
+  ch->cells[0].dead=0;
+  upd_targets(&w,R(0.016));
+  CHECK(!t->alive,"live fast-moving rubble did not register a real collision");
   puts("collapse survivors: intact vs failed frames, no-air pockets, HP injury, 1-HP miracles, one roll, expiring grace and killability PASSED");
   return 0;
 }
