@@ -336,7 +336,53 @@ static int n3_sprite_volume_probe(void){
 #endif
   return 0;
 }
+/* The same real four-tap renderer with its tight bounds disabled/enabled.
+   Screens cover both 3DS software framebuffers, left/right facing, human
+   and Wolfman, thin/wide silhouettes, rotations and screen-edge clipping.
+   The EXACT same background and sprite colors must survive the shortcut. */
+#ifdef MX_N3DS_ROT_WORK_COUNT
+static int n3_rot_tight_bounds_probe(void){
+  static const int poses[]={MSF_IDLE_A,MSF_FLY_A,MSF_DIVE,
+                            MSF_SPIN_0,MSF_SPIN_6,MSF_SPIN_12,MSF_HOWL};
+  static const float angles[]={-.83f,0.f,.27f,.69f,1.5707963f,
+                                2.21f,3.1415927f,5.35f};
+  unsigned long long digest=1469598103934665603ull;
+  unsigned cases=0;
+  man_rot_candidate_pixels=man_rot_sampled_pixels=0;
+  for(int viewport=0;viewport<2;viewport++){
+    Scr *screen=viewport?&bot:&top;
+    screen->fb=viewport?fb_bot:fb_top[0];
+    screen->w=viewport?320:400;screen->h=240;
+    for(int fur=0;fur<2;fur++){
+      apply_outfit(fur?12:0);
+      for(unsigned fi=0;fi<sizeof poses/sizeof poses[0];fi++)
+      for(int facing=-1;facing<=1;facing+=2)
+      for(unsigned ai=0;ai<sizeof angles/sizeof angles[0];ai++)
+      for(int pos=0;pos<3;pos++){
+        int cx=pos==0?screen->w/2:pos==1?7:screen->w-8;
+        int cy=pos==0?screen->h/2:pos==1?12:screen->h-12;
+        memset(screen->fb,41,(size_t)screen->w*screen->h*3);
+        blit_frame_rot(screen,poses[fi],cx,cy,viewport?4:3,facing,angles[ai]);
+        unsigned h=n3_hash(screen->fb,(size_t)screen->w*screen->h*3);
+        digest^=h;digest*=1099511628211ull;
+        cases++;
+      }
+    }
+  }
+  if(!man_rot_sampled_pixels || man_rot_candidate_pixels<man_rot_sampled_pixels){
+    fputs("FAIL: 3DS rotated sprite coverage work counters invalid\n",stderr);
+    return 1;
+  }
+  printf("N3_ROT_TIGHT_HASH %016llx cases=%u\n",digest,cases);
+  printf("N3_ROT_TIGHT_WORK candidate=%u sampled=%u\n",
+         man_rot_candidate_pixels,man_rot_sampled_pixels);
+  return 0;
+}
+#endif
 int main(int argc, char **argv){
+#ifdef MX_N3DS_ROT_WORK_COUNT
+  if(getenv("N3DS_ROT_TIGHT_PROBE"))return n3_rot_tight_bounds_probe();
+#endif
   if(getenv("N3DS_SPRITE_VOLUME_PROBE"))return n3_sprite_volume_probe();
 #ifdef MX_N3DS_PARTICLE_BENCH
   if(getenv("N3DS_PARTICLE_BOUNDS_PROBE"))return n3_particle_bounds_probe();
