@@ -978,6 +978,7 @@ static void draw_street_dressing(const View *v){
   text(v->s,x+8,y-8*p+4,"RENT?",1,RGB(150,45,62));
 }
 static void draw_landlords(const View *v){
+  const int last_target=world.state==MX_PLAY && mx_targets_alive(&world)==1;
   for(int i = 0; i < world.ntargets; i++){
     const MxTarget *t = &world.targets[i];
     if(!t->alive) continue;
@@ -1051,6 +1052,8 @@ static void draw_landlords(const View *v){
        Drawn only for this single exceptional enemy, in both stereo eyes. */
     if(t->collapse_rolled==2)
       textc(v->s,x,y-p*7,"!",2,RGB(255,210,63));
+    if(last_target && t->collapse_rolled!=2)
+      textc(v->s,x,y-p*7,"LAST",1,RGB(255,126,176));
   }
 }
 /* briefcases in the air (Batter Up), and the pink bounce pads of walk levels: chevrons float up from each */
