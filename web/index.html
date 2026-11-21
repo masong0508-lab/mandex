@@ -389,7 +389,7 @@ LEVELS.push(
    for(let k=0;k<3;k++)house({x:50+k*18,w:10,floors:2,wall:BRICK,floor:WOOD,roof:WOOD,gable:true,paper:k%2?'#cfe0c0':'#f0d9c0'});
    rect(62,52,4,8,TNT);rect(80,52,4,8,TNT);
    tgt(54,59);tgt(56,50);tgt(72,59);tgt(74,50);tgt(90,59);tgt(92,50);tgt(102,60)}},
- {name:'Rubber Room',men:8,build(){                  // a big bouncy hall: come in through the wooden roof
+ {name:'Rubber Room',men:8,tip:'BANK SHOT: rebound off rubber, then directly evict a landlord within 2 seconds for +1500!',build(){                  // a big bouncy hall: come in through the wooden roof
    house({x:60,w:30,floors:3,wall:RUBBER,floor:WOOD,roof:WOOD,gable:false,paper:'#f8d4e4'});
    tgt(66,59);tgt(84,59);tgt(70,50);tgt(82,50);tgt(68,41);tgt(80,41);tnt(78,59);tnt(64,50);tnt(86,41)}},
  {name:'Stairway to Eviction',men:8,build(){         // a landlord on every step
