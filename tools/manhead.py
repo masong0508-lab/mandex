@@ -103,12 +103,12 @@ KEY = {'B': 'BLK', 'G': 'GOLD', 'g': 'GOLD2', 'w': 'WH', 'h': 'HAIR', 'H': 'HAIR
 # ---- side view, facing right (flying / diving): 16 wide x 15 tall ----
 SIDE_BASE = [      # thinning, like the front view: a bare shiny crown, a tuft behind the ear, a few combed-over strands
     "....oooooo......",
-    "...oSKKSSSo.....",
-    "..ohhhhhhSSoo...",
-    ".ohhSSSSSSSSSo..",
-    ".ohhSSSSSSSSSSo.",
-    ".ohhSSSSSSSSSSSo",
-    ".ohhhSSSSSSSSSSo",
+    "...ohhHHHHo.....",
+    "..ohhhhhHHSoo...",
+    ".ohhhhhHHHSSSo..",
+    ".ohhhhhhHHSSSSo.",
+    ".ohhhhhSSSSSSSSo",
+    ".ohhhhSSSSSSSSSo",
     ".ohhhSSSsSSSSSSo",
     "..ohhSSsSSSSSkko",
     "..ohhSSSSSSSSSko",
