@@ -22,6 +22,19 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## Browser/Android camera-zoom rubble rendering
+
+- Browser zoom now drops entirely offscreen debris chunks and individual
+  offscreen debris sprites before issuing Canvas transforms/drawImage calls.
+  The original raster path remains for every potentially visible rotated
+  fragment; screen shake and normal full-world camera mode bypass the filter.
+- Shattered cells are no longer drawn during the frame before debris cleanup.
+  A dedicated headless Canvas transform test compares every visible sprite
+  and draw order with the original across 1,600 randomly positioned rubble
+  cells, camera zoom, no-zoom and screen shake.
+- This changes only drawing, not destruction physics, controls, music clock
+  or collision. No new images, heap pools or framebuffers.
+
 ## November 20: offscreen destruction draw budget
 
 - On 3DS, both stereoscopic eyes skip entire rigid rubble chunks that cannot

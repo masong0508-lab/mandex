@@ -3239,7 +3239,26 @@ function draw(){
     ctx.drawImage(SPR[m][hsh(x,y)&3][r>.66?0:r>.33?1:2],px,py);
     if(brk[i]){ctx.fillStyle=m===GLASS?'rgba(255,255,255,.95)':'rgba(15,8,4,.8)';const b=brk[i];   // snapped joints show as cracks
       if(b&1)ctx.fillRect(px+6,py+1,2,3);if(b&2)ctx.fillRect(px,py+4,2,3);if(b&4)ctx.fillRect(px+3,py+6,4,2);if(b&8)ctx.fillRect(px+1,py,4,2)}}
-  for(const ch of chunks){ctx.save();ctx.translate(ch.x,ch.y);ctx.rotate(ch.ang);for(const a of ch.cells){const r=a.h/MAT[a.m].hp;ctx.drawImage(SPR[a.m][(a.lx*7+a.ly*3|0)&3][r>.66?0:r>.33?1:2],-V/2+a.lx,-V/2+a.ly)}ctx.restore()}
+  /* At high zoom, most collapsed rubble can be beyond the screen.
+     Only cull with a stable camera and no screen shake. Use a generous
+     two-voxel margin: rotated blocks at the viewport edge still draw.
+     Culling affects CANVAS WORK ONLY, never debris physics or collision. */
+  const rubbleCull=camOn&&shake===0;
+  const rubbleX0=CAM.x-2*V,rubbleX1=CAM.x+W/CAM.z+2*V;
+  const rubbleY0=CAM.y-2*V,rubbleY1=CAM.y+H/CAM.z+2*V;
+  for(const ch of chunks){
+    if(rubbleCull&&(ch.x+ch.rad+V<rubbleX0||ch.x-ch.rad-V>rubbleX1||
+                    ch.y+ch.rad+V<rubbleY0||ch.y-ch.rad-V>rubbleY1))continue;
+    ctx.save();ctx.translate(ch.x,ch.y);ctx.rotate(ch.ang);
+    for(const a of ch.cells){
+      if(a.dead)continue; // shattered fragments are neither visible nor collidable
+      if(rubbleCull&&(a.wx<rubbleX0-V||a.wx>rubbleX1+V||
+                      a.wy<rubbleY0-V||a.wy>rubbleY1+V))continue;
+      const r=a.h/MAT[a.m].hp;
+      ctx.drawImage(SPR[a.m][(a.lx*7+a.ly*3|0)&3][r>.66?0:r>.33?1:2],-V/2+a.lx,-V/2+a.ly);
+    }
+    ctx.restore();
+  }
   for(const t of targets)if(t.alive){const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);ctx.restore()}
   if(cases.length)drawCases();
   if(man&&man.mode==='aim'&&man.stun>0){const q=Math.sin(time*14);txt('DAZED...',SX,SY-48+q*2,16,'#ffd23f','center');for(let i=0;i<3;i++){const a=time*7+i*2.1;txt('*',SX+Math.cos(a)*18,SY-28+Math.sin(a)*5,18,'#fff','center')}}

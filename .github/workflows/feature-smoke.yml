@@ -15,6 +15,7 @@ on:
       - "test/collapse_survivor_web_test.js"
       - "test/rubble_broadphase_test.c"
       - "test/rubble_broadphase_web_test.js"
+      - "test/browser_rubble_draw_test.js"
       - "test/landlord_ai_web_test.js"
       - "test/collapse_survivor_test.c"
       - "test/bank_shot_test.c"
@@ -56,6 +57,7 @@ jobs:
             /tmp/rubble_broadphase_$mode
           done
           node test/rubble_broadphase_web_test.js
+          node test/browser_rubble_draw_test.js
       - name: Verify new rubber BANK SHOT bonus in both core numeric modes
         run: |
           for mode in float fixed; do

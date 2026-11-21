@@ -30,6 +30,7 @@ done
 if command -v node >/dev/null 2>&1; then
   node collapse_survivor_web_test.js
   node landlord_ai_web_test.js
+  node browser_rubble_draw_test.js
 fi
 echo "--- moving rubble vs landlords: conservative contact AABB parity (fixed/float/browser) ---"
 for mode in float fixed; do
