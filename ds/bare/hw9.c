@@ -99,6 +99,8 @@ static u16 pending_kill;
    cost ring slots but do not alter the sound. Failed updates are NOT cached,
    so a congested ring still gets the latest requested gain on retry. */
 static u8 pcm_gain[8], pcm_gain_valid;
+/* Quantized effect glides can hold an identical pitch over many ticks. */
+static u16 queued_freq[16], queued_freq_valid;
 
 /* ARM7 advances tail independently. Since it only CONSUMES commands, the
    remaining space computed here is a conservative lower bound. A channel
@@ -123,6 +125,7 @@ static void snd_flush_kills(void){
     pending_kill &= (u16)~(1u << c);
     busy[c] = 0;
     if(c < 8) pcm_gain_valid &= (u8)~(1u << c);
+    queued_freq_valid &= (u16)~(1u << c);
   }
 }
 void soundPump(void){ snd_flush_kills(); }    /* one cheap check per game frame */
@@ -131,6 +134,7 @@ void soundEnable(void){
   MX_IPC->head = MX_IPC->tail = 0;
   pending_kill = 0;
   pcm_gain_valid = 0;
+  queued_freq_valid = 0;
   for(int c = 0; c < 16; c++) busy[c] = 0;
 }
 int soundPlayPSG(DutyCycle d, u16 f, u8 v, u8 pan){
@@ -139,6 +143,7 @@ int soundPlayPSG(DutyCycle d, u16 f, u8 v, u8 pan){
   int c = grab(8, 13); if(c < 0) return -1;
   snd_push((C_FREQ << 28) | (c << 24) | f);
   snd_push((C_PLAY_PSG << 28) | (c << 24) | ((u32)(d & 7) << 21) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
+  queued_freq[c] = f; queued_freq_valid |= (u16)(1u << c);
   return c;
 }
 int soundPlayNoise(u16 f, u8 v, u8 pan){
@@ -147,6 +152,7 @@ int soundPlayNoise(u16 f, u8 v, u8 pan){
   int c = grab(14, 15); if(c < 0) return -1;
   snd_push((C_FREQ << 28) | (c << 24) | f);
   snd_push((C_PLAY_NOISE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
+  queued_freq[c] = f; queued_freq_valid |= (u16)(1u << c);
   return c;
 }
 int soundPlayWave(const signed char *cyc, u16 f, u8 v, u8 pan){
@@ -160,6 +166,7 @@ int soundPlayWave(const signed char *cyc, u16 f, u8 v, u8 pan){
   snd_push((C_PLAY_WAVE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
   pcm_gain[c] = v & 127;
   pcm_gain_valid |= (u8)(1u << c);
+  queued_freq[c] = f; queued_freq_valid |= (u16)(1u << c);
   return c;
 }
 void soundSetVol(int h, u8 v){
@@ -178,8 +185,13 @@ void soundSetVol(int h, u8 v){
 }
 void soundSetFreq(int h, u16 f){
   snd_flush_kills();
-  if(h >= 0 && h < 16 && busy[h] && snd_room() >= 4)
-    snd_push((C_FREQ << 28) | (h << 24) | f);
+  if(h < 0 || h >= 16 || !busy[h]) return;
+  u16 bit = (u16)(1u << h);
+  if((queued_freq_valid & bit) && queued_freq[h] == f) return;
+  if(snd_room() < 4) return; /* don't cache a dropped pitch */
+  snd_push((C_FREQ << 28) | (h << 24) | f);
+  queued_freq[h] = f;
+  queued_freq_valid |= bit;
 }
 void soundKill(int h){
   if(h < 0 || h >= 16 || (!busy[h] && !(pending_kill & (1u << h)))) return;
@@ -188,6 +200,7 @@ void soundKill(int h){
     pending_kill &= (u16)~(1u << h);
     busy[h] = 0;
     if(h < 8) pcm_gain_valid &= (u8)~(1u << h);
+    queued_freq_valid &= (u16)~(1u << h);
   }else pending_kill |= (u16)(1u << h);
 }
 
