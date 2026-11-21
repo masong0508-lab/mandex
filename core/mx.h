@@ -123,7 +123,8 @@ enum {
   EV_SWING,    /* a landlord swung at x,y (walker punch / bat practice swing) */
   EV_HEAL,     /* a healer patched a landlord up at x,y */
   EV_OOF,      /* a tough landlord took a hit and survived at x,y: a = hp left, m = 1 if a shield was smashed */
-  EV_DISTRICT  /* Landlord HQ: the district was cleared and the next one is up (m = its number, 1 or 2); +MX_HQ_BONUS_MEN men and +3000 were added */
+  EV_DISTRICT, /* Landlord HQ: the district was cleared and the next one is up (m = its number, 1 or 2); +MX_HQ_BONUS_MEN men and +3000 were added */
+  EV_SURVIVOR  /* rare, injured escape from a collapsed room; m = remaining HP */
 };
 /* power-ups: one use of each per level */
 enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT, PW_TURBO, PW_QUAKE, PW_COUNT }; /* appended: preserve legacy save IDs */
@@ -154,7 +155,8 @@ typedef struct {
 /* chapter 3: hp/hpmax (shield 2, boss 3, others 1; the front-ends draw a bar when hpmax > 1), armor (riot shield facing `face`), inv = hit immunity left,
    shield = blocks a slow shot from the front; sprinter runs, boss throws two briefcases, healer patches the others up; all walkers dodge debris, run for cover and climb one-block stairs. */
 typedef struct { real x, y, vy, t; uint8_t alive, kind, mv; int8_t face, pdir; uint8_t eng; real hx, range, cd, wind, swing, stun, pan, wk;
-                 uint8_t hp, hpmax, armor, b2; int8_t dd; real inv, dodge, cover, ck, heal; } MxTarget;
+                 uint8_t hp, hpmax, armor, b2; int8_t dd; real inv, dodge, cover, ck, heal;
+                 uint8_t room_id, collapse_rolled; /* room index (255=outdoors), 0=eligible, 1=lost roll, 2=escaped once */ } MxTarget;
 #define MX_MAX_CASES 4
 typedef struct { real x, y, vx, vy, rot, l; uint8_t active; } MxCase;      /* a thrown briefcase */
 #define MX_MAX_PADS 3
@@ -233,6 +235,7 @@ typedef struct {
   int nrooms;
   /* Event-driven support for each painted room, no extra framebuffer. */
   uint16_t room_frame_init[MX_MAX_ROOMS];
+  uint16_t room_frame_orig[MX_MAX_ROOMS]; /* retained after wallpaper falls: rare collapse-escape odds */
   uint8_t paper_dirty, paper_torn; /* damaged back-wall edges can use subtle rip shading */
   uint8_t paper[MX_ROWS * MX_COLS];   /* wallpaper per cell: palette+1 (0 = none). Blasts, broken walls and collapsing rubble knock it out (3x3 around every voxel lost), so interiors are destructible */
   MxTube tubes[MX_MAX_TUBES];
