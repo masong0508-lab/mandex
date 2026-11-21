@@ -74,11 +74,11 @@ static int dc_outfit_memory_probe(void){
   recolor_man(0);
   unsigned restored=dc_hash((const unsigned char *)tx_man,bytes);
   if(atlas!=tx_man || classic!=restored || classic==work || classic==camo || work==camo){
-    printf("FAIL: Dreamcast outfit tint parity / VRAM stability %08x %08x %08x %08x\\n",
+    printf("FAIL: Dreamcast outfit tint parity / VRAM stability %08x %08x %08x %08x\n",
            classic,work,camo,restored);
     return 1;
   }
-  printf("ok: Dreamcast outfits round-trip identically in-place, permanent 1 MiB atlas not needed (%08x)\\n",classic);
+  printf("ok: Dreamcast outfits round-trip identically in-place, permanent 1 MiB atlas not needed (%08x)\n",classic);
   return 0;
 }
 static int dc_fastpath_probe(void){
