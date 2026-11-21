@@ -101,6 +101,16 @@ static void toast_tick(void){
 
 static int pad_dx, pad_dy, pad_used, dragging;
 static int MAXHP[MX_NMAT];                    /* filled from the core's material table */
+#ifndef MX_DS_DAMAGE_THRESH
+#define MX_DS_DAMAGE_THRESH 1
+#endif
+#if MX_DS_DAMAGE_THRESH
+/* Quantized HP is an integer. hp*3 > max*2 is exactly equivalent
+   to hp > floor(max*2/3) for nonnegative damage. Move these
+   multiplications out of the upper/lower-screen voxel hot loops.
+   Cached once for nine materials; no pixel, physics or RAM buffers change. */
+static int HP_33[MX_NMAT], HP_67[MX_NMAT];
+#endif
 #ifndef MX_DS_FACADE_CACHE
 #define MX_DS_FACADE_CACHE 0 /* measured neutral/slower across 8 host scenarios; retain for A/B */
 #endif
@@ -822,7 +832,11 @@ static void draw_voxels(const View *v){
       int m = row[x];
       if(!m) continue;
       int i = y * MX_COLS + x, hp = world.hp[i] >> 12;
+#if MX_DS_DAMAGE_THRESH
+      int d = hp > HP_67[m] ? 0 : hp > HP_33[m] ? 1 : 2;
+#else
       int d = hp * 3 > MAXHP[m] * 2 ? 0 : hp * 3 > MAXHP[m] ? 1 : 2;
+#endif
       if(d == 0 && world.brk[i]) d = 1;                       /* a snapped joint shows as a crack */
       int sx = x * ppc - v->cx, sy = py;
       if(wob){ sx += (world.ox[i] * ppc) >> 12; sy += (world.oy[i] * ppc) >> 12; }   /* swaying with the wobble */
@@ -1594,6 +1608,12 @@ int main(void){
   STAGE(1, RGB15(31,0,0));                             /* red */
   gfx_init();
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? mx_material_hp(k) : 1;
+#if MX_DS_DAMAGE_THRESH
+  for(int k = 0; k < MX_NMAT; k++){
+    HP_33[k] = MAXHP[k] / 3;
+    HP_67[k] = (MAXHP[k] * 2) / 3;
+  }
+#endif
   for(int i = 0; i < 256; i++){ BG_PALETTE[i] = gfx_pal[i]; BG_PALETTE_SUB[i] = gfx_pal[i]; }
   STAGE(2, RGB15(0,31,0));                             /* green */
   sfx_init();
