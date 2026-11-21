@@ -20,6 +20,13 @@ echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
 if command -v node >/dev/null 2>&1; then
   node -e 'const fs=require("fs");const h=fs.readFileSync("../web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<a)throw Error("game script missing");const s=h.slice(a+8,b);new Function(s);for(const sym of ["function cgRearPanel","function cgHotTake","function cgMoonlitKiss"])if(!s.includes(sym))throw Error(sym+" missing");console.log("ok: browser script parses and cutscene effects are present")'
 fi
+echo "--- BANK SHOT trick bonus: true rubber rebound, direct eviction only, 2s expiry (fixed/float) ---"
+for mode in float fixed; do
+  defs=""
+  test "$mode" = fixed && defs="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function $defs -I../core bank_shot_test.c -lm -o bank_shot_$mode
+  ./bank_shot_$mode
+done
 echo "--- eviction streak: capped score, fixed/float parity, timer expiry and armored targets ---"
 gcc -std=gnu99 -O2 -Wno-unused-function -I../core combo_test.c -lm -o combo_float && ./combo_float
 gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -I../core combo_test.c -lm -o combo_fixed && ./combo_fixed
