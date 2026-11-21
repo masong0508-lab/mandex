@@ -940,10 +940,45 @@ function manPlow(){
 //  WALK MODE (levels with CL.walk): he lands, then you steer him on foot: A/D move, W/Space jump, X punch, S stomp, G give up
 // =====================================================================
 const KEYS={},TID={},WHW=7,WHH=19,WALK_T=45;
-function wBlocked(x,y){const xs=[x-WHW,x,x+WHW],ys=[y-WHH,y-WHH*.5,y,y+WHH*.5,y+WHH-.01];
-  for(const qx of xs)for(const qy of ys){if(solidAt(qx,qy))return true;
-    for(const ch of chunks){if(Math.hypot(ch.x-qx,ch.y-qy)>ch.rad+RC)continue;for(const a of ch.cells)if(!a.dead&&Math.abs(a.wx-qx)<RC&&Math.abs(a.wy-qy)<RC)return true}}
-  return false}
+/* Shared with the portable core's approach: test fixed grid points first,
+ * then broad-phase each nearby chunk and cell only ONCE. The final narrow
+ * test deliberately retains the original circular chunk-radius check, so
+ * partial fragments and borderline hits behave identically. No arrays are
+ * allocated during this very hot walk/jump/stomp collision query. */
+function wBlocked(x,y){
+  for(let i=0;i<3;i++){
+    const qx=i===0?x-WHW:i===1?x:x+WHW;
+    for(let j=0;j<5;j++){
+      let qy=y;
+      if(j===0)qy=y-WHH;
+      else if(j===1)qy=y-WHH*.5;
+      else if(j===3)qy=y+WHH*.5;
+      else if(j===4)qy=y+WHH-.01;
+      if(solidAt(qx,qy))return true;
+    }
+  }
+  for(const ch of chunks){
+    const radius=ch.rad+RC;
+    if(Math.abs(ch.x-x)>radius+WHW||Math.abs(ch.y-y)>radius+WHH)continue;
+    for(const a of ch.cells){
+      if(a.dead||Math.abs(a.wx-x)>=WHW+RC||Math.abs(a.wy-y)>=WHH+RC)continue;
+      for(let i=0;i<3;i++){
+        const qx=i===0?x-WHW:i===1?x:x+WHW;
+        if(Math.abs(a.wx-qx)>=RC)continue;
+        for(let j=0;j<5;j++){
+          let qy=y;
+      if(j===0)qy=y-WHH;
+      else if(j===1)qy=y-WHH*.5;
+      else if(j===3)qy=y+WHH*.5;
+      else if(j===4)qy=y+WHH-.01;
+          if(Math.abs(a.wy-qy)>=RC)continue;
+          if(Math.hypot(ch.x-qx,ch.y-qy)<=radius)return true;
+        }
+      }
+    }
+  }
+  return false;
+}
 function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.vx=m.vy=0;m.gr=false;m.wt=WALK_T;m.pT=0;m.pCd=0;m.stomp=false;m.R=14;m.pwr=m.pwr;
   let ok=!wBlocked(m.x,m.y);for(let u=1;u<=110&&!ok;u++){if(!wBlocked(m.x,m.y-u)){m.y-=u;ok=true}}
   for(let r=4;r<=200&&!ok;r+=4)for(let a=0;a<16&&!ok;a++){const an=-Math.PI/2+(a%2?1:-1)*Math.ceil(a/2)*.4,qx=m.x+Math.cos(an)*r,qy=m.y+Math.sin(an)*r;if(!wBlocked(qx,qy)){m.x=qx;m.y=qy;ok=true}}   // nearest free spot, preferring up
@@ -1011,7 +1046,19 @@ function drawWalkMan(m){
   ctx.restore();
 }
 function walkTouch(x,y,id){for(const b of walkBtns())if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){KEYS[b.k]=true;TID[id]=b.k;return true}return false}
-function walkBtns(){const y=H-64,w=62,h=54,r=W-12,yl=H-128;return[{k:'TL',t:'<',x:10,y:yl,w,h},{k:'TR',t:'>',x:82,y:yl,w,h},{k:'TS',t:'STOMP',x:r-3*w-16,y,w,h},{k:'TP',t:'PUNCH',x:r-2*w-8,y,w,h},{k:'TJ',t:'JUMP',x:r-w,y,w,h}]}
+/* The touch HUD is drawn every frame. Reuse the five hit-test objects,
+ * updating only their positions when canvas dimensions change. */
+const WALK_BUTTONS=[{k:'TL',t:'<',x:10,y:0,w:62,h:54},{k:'TR',t:'>',x:82,y:0,w:62,h:54},
+  {k:'TS',t:'STOMP',x:0,y:0,w:62,h:54},{k:'TP',t:'PUNCH',x:0,y:0,w:62,h:54},
+  {k:'TJ',t:'JUMP',x:0,y:0,w:62,h:54}];
+function walkBtns(){
+  const y=H-64,r=W-12,w=62;
+  WALK_BUTTONS[0].y=WALK_BUTTONS[1].y=H-128;
+  WALK_BUTTONS[2].x=r-3*w-16;WALK_BUTTONS[2].y=y;
+  WALK_BUTTONS[3].x=r-2*w-8;WALK_BUTTONS[3].y=y;
+  WALK_BUTTONS[4].x=r-w;WALK_BUTTONS[4].y=y;
+  return WALK_BUTTONS;
+}
 function drawWalkHUD(){const m=man;if(state!=='play'||m.mode!=='walk')return;
   const k=clamp(m.wt/WALK_T,0,1);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W/2-80,40,160,9);ctx.fillStyle=k>.3?'#7dff5a':'#ff4a4a';ctx.fillRect(W/2-79,41,158*k,7);
   txt('A/D MOVE  W JUMP  X PUNCH  S STOMP  G GIVE UP',W/2,66,12,'#fff','center');
@@ -2410,6 +2457,10 @@ function eye3(s,k,gz){const ex=s*6,gx=(gz[0]||0)*1.8,gy=(gz[1]||0)*1.4;
 function quiffDraw(cx,sx,pd){ctx.save();ctx.translate(cx,pd*.4);ctx.scale(sx,1);frontHair();ctx.restore()}
 let CAPEA=0,CAPET=-9;
 function capeAng(th){if(time-CAPET>.3)CAPEA=th;else CAPEA+=(th-CAPEA)*.1;CAPET=time;return CAPEA}   // the cape swings after the body
+/* The rare rear-gag detail is deterministic. Precompute it once instead of
+ * creating 27 arrays on EVERY walking/idle/flight character render. Reusing
+ * these immutable points preserves identical silhouettes and hair strokes. */
+const SPIN_WISP=(()=>{const w=[];let r=7;const rn=()=>(r=(r*1103515245+12345)&0x7fffffff)/0x7fffffff;for(let k=0;k<26;k++){const edge=rn();w.push([2+rn()*22,17+rn()*21+(edge<.35?0:0),(rn()-.5)*2.6,1.2+rn()*1.8])}return w})();
 function drawSpin(th,o){
   o=o||{};
   const hip=o.hip||0,cl=o.cl||0,cr=o.cr||0,psi=(o.psi||0)*Math.PI/180+(o.plant?-.6*th:0),ld=(o.plant?58*Math.tanh((o.ld||0)/58):(o.ld||0))*Math.PI/180,hpA=(o.hp||0)*Math.PI/180,pdv=hpA*13,CA=o.arms,fk=o.face||'',FX=FACE3[fk]||FACE3.base,gzv=o.gz||[0,0],spd=o.spd==null?1:o.spd,dir=o.dir||1,tt=o.t||0;
@@ -2423,7 +2474,7 @@ function drawSpin(th,o){
   const OP=o.oops?Object.assign({},OOPS_DEF,o.oops):null;                                                            // the "oops" gag: boxers down, bare butt, covering up
   // the bare butt, seen from behind: curvy, full and heavy (a little muscle under the curves), a paler 'tan line' skin, a deep soft cleft, a fold under each cheek, sparse hair, a heavy wobble
   // little curly wisps, deterministic: [x, y, dx, dy] on a cheek (x counted from the cleft)
-  const WISP=(()=>{const w=[];let r=7;const rn=()=>(r=(r*1103515245+12345)&0x7fffffff)/0x7fffffff;for(let k=0;k<26;k++){const edge=rn();w.push([2+rn()*22,17+rn()*21+(edge<.35?0:0),(rn()-.5)*2.6,1.2+rn()*1.8])}return w})();
+  const WISP=SPIN_WISP;
   const addButt=()=>add(12,()=>{
     const dr=OP.drop,SHD='rgba(165,88,56,',tl=OP.tilt||0;
     ctx.save();ctx.translate(oL+ro[0],ro[1]);ctx.translate(0,11);ctx.scale(1.07,1.1);ctx.translate(0,-11);ctx.lineJoin='round';ctx.lineCap='round';      // a little bigger: full and heavy
