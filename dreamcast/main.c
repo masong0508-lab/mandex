@@ -256,15 +256,24 @@ static void toast_tick(void){
 }
 /* the man's colours: boxers (red family) and towel (pink family) are re-tinted in the decoded atlas by hue, keeping each texel's brightness */
 static int man_fur;                                                          /* the Wolfman outfit: flying frames get the wolf head */
-static unsigned short *man_px;
 static void recolor_man(int o){
-  if(!man_px || !tx_man) return;
-  uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); int fur = mx_outfit_skin(o, sk); man_fur = fur;
+  if(!tx_man) return;
+  uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); int fur = mx_outfit_skin(o, sk);
   size_t tot = (size_t)DCT_MAN_W * DCT_MAN_H;
   unsigned short *tmp = (unsigned short *)malloc(tot * 2);
   if(!tmp) return;
+  /* One temporary atlas replaces the old permanent 1024x512 source atlas
+     PLUS a second temporary copy. Every change starts from the original
+     RLE bytes, so repeated outfit switching cannot accumulate tint errors. */
+  size_t n = 0;
+  for(int i = 0; i + 1 < DCT_MAN_RLE_LEN && n < tot; i += 2){
+    unsigned cnt = DCT_MAN_RLE[i];
+    unsigned short v = DCT_MAN_RLE[i + 1];
+    while(cnt-- && n < tot) tmp[n++] = v;
+  }
+  if(n != tot){ free(tmp); return; } /* preserve previous valid texture */
   for(size_t i = 0; i < tot; i++){
-    unsigned short v = man_px[i]; unsigned a = (v >> 12) & 15, r = ((v >> 8) & 15) * 17, g = ((v >> 4) & 15) * 17, b = (v & 15) * 17;
+    unsigned short v = tmp[i]; unsigned a = (v >> 12) & 15, r = ((v >> 8) & 15) * 17, g = ((v >> 4) & 15) * 17, b = (v & 15) * 17;
     int mx_ = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b), d = mx_ - mn;
     if(fur && a && r >= 190 && g * 100 >= 62 * (int)r && g * 100 <= 88 * (int)r && b * 100 >= 45 * (int)r && b * 100 <= 74 * (int)r && (int)(g - b) * 100 >= 11 * (int)r){   /* skin: his pink becomes grey fur, same brightness steps */
       int nr = sk[0][0] * (int)r / 244, ng = sk[0][1] * (int)r / 244, nb = sk[0][2] * (int)r / 244;
@@ -282,6 +291,7 @@ static void recolor_man(int o){
   }
   pvr_txr_load(tmp, tx_man, (uint32)(tot * 2));
   free(tmp);
+  man_fur = fur;
 }
 static void handle_events(void){
   for(int i = 0; i < world.nev; i++){
@@ -940,8 +950,6 @@ static void gfx_init(void){
      Cost: 1 MB of PVR RAM, zero extra CPU-side atlas copies and zero
      additional per-frame framebuffer or pixel conversion. */
   tx_wman = load_tex(DCT_WMAN_RLE, DCT_WMAN_RLE_LEN, DCT_WMAN_W, DCT_WMAN_H);
-  { size_t tot = (size_t)DCT_MAN_W * DCT_MAN_H; man_px = (unsigned short *)malloc(tot * 2);       /* a copy of the atlas so outfits can re-tint it */
-    if(man_px){ size_t n = 0; for(int i = 0; i + 1 < DCT_MAN_RLE_LEN && n < tot; i += 2){ unsigned cnt = DCT_MAN_RLE[i]; unsigned short v = DCT_MAN_RLE[i + 1]; while(cnt-- && n < tot) man_px[n++] = v; } } }
   tx_ttl = load_tex(DCT_TTL_RLE, DCT_TTL_RLE_LEN, DCT_TTL_W, DCT_TTL_H);
   make_hdr(&hdr_bga, PVR_TXRFMT_RGB565, DCT_BGA_W, DCT_BGA_H, tx_bga);
   make_hdr(&hdr_bgb, PVR_TXRFMT_ARGB1555, DCT_BGB_W, DCT_BGB_H, tx_bgb);
