@@ -47,6 +47,15 @@ jobs:
         run: |
           node test/collapse_survivor_web_test.js
           node test/landlord_ai_web_test.js
+      - name: Require exact rubble collision behavior with fast rectangle rejection
+        run: |
+          for mode in float fixed; do
+            flags=""
+            test "$mode" = fixed && flags="-DMX_FIXED"
+            gcc -std=gnu99 -O2 $flags -Icore test/rubble_broadphase_test.c -lm -o /tmp/rubble_broadphase_$mode
+            /tmp/rubble_broadphase_$mode
+          done
+          node test/rubble_broadphase_web_test.js
       - name: Verify new rubber BANK SHOT bonus in both core numeric modes
         run: |
           for mode in float fixed; do
