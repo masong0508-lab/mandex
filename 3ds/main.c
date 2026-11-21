@@ -581,7 +581,17 @@ static void draw_tile(Scr *s, int sx, int sy, int p, int m, int v, int d, int dm
     }
   }
 }
+/* Compute the two brightness multipliers once per draw, not for every
+   standing voxel and every bit of flying rubble. Keeps the same float
+   evaluation order, all color channels and both 3DS stereo eyes. */
+#ifndef MX_N3DS_TILE_DIM_CACHE
+#define MX_N3DS_TILE_DIM_CACHE 1
+#endif
 static void draw_cells(const View *v){
+#if MX_N3DS_TILE_DIM_CACHE
+  const int dim_normal=(int)(256 * g_dim);
+  const int dim_cracked=(int)(256 * g_dim * .8f);
+#endif
   int p = v->ppc;
   tile_build(p);
   static float minv[MX_NMAT]; static int mready;
@@ -601,7 +611,12 @@ static void draw_cells(const View *v){
     int sx = VX(v, fx), sy = VY(v, fy);
     if(sx + p < 0 || sx >= sw || sy + p < 0 || sy >= sh) continue;
     float r = RTOF(world.hp[i]) * minv[m];
-    int dd = r > .66f ? 0 : r > .33f ? 1 : 2, dm = (int)(256 * g_dim * (world.brk[i] ? .8f : 1.0f));
+    int dd = r > .66f ? 0 : r > .33f ? 1 : 2;
+#if MX_N3DS_TILE_DIM_CACHE
+    int dm = world.brk[i] ? dim_cracked : dim_normal;
+#else
+    int dm = (int)(256 * g_dim * (world.brk[i] ? .8f : 1.0f));
+#endif
     draw_tile(v->s, sx, sy, p, m, ((x * 374761393u + y * 668265263u) >> 13) & 3, dd, dm);
   }
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
@@ -610,7 +625,13 @@ static void draw_cells(const View *v){
     for(int k = 0; k < ch->count; k++){
       const MxCell *a = &ch->cells[k];
       if(a->dead) continue;
-      draw_tile(v->s, VX(v, RTOF(a->wx)) - p / 2, VY(v, RTOF(a->wy)) - p / 2, p, a->m, (k * 7 + 3) & 3, 0, (int)(256 * g_dim));
+      draw_tile(v->s, VX(v, RTOF(a->wx)) - p / 2, VY(v, RTOF(a->wy)) - p / 2, p, a->m, (k * 7 + 3) & 3, 0,
+#if MX_N3DS_TILE_DIM_CACHE
+        dim_normal
+#else
+        (int)(256 * g_dim)
+#endif
+      );
     }
   }
 }
