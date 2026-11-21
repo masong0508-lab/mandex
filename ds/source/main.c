@@ -1120,12 +1120,36 @@ static void draw_man(const View *v){
   }
 }
 
+#ifndef MX_DS_PARTICLE_VIEW_CULL
+#define MX_DS_PARTICLE_VIEW_CULL 1
+#endif
 static void draw_parts(const View *v){
   for(int i = 0; i < (MX_DS_PARTICLE_BOUNDS ? part_high_water : NPART); i++){
     const Part *p = &parts[i];
     if(p->life <= 0) continue;
     int px = (p->x * v->ppc >> 6) - v->cx, py = (p->y * v->ppc >> 6) - v->cy;
-    if(px < -8 || px > 264 || py < -8 || py > 200) continue;
+#if MX_DS_PARTICLE_VIEW_CULL
+    /* Most particles occupy 8px or less beyond their anchor. Only pay
+       for a wider visibility test when the anchor has ALREADY left that
+       area. Otherwise big expanding rings (and long dust trails) vanish
+       even though their pixels still overlap the screen. Compare every
+       type, phase, zoom and edge against the completely unculled painter
+       with DS_PARTICLE_EDGE_PROBE. No extra RAM or image assets. */
+    if(px < -8 || px > 264 || py < -8 || py > 200){
+      int pad=8;
+      if(p->type==PT_RING){
+        int r=((int)p->r*v->ppc)>>6; /* final radius; >= current eased radius */
+        if(r+1>pad)pad=r+1;
+      }else if(p->type==PT_DUST){
+        int w=3+(p->max-p->life)/8;
+        if(w+2>pad)pad=w+2;
+      }else if(p->type==PT_SMOKE || p->type==PT_ZZZ){
+        pad=12;
+      }
+      if(px < -pad || px > 255+pad || py < -pad || py > 191+pad)
+        continue;
+    }
+#endif
     int age = p->max - p->life, big = v->ppc >= 4;
     switch(p->type){
     case PT_DEBRIS: gfx_rect(v->buf, px, py, big ? 2 : 1, big ? 2 : 1, p->col); break;
