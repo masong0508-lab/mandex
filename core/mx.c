@@ -1804,6 +1804,48 @@ static void walk_step(MxWorld *w, real dt){
   }
 }
 
+/* A last-second escape from a genuinely collapsed room is uncommon, not
+   blanket immunity for every falling enemy. Check ONLY at a lethal impact;
+   normal simulation never scans rooms. A nearby clear pocket must exist.
+   Fully intact HP and a few intact posts slightly improve the odds:
+   base ~1.1% for a one-HP landlord in complete ruin, at most ~7%.
+   Once rolled, even a failed escape cannot be rerolled during the collapse. */
+#ifndef MX_COLLAPSE_SURVIVORS
+#define MX_COLLAPSE_SURVIVORS 1
+#endif
+static int collapse_survive(MxWorld *w, MxTarget *t){
+#if MX_COLLAPSE_SURVIVORS
+  if(t->collapse_rolled || t->room_id >= w->nrooms) return 0;
+  const int rid=t->room_id, initial=w->room_frame_orig[rid];
+  if(initial<6) return 0;
+  int left=paper_frame_support(w,&w->rooms[rid]);
+  if(left*5>initial*2) return 0; /* 60%+ of its frame has gone */
+  static const int DX[]={0,-1,1,0,0,-2,2,-1,1};
+  static const int DY[]={0,0,0,-1,-2,0,0,-1,-1};
+  real safe_x=t->x,safe_y=t->y;
+  int pocket=0;
+  for(int k=0;k<9;k++){
+    real x=t->x+RI(DX[k]),y=t->y+RI(DY[k]);
+    if(x < RI(1)||x >= RI(MX_COLS-1)||y < RI(2)||y >= RI(MX_ROWS))continue;
+    if(solid_at(w,x,y)||solid_at(w,x,y-R(0.875))||
+       solid_at(w,x-R(0.25),y)||solid_at(w,x+R(0.25),y))continue;
+    safe_x=x;safe_y=y;pocket=1;break;
+  }
+  if(!pocket)return 0;
+  t->collapse_rolled=1;
+  int chance=45+(t->hp>1?(t->hp-1)*65:0)+left*250/initial;
+  if(rrand(w)>=rdiv(RI(chance),RI(4096)))return 0;
+  t->collapse_rolled=2;
+  t->hp=t->hp>1?t->hp-1:1;
+  t->armor=0;t->inv=R(1.5);t->stun=R(1.8);t->vy=0;
+  t->x=safe_x;t->y=safe_y;
+  ev(w,EV_SURVIVOR,t->x,t->y,t->hp,0,0);
+  return 1;
+#else
+  (void)w;(void)t;return 0;
+#endif
+}
+
 static void upd_targets(MxWorld *w, real dt){
   for(int i = 0; i < w->ntargets; i++){
     MxTarget *t = &w->targets[i];
@@ -1813,7 +1855,7 @@ static void upd_targets(MxWorld *w, real dt){
     real r = R(0.875);
     int gr = solid_at(w, t->x, t->y + r + R(0.125)) || solid_at(w, t->x - R(0.5), t->y + r + R(0.125)) || solid_at(w, t->x + R(0.5), t->y + r + R(0.125));
     if(gr){
-      if(t->vy > R(53.75)){ kill_hard(w, t); continue; }                           /* a very hard landing kills */
+      if(t->vy > R(53.75)){ if(!collapse_survive(w,t))kill_hard(w,t); continue; }                           /* a very hard landing kills */
       if(t->vy > R(37.5) && t->inv <= 0){ t->stun = R(0.8); t->inv = R(0.8); ev(w, EV_OOF, t->x, t->y, 0, RI(t->hp), 0); }   /* a hard one only stuns */
       t->vy = 0; }
     else { t->vy += rmul(GRAV, dt); t->y += rmul(t->vy, dt); }
@@ -1821,8 +1863,9 @@ static void upd_targets(MxWorld *w, real dt){
       real up = 0;
       for(real d = R(0.25); d <= RI(3); d += R(0.25)) if(!solid_at(w, t->x, t->y - d) && !solid_at(w, t->x, t->y - d - r)){ up = d; break; }
       if(up){ t->y -= up; t->vy = 0; t->stun = RI(1); t->inv = RI(1); }
-      else { kill_hard(w, t); continue; }
+      else { if(!collapse_survive(w,t))kill_hard(w,t); continue; }
     }
+    if(t->collapse_rolled==2 && t->inv>0)continue; /* one brief escape grace, not permanent invulnerability */
     for(int c = 0; c < MX_MAX_CHUNKS && t->alive; c++){
       MxChunk *ch = &w->chunks[c];
       if(!ch->active) continue;
@@ -1834,7 +1877,7 @@ static void upd_targets(MxWorld *w, real dt){
         if(rmul(ddx, ddx) + rmul(ddy, ddy) >= rmul(lim, lim)) continue;
         real vx = ch->vx - rmul(ch->w, a->wy - ch->y), vy = ch->vy + rmul(ch->w, a->wx - ch->x);
         real sp2 = rmul(vx, vx) + rmul(vy, vy);
-        if(sp2 > R(351.6)){ kill_target(w, t); break; }                              /* fast rubble (> 18.75 cells/s) kills; a slower graze only stuns */
+        if(sp2 > R(351.6)){ if(!collapse_survive(w,t))kill_target(w,t); break; }                              /* fast rubble (> 18.75 cells/s) kills; a slower graze only stuns */
         if(sp2 > R(76.6) && t->inv <= 0){ t->inv = R(0.8); t->stun = R(0.9); ev(w, EV_OOF, t->x, t->y, 0, RI(t->hp), 0); }
       }
     }
@@ -2236,6 +2279,18 @@ static void load_level(MxWorld *w, int level, int district){
   build(w, level);
   for(int r = 0; r < w->nrooms; r++){ const MxRoom *rm = &w->rooms[r]; for(int y = rm->y; y < rm->y + rm->h; y++) for(int x = rm->x; x < rm->x + rm->w; x++) w->paper[IDX(x, y)] = (uint8_t)(rm->pal + 1); }
   unclip_targets(w);
+  /* Bind each landlord to its ORIGINAL room. Walking/falling must not
+     overwrite this identity; it determines which fallen roof protected him. */
+  for(int i=0;i<w->ntargets;i++){
+    MxTarget *t=&w->targets[i];t->room_id=255;t->collapse_rolled=0;
+    int gx=rfloor(t->x),gy=rfloor(t->y);
+    for(int j=0;j<w->nrooms;j++){
+      const MxRoom *rm=&w->rooms[j];
+      if(gx>=rm->x && gx<rm->x+rm->w && gy>=rm->y-1 && gy<=rm->y+rm->h){
+        t->room_id=(uint8_t)j;break;
+      }
+    }
+  }
   w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = w->pw_left[PW_TURBO] = w->pw_left[PW_QUAKE] = 1;
   w->sand_on = 1;
   /* anything that wouldn't hold at spawn is welded in place, so levels never collapse on load */
@@ -2243,7 +2298,7 @@ static void load_level(MxWorld *w, int level, int district){
   for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active){ settle(w, &w->chunks[c], 1); }
   w->need_support = 0;
   for(int r=0;r<w->nrooms;r++)
-    w->room_frame_init[r]=(uint16_t)paper_frame_support(w,&w->rooms[r]);
+    w->room_frame_orig[r]=w->room_frame_init[r]=(uint16_t)paper_frame_support(w,&w->rooms[r]);
   w->paper_dirty=0;
   next_man(w);
 }
