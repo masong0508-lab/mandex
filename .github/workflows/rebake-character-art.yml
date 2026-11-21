@@ -10,6 +10,8 @@ on:
       - "tools/manhead.py"
       - "tools/gen_manspr.py"
       - "tools/gen_dc_art.py"
+      - "dreamcast/main.c"
+      - "test/dreamcast_wolf_atlas_test.py"
       - ".github/workflows/rebake-character-art.yml"
   workflow_dispatch:
 permissions:
@@ -41,6 +43,7 @@ jobs:
           test -s art/manspr.h
           test -s art/dcart.h
           grep -q 'MS_CANONICAL_TURN_BAKE 1' art/manspr.h
+          grep -q 'shared human rectangles: 0' /tmp/dreamcast-rebake-report.txt
           tail -n 10 /tmp/man-rebake-report.txt
           tail -n 10 /tmp/dreamcast-rebake-report.txt
       - name: Enforce head, hair, profile, wolf and atlas invariants
@@ -48,6 +51,7 @@ jobs:
           set -eu
           python3 test/head_turnaround_test.py
           python3 test/character_turnaround_test.py
+          python3 test/dreamcast_wolf_atlas_test.py
           python3 tools/retouch_baked_heads.py --check
           python3 test/sprite_surface_test.py
           git diff --check
@@ -75,6 +79,7 @@ jobs:
             -lm -o /tmp/rebake-dc-render
           DC_MENU_FLOW_TEST=1 /tmp/rebake-dc-render > /tmp/rebake-dc.log
           grep -q 'Dreamcast menu flow: all passed' /tmp/rebake-dc.log
+          grep -q 'Dreamcast wolf side profile is visibly distinct from the human face' /tmp/rebake-dc.log
       - name: Publish reproducible generated atlas and review previews
         uses: actions/upload-artifact@v4
         with:
