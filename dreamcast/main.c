@@ -965,6 +965,26 @@ static void draw_all(void){
   }
   { static float shown; shown += (world.score - shown) * 0.12f; if(fabsf(world.score - shown) < 0.6f) shown = (float)world.score;
     snprintf(buf, sizeof buf, "%06d", (int)(shown + 0.5f)); text(buf, 634, 27, 14, WHITE, 2, Z_HUD + 0.1f); }
+  /* Final-target-only edge hint: project with the same world camera as
+     the actor, then clip to the unobscured action view. Does not follow
+     world movement when the target is already visible on screen. */
+  if(objective.phase==MX_OBJ_LAST && objective.target_index>=0){
+    const MxTarget *t=&world.targets[objective.target_index];
+    float ox,oy;mx_target_offset(&world,t,&ox,&oy);
+    MxObjectiveEdge edge=mx_objective_edge(
+      (int)X(t->x+ox),(int)Y(t->y+oy),640,480,74,34);
+    if(edge.dir){
+      const char *hint=edge.dir==MX_EDGE_LEFT?"< LAST":
+                       edge.dir==MX_EDGE_RIGHT?"LAST >":
+                       edge.dir==MX_EDGE_UP?"LAST UP":"LAST DOWN";
+      quad((float)edge.x-43,(float)edge.y-13,86,25,Z_HUD+0.06f,
+           argb(15,18,30,222));
+      quad((float)edge.x-43,(float)edge.y-13,86,2,Z_HUD+0.07f,
+           argb(255,126,176,255));
+      text(hint,(float)edge.x,(float)edge.y+5,15,
+           argb(255,126,176,255),1,Z_HUD+0.11f);
+    }
+  }
   text("MEN", 292, 25, 11, argb(190, 190, 190, 255), 0, Z_HUD + 0.1f);
   for(int i = 0; i < world.men; i++) atl(324 + i * 15, 11, 15, 16, DCA_ICON, Z_HUD + 0.1f, WHITE);
   if(world.combo > 1 && world.combo_left > 0){
