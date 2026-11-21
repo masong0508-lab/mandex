@@ -7,6 +7,7 @@ on:
       - "tools/gen_manspr.py"
       - "tools/manhead.py"
       - "tools/retouch_baked_heads.py"
+      - "tools/render_turnaround_sheet.py"
       - "test/head_turnaround_test.py"
       - "test/character_turnaround_test.py"
       - "web/index.html"
@@ -64,6 +65,10 @@ jobs:
             core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_art_review
           DS_PERF_BENCH=1 DS_ART_REVIEW=1 /tmp/mandex_art_review out/art-review/gameplay 520 0 > out/art-review/host-report.txt
           WALK_TEST=3 /tmp/mandex_art_review out/art-review/landlords 900 25 > out/art-review/landlords-report.txt
+          # The contact sheet reads shipped MS_FRAMES, not synthetic mockups.
+          # Human + Wolfman across front, 3/4, side, rear and return turns.
+          python3 tools/render_turnaround_sheet.py out/art-review/character-turnaround.ppm
+          test -s out/art-review/character-turnaround.txt
           find out/art-review -name '*.ppm' -print | head -24
           find out/art-review -name '*.ppm' -print0 | xargs -0 -r python3 tools/ppm_to_png.py
           test -n "$(find out/art-review -name '*.png' -print -quit)"
@@ -74,5 +79,6 @@ jobs:
             out/art-review/*.png
             out/art-review/host-report.txt
             out/art-review/landlords-report.txt
+            out/art-review/character-turnaround.txt
           retention-days: 7
           if-no-files-found: error
