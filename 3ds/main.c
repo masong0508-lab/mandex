@@ -452,6 +452,12 @@ static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
 #ifndef MX_N3DS_ROT_COVERAGE
 #define MX_N3DS_ROT_COVERAGE 1
 #endif
+#ifndef MX_N3DS_ROT_SOURCE_GUARD
+#define MX_N3DS_ROT_SOURCE_GUARD 1
+#endif
+#ifdef MX_N3DS_ROT_WORK_COUNT
+static unsigned man_rot_candidate_pixels,man_rot_sampled_pixels;
+#endif
 static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, float a){
   if(man_fur && fr < MSF_NBASE) fr += MSF_NBASE;
   const MsFrame *f=&MS_FRAMES[fr];
@@ -468,10 +474,24 @@ static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, fl
   float du[4],dv[4];
   for(int k=0;k<4;k++){du[k]=xs[k]*ca+ys[k]*sa;dv[k]=-xs[k]*sa+ys[k]*ca;}
   float mirror=face<0?-1.0f:1.0f;
+  /* Largest inverse-rotated four-tap offset is q*(sqrt(2)/4), plus
+     0.5f for nearest-texel rounding. This slightly padded guard can NEVER
+     reject a visible sample, but avoids four floorf + texel lookups for
+     blank margins of the rotation candidate square. */
+  const float guard=.501f+.354f*q;
   for(int y=y0;y<y1;y++){
     float dy=(y-cy)*q,dx=(x0-cx)*q*mirror;
     float su=dx*ca+dy*sa+f->ax,sv=-dx*sa+dy*ca+f->ay;
     for(int x=x0;x<x1;x++,su+=q*mirror*ca,sv-=q*mirror*sa){
+#ifdef MX_N3DS_ROT_WORK_COUNT
+      man_rot_candidate_pixels++;
+#endif
+#if MX_N3DS_ROT_SOURCE_GUARD
+      if(su< -guard || sv< -guard || su>=f->w+guard || sv>=f->h+guard)continue;
+#endif
+#ifdef MX_N3DS_ROT_WORK_COUNT
+      man_rot_sampled_pixels++;
+#endif
       unsigned r=0,g=0,b=0,n=0;
       for(int k=0;k<4;k++){
         int sx=(int)floorf(su+du[k]+.5f),sy=(int)floorf(sv+dv[k]+.5f);
