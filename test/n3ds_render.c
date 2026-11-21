@@ -288,6 +288,7 @@ static int n3_sprite_volume_probe(void){
   apply_outfit(0);
   unsigned long long occupancy=1469598103934665603ull;
   unsigned filled=0,soft=0,lit=0;
+  unsigned long long rotated_hash=1469598103934665603ull;
   for(int fr=0;fr<MSF_COUNT;fr+=3)for(int face=-1;face<=1;face+=2){
     rect(&top,0,0,400,240,bg);
     blit_frame(&top,fr,200,120,4,face);
@@ -316,6 +317,7 @@ static int n3_sprite_volume_probe(void){
     for(int y=44;y<197;y++)for(int x=144;x<257;x++){
       u8 *p=top.fb+(x*top.h+(top.h-1-y))*3;
       u32 pixel=RGB(p[2],p[1],p[0]);
+      rotated_hash^=pixel;rotated_hash*=1099511628211ull;
       if(pixel==bg)continue;
       int full=0;
       for(int s=0;s<3;s++)for(int i=0;i<MS_NPAL;i++)
@@ -328,6 +330,10 @@ static int n3_sprite_volume_probe(void){
 #endif
   printf("N3_SPRITE_OCCUPANCY %016llx pixels=%u\n",occupancy,filled);
   printf("N3_SPRITE_CONTOURS shaded=%u blended_rotated=%u\n",lit,soft);
+  printf("N3_SPRITE_ROT_HASH %016llx\n",rotated_hash);
+#ifdef MX_N3DS_ROT_WORK_COUNT
+  printf("N3_ROT_WORK candidate=%u sampled=%u\n",man_rot_candidate_pixels,man_rot_sampled_pixels);
+#endif
   return 0;
 }
 int main(int argc, char **argv){
