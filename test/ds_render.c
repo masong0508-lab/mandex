@@ -957,8 +957,85 @@ static int walk_phase_probe(void){
   printf("DS_WALK_PHASE_PASS inputs=%lu exact_float_parity=1\n",count);
   return 0;
 }
+/* Render the real DS rubble painter against three synthetic fragmented
+   building slabs, for both DS cameras and all screen edges. The reference
+   build (MX_DS_CHUNK_VIEW_CULL=0) must hash to EXACTLY the same pixels. */
+static int chunk_visibility_probe(void){
+  static const int ax[]={-220,-130,-90,-60,-25,-4,-1,0,1,48,128,242,255,256,270,310,390};
+  static const int ay[]={-180,-110,-70,-40,-14,-2,0,1,80,180,191,192,200,240,300};
+  unsigned hash=2166136261u,scenes=0,visible=0,offscreen=0;
+  gfx_init();
+  for(int m=1;m<MX_NMAT;m++){
+    MAXHP[m]=mx_material_hp(m);
+#if MX_DS_DAMAGE_THRESH
+    HP_33[m]=MAXHP[m]/3; HP_67[m]=MAXHP[m]*2/3;
+#endif
+  }
+  memset(world.chunks,0,sizeof world.chunks);
+  for(int c=0;c<3;c++){
+    MxChunk *ch=&world.chunks[c];
+    ch->active=1;ch->count=240;ch->x=RI(40+c*7);ch->y=RI(25+c*5);
+    ch->rad=RI(50); /* all fixture cells lie strictly within this radius */
+    for(int k=0;k<ch->count;k++){
+      MxCell *a=&ch->cells[k];
+      a->wx=ch->x+RI(((k*37+c*11)%61)-30);
+      a->wy=ch->y+RI(((k*19+c*7)%53)-26);
+      a->m=(uint8_t)(1+(k+c)%(MX_NMAT-1));
+      a->h=RI(MAXHP[a->m]*(k%4+1)/4); /* pristine, chipped and cracked */
+      a->dead=(uint8_t)(k%19==0);
+    }
+  }
+  /* Vary the world-camera separation and zoom without moving a single cell:
+     this catches partial chunks, isolated edge pixels, and entirely
+     invisible chunks (where the optimized path saves the most work). */
+  for(int ppc=2;ppc<=4;ppc++){
+    for(unsigned x=0;x<sizeof ax/sizeof ax[0];x++)
+    for(unsigned y=0;y<sizeof ay/sizeof ay[0];y++){
+      View view={buf_top,ppc,40*ppc-ax[x],25*ppc-ay[y]};
+      memset(buf_top,0,sizeof buf_top);
+      draw_chunks(&view);
+      unsigned ink=0;
+      for(unsigned i=0;i<sizeof buf_top;i++){
+        hash=(hash^(unsigned)buf_top[i])*16777619u;
+        ink+=(buf_top[i]!=0);
+      }
+      visible+=(ink!=0);offscreen+=(ink==0);scenes++;
+    }
+  }
+  if(!visible||!offscreen){fputs("FAIL: rubble visibility fixture lacks edge cases\n",stderr);return 1;}
+  printf("DS_CHUNK_VIEW_HASH scenes=%u visible=%u offscreen=%u checksum=%08x\n",scenes,visible,offscreen,hash);
+  return 0;
+}
+static int chunk_damage_probe(void){
+  gfx_init();
+  for(int m=1;m<MX_NMAT;m++){
+    MAXHP[m]=mx_material_hp(m);
+#if MX_DS_DAMAGE_THRESH
+    HP_33[m]=MAXHP[m]/3;HP_67[m]=MAXHP[m]*2/3;
+#endif
+  }
+  memset(world.chunks,0,sizeof world.chunks);
+  MxChunk *ch=&world.chunks[0];
+  ch->active=1;ch->count=1;ch->x=RI(25);ch->y=RI(20);ch->rad=RI(2);
+  MxCell *a=&ch->cells[0];
+  a->m=MX_WOOD;a->wx=ch->x;a->wy=ch->y;
+  View view={buf_top,4,0,0};
+  a->h=RI(mx_material_hp(MX_WOOD));
+  memset(buf_top,0,sizeof buf_top);draw_chunks(&view);
+  unsigned pristine=2166136261u;
+  for(unsigned i=0;i<sizeof buf_top;i++)pristine=(pristine^buf_top[i])*16777619u;
+  a->h=RI(1);
+  memset(buf_top,0,sizeof buf_top);draw_chunks(&view);
+  unsigned cracked=2166136261u;
+  for(unsigned i=0;i<sizeof buf_top;i++)cracked=(cracked^buf_top[i])*16777619u;
+  if(pristine==cracked){fputs("FAIL: DS flying rubble lost its cracked variant\n",stderr);return 1;}
+  printf("DS_RUBBLE_DAMAGE_PASS intact=%08x damaged=%08x\n",pristine,cracked);
+  return 0;
+}
 int main(int argc, char **argv){
   if(getenv("DS_PARTICLE_EDGE_PROBE"))return particle_edge_probe();
+  if(getenv("DS_RUBBLE_DAMAGE_PROBE"))return chunk_damage_probe();
+  if(getenv("DS_CHUNK_VIS_PROBE"))return chunk_visibility_probe();
   if(getenv("DS_TARGET_CULL_PROBE"))return target_visibility_probe();
   if(getenv("DS_WALK_PHASE_PROBE"))return walk_phase_probe();
   if(getenv("DS_PARTICLE_PROBE"))return particle_pool_probe();

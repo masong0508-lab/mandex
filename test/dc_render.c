@@ -253,7 +253,30 @@ static int dc_menu_flow_test(void){
   printf(fail?"Dreamcast menu flow: %d FAILED\n":"Dreamcast menu flow: all passed\n",fail);
   return fail!=0;
 }
+/* Hash the precise old-vs-new material damage classifier over a dense
+   spread of fractional HP values around both thresholds and full health.
+   The fast branch may ONLY skip division for truly pristine material. */
+static int dc_damage_fastpath_probe(void){
+  unsigned hash=2166136261u;
+  unsigned bins[3]={0,0,0};
+  for(int m=1;m<MX_NMAT;m++)MAXHP[m]=(float)mx_material_hp(m);
+  for(int m=1;m<MX_NMAT;m++){
+    for(int j=-300;j<=12000;j++){
+      float hp=(float)j*MAXHP[m]/10000.0f;
+      int d=dmg(hp,m);
+      if(d<0||d>2){puts("FAIL: invalid Dreamcast damage stage");return 1;}
+      bins[d]++;
+      hash=(hash^(unsigned)(m*17+j*3+d*113))*16777619u;
+    }
+    if(dmg(MAXHP[m],m)!=0){puts("FAIL: pristine material must remain pristine");return 1;}
+  }
+  if(!bins[0]||!bins[1]||!bins[2]){puts("FAIL: damage probe lacks all three art stages");return 1;}
+  printf("DC_DAMAGE_CLASS_HASH cases=%u intact=%u chipped=%u cracked=%u checksum=%08x\n",
+         bins[0]+bins[1]+bins[2],bins[0],bins[1],bins[2],hash);
+  return 0;
+}
 int main(void){
+  if(getenv("DC_DAMAGE_FASTPATH_PROBE"))return dc_damage_fastpath_probe();
   if(getenv("DC_FASTPATH_PROBE"))return dc_fastpath_probe();
   gfx_init();
   if(getenv("DC_OUTFIT_RECOLOR_PROBE"))return dc_outfit_memory_probe();

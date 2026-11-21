@@ -916,15 +916,53 @@ static void draw_voxels(const View *v){
   }
 }
 
+/* The upper and lower DS cameras can see very different pieces of the
+   collapse. Skip an entire offscreen chunk before walking up to 512 cells;
+   then reject offscreen individual tiles before calling the tile renderer.
+   Bounds use the body's conservative radius plus two tile widths, leaving
+   integer-rounding safety margin. No heap, sprite changes or extra buffers.
+   Disable for a pixel-exact reference build with -DMX_DS_CHUNK_VIEW_CULL=0. */
+#ifndef MX_DS_CHUNK_VIEW_CULL
+#define MX_DS_CHUNK_VIEW_CULL 1
+#endif
+/* Rubble should retain the same health-dependent cracked tile appearance
+   it had while attached to the building; no new palette or texture data. */
+#ifndef MX_DS_RUBBLE_DAMAGE
+#define MX_DS_RUBBLE_DAMAGE 1
+#endif
 static void draw_chunks(const View *v){
-  int h = v->ppc / 2;
-  for(int c = 0; c < MX_MAX_CHUNKS; c++){
-    const MxChunk *ch = &world.chunks[c];
-    if(!ch->active) continue;
-    for(int k = 0; k < ch->count; k++){
-      const MxCell *a = &ch->cells[k];
-      if(a->dead) continue;
-      gfx_tile(v, a->m, 0, k & 1, vx(v, a->wx) - h, vy(v, a->wy) - h);
+  const int ppc=v->ppc, h=ppc/2;
+  for(int c=0;c<MX_MAX_CHUNKS;c++){
+    const MxChunk *ch=&world.chunks[c];
+    if(!ch->active)continue;
+#if MX_DS_CHUNK_VIEW_CULL
+    const int cx=vx(v,ch->x),cy=vy(v,ch->y);
+    const int reach=(ch->rad*ppc>>12)+ppc*2+2;
+    if(cx+reach<=0 || cx-reach>=256 || cy+reach<=0 || cy-reach>=192)
+      continue;
+#endif
+    for(int k=0;k<ch->count;k++){
+      const MxCell *a=&ch->cells[k];
+      if(a->dead)continue;
+#if MX_DS_CHUNK_VIEW_CULL
+      int sx=vx(v,a->wx)-h;
+      if(sx+ppc<=0 || sx>=256)continue;
+      int sy=vy(v,a->wy)-h;
+      if(sy+ppc<=0 || sy>=192)continue;
+#else
+      int sx=vx(v,a->wx)-h,sy=vy(v,a->wy)-h;
+#endif
+#if MX_DS_RUBBLE_DAMAGE
+      const int hp=a->h>>12,mat=a->m;
+#if MX_DS_DAMAGE_THRESH
+      const int damage=hp>HP_67[mat]?0:hp>HP_33[mat]?1:2;
+#else
+      const int damage=hp*3>MAXHP[mat]*2?0:hp*3>MAXHP[mat]?1:2;
+#endif
+#else
+      const int damage=0;
+#endif
+      gfx_tile(v,a->m,damage,k&1,sx,sy);
     }
   }
 }

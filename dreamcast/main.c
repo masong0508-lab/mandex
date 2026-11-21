@@ -563,7 +563,19 @@ static void tile_rot_visible(float cx,float cy,float ca,float sa,int m,int v,int
 #endif
   tile_rot(cx,cy,ca,sa,m,v,d,z);
 }
-static int dmg(float hp, int m){ float r = hp / MAXHP[m]; return r > 0.66f ? 0 : r > 0.33f ? 1 : 2; }
+/* Almost every standing wall tile is undamaged. On Dreamcast, skipping
+   a float division on those tiles saves work in every PVR frame, while all
+   chipped/cracked blocks still use the EXACT original classification. */
+#ifndef MX_DC_FAST_PRISTINE_DAMAGE
+#define MX_DC_FAST_PRISTINE_DAMAGE 1
+#endif
+static int dmg(float hp,int m){
+#if MX_DC_FAST_PRISTINE_DAMAGE
+  if(MAXHP[m]>0.0f && hp>=MAXHP[m])return 0;
+#endif
+  float r=hp/MAXHP[m];
+  return r>0.66f?0:r>0.33f?1:2;
+}
 
 /* chapter 2 kinds: the same sprite, tinted (bat green, thrower blue), mirrored to face his way, plus the club / briefcase / papers / dazed stars */
 static void draw_landlord(float x, float y, float z, const MxTarget *t){
