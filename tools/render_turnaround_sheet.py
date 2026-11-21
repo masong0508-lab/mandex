@@ -58,8 +58,29 @@ def frames():
     assert wanted <= sprites.keys(), f"missing turnaround frames: {wanted - sprites.keys()}"
     return pal, sprites
 
+def wolfman_palette(base):
+    """Read the actual runtime Wolfman fur shades from mx_outfit_skin().
+
+    Otherwise the review sheet falsely paints the Wolfman's skin tan, even
+    though both indexed handheld ports remap palette entries 2..5 to grey.
+    Keep the review sheet tied to production C rather than a copied RGB list.
+    """
+    source = (ROOT / "core" / "mx_meta.c").read_text()
+    match = re.search(
+        r"static\s+const\s+uint8_t\s+FUR\[4\]\[3\]\s*=\s*\{(.*?)\};",
+        source, re.S)
+    assert match, "mx_outfit_skin FUR palette missing from canonical source"
+    shades = [tuple(map(int, row)) for row in re.findall(
+        r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}", match.group(1))]
+    assert len(shades) == 4, "expected four source-code Wolfman fur shades"
+    result = list(base)
+    result[1:5] = shades
+    return result
+
+
 def build(destination: Path):
     pal, sprites = frames()
+    fur_pal = wolfman_palette(pal)
     width, height = len(FORWARD) * CELL_W, len(ROWS) * CELL_H
     rgb = bytearray(bytes(BACKGROUND) * (width * height))
     def put(x, y, c):
@@ -74,11 +95,13 @@ def build(destination: Path):
             rgb[start:stop] = ink * max(0, min(width,x1) - max(0,x0))
     manifest = ["MANDEX — actual compiled console atlas turnaround",
                 "Columns share the same image-space origin at sprite.ax / sprite.ay.",
-                "Same atlas palette, frame bounds and pivots; intentional micro-pinholes filled."]
+                "Wolfman rows show the production grey-fur palette from mx_outfit_skin().",
+                "Same frame bounds and pivots; intentional micro-pinholes filled."]
     for row, (label, names) in enumerate(ROWS):
         manifest.append(f"row {row+1}: {label}")
         for col, name in enumerate(names):
             w, h, ax, ay, px = sprites[name]
+            runtime_palette = fur_pal if name.endswith("_W") else pal
             manifest.append(f"  column {col+1:02d}  {name:16s} {w}x{h}  anchor {ax},{ay}")
             cellx, celly = col * CELL_W, row * CELL_H
             rect(cellx+2, celly+3, cellx+CELL_W-3, celly+CELL_H-4, BASE)
@@ -92,7 +115,7 @@ def build(destination: Path):
                     k = px[py*w+qx]
                     if not k: continue
                     sx, sy = x0 + qx*SCALE, y0 + py*SCALE
-                    c = pal[k-1]
+                    c = runtime_palette[k-1]
                     for yy in range(SCALE):
                         for xx in range(SCALE):
                             put(sx+xx, sy+yy, c)
