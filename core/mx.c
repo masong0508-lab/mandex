@@ -1746,7 +1746,7 @@ static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
   mx_flight_face_update(m);
   if(m->face != -1) m->face = 1;
-  m->mode = MAN_WALK; m->walked = 1; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0;
+  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0;
   m->in_ax = 0; m->in_jump = m->in_punch = m->in_stomp = 0;
   int ok = !wblocked(w, m->x, m->y);
   for(int u = 1; u <= 110 && !ok; u++) if(!wblocked(w, m->x, m->y - PX(u))){ m->y -= PX(u); ok = 1; }
@@ -1820,7 +1820,11 @@ static void walk_step(MxWorld *w, real dt){
   /* Don't count a forced pop-out from rubble as a walking stride. */
   const real stride_start_x=m->x;
   int ax = m->in_ax;
-  if(ax) m->face = (int8_t)ax;
+  if(ax && ax != m->face){ /* gameplay turns immediately; silhouette completes a short back-view turn */
+    m->face=(int8_t)ax;
+    m->turn_ticks=12;
+  } else if(ax) m->face=(int8_t)ax;
+  if(m->turn_ticks) m->turn_ticks--;
   { real tv = ax > 0 ? R(16.875) : ax < 0 ? -R(16.875) : 0, k = rmul(dt, m->gr ? RI(14) : RI(5)); if(k > RI(1)) k = RI(1); m->vx += rmul(tv - m->vx, k); }
   if(m->pCd > 0) m->pCd -= dt;
   if(m->pT > 0) m->pT -= dt;
