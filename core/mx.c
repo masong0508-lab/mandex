@@ -590,13 +590,43 @@ static MX_HOT void wobble_step(MxWorld *w, real dt
   }
 }
 /* once per frame: snap joints that stretched past their break strain, and detect when everything has stopped */
+#ifndef MX_WOB_JOINT_MASK
+#define MX_WOB_JOINT_MASK 1
+#endif
 static void wobble_check(MxWorld *w){
   real maxv = 0, maxo = 0;
   for(int n = 0; n < wob_nact; n++){
-    int i = wob_act[n], x = wob_cx[n], m = w->grid[i];
+    int i = wob_act[n], m = w->grid[i];
     real sv = rabs(w->ovx[i]) + rabs(w->ovy[i]), so = rabs(w->ox[i]) + rabs(w->oy[i]);
     if(sv > maxv) maxv = sv;
     if(so > maxo) maxo = so;
+#if MX_WOB_JOINT_MASK
+    /* wob_list already checked grid presence, boundaries and broken bits
+       for every active voxel. No grid cells or links change during the
+       intervening wobble substeps; only offsets/velocities do. Reuse the
+       exact +X, then +Y pair order and avoid re-testing cold or broken
+       joints. No new arrays or changed spring mathematics. */
+    unsigned nb = wob_nb[n];
+#define MX_CHECK_FORWARD(D, J) do { \
+      const int j = (J), mj = w->grid[j]; \
+      real s = rabs(w->ox[j] - w->ox[i]) + rabs(w->oy[j] - w->oy[i]); \
+      real lim = MATS[m].ymax < MATS[mj].ymax ? MATS[m].ymax : MATS[mj].ymax; \
+      if(s > lim){ \
+        w->brk[i] |= (uint8_t)(1 << (D)); w->brk[j] |= (uint8_t)(1 << ((D) ^ 1)); \
+        dz_touch(w, i); dz_touch(w, j); \
+        w->need_support = 1; \
+        if(w->crack_ev < 4){ \
+          w->crack_ev++; \
+          ev(w, EV_CRACK, RI(wob_cx[n]) + R(0.5) + ((D) == 0 ? R(0.5) : 0), \
+             RI(wob_cy[n]) + R(0.5) + ((D) == 2 ? R(0.5) : 0), m, s, 0); \
+        } \
+      } \
+    } while(0)
+    if(nb & 1u) MX_CHECK_FORWARD(0, i + 1);
+    if(nb & 4u) MX_CHECK_FORWARD(2, i + MX_COLS);
+#undef MX_CHECK_FORWARD
+#else
+    int x = wob_cx[n];
     for(int d = 0; d < 3; d += 2){                       /* each joint once: +x and +y */
       int j = d == 0 ? (x + 1 < MX_COLS ? i + 1 : -1) : i + MX_COLS;
       if(j < 0 || ((w->brk[i] >> d) & 1)) continue;
@@ -611,6 +641,7 @@ static void wobble_check(MxWorld *w){
         if(w->crack_ev < 4){ int y = i / MX_COLS; w->crack_ev++; ev(w, EV_CRACK, RI(x) + R(0.5) + (d == 0 ? R(0.5) : 0), RI(y) + R(0.5) + (d == 2 ? R(0.5) : 0), m, s, 0); }
       }
     }
+#endif
   }
   if(maxv < R(0.6) && maxo < R(0.03)){
     if(++w->wob_quiet > 20){
