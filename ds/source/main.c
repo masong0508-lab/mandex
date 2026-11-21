@@ -896,14 +896,15 @@ static void draw_chunks(const View *v){
 #ifndef MX_DS_INTEGER_WALK_PHASE
 #define MX_DS_INTEGER_WALK_PHASE 1
 #endif
-/* The DS ARM9 has no FPU. Walking distance is a positive 20.12 fixed-point
-   accumulator; multiplying its whole and fractional parts by 14 avoids
-   float conversion and software floating-point multiplication per landlord.
-   Both terms stay in 32 bits even at the representable distance limit.
-   Keep the original path as a compile-time A/B reference. */
+/* The DS ARM9 has no FPU. Distance is 20.12 fixed point. For the
+   ordinary 0..480-cell travel range, the integer split is pixel-identical
+   to the original float expression for every representable input; see the
+   exhaustive DS_WALK_PHASE_PROBE host regression. Beyond that range the
+   original floating-point rounding is retained for strict visual parity. */
 static int ds_target_walk_phase(real wk){
 #if MX_DS_INTEGER_WALK_PHASE
-  if(wk >= 0) return (wk >> 12)*14 + (((wk & 4095)*14) >> 12);
+  if((unsigned)wk < (unsigned)RI(480))
+    return (wk >> 12)*14 + (((wk & 4095)*14) >> 12);
 #endif
   return (int)(RTOF(wk)*14.0f);
 }
