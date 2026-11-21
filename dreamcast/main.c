@@ -668,7 +668,10 @@ static void draw_all(void){
     const MxTarget *t = &world.targets[i];
     if(!t->alive) continue;
     float wx, wy; mx_target_offset(&world, t, &wx, &wy);
-    draw_landlord(X(t->x + wx), Y(t->y + wy) + (t->mv ? 0.0f : sinf(world.time * 5 + t->t) * 0.5f), Z_TARGET, t);
+    float tx=X(t->x+wx),ty=Y(t->y+wy)+(t->mv?0.0f:sinf(world.time*5+t->t)*0.5f);
+    draw_landlord(tx,ty,Z_TARGET,t);
+    if(t->collapse_rolled==2) /* survivor remains an objective after smoke fades */
+      text("!",tx,ty-44,18,argb(255,210,63,255),1,Z_TARGET+0.75f);
   }
   /* briefcases in the air (Batter Up) and the pink bounce pads of the walk levels */
   for(int i = 0; i < MX_MAX_CASES; i++){
