@@ -136,6 +136,8 @@ echo "--- 3DS cutscenes (shared with the DS) ---"
 gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_intro.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_intro && ./n3ds_intro | grep -v "^ok:"
 echo "--- Landlord HQ: three districts in turn (float and fixed core) ---"
 for m in "" "-DMX_FIXED"; do gcc -std=c99 -O2 -Wall $m -I../core ../core/mx.c hq_test.c -lm -o hq_test && ./hq_test | grep -v "^ok:"; done
+echo "--- triangle span reference: original rectangle path must retain identical pixels ---"
+gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_TRI_SPAN=0 -Istubs -I../core -I../ds/source -I../art gfx_clip_test.c ../ds/source/gfx.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o gfx_tri_reference && ./gfx_tri_reference
 echo "--- offscreen art culling: ellipses / triangles / dither match reference pixels ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -Istubs -I../core -I../ds/source -I../art gfx_clip_test.c ../ds/source/gfx.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o gfx_clip_test && ./gfx_clip_test
 echo "--- text drawing is pixel-identical to the reference ---"
