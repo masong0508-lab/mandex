@@ -977,11 +977,12 @@ static void draw_all(void){
       const char *hint=edge.dir==MX_EDGE_LEFT?"< LAST":
                        edge.dir==MX_EDGE_RIGHT?"LAST >":
                        edge.dir==MX_EDGE_UP?"LAST UP":"LAST DOWN";
-      quad((float)edge.x-43,(float)edge.y-13,86,25,Z_HUD+0.06f,
+      int cx=edge.x<44?44:edge.x>596?596:edge.x;
+      quad((float)cx-43,(float)edge.y-13,86,25,Z_HUD+0.06f,
            argb(15,18,30,222));
-      quad((float)edge.x-43,(float)edge.y-13,86,2,Z_HUD+0.07f,
+      quad((float)cx-43,(float)edge.y-13,86,2,Z_HUD+0.07f,
            argb(255,126,176,255));
-      text(hint,(float)edge.x,(float)edge.y+5,15,
+      text(hint,(float)cx,(float)edge.y+5,15,
            argb(255,126,176,255),1,Z_HUD+0.11f);
     }
   }
