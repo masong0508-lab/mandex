@@ -173,7 +173,7 @@ typedef struct {
   real x, y, vx, vy, t, gt, hitCd, gooT, ang;
   /* walk levels: after the flight he lands on his feet (MAN_WALK).  Input comes from mx_walk_input(); wt = seconds left, pT = punch animation left, hurtCd = ouch immunity.
      stun: in the sling, a briefcase hit leaves him dazed (aim is locked) for this long. */
-  int8_t face; uint8_t gr, stomp, walked;
+  int8_t face; uint8_t gr, stomp, walked, turn_ticks; /* 12-tick cosmetic side/back/side reverse */
   real wt, pT, pCd, padCd, hurtCd, stun;
   real gait;            /* cosmetic ground distance, modulo 4 cells; no renderer memory or save data */
   int8_t in_ax; uint8_t in_jump, in_punch, in_stomp;
@@ -205,8 +205,21 @@ static inline int mx_walk_anim_phase(const MxMan *m){
 }
 /* Half-stride lift: continuous 0 -> peak -> 0 in each two-cell step,
    aligned to the EXISTING side-profile sprites. No stored animation state. */
+/* A turn follows the existing 15-degree sprite atlas through the back:
+   facing old direction: 105,135,165 degrees; new: 195,225,255.
+   One frame per two simulation ticks, no overlay sprite or extra bitmap. */
+static inline int mx_walk_turn_offset(const MxMan *m){
+  if(!m->turn_ticks || m->mode!=MAN_WALK) return 0;
+  int step=(12-(int)m->turn_ticks)/2;
+  if(step<0)step=0;
+  if(step>5)step=5;
+  return step<3?1+2*step:1+2*(5-step);
+}
+static inline int mx_walk_render_face(const MxMan *m){
+  return m->turn_ticks>6 && m->mode==MAN_WALK?-m->face:m->face;
+}
 static inline real mx_walk_foot_lift(const MxMan *m){
-  if(mx_walk_anim_phase(m)<0) return 0;
+  if(m->turn_ticks || mx_walk_anim_phase(m)<0) return 0;
   real g=m->gait;
   if(g>=RI(2)) g-=RI(2);
   if(g>RI(1)) g=RI(2)-g;
