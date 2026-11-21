@@ -125,6 +125,7 @@ for(const height of [760,960,1170]){
 assert(html.includes('WEB_UI.gesture={id:e.pointerId,x,y,screen:state}'),
  'portrait menu activation must defer to pointerup so swipes do not fire buttons');
 assert(html.includes('mobileEditorToWorld(x,y)') &&
-       html.includes('mobileEditorToWorld(mx,clamp(my,0,WEB_UI.editorHeight))'),
- 'portrait paint input is transformed for both touch-down and move');
+       html.includes('mobileEditorToWorld(mx,my)') &&
+       html.includes('my<WEB_UI.editorHeight'),
+ 'portrait paint input is transformed and never writes while dragging across toolbar');
 console.log('WEB_ORIENTATION_PASS responsive_canvas=1 portrait_editor=1 ratio_pointer=1 touch_controls='+total);
