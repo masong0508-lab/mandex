@@ -1336,9 +1336,10 @@ static void draw_hud(const View *camera){
         const char *word=edge.dir==MX_EDGE_LEFT?"< LAST":
                          edge.dir==MX_EDGE_RIGHT?"LAST >":
                          edge.dir==MX_EDGE_UP?"LAST UP":"LAST DOWN";
-        rect(&top,edge.x-29,edge.y-9,58,18,RGB(18,24,42));
-        rect(&top,edge.x-29,edge.y-9,58,2,RGB(255,126,176));
-        textc(&top,edge.x,edge.y-4,word,1,RGB(255,126,176));
+        int cx=edge.x<30?30:edge.x>370?370:edge.x;
+        rect(&top,cx-29,edge.y-9,58,18,RGB(18,24,42));
+        rect(&top,cx-29,edge.y-9,58,2,RGB(255,126,176));
+        textc(&top,cx,edge.y-4,word,1,RGB(255,126,176));
       }
     }
   }
