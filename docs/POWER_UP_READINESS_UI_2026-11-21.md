@@ -27,3 +27,7 @@ Short power descriptions refer to actual mechanics: BEANS → mid-air jet, TOWEL
 ### Cross-port build correction
 
 The `PW_*` inventory identifiers and `MX_TOOL_*` starting-option identifiers do not have identical numeric values: `MX_TOOL_VALVE` occupies an option index but is not consumable inventory. The original `mx_tool_name()` is declared externally by `mx_meta.h` for options. This UI now uses a distinct, header-only `mx_power_name()` for live `PW_*` inventory labels, so the DS/Dreamcast/3DS translation units can include both headers without linkage conflicts or mistakenly labeling a selected power. The host feedback test includes both public headers to catch future collisions. This correction is UI-only; it does not change any save indices, charges or simulation behavior.
+
+### Native pre-merge console builds
+
+Before this change only the DS toolchain built on pull requests. The separate 3DS workflow now compiles `mandex.3dsx` and checks its ELF and payload on PRs that touch 3DS, shared core or art; the existing Dreamcast experimental native build additionally runs for relevant PRs. The repository's main-branch ROMs packaging remains unchanged. Native compilation alone is not a gameplay or hardware FPS test.

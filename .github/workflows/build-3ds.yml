@@ -1,0 +1,35 @@
+name: Build Nintendo 3DS (pull request)
+
+# ROMs.yml packages 3DS on main; this fast native compile catches regressions
+# on proposed core/3DS changes *before* merging them.
+on:
+  pull_request:
+    paths: ["3ds/**", "core/**", "art/**", ".github/workflows/build-3ds.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  n3ds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Mandex 3DS homebrew
+        run: |
+          export DEVKITPRO=${DEVKITPRO:-/opt/devkitpro}
+          export DEVKITARM=${DEVKITARM:-$DEVKITPRO/devkitARM}
+          [ -f "$DEVKITPRO/libctru/include/3ds.h" ] || dkp-pacman -S --noconfirm 3ds-dev
+          make -C 3ds
+          test -s 3ds/mandex.3dsx
+          test -s 3ds/mandex.elf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-3ds-pr
+          path: |
+            3ds/mandex.3dsx
+            3ds/mandex.elf
+          if-no-files-found: error
