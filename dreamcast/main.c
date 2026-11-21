@@ -135,6 +135,10 @@ static void use(const pvr_poly_hdr_t *h){ if(cur_hdr != h){ pvr_prim((void *)h, 
 
 static pvr_ptr_t load_tex(const unsigned short *rle, int rle_len, int w, int h){
   unsigned short *tmp = (unsigned short *)malloc((size_t)w * h * 2);
+  /* Especially relevant when restoring the 1 MB title after a long game:
+     a failed SH-4 system-RAM scratch allocation must show fallback text,
+     not dereference NULL and hang the whole console. */
+  if(!tmp) return 0;
   size_t n = 0, tot = (size_t)w * h;
   for(int i = 0; i + 1 < rle_len && n < tot; i += 2){ unsigned cnt = rle[i]; unsigned short v = rle[i + 1]; while(cnt-- && n < tot) tmp[n++] = v; }
   pvr_ptr_t p = pvr_mem_malloc((size_t)w * h * 2);
@@ -1000,8 +1004,12 @@ int main(int argc, char **argv){
         else if(pressed & CONT_X){nofight=!nofight;mx_set_fight(&world,!nofight);dc_save_sync();}
         else if(pressed & CONT_B)mus_pref=!mus_pref;
       } else {
+        /* START and Y are exclusive navigation actions. Previously START
+           could pause while a simultaneous A/B press still fired the sling,
+           and a Y restart could launch the fresh level immediately. */
         if(pressed & CONT_START) paused = 1;
-        if(pressed & CONT_Y) load_level(world.level);
+        else if(pressed & CONT_Y) load_level(world.level);
+        if(!paused && !(pressed & CONT_Y)){
         if(world.man.mode == MAN_AIM){
           world.valve_ok = dc_valve_equipped && mx_valve_unlocked(&stats);
           float jx = st->joyx / 127.0f, jy = st->joyy / 127.0f;
@@ -1034,7 +1042,11 @@ int main(int argc, char **argv){
           mx_walk_input(&world, ax, (st->buttons & (CONT_A | CONT_DPAD_UP)) != 0 || st->joyy < -90, (st->buttons & CONT_B) != 0, (st->buttons & (CONT_X | CONT_DPAD_DOWN)) != 0 || st->joyy > 90);
           { static int lwas; int l = st->ltrig > 128; if(l && !lwas) mx_walk_quit(&world); lwas = l; }
         } else if(pressed & (CONT_A | CONT_B)) mx_dive(&world);
+        }
       }
+    }else{
+      /* Controller removal/replug must not retain the last pressed edge. */
+      prev=0;prev_trig=0;
     }
     if(on_title){ title_t++; }
     else if(!paused){
