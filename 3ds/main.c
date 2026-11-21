@@ -322,9 +322,17 @@ static void on_events(void){
     case EV_CRACK: for(int k = 0; k < 2; k++) spawn(x, y, (rand() % 9 - 4) * .1f, -(.2f + (rand() % 5) * .1f), 17, RGB(185, 170, 148)); break;
     case EV_THUD: if(e->a > R(0.6)) for(int k = 0; k < 4; k++)
       spawn(x, y, (rand() % 11 - 5) * .22f, -(rand() % 8) * .12f, 20, RGB(178, 165, 139)); break;
-    case EV_CRUMBLE:
-      for(int k = 0; k < 8; k++) spawn(x + (rand() % 9 - 4), y, (rand() % 11 - 5) * .14f, -(rand() % 8) * .14f, 22, RGB(178, 165, 139));
-      popup(x, y - 4, "CRUMBLE!", RGB(255, 210, 63)); break;
+    case EV_CRUMBLE: {
+      const int tier=mx_crumble_tier(e->a), n=8+2*tier;
+      for(int k=0;k<n;k++)
+        spawn(x+(rand()%9-4),y,(rand()%11-5)*.14f,-(rand()%8)*.14f,22,RGB(178,165,139));
+      /* Two starbursts at the centre read as a falling facade, without a
+         second particle array or added framebuffer/stereo allocations. */
+      if(tier>=2)
+        for(int k=0;k<2*tier;k++)
+          spawn_k(x+(k-tier)*2,y-3,(float)(k-tier)*.17f,-.4f,18,RGB(255,210,63),2);
+      popup(x,y-4,tier>=2?"BUILDING DOWN!":"CRUMBLE!",RGB(255,210,63));
+      break; }
     case EV_SPLAT: for(int k = 0; k < 12; k++) spawn(x, y, (rand() % 15 - 7) * .3f, -(rand() % 9) * .3f, 30, RGB(110, 255, 90)); break;
     case EV_TUBE: { static const u32 TC[3] = { RGB(255, 154, 60), RGB(79, 208, 255), RGB(140, 255, 90) };        /* posted through a pneumatic tube */
       for(int k = 0; k < 16; k++){ float an = k * .39f; spawn(x, y, cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); spawn(RTOF(e->a), RTOF(e->b), cosf(an) * 3, sinf(an) * 3, 26, TC[e->m % 3]); }
