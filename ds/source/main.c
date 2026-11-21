@@ -388,11 +388,18 @@ static void on_events(void){
       spawn_ring(e->x, e->y, 11, C_GOO); spawn_ring(e->x, e->y, 8, C_WHITE);
       sfx_play(SFX_SPLAT, pan); popup(e->x, e->y - RI(4), "SPLOOSH!", C_GOO); ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
       break;
-    case EV_CRUMBLE: {                                      /* the run is over and the damaged walls give way (core aftershock) */
-      for(int k = 0; k < 8; k++) spawn(PT_DUST, e->x + RI(rnd(9) - 4), e->y + RI(rnd(7) - 3), rnd(11) - 5, -rnd(6), 0, 24 + rnd(14));
-      sfx_play(SFX_THUD, pan); sfx_play(SFX_CRACK, pan);
-      popup(e->x, e->y - RI(4), "CRUMBLE!", C_GOLD);
-      ev_fx = e->x; ev_fy = e->y; ev_ft = 60;
+    case EV_CRUMBLE: {                                      /* scale visual feedback with the number of cracked blocks */
+      int tier=mx_crumble_tier(e->a);
+      int dust=8+2*tier; /* never more than 14 particles */
+      for(int k=0;k<dust;k++)
+        spawn(PT_DUST,e->x+RI(rnd(9)-4),e->y+RI(rnd(7)-3),rnd(11)-5,-rnd(6),0,24+rnd(14));
+      if(tier>=2){ /* a legible outward shock ring, using the existing pool */
+        spawn_ring(e->x,e->y,11+2*tier,C_GOLD);
+        spawn_ring(e->x,e->y,7+tier,C_WHITE);
+      }
+      sfx_play(SFX_THUD,pan);sfx_play(SFX_CRACK,pan);
+      popup(e->x,e->y-RI(4),tier>=2?"BUILDING DOWN!":"CRUMBLE!",C_GOLD);
+      ev_fx=e->x;ev_fy=e->y;ev_ft=60+8*tier;
       break; }
     case EV_DISTRICT:                                       /* Landlord HQ: the next district is built in the same grid, with fresh men */
       cells0 = mx_cells_left(&world); dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts); part_high_water = 0; memset(pops, 0, sizeof pops); ev_ft = 0;
