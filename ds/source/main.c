@@ -347,7 +347,7 @@ static void on_events(void){
       spawn(PT_HAT, e->x, e->y - RI(3), rnd(9) - 4, -22, 0, 90);
       sfx_play(SFX_TARGET, pan);
       ev_fx = e->x; ev_fy = e->y; ev_ft = 90;
-      popup(e->x, e->y - RI(4), e->m > 1 ? mx_combo_taunt(e->m) : WORDS[rnd(4)], e->m > 1 ? C_PINK : C_GOLD);
+      popup(e->x, e->y - RI(4), e->b > 0 ? "BANK SHOT!" : e->m > 1 ? mx_combo_taunt(e->m) : WORDS[rnd(4)], e->b > 0 || e->m > 1 ? C_PINK : C_GOLD);
       break; }
     case EV_LAUNCH: sfx_play(SFX_LAUNCH, pan); dragging = 0; break;
     case EV_DIVE:   sfx_play(SFX_DIVE, pan); break;
