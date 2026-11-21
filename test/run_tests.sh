@@ -50,6 +50,8 @@ echo "--- Browser walk physics parity, reusable touch controls and character-det
 if command -v node >/dev/null 2>&1;then node browser_walk_memory_test.js;fi
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
 if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
+echo "--- Browser editor: real pointer events and touch cancellation ---"
+if command -v node >/dev/null 2>&1;then node browser_editor_pointer_events_test.js;fi
 echo "--- Browser editor: isolate painting to owning pointer ---"
 if command -v node >/dev/null 2>&1;then node browser_editor_touch_isolation_test.js;fi
 echo "--- Browser creator: starter structures, undo/redo, mobile actions ---"

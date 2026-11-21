@@ -12,3 +12,6 @@ Two fingers could move or finish the same editor brush/rectangle stroke; a secon
 
 ## Tests
 `test/browser_editor_touch_isolation_test.js` extracts the **real production stroke code** and checks owner-only completion, foreign touches, rectangle cancellation and runtime event wiring. Fast GitHub CI runs this alongside existing portrait and multitouch regressions. Real-device acceptance still needed (Android two-finger drag, rotation, browser system interruption and stylus).
+
+## Event-handler integration regression
+`node test/browser_editor_pointer_events_test.js` now registers and dispatches the **shipped browser's actual pointerdown, pointermove, pointerup, pointercancel and lostpointercapture handlers**. It checks two-finger ownership, cancellation, single rectangle commit, portrait-to-world coordinate translation, and that toolbar or picker touches cannot paint. This supplements the focused helper-unit tests and runs in both the fast CI workflow and full host suite.

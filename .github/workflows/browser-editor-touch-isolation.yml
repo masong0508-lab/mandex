@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run owner-only editor stroke tests
         run: node test/browser_editor_touch_isolation_test.js
+      - name: Dispatch real browser pointer handlers with two fingers
+        run: node test/browser_editor_pointer_events_test.js
       - name: Validate mobile orientation and multitouch
         run: |
           node test/browser_multitouch_test.js
