@@ -115,6 +115,13 @@ void gfx_line(u8 *b, int x0, int y0, int x1, int y1, u8 c){
   }
 }
 
+/* A triangle has already clipped its y-range to visible scanlines. Its
+   spans can use the narrower span writer instead of calling the general
+   rectangle clipper for every row. Shares the exact same inclusive pixels
+   with the old rectangle path; keep a compile-time reference for A/B. */
+#ifndef MX_DS_TRI_SPAN
+#define MX_DS_TRI_SPAN 1
+#endif
 void gfx_tri(u8 *b, int x0, int y0, int x1, int y1, int x2, int y2, u8 c){
   int t;
   if(y1 < y0){ t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
@@ -124,7 +131,11 @@ void gfx_tri(u8 *b, int x0, int y0, int x1, int y1, int x2, int y2, u8 c){
     int a = x0 < x1 ? x0 : x1, e = x0 > x1 ? x0 : x1;
     if(x2 < a) a = x2;
     if(x2 > e) e = x2;
+    #if MX_DS_TRI_SPAN
+    hspan(b, a, e, y0, c);
+#else
     gfx_rect(b, a, y0, e - a + 1, 1, c);
+#endif
     return;
   }
   /* Skip triangle scanlines outside the framebuffer, preserving the exact
@@ -135,7 +146,11 @@ void gfx_tri(u8 *b, int x0, int y0, int x1, int y1, int x2, int y2, u8 c){
     if(y < y1) xb = x0 + (x1 - x0) * (y - y0) / (y1 - y0);
     else xb = y2 == y1 ? x1 : x1 + (x2 - x1) * (y - y1) / (y2 - y1);
     if(xa > xb){ t = xa; xa = xb; xb = t; }
+    #if MX_DS_TRI_SPAN
+    hspan(b, xa, xb, y, c);
+#else
     gfx_rect(b, xa, y, xb - xa + 1, 1, c);
+#endif
   }
 }
 
