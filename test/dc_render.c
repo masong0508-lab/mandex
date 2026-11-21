@@ -230,6 +230,35 @@ static int dc_menu_flow_test(void){
   MENU_CHECK(punch!=contact && punch!=empty,
              "Dreamcast punch anticipation changes real rendered pixels");
   world.man.pT=0;
+  /* Run the real collapse event handler at all four damage tiers. A wide
+     facade should be legible, not fourteen particles stacked at one point.
+     No new particle capacity is allocated; every event remains bounded. */
+  for(int tier=0;tier<4;tier++){
+    memset(parts,0,sizeof parts);part_high_water=0;
+#if MX_DC_PARTICLE_HINT
+    part_free_hint=0;
+#endif
+    world.nev=1;
+    world.ev[0]=(MxEvent){EV_CRUMBLE,0,RI(50),RI(25),
+                           RI(tier==0?1:tier==1?8:tier==2?24:48),0};
+    handle_events();
+    int n=8+2*tier;
+    MENU_CHECK(part_high_water==n,
+               "Dreamcast collapse keeps bounded particle counts at each severity");
+    float left=parts[0].x,right=parts[0].x,top_y=parts[0].y,low_y=parts[0].y;
+    for(int k=1;k<n;k++){
+      if(parts[k].x<left)left=parts[k].x;
+      if(parts[k].x>right)right=parts[k].x;
+      if(parts[k].y<top_y)top_y=parts[k].y;
+      if(parts[k].y>low_y)low_y=parts[k].y;
+    }
+    MENU_CHECK(right-left>0.1f && low_y-top_y>0.1f,
+               "Dreamcast collapse debris covers both facade width and height");
+  }
+  world.nev=0;memset(parts,0,sizeof parts);part_high_water=0;
+#if MX_DC_PARTICLE_HINT
+  part_free_hint=0;
+#endif
   on_title=1;title_t=0;title_lv=0;nofight=0;cur_hdr=0;
   memset(fb,0,sizeof fb);draw_title();
   unsigned before=dc_hash(fb,sizeof fb);
