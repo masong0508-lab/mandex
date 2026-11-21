@@ -821,6 +821,9 @@ static void draw_street_dressing(const View *v){
   gfx_text(v->buf, x+7, y-8*p+2, p >= 3 ? "RENT?" : "NO", C_RED2, 1);
 }
 
+#ifndef MX_DS_VOXEL_EMPTY4
+#define MX_DS_VOXEL_EMPTY4 1
+#endif
 static void draw_voxels(const View *v){
   int ppc = v->ppc, wob = world.wob_on;
   int x0 = v->cx > 0 ? v->cx / ppc : 0, x1 = (v->cx + 256) / ppc + 1; if(x1 > MX_COLS) x1 = MX_COLS;
@@ -829,6 +832,17 @@ static void draw_voxels(const View *v){
     const uint8_t *row = &world.grid[y * MX_COLS];
     int py = y * ppc - v->cy;
     for(int x = x0; x < x1; x++){
+#if MX_DS_VOXEL_EMPTY4
+      /* Skip four absent masonry tiles with one safe word read, but only
+         on aligned column groups wholly inside the camera's tile range.
+         memcpy handles any struct alignment and preserves all occupied
+         tiles, their original order, damage marks and wobble offsets. */
+      if(!(x & 3) && x + 4 <= x1){
+        u32 group;
+        memcpy(&group, row + x, sizeof group);
+        if(!group){ x += 3; continue; }
+      }
+#endif
       int m = row[x];
       if(!m) continue;
       int i = y * MX_COLS + x, hp = world.hp[i] >> 12;
