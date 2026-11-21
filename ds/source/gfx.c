@@ -724,6 +724,10 @@ static void blit_frame_rot(u8 *b, const MsFrame *fr, int x, int y, int ppc, int 
     if(!jl && ss==256 && st==256){
       int numer_u=col0*cs+j*sn, numer_v=j*cs-col0*sn;
       for(int i=col0;i<=col1;i++,numer_u+=cs,numer_v-=sn){
+#if !MX_DS_CLIP_ROT
+        /* Honor the legacy unclipped reference mode, too. */
+        if((unsigned)(x+i)>=256u)continue;
+#endif
         int u=(numer_u>>12)+ax, v=(numer_v>>12)+ay;
         if(u<0 || v<0)continue;
         int sx=(u*inv)>>12,sy=(v*inv)>>12;
