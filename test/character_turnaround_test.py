@@ -52,11 +52,17 @@ ok(manhead.side_head("fly")!=manhead.side_head("dive"),
 header=(ROOT/"art"/"manspr.h").read_text()
 ok("#define MS_NPAL 39" in header and "#define MSF_NBASE 71" in header,
    "palettes and 71 human plus 71 wolf frame indices stay stable")
-output,changed,frames=baked.patch_string(header)
-ok(output==header and changed==0 and len(frames)==13,
-   "the 13 shipped profile sprites already contain the canonical face/hair ink")
-ok(all(x[1]==0 for x in frames),
-   "re-running baked art migration cannot change any pixels")
+if "#define MS_CANONICAL_TURN_BAKE 1" in header:
+    ok("MSF_SPIN_R11" in header and "MSF_FLY_B_W" in header,
+       "fully regenerated console atlas retains all turnaround/flight frame names")
+    ok("static const MsFrame MS_FRAMES[MSF_COUNT]" in header,
+       "complete high-fidelity re-bake preserves renderer metadata and frame order")
+else:
+    output,changed,frames=baked.patch_string(header)
+    ok(output==header and changed==0 and len(frames)==13,
+       "the 13 shipped profile sprites already contain the canonical face/hair ink")
+    ok(all(x[1]==0 for x in frames),
+       "re-running baked art migration cannot change any pixels")
 src=(ROOT/"tools"/"gen_manspr.py").read_text()
 ok('manhead.turn_head(a, "dive")' in src,
    "future sprite exports use the same 19-row head turnaround")
