@@ -902,7 +902,14 @@ function manPlow(){
     for(const a of ch.cells){if(a.dead||Math.hypot(a.wx-m.x,a.wy-m.y)>=R+RC)continue;touched=true;hit=true;ax+=a.wx;ay+=a.wy;n++;const cost=a.h*K;
       if(E>=cost){E-=cost;a.dead=true;const c=MAT[a.m].c;for(let k=0;k<2;k++)chip(a.wx,a.wy,c,m.vx*.25+(rnd()-.5)*200,m.vy*.25-rnd()*150)}else{a.h-=E/K;E=0}}
     if(hit&&ch.hitCd<=0){ch.hitCd=.12;applyImpulse(ch,ax/n,ay/n,m.vx*mass*.9,m.vy*mass*.9)}}
-  for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<R+t.r+2&&!batBlock(t,m))killTarget(t,false,true);
+  /* Man-target proximity is checked for every flight substep. Squared
+     distance avoids a square root for each landlord without sacrificing
+     collision radius, target count, graphics or physics timestep. */
+  for(const t of targets){
+    if(!t.alive)continue;
+    const dx=t.x-m.x,dy=t.y-m.y,reach=R+t.r+2;
+    if(dx*dx+dy*dy<reach*reach&&!batBlock(t,m))killTarget(t,false,true);
+  }
   if(touched){const spent=E0-E,sc=spent/64;
     if(sc>20){const f=Math.min(.55,sc/2400);wobKick(Math.floor(m.x/V),Math.floor(m.y/V),5,m.vx/V*f,m.vy/V*f)}   // what the man gave up is shoved into the structure
     if(spent>2000&&m.hitCd<=0){m.hitCd=.06;SFX.crunch(Math.min(1,spent/160000));shake=Math.max(shake,Math.min(9,spent/28000));spark(m.x,m.y,4,200);dust(m.x,m.y,2,9)}
