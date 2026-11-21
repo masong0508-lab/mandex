@@ -4645,7 +4645,7 @@ function drawMobileSelect(){
   const labels=['STORY','MY LEVELS','CHAPTER 2','CHAPTER 3'],tabs=[0,1,2,3];
   for(let i=0;i<4;i++)mobileTab(12+(i%2)*264,101,252,labels[i],
     ()=>{selTab=tabs[i];WEB_UI.page.select=0},selTab===tabs[i]);
-  const items=mobileSelectItems(),top=208,rh=78,rowGap=8,cols=2,
+  const items=mobileSelectItems(),top=208,rh=94,rowGap=8,cols=2,
     visibleRows=Math.max(2,Math.floor((H-top-94)/(rh+rowGap))),size=visibleRows*cols,
     page=mobilePage('select',items.length,size),start=page*size;
   for(let j=start;j<Math.min(items.length,start+size);j++){
@@ -4655,9 +4655,9 @@ function drawMobileSelect(){
         {size:it.label.length>19?12:15,on:!it.locked&&it.stars>=2});
     if(!it.locked&&it.stars)txt('★'.repeat(it.stars),x+126,y+rh-8,15,'#ffd23f','center');
     if(it.custom&&it.i!=null){
-      btn(x+4,y+rh-31,76,26,'EDIT',()=>openEditor(false,it.i),{size:12});
-      btn(x+86,y+rh-31,70,26,'SHARE',()=>exportCode(PD.custom[it.i]),{size:12});
-      btn(x+162,y+rh-31,84,26,'DELETE',()=>{if(confirmDel(PD.custom[it.i])){PD.custom.splice(it.i,1);pdTouch();pdSave()}},{size:11});
+      btn(x+4,y+rh-44,76,40,'EDIT',()=>openEditor(false,it.i),{size:12});
+      btn(x+86,y+rh-44,70,40,'SHARE',()=>exportCode(PD.custom[it.i]),{size:12});
+      btn(x+162,y+rh-44,84,40,'DELETE',()=>{if(confirmDel(PD.custom[it.i])){PD.custom.splice(it.i,1);pdTouch();pdSave()}},{size:11});
     }
   }
   mobilePager('select',items.length,size);
