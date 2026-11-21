@@ -1,0 +1,34 @@
+name: Browser editor paint integrity and preflight
+on:
+  pull_request:
+    paths:
+      - "web/index.html"
+      - "test/browser_creator_paint_test.js"
+      - ".github/workflows/browser-editor-paint.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/index.html"
+      - "test/browser_creator_paint_test.js"
+      - ".github/workflows/browser-editor-paint.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  editor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Paint cancellation, target allocations and explicit preflight
+        run: node test/browser_creator_paint_test.js
+      - name: Share codec and valid starter builds
+        run: |
+          node test/browser_creator_codec_test.js
+          node test/browser_creator_starters_test.js
+      - name: Editor pointer ownership and responsive controls
+        run: |
+          node test/browser_editor_pointer_events_test.js
+          node test/browser_editor_touch_isolation_test.js
+          node test/browser_orientation_test.js
