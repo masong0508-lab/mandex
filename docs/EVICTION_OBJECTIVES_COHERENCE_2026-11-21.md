@@ -16,3 +16,18 @@
 - `test/browser_objective_test.js`: parity for those cases, mobile/desktop HUD placement, actual browser JavaScript parsing.
 - Both are part of `test/run_tests.sh`. Console compilation and screenshot review must confirm the new status fits without obscuring action.
 - In-game guidance is read-only: a last-target direction is only displayed when exactly one living landlord remains; location accuracy is based on logical world x, not the camera center.
+
+## Last-landlord world locator
+
+When exactly one landlord survives, the game now displays a small **LAST**
+label over that character in the actual scene, on DS, 3DS (each stereo
+projection), Dreamcast and the web. It is deliberately suppressed while
+multiple landlords remain. The rare collapse-survivor gold exclamation
+marker retains priority over the pink LAST marker on the consoles to avoid
+stacking competing tags; the HUD still reports LAST LANDLORD.
+
+The marker draws with existing small font primitives. It adds no actor,
+texture, frame state or particle allocation. Every renderer computes the
+one-target condition once before the landlord loop rather than rescanning
+the target list per actor. The standard world culling margins remain valid
+because the marker fits within the existing warning and survivor tells.
