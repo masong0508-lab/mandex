@@ -965,6 +965,12 @@ static int chunk_visibility_probe(void){
   static const int ay[]={-180,-110,-70,-40,-14,-2,0,1,80,180,191,192,200,240,300};
   unsigned hash=2166136261u,scenes=0,visible=0,offscreen=0;
   gfx_init();
+  for(int m=1;m<MX_NMAT;m++){
+    MAXHP[m]=mx_material_hp(m);
+#if MX_DS_DAMAGE_THRESH
+    HP_33[m]=MAXHP[m]/3; HP_67[m]=MAXHP[m]*2/3;
+#endif
+  }
   memset(world.chunks,0,sizeof world.chunks);
   for(int c=0;c<3;c++){
     MxChunk *ch=&world.chunks[c];
@@ -975,6 +981,7 @@ static int chunk_visibility_probe(void){
       a->wx=ch->x+RI(((k*37+c*11)%61)-30);
       a->wy=ch->y+RI(((k*19+c*7)%53)-26);
       a->m=(uint8_t)(1+(k+c)%(MX_NMAT-1));
+      a->h=RI(MAXHP[a->m]*(k%4+1)/4); /* pristine, chipped and cracked */
       a->dead=(uint8_t)(k%19==0);
     }
   }
