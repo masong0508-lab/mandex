@@ -106,6 +106,30 @@ int main(void){
   ch->cells[0].wy=t->y;ch->cells[0].dead=0;
   upd_targets(&w,R(0.016));
   CHECK(t->alive,"long-flung rubble caused a ghost collision due to fixed-point distance overflow");
-  puts("collapse survivors: room escape, grounded injury, no repeats, real/dead/far rubble collisions PASSED");
+  /* Real two-chunk pile-up: the first impact triggers a lucky miracle,
+     the second MUST NOT evaporate the brief recovery grace. One HP is
+     deliberate: kill_target_ex ignores normal damage grace at 1 HP. */
+  init(1);t=&w.targets[0];
+  lucky=successful_seed(45);
+  CHECK(lucky!=0xffffffffu,"no deterministic rescue seed for overlapping chunks");
+  w.rng=lucky;
+  for(int c=0;c<2;c++){
+    ch=&w.chunks[c];ch->active=1;ch->count=1;ch->rad=RI(2);
+    ch->x=t->x;ch->y=t->y;ch->vx=RI(30);
+    ch->cells[0].wx=t->x;ch->cells[0].wy=t->y;
+    ch->cells[0].m=MX_STONE;ch->cells[0].dead=0;
+  }
+  upd_targets(&w,R(0.016));
+  CHECK(t->alive&&t->collapse_rolled==2&&t->hp==1,
+        "survivor died to a second rubble chunk in the very same tick");
+  int survivor_events=0;
+  for(int k=0;k<w.nev;k++)survivor_events+=(w.ev[k].type==EV_SURVIVOR);
+  CHECK(survivor_events==1,"two simultaneous chunks caused duplicate miracles");
+  upd_targets(&w,R(0.016));
+  CHECK(t->alive,"survivor was killed during its short impact grace");
+  t->inv=0;t->stun=0; /* grace is temporary; subsequent rubble is lethal */
+  upd_targets(&w,R(0.016));
+  CHECK(!t->alive,"survivor never became killable after grace expiration");
+  puts("collapse survivors: room escape, grounded injury, no repeats, real/dead/far/two-chunk impacts PASSED");
   return 0;
 }
