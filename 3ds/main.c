@@ -892,9 +892,11 @@ static void draw_man(const View *v){
   int p = v->ppc, x = VX(v, RTOF(m->x)), y = VY(v, RTOF(m->y)), face = 1, fr;
   if(m->mode == MAN_WALK){                                                   /* on his own feet: the turning frames step him along, three quarters of the sling size */
     if(m->hurtCd > 0 && (frame & 2)) return;
-    int q = (p * 3 + 2) / 4, mv = m->gr && (m->vx > R(3) || m->vx < -R(3)), wf = MSF_SPIN_6 + (mv ? ((frame >> 2) & 1 ? 1 : -1) : 0), fc = m->face < 0 ? -1 : 1;
+    int q = (p * 3 + 2) / 4, phase = mx_walk_anim_phase(m);
+    int wf = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
+    int fc = m->face < 0 ? -1 : 1;
     const MsFrame *f = &MS_FRAMES[wf + (man_fur ? MSF_NBASE : 0)];
-    int fy = VY(v, RTOF(m->y) + 2.375f) - (mv && ((frame >> 2) & 1) ? 1 : 0);
+    int fy = VY(v, RTOF(m->y) + 2.375f) - (phase == 1 || phase == 3 ? 1 : 0);
     blit_frame(v->s, wf, x, fy - fdiv4((f->h - f->ay) * q), q, fc);
     if(m->pT > 0){ for(int k = -3; k <= 3; k++) px(v->s, x + fc * (p * 5 - k * k * p * 5 / 18) + fc * p * 4, y + k * p * 3 / 4, RGB(255, 255, 255)); }
     return;
