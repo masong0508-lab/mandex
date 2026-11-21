@@ -295,17 +295,17 @@ static int n3_sprite_volume_probe(void){
     rect(&top,0,0,400,240,bg);draw_man(&walkview);
     unsigned airborne=n3_hash(top.fb,(size_t)top.w*top.h*3);
     if(contact==airborne){
-      fprintf(stderr,"FAIL: 3DS walking contact shadow invisible in eye %d\\n",eye);
+      fprintf(stderr,"FAIL: 3DS walking contact shadow invisible in eye %d\n",eye);
       return 1;
     }
     world.man.gr=1;world.man.pT=R(0.1);
     rect(&top,0,0,400,240,bg);draw_man(&walkview);
     unsigned punch=n3_hash(top.fb,(size_t)top.w*top.h*3);
     if(punch==contact){
-      fprintf(stderr,"FAIL: 3DS punch animation invisible in eye %d\\n",eye);
+      fprintf(stderr,"FAIL: 3DS punch animation invisible in eye %d\n",eye);
       return 1;
     }
-    printf("N3_WALK_IMPACT eye=%d ground=%08x air=%08x punch=%08x\\n",
+    printf("N3_WALK_IMPACT eye=%d ground=%08x air=%08x punch=%08x\n",
            eye,contact,airborne,punch);
     world.man.pT=0;
   }
