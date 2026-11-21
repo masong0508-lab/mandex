@@ -56,6 +56,10 @@ int main(void){
   CHECK(t->hp==2&&t->alive&&t->collapse_rolled==2,"must lose HP and remain alive");
   CHECK(t->inv>0&&t->stun>0&&t->vy==0,"no survivor grace / injury");
   CHECK(w.nev==1&&w.ev[0].type==EV_SURVIVOR&&w.ev[0].m==2,"no survivor FX event");
+  w.nev=MX_MAX_EVENTS;w.ev[MX_MAX_EVENTS-1].type=EV_CELL;
+  ev(&w,EV_SURVIVOR,t->x,t->y,t->hp,0,0);
+  CHECK(w.nev==MX_MAX_EVENTS&&w.ev[MX_MAX_EVENTS-1].type==EV_SURVIVOR,
+        "rare survivor announcement lost under debris event saturation");
   CHECK(!collapse_survive(&w,t),"one landlord survived multiple times");
   kill_hard(&w,t); CHECK(!t->alive,"escaped landlord permanently invulnerable");
   init(1); t=&w.targets[0];
