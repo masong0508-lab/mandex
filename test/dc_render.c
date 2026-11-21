@@ -153,6 +153,23 @@ static int dc_menu_flow_test(void){
   int fail=0;
 #define MENU_CHECK(c,m) do{if(!(c)){fprintf(stderr,"FAIL: %s\n",m);fail++;}else printf("ok: %s\n",m);}while(0)
   MENU_CHECK(tx_ttl!=0,"title is initially allocated on the Dreamcast PVR");
+  MENU_CHECK(tx_wman!=0 && hdr_wman.ptr==tx_wman,
+             "Dreamcast allocates real dedicated 1024x512 Wolfman PVR texture");
+  MENU_CHECK(DCT_WMAN_W==DCT_MAN_W && DCT_WMAN_H==DCT_MAN_H,
+             "human and Wolfman atlas UV dimensions match without extra view transforms");
+  /* Render the exact same flying pose from the two different atlases, as
+     the real PVR will do. The former atlas alias rendered human features
+     in place of Wolfman fur and muzzle for 32 of the 71 poses. */
+  on_title=0;man_zoom=1;man_rot=0;man_fur=0;cur_hdr=0;
+  memset(fb,0,sizeof fb);
+  draw_frame(MSF_FLY_A,320,240,1,Z_MAN,NULL);
+  unsigned human_face=dc_hash(fb,sizeof fb);
+  man_fur=1;cur_hdr=0;memset(fb,0,sizeof fb);
+  draw_frame(MSF_FLY_A,320,240,1,Z_MAN,NULL);
+  unsigned wolf_face=dc_hash(fb,sizeof fb);
+  MENU_CHECK(human_face!=wolf_face && human_face!=0 && wolf_face!=0,
+             "Dreamcast wolf side profile is visibly distinct from the human face");
+  man_fur=0;
   on_title=1;title_t=0;title_lv=0;nofight=0;cur_hdr=0;
   memset(fb,0,sizeof fb);draw_title();
   unsigned before=dc_hash(fb,sizeof fb);
