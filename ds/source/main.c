@@ -930,7 +930,7 @@ static void draw_chunks(const View *v){
 }
 
 #ifndef MX_DS_CULL_TARGETS
-#define MX_DS_CULL_TARGETS 0 /* enabled only if proven fast on the target */
+#define MX_DS_CULL_TARGETS 1 /* reject invisible landlords; full-art and frame parity are CI gated */
 #endif
 #ifndef MX_DS_INTEGER_WALK_PHASE
 #define MX_DS_INTEGER_WALK_PHASE 1
@@ -955,11 +955,14 @@ static void draw_targets(const View *v){
     real wx,wy;mx_target_offset(&world,t,&wx,&wy);
     int sx=vx(v,t->x+wx),sy=vy(v,t->y+wy);
 #if MX_DS_CULL_TARGETS
-    /* All sprites use a common anchor: the silhouette never projects
-       beyond +/- 10 cells horizontally or 12 above / 7 below it.
-       Account for unusually long multi-hit health bars too.
-       Skip both the lengthy landlord painter AND its health bar when
-       the entire bounds lie offscreen. Simulation and AI are untouched. */
+    /* Conservatively bound ALL landlord ink: the outstretched club,
+       thrown briefcase, warning glyph, 1px dazed stars, top hat, and
+       persistent survivor marker. gfx.c's S(n) is n*ppc/8, so these
+       +/-10, -12/+7 CELL margins exceed the painter's eighth-cell
+       offsets. Expand x for arbitrarily wide multi-hit health bars.
+       Only skip when the ENTIRE possible image is offscreen; every
+       visible pixel keeps the exact same detailed drawing path.
+       Target simulation, hit boxes and NPC AI are unaffected. */
     int pad_x=v->ppc*10;
     if(t->hpmax>1){
       int bar=(t->hpmax*(v->ppc*7/8>1?v->ppc*7/8:1))/2+3;
