@@ -1429,13 +1429,18 @@ void mx_release(MxWorld *w){
     if(m->inf > R(0.6)) w->st_inflated++;
     if(w->pw_sel){
       int pw=w->pw_sel;
-      m->pwr=(uint8_t)pw;
-      w->pw_left[pw]--;
-      /* Legacy 4-counter achievement/save data remains binary-identical.
-         New one-shot powers are per-level and do not alter old counters. */
-      if(pw<=PW_SPLAT)w->st_pw[pw]++;
-      w->pw_sel=0;
-      if(pw==PW_TURBO){m->vx=rmul(m->vx,R(1.35));m->vy=rmul(m->vy,R(1.35));}
+      /* Recheck the inventory at launch, not just at selection. A stale,
+         depleted or corrupt power ID must not index beyond pw_left or
+         grant a phantom shot. Valid launches retain identical behavior. */
+      if(pw > PW_NONE && pw < PW_COUNT && w->pw_left[pw] > 0){
+        m->pwr=(uint8_t)pw;
+        w->pw_left[pw]--;
+        /* Legacy 4-counter achievement/save data remains binary-identical.
+           New one-shot powers are per-level and do not alter old counters. */
+        if(pw<=PW_SPLAT)w->st_pw[pw]++;
+        if(pw==PW_TURBO){m->vx=rmul(m->vx,R(1.35));m->vy=rmul(m->vy,R(1.35));}
+      }
+      w->pw_sel=PW_NONE;
     } }
   m->mode = MAN_FLY; m->gt = 0; w->men--;
   m->face = m->vx < 0 ? -1 : 1;

@@ -56,7 +56,44 @@ int main(void){
         strcmp(mx_tool_effect(PW_QUAKE),"LANDING SHOCKWAVE")==0 &&
         strcmp(mx_tool_effect(PW_NONE),"")==0,
         "tooltips explain real powers only when equipped");
+  /* Test the actual core launch, not only the read-only HUD. A selected
+     power is never spent on a short pull; a successful launch spends once. */
+  mx_load(&w,0);
+  mx_select_power(&w,PW_TURBO);
+  CHECK(w.pw_sel==PW_TURBO && w.pw_left[PW_TURBO]==1,
+        "fresh level permits one turbo charge");
+  mx_set_pull(&w,RI(-1),0);
+  mx_release(&w);
+  CHECK(w.man.mode==MAN_AIM && w.pw_sel==PW_TURBO &&
+        w.pw_left[PW_TURBO]==1,
+        "short release retains selected power and stock");
+  mx_set_pull(&w,RI(-8),RI(2));
+  mx_release(&w);
+  CHECK(w.man.mode==MAN_FLY && w.man.pwr==PW_TURBO &&
+        w.pw_left[PW_TURBO]==0 && w.pw_sel==PW_NONE,
+        "valid launch spends one turbo charge and disarms it");
+
+  /* A stale/depleted selection should launch normally without an ability. */
+  mx_load(&w,0);
+  w.pw_sel=PW_BEANS;w.pw_left[PW_BEANS]=0;
+  mx_set_pull(&w,RI(-8),RI(2));
+  mx_release(&w);
+  CHECK(w.man.mode==MAN_FLY && w.man.pwr==PW_NONE &&
+        w.pw_left[PW_BEANS]==0 && w.pw_sel==PW_NONE &&
+        w.st_pw[PW_BEANS]==0,
+        "depleted power cannot be launched or decremented below zero");
+  for(int n=0;n<2;n++){
+    mx_load(&w,0);
+    w.pw_sel=n?PW_COUNT+37:-1;
+    int before[PW_COUNT];memcpy(before,w.pw_left,sizeof before);
+    mx_set_pull(&w,RI(-8),RI(2));
+    mx_release(&w);
+    CHECK(w.man.mode==MAN_FLY && w.man.pwr==PW_NONE &&
+          w.pw_sel==PW_NONE &&
+          memcmp(before,w.pw_left,sizeof before)==0,
+          "invalid selected power cannot touch the inventory array");
+  }
   if(bad)return 1;
-  puts("TOOL_FEEDBACK_PASS modes=8 pull_threshold=exact gauge=0..100 stock=read-only invalid_ids=guarded");
+  puts("TOOL_FEEDBACK_PASS modes=8 pull_threshold=exact gauge=0..100 stock=read-only invalid_ids=guarded launch_stock=guarded");
   return 0;
 }
