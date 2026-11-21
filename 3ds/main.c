@@ -1272,7 +1272,7 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
 /* ---------------------------------------------------------------- HUD / panels */
 static int alive(void){ return mx_targets_alive(&world); }
 static int hud_wrecked; static int hud_sample=-1;
-static void draw_hud(void){
+static void draw_hud(const View *camera){
   /* One 7,200-cell scan per eight frames, shared by both stereo eyes. */
   if(hud_sample != (frame >> 3)){
     int left=mx_cells_left(&world), base=cells0>0 ? cells0 : 1;
@@ -1319,6 +1319,29 @@ static void draw_hud(void){
   if(world.combo > 1 && world.combo_left > 0){
     rect(&top, 6, 27, 188, 14, RGB(27, 16, 43)); text(&top, 12, 30, mx_combo_taunt(world.combo), 1, RGB(255, 126, 176));
     rect(&top, 6, 41, (int)(188 * RTOF(world.combo_left) / 2.5f), 2, RGB(255, 210, 63)); }
+  /* Project the sole remaining landlord through this eye's camera. Only
+     display a cue outside the playable view, never over a visible actor.
+     50px top and 30px bottom preserve objective and control strips. */
+  if(world.state==MX_PLAY){
+    MxObjective obj=mx_objective_snapshot(&world);
+    if(obj.phase==MX_OBJ_LAST && obj.target_index>=0){
+      const MxTarget *t=&world.targets[obj.target_index];
+      real ox,oy;mx_target_offset(&world,t,&ox,&oy);
+      View actor=*camera;
+      actor.ox-= (int)lroundf(g_sgn*3.0f*g_sl*0.5f);
+      MxObjectiveEdge edge=mx_objective_edge(
+        VX(&actor,RTOF(t->x+ox)),VY(&actor,RTOF(t->y+oy)),
+        400,240,54,30);
+      if(edge.dir){
+        const char *word=edge.dir==MX_EDGE_LEFT?"< LAST":
+                         edge.dir==MX_EDGE_RIGHT?"LAST >":
+                         edge.dir==MX_EDGE_UP?"LAST UP":"LAST DOWN";
+        rect(&top,edge.x-29,edge.y-9,58,18,RGB(18,24,42));
+        rect(&top,edge.x-29,edge.y-9,58,2,RGB(255,126,176));
+        textc(&top,edge.x,edge.y-4,word,1,RGB(255,126,176));
+      }
+    }
+  }
   if(toast_t > 0 && toast_id >= 0){                                          /* achievement popup: drops in, gold frame, star badge, time bar */
     int t = toast_t, off = t < 10 ? (10 - t) * 5 : t > 140 ? (t - 140) * 5 : 0, y = 24 - off, x = 84, w = 232, h = 36;
     int oc = toast_id >= 100; u32 fc = oc ? RGB(125, 255, 90) : RGB(255, 210, 63);
@@ -1595,7 +1618,7 @@ int main(void){
       { char fb[48]; sprintf(fb, "Y: LANDLORDS FIGHT BACK  %s", nofight ? "OFF" : "ON"); textc(&top, 200, 190, fb, 1, nofight ? RGB(150, 150, 165) : RGB(125, 255, 90)); }
       { char ob[64]; sprintf(ob, "L/R: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {
-      draw_hud(); draw_end();
+      draw_hud(&vt); draw_end();
       if(app == ST_PAUSE){
         rect(&top,110,80,180,76,RGB(15,18,30));
         textc(&top,200,88,"PAUSED",3,RGB(255,210,63));
