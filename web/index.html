@@ -3323,7 +3323,7 @@ function layoutTick(){
     WEB_UI.portrait=por;WEB_UI.gesture=null;
     if(typeof dragging!=='undefined')dragging=false;
     if(typeof sliderDrag!=='undefined')sliderDrag=false;
-    if(typeof E!=='undefined'&&E)E.drag=null;
+    if(typeof E!=='undefined'&&E){E.drag=null;E.pointer=null;}
     for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
     CAM.reset=true;CAM.snap=true;hits=[];
   }
@@ -3643,12 +3643,15 @@ cv.addEventListener('pointerdown',e=>{
   }
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending'){hitTest(x,y);return}
   if(state==='edit'){
+    // Ignore a second finger while a different pointer is painting.
+    if(E.pointer!==null&&E.pointer!==e.pointerId)return;
     if(hitTest(x,y))return;
     if(E.starters)return; // Overlay buttons cannot accidentally paint the map.
     if(isPortrait()&&y>=0&&y<WEB_UI.editorHeight){
       const p=mobileEditorToWorld(x,y);eDown(p[0],p[1]);
     }else if(!isPortrait())eDown(x,y);
-    try{cv.setPointerCapture(e.pointerId)}catch(_){}
+    if(eBeginStroke(e.pointerId))
+      try{cv.setPointerCapture(e.pointerId)}catch(_){}
     return;
   }
   if(hitTest(x,y))return;
@@ -3668,8 +3671,9 @@ cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
     walkTouch(mx,my,e.pointerId);return;
   }
   if(state==='edit'){
+    if(!eStrokeOwner(e.pointerId))return;
     if(!isPortrait())eMove(mx,my);
-    else if(E.drag&&my>=0&&my<WEB_UI.editorHeight){
+    else if(my>=0&&my<WEB_UI.editorHeight){
       /* Leaving the world area for the toolbar must never paint the last
          building row or carry a rectangle selection into a control. */
       const pos=mobileEditorToWorld(mx,my);eMove(pos[0],pos[1]);
@@ -3693,7 +3697,7 @@ cv.addEventListener('pointerup',e=>{
     return;
   }
   sodaHold=false;if(sliderDrag){sliderDrag=false;pdSave();SFX.boing()}
-  if(state==='edit'){eUp();return}
+  if(state==='edit'){eEndStroke(e.pointerId,false);return}
   if(dragging){dragging=false;if(man.mode==='aim'){
     if(man.vlv){man.seated=true;return}man.seated=false;launch()
   }}
@@ -3711,11 +3715,14 @@ for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
   releaseWalkTouch(e.pointerId);
   if(ev==='pointercancel'){
     if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
-    if(state==='edit'&&E.drag)eUp();
+    if(state==='edit')eEndStroke(e.pointerId,true);
     if(dragging){dragging=false;man.seated=false}
   }
 });
-cv.addEventListener('lostpointercapture',e=>releaseWalkTouch(e.pointerId));
+cv.addEventListener('lostpointercapture',e=>{
+  releaseWalkTouch(e.pointerId);
+  if(state==='edit')eEndStroke(e.pointerId,true);
+});
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
   if(e.code==='Space'){dive();e.preventDefault()}
@@ -5239,7 +5246,7 @@ function importCode(){
 }
 
 // ---------- the editor ----------
-const E={g:new Uint8Array(COLS*ROWS),t:[],men:5,mat:1,tool:'mat',shape:'pen',bk:0,bs:0,bt:1,undo:[],redo:[],starters:false,id:-1,name:'',drag:null};
+const E={g:new Uint8Array(COLS*ROWS),t:[],men:5,mat:1,tool:'mat',shape:'pen',bk:0,bs:0,bt:1,undo:[],redo:[],starters:false,id:-1,name:'',drag:null,pointer:null};
 const EMIN=28;   // columns left of this stay empty: the sling lives there
 function openEditor(back,which){
   testing=false;state='edit';hits=[];
@@ -5248,12 +5255,12 @@ function openEditor(back,which){
   if(back)return;
   if(which!==undefined&&which>=0){const L=PD.custom[which];E.g=decodeCells(L.c);E.t=L.t.map(p=>p.slice());E.men=L.m|0||5;E.id=which;E.name=L.n}
   else{E.g=new Uint8Array(COLS*ROWS);E.t=[];E.men=5;E.id=-1;E.name=''}
-  E.undo=[];E.redo=[];E.starters=false;E.mat=1;E.tool='mat';E.shape='pen';E.bk=0;E.bs=0;E.bt=1}
+  E.undo=[];E.redo=[];E.starters=false;E.pointer=null;E.drag=null;E.mat=1;E.tool='mat';E.shape='pen';E.bk=0;E.bs=0;E.bt=1}
 
 // Editor-only snapshots are capped at 24 states (~175 KiB of grid data).
 // They never enter the console core, the save payload or the frame loop.
 function eState(){return [E.g.slice(),E.t.map(p=>p.slice()),E.id,E.name,E.men]}
-function eRestore(s){E.g=s[0];E.t=s[1];E.id=s[2];E.name=s[3];E.men=s[4];E.drag=null}
+function eRestore(s){E.g=s[0];E.t=s[1];E.id=s[2];E.name=s[3];E.men=s[4];E.drag=null;E.pointer=null}
 function eSnap(){E.undo.push(eState());if(E.undo.length>24)E.undo.shift();E.redo.length=0}
 function eUndo(){const s=E.undo.pop();if(!s)return;E.redo.push(eState());eRestore(s)}
 function eRedo(){const s=E.redo.pop();if(!s)return;E.undo.push(eState());eRestore(s)}
@@ -5297,7 +5304,7 @@ function eApplyStarter(kind){
   const p=eStarterPattern(kind);
   eSnap(); // One undo restores the previous world, name and custom-level ID.
   E.g=p.grid;E.t=p.level.t.map(x=>x.slice());E.men=p.level.m;
-  E.name=p.level.n;E.id=-1;E.drag=null;E.starters=false;
+  E.name=p.level.n;E.id=-1;E.drag=null;E.pointer=null;E.starters=false;
   toast('outfit','Starter loaded',E.name+' — UNDO restores the previous design');
 }
 function drawStarterMenu(x,y,w){
@@ -5333,6 +5340,18 @@ function eDown(x,y){
   E.drag={pen:true,m,l:c};ePut(c[0],c[1],m)}
 function eMove(x,y){if(!E.drag)return;const c=eCell(x,y);if(E.drag.pen){if(y<GY+3){const t=[c[0],Math.min(c[1],ROWS-1)];eLine(E.drag.l,t,E.drag.m);E.drag.l=t}}else E.drag.b=[c[0],Math.min(c[1],ROWS-1)]}
 function eUp(){if(E.drag&&!E.drag.pen)eRect(E.drag.a,E.drag.b,E.drag.m);E.drag=null}
+// Only the touch that began an editor stroke may move or finish it.
+// Canceled/rotated strokes discard an unfinished rectangle.
+function eBeginStroke(id){
+  if(E.pointer!==null||!E.drag)return false;
+  E.pointer=id;return true
+}
+function eStrokeOwner(id){return E.pointer!==null&&E.pointer===id&&!!E.drag}
+function eEndStroke(id,cancel){
+  if(E.pointer===null||E.pointer!==id)return false;
+  if(cancel)E.drag=null;else eUp();
+  E.pointer=null;return true
+}
 function eBuild(){const g=E.g.slice(),t=E.t.map(p=>p.slice());return{name:E.name||'Test Level',men:E.men,custom:true,build(){for(let i=0;i<g.length;i++)if(g[i])set(i%COLS,(i/COLS)|0,g[i]);for(const[cx,row]of t)tgt(cx,row)}}}
 /* The same safe geometry rules apply to edited and shared levels. Never
  * launch a broken test scene or overwrite a good saved level with one. */
