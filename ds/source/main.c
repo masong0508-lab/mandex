@@ -1018,8 +1018,12 @@ static void draw_targets(const View *v){
       int bar=(t->hpmax*(v->ppc*7/8>1?v->ppc*7/8:1))/2+3;
       if(bar>pad_x)pad_x=bar;
     }
+    /* The LAST marker is 9 cells above the actor and has a 1px outlined
+       glyph. Do not cull the landlord while that text can still be seen
+       through the lower viewport edge (the same as survivor warnings). */
     int pad_bottom=(t->collapse_rolled==2 && v->ppc>=3)?
-                   v->ppc*13 : v->ppc*8;
+                   v->ppc*13 : last_target && t->collapse_rolled!=2 && v->ppc>=2 ?
+                   v->ppc*11 : v->ppc*8;
     if(sx < -pad_x || sx >= 256+pad_x ||
        sy < -v->ppc*12 || sy >= 192+pad_bottom)continue;
 #endif
