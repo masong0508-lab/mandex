@@ -3237,8 +3237,12 @@ function layoutTick(){
   const vp=window.visualViewport;
   const vw=Math.max(1,vp&&vp.width||window.innerWidth||960),
         vh=Math.max(1,vp&&vp.height||window.innerHeight||540);
-  const por=vh>vw*1.08;
-  const w=por?540:960,h=por?Math.max(720,Math.min(1240,Math.round(w*vh/vw))):540;
+  /* visualViewport shrinks when the on-screen keyboard opens. It should
+     resize the CSS drawing area, NOT falsely rotate the entire game. */
+  const stableW=Math.max(1,window.innerWidth||vw),
+        stableH=Math.max(1,window.innerHeight||vh),
+        por=stableH>stableW*1.08;
+  const w=por?540:960,h=por?Math.max(720,Math.min(1240,Math.round(w*stableH/stableW))):540;
   const changed=por!==WEB_UI.portrait;
   if(changed){
     WEB_UI.portrait=por;WEB_UI.gesture=null;
