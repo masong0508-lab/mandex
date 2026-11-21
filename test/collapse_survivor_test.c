@@ -100,7 +100,7 @@ int main(void){
      squared-distance wrapping. Keep chunk centroid nearby to deliberately
      exercise the per-cell guard; a single far-flung cell is still harmless. */
   init(1);t=&w.targets[0];t->room_id=255;
-  ch=&w.chunks[0];ch->active=1;ch->count=1;ch->rad=RI(2500);
+  ch=&w.chunks[0];ch->active=1;ch->count=1;ch->rad=RI(2048);
   ch->x=t->x;ch->y=t->y;ch->vx=RI(30);
   ch->cells[0].wx=t->x+RI(2000);
   ch->cells[0].wy=t->y;ch->cells[0].dead=0;
