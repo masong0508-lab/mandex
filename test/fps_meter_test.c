@@ -35,6 +35,17 @@ int main(void){
  MxFpsMeter huge={0};
  mx_fps_meter_add(&huge,UINT_MAX,1000000000u,1,1);
  CK(huge.render_x10==2&&huge.sim_x10==2);
+ /* A fast timer's two-second window must not wrap at 2^32 ticks. */
+ MxFpsMeter fast_clock={0};
+ for(int i=0;i<3;i++)mx_fps_meter_add(&fast_clock,1000000000u,1000000000u,1,1);
+ CK(fast_clock.render_x10==10&&fast_clock.sim_x10==10);
+ CK(fast_clock.clock_ticks==1000000000u);
+ /* Even the largest supported unsigned clock must close its window. */
+ MxFpsMeter extreme_clock={0};
+ mx_fps_meter_add(&extreme_clock,UINT_MAX,UINT_MAX,1,1);
+ mx_fps_meter_add(&extreme_clock,UINT_MAX,UINT_MAX,1,1);
+ CK(extreme_clock.render_x10==10&&extreme_clock.sim_x10==10);
+ CK(extreme_clock.clock_ticks==0);
  unsigned short prev=65535,now=1;CK((unsigned short)(now-prev)==2);
  puts("ok: wall-clock FPS and simulation SPS distinguished at 60/30/30+catchup; 16-bit VBlank wrap");
  return 0;
