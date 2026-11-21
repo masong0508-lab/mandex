@@ -1043,12 +1043,46 @@ static void e2_dusk(u8 *b, int k, int tt){
 /* transitions (the first 30 frames of a scene) */
 /* The console cut holds its composition: a short palette fade is cheaper and
    more legible than a rapidly expanding iris or a full-width wipe. */
+/* Camera/editorial transitions for all DS/3DS/Dreamcast story scenes.
+   Wipe and iris previously ignored TRANS's type and were the same opaque
+   black flash. The masks are drawn directly into the existing 256x192
+   palette frame; no additional framebuffer, scratch array or sqrt calls.
+   A 4px iris scan saves expensive per-row software rect calls on ARM9. */
+static int trans_reveal(int tick){
+  if(tick<=0)return 0;
+  if(tick>=12)return 256;
+  /* Smoothstep easing in fixed integer arithmetic: 0..256. */
+  return tick*tick*(36-2*tick)*256/(12*12*12);
+}
 static void trans(u8 *b){
   int type=TRANS(sc);
-  if(type==4||t>=12)return;
-  u8 ink=type==3?C_WHITE:C_BLACK;
-  if(t<4)gfx_rect(b,0,0,256,192,ink);
-  else if(t<9)gfx_dither(b,0,0,256,192,ink);
+  if(type==4||t>=12)return;  /* true hard cut; finished transitions vanish */
+  if(type==0||type==3){
+    u8 ink=type==3?C_WHITE:C_BLACK;
+    if(t<3)gfx_rect(b,0,0,256,192,ink);
+    else if(t<7)gfx_dither(b,0,0,256,192,ink);
+    return;
+  }
+  int open=trans_reveal(t);
+  if(type==1){
+    /* Reveal left to right, rather than painting a static black flash. */
+    if(open<256)gfx_rect(b,open,0,256-open,192,C_BLACK);
+  }else if(type==2){
+    /* Elliptical approximation with a smooth quadratic contour. At the
+       largest aperture even the four screen corners are fully uncovered. */
+    int rx=open*240/256,ry=open*180/256;
+    if(!ry){gfx_rect(b,0,0,256,192,C_BLACK);return;}
+    int ry2=ry*ry;
+    for(int y=0;y<192;y+=4){
+      int dy=y+2-96;
+      if(dy<0)dy=-dy;
+      if(dy>=ry){gfx_rect(b,0,y,256,4,C_BLACK);continue;}
+      int extent=rx*(ry2-dy*dy)/ry2;
+      int left=128-extent,right=128+extent;
+      if(left>0)gfx_rect(b,0,y,left>256?256:left,4,C_BLACK);
+      if(right<256)gfx_rect(b,right<0?0:right,y,256-(right<0?0:right),4,C_BLACK);
+    }
+  }
 }
 /* Only a local exposure rim after a strong shot; random glints in interior
    scenes previously looked like unsupported floating objects. */
