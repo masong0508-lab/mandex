@@ -1080,7 +1080,16 @@ static void draw_man(const View *v){
                               phase == 0 ? -1 : phase == 2 ? 1 : 0);
     int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
     const MsFrame *f = &MS_FRAMES[wf + (man_fur ? MSF_NBASE : 0)];
-    int fy = VY(v, RTOF(m->y) + 2.375f) - (int)lroundf(RTOF(mx_walk_foot_lift(m)) * p);
+    int ground_y = VY(v, RTOF(m->y) + 2.375f);
+    int fy = ground_y - (int)lroundf(RTOF(mx_walk_foot_lift(m)) * p);
+    /* Match the DS grounded contact cue: under the feet, never at the
+       lifted sprite's position. Both stereo eyes use their own View. */
+    if(m->gr){
+      int half = p * 3 / 2;
+      if(half < 1) half = 1;
+      rect(v->s, x - half, ground_y + 1, half * 2 + 1, 2,
+           RGB(44, 44, 56));
+    }
     blit_frame(v->s, wf, x, fy - fdiv4((f->h - f->ay) * q), q, fc);
     if(m->pT > 0){ for(int k = -3; k <= 3; k++) px(v->s, x + fc * (p * 5 - k * k * p * 5 / 18) + fc * p * 4, y + k * p * 3 / 4, RGB(255, 255, 255)); }
     return;
