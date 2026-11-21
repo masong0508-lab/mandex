@@ -52,6 +52,14 @@ echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning 
 if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
 echo "--- Web: touch capture, landscape/portrait two-thumb controls, safe camera pan ---"
 if command -v node >/dev/null 2>&1;then node browser_multitouch_test.js;fi
+echo "--- read-only shot readiness and actual power stock (float/fixed/browser) ---"
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core tool_feedback_test.c ../core/mx.c ../core/cloth.c -lm -o tool_feedback_$mode
+  ./tool_feedback_$mode
+done
+if command -v node >/dev/null 2>&1;then node browser_tool_feedback_test.js;fi
 echo "--- Browser side -> rear -> side pose coherence at 60Hz ---"
 if command -v node >/dev/null 2>&1;then node browser_turn_pose_test.js;fi
 echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"

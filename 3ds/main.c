@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include "mx.h"
+#include "mx_tool_feedback.h"
 #include "mx_objective.h"
 #include "mx_fps_meter.h"
 #include "intro.h"
@@ -1660,8 +1661,23 @@ int main(void){
       }
     }
     if(app == ST_PLAY){
-      if(world.man.mode == MAN_AIM && !dragging && world.state == MX_PLAY) textc(&bot, 200, 12, "DRAG BACK AND LET GO", 2, RGB(255, 255, 255));
+      if(world.man.mode == MAN_AIM && world.state == MX_PLAY){
+        MxToolFeedback cue=mx_tool_feedback(&world);
+        textc(&bot, 200, 12, mx_tool_status_label(cue.phase), 2,
+              cue.phase==MX_SHOT_DAZED?RGB(255,92,92):
+              cue.phase==MX_SHOT_PULL?RGB(125,255,90):RGB(255,255,255));
+      }
       if(world.man.mode==MAN_AIM && world.state==MX_PLAY){
+        /* Launch power was only visible on DS. This compact gauge uses
+           the same simulation displacement, once on the 3DS bottom panel,
+           without adding a texture or a new render pass to either eye. */
+        int power=mx_sling_power_pct(&world);
+        rect(&bot,4,180,153,16,RGB(18,24,42));
+        text(&bot,7,184,"POWER",1,RGB(255,255,255));
+        rect(&bot,44,184,108,9,RGB(60,65,82));
+        rect(&bot,45,185,power*106/100,7,
+             power>84?RGB(255,92,92):
+             power>49?RGB(255,210,63):RGB(125,255,90));
         static const char *const names[6]={"AIR","BEANS","TOWEL","SPLAT","TURBO","QUAKE"};
         for(int k=0;k<6;k++){
           int x=k*53,w=k==5?55:53;
@@ -1670,7 +1686,15 @@ int main(void){
           rect(&bot,x+1,216,w-2,24,selected?RGB(255,210,63):RGB(22,29,51));
           rect(&bot,x+1,216,w-2,1,available?RGB(210,220,242):RGB(76,79,96));
           textc(&bot,x+w/2,224,names[k],1,selected?RGB(15,18,30):available?RGB(255,255,255):RGB(100,103,118));
+          if(k>0){
+            char qty[8];
+            snprintf(qty,sizeof qty,"%d",mx_tool_stock(&world,k));
+            text(&bot,x+w-9,218,qty,1,selected?RGB(15,18,30):
+                 available?RGB(255,210,63):RGB(110,113,130));
+          }
         }
+        if(world.pw_sel>PW_NONE && mx_tool_stock(&world,world.pw_sel)>0)
+          textc(&bot,230,183,mx_tool_effect(world.pw_sel),1,RGB(255,210,63));
         textc(&bot,160,204,"TAP TOOL  /  X CYCLE  /  R USE AIR",1,RGB(255,210,63));
       }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
