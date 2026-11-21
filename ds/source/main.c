@@ -1138,6 +1138,9 @@ static void draw_man(const View *v){
     int face = mx_walk_render_face(m) < 0 ? -1 : 1;
     int foot_lift = (int)((rmul(mx_walk_foot_lift(m),RI(v->ppc)) + R(0.5)) >> 12);
     int fy = vy(v, m->y + R(2.375)) - foot_lift;
+    /* Contact shadow connects the figure to the actual ledge underfoot,
+       instead of letting the flat side sprite hover over rubble. */
+    if(m->gr)gfx_ell(v->buf,x,vy(v,m->y+R(2.375))+1,v->ppc*2,1,C_SHADOW);
     spr_man_walk(v->buf, x, fy, p < 1 ? 1 : p, face, fr, 0);
     if(m->pT > 0){ int r = v->ppc * 5, ax = x + face * v->ppc * 4; for(int k = -3; k <= 3; k++) gfx_px(v->buf, ax + face * (r - k * k * r / 18), y + k * v->ppc * 3 / 4, C_WHITE); }   /* punch swoosh */
     return;
