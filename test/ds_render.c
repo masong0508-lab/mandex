@@ -458,7 +458,9 @@ void swiWaitForVBlank(void){
       static int sh_case, sh_throw, sh_swing;
       for(int i = 0; i < world.nev; i++){ int ty = world.ev[i].type; if(ty == EV_THROW) sh_throw++; if(ty == EV_SWING) sh_swing++; }
       for(int i = 0; i < MX_MAX_CASES; i++) if(world.cases[i].active && !sh_case){ sh_case = 1; shot("case"); }
-      if(vf == 120) shot("lords");
+      /* The level intro banner lasts well past frame 120. Photograph the
+         actual moving enemies after it clears so art review is useful. */
+      if(vf == 260) shot("lords");
       if(vf == 780){ printf("fight: throws=%d swings=%d case_shot=%d hurt_dazed=%d\n", sh_throw, sh_swing, sh_case, world.man.stun > 0); WCHECK(wt == 3 || sh_throw > 0 || sh_swing > 0, "something fought back within 13 s");
         printf(fails ? "fight: %d FAILED\n" : "fight: all passed\n", fails); exit(fails != 0); }
     }

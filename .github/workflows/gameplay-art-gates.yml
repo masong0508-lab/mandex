@@ -15,6 +15,7 @@ on:
       - "test/room_facade_web_test.js"
       - "test/landlord_motion_regression.c"
       - "test/landlord_motion_regression.py"
+      - "test/ds_render.c"
       - ".github/workflows/gameplay-art-gates.yml"
   workflow_dispatch:
 jobs:
