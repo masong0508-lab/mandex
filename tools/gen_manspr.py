@@ -450,6 +450,11 @@ def main():
         turn_hair_finish.finish_grid(idx, int(ay), name)
         import sprite_pinhole_cleanup
         sprite_pinhole_cleanup.close_pinholes(idx, int(ay), name)
+        # Give the Wolfman's head, shoulders and raised arms the same
+        # restrained volume as the prebaked lower body. Palette-only source
+        # finish: no new assets, body state or runtime drawing instructions.
+        import wolf_upper_volume
+        wolf_upper_volume.finish_grid(idx, int(ay), name)
         ys, xs = np.nonzero(idx); y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
         idx = idx[y0:y1, x0:x1]; ax -= x0; ay -= y0; h, w = idx.shape
         (bx, by, br), (rx, ry, rr) = BLOBS[family(name)]
