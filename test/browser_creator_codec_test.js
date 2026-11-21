@@ -52,7 +52,7 @@ rejects({...canonical,t:[[56.5,31]]},'non-integer coordinates');
 rejects({...canonical,m:99},'unreasonable player count');
 assert.throws(()=>create.decodeSharedLevel('MX1.'+'A'.repeat(100001)),Error,'oversized code rejected before decode');
 const before=create.PD.custom.length,priorSave=create.saved;
-create.setPrompt('MX1.'+btoa(JSON.stringify({...canonical,t:[[-100,31]]})));
+create.setPrompt('MX1.'+Buffer.from(JSON.stringify({...canonical,t:[[-100,31]]}), 'utf8').toString('base64'));
 create.importCode();
 assert.strictEqual(create.PD.custom.length,before,'invalid import does not mutate save');
 assert.strictEqual(create.saved,priorSave,'invalid import does not write save');
