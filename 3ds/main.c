@@ -815,6 +815,10 @@ static void draw_landlords(const View *v){
     /* Walkers and sprinters get the same readable pre-hit tell as throwers. */
     if(wind && t->kind != LK_THROWER && t->kind != LK_BOSS)
       textc(v->s,x,y-p*6,"!",2,RGB(255,210,63));
+    /* Gold locator persists after the rare collapse-survivor toast.
+       Drawn only for this single exceptional enemy, in both stereo eyes. */
+    if(t->collapse_rolled==2)
+      textc(v->s,x,y-p*7,"!",2,RGB(255,210,63));
   }
 }
 /* briefcases in the air (Batter Up), and the pink bounce pads of walk levels: chevrons float up from each */
