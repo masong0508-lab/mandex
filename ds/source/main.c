@@ -1504,6 +1504,14 @@ static void apply_outfit(int o){
   }
   { uint8_t sk[4][3]; extern int gfx_man_fur; gfx_man_fur = mx_outfit_skin(o, sk);                                   /* the Wolfman's skin is grey fur */
     for(int k = 0; k < 4; k++){ u16 c = RGB15(sk[k][0] >> 3, sk[k][1] >> 3, sk[k][2] >> 3); gfx_pal[C_MAN0 + 1 + k] = c; BG_PALETTE[C_MAN0 + 1 + k] = c; BG_PALETTE_SUB[C_MAN0 + 1 + k] = c; } }
+  /* Palette-only volume shading follows the chosen outfit/skin. The 25
+     reserved shades are below the inventory swatches at index 224. */
+  gfx_man_rim_palette();
+  for(int k=0;k<C_MAN_RIM_COUNT;k++){
+    u16 shade=gfx_pal[C_MAN_RIM0+k];
+    BG_PALETTE[C_MAN_RIM0+k]=shade;
+    BG_PALETTE_SUB[C_MAN_RIM0+k]=shade;
+  }
 }
 /* AIR is an explicit gameplay toolbar selection. The title's remembered
    start tool must never silently summon the valve into normal shots. */
