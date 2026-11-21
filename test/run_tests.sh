@@ -21,6 +21,8 @@ gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -I../core room_backdrop_test.
 if command -v node >/dev/null 2>&1;then node room_backdrop_web_test.js;fi
 echo "--- real-time frame meter: rendered FPS vs simulation steps/s ---"
 gcc -std=gnu99 -O2 -I../core fps_meter_test.c -o fps_meter_test && ./fps_meter_test
+echo "--- Browser refresh-rate-independent fixed-step simulation ---"
+if command -v node >/dev/null 2>&1;then node browser_fixed_step_test.js;fi
 echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
 if command -v node >/dev/null 2>&1; then
   node -e 'const fs=require("fs");const h=fs.readFileSync("../web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<a)throw Error("game script missing");const s=h.slice(a+8,b);new Function(s);for(const sym of ["function cgRearPanel","function cgHotTake","function cgMoonlitKiss"])if(!s.includes(sym))throw Error(sym+" missing");console.log("ok: browser script parses and cutscene effects are present")'
