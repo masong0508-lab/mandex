@@ -243,6 +243,15 @@ END_TEST=1 ./ds_render /tmp/dsend1 9000 0 | grep -v "^ok:"
 END_TEST=2 ./ds_render /tmp/dsend2 9000 0 | grep -v "^ok:"
 echo "--- idle gags: every step valid, every gag ends and plays, he falls asleep, input wakes him ---"
 gcc -std=c99 -O2 -Wall -Wno-unused-function -I../art idle_test.c -o idle_test && ./idle_test
+echo "--- DS moving rubble screen-cull parity (2/3/4 px zoom, all edges) ---"
+for mode in 0 1; do
+  gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_CHUNK_VIEW_CULL=$mode -Istubs -I../core -I../art -I../ds/source \
+    ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c \
+    ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_chunk_view_$mode
+  DS_CHUNK_VIS_PROBE=1 ./ds_chunk_view_$mode > ds_chunk_view_$mode.txt
+done
+cmp ds_chunk_view_0.txt ds_chunk_view_1.txt
+cat ds_chunk_view_1.txt
 echo "--- Dreamcast front-end drawing on the host (software rasteriser instead of the PVR): jiggle, gags, win/lose ---"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o dc_$f.o; done   # the shared cutscene code, built exactly as dreamcast/Makefile does
 gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c dc_render.c -lm -o dc_render && DC_OUTFIT_RECOLOR_PROBE=1 ./dc_render && DC_MENU_FLOW_TEST=1 ./dc_render && ./dc_render
