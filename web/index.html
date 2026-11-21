@@ -3242,7 +3242,7 @@ const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0};
    portrait rather than being a postage-stamp landscape menu. */
 function webViewport(width,height,mode){
   const portrait=height>width*1.1;
-  const wideOnly=mode==='cutscene'||mode==='edit';
+  const wideOnly=mode==='cutscene';
   const tall=portrait&&!wideOnly;
   const w=tall?540:960,h=tall?Math.max(780,Math.min(1240,Math.round(540*height/width))):540;
   const scale=Math.min(width/w,height/h);
@@ -4829,7 +4829,10 @@ function openEditor(back,which){
 
 function eSnap(){E.undo.push([E.g.slice(),E.t.map(p=>p.slice())]);if(E.undo.length>30)E.undo.shift()}
 function eUndo(){const s=E.undo.pop();if(s){E.g=s[0];E.t=s[1]}}
-function eCell(px,py){return[Math.floor(px/V),Math.floor(py/V)]}
+let mobileEditorPan=0;
+function eCell(px,py){
+  return[Math.floor((px+(mobilePortrait&&state==='edit'?mobileEditorPan:0))/V),Math.floor(py/V)];
+}
 function eClearLord(x,y){E.t=E.t.filter(p=>!(p[0]===x&&p[1]-1===y))}
 // brushes: SQUARE n x n, WIDE n x thickness (long beams), TALL thickness x n (columns), ROUND radius n (discs)
 const BR_KIND=['SQUARE','WIDE','TALL','ROUND'];
@@ -4846,7 +4849,8 @@ function ePut(cx,cy,m){const B=brushDims(),ox=cx-((B.w-1)>>1),oy=cy-((B.h-1)>>1)
 function eLine(a,b,m){const n=Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]));for(let t=1;t<=n;t++)ePut(Math.round(a[0]+(b[0]-a[0])*t/n),Math.round(a[1]+(b[1]-a[1])*t/n),m)}   // no gaps when you drag fast
 function eRect(a,b,m){const x0=Math.min(a[0],b[0]),x1=Math.max(a[0],b[0]),y0=Math.min(a[1],b[1]),y1=Math.max(a[1],b[1]);for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(x<EMIN||x>=COLS||y<0||y>=ROWS)continue;E.g[idx(x,y)]=m;eClearLord(x,y)}}
 function eDown(x,y){
-  if(y>=GY+3||x<EMIN*V)return;const c=eCell(x,y);
+  if(y>=GY+3)return;const c=eCell(x,y);
+  if(c[0]<EMIN)return;
   if(E.tool==='lord'){eSnap();const k=E.t.findIndex(p=>Math.abs(p[0]-c[0])<=1&&Math.abs(p[1]-1-c[1])<=1);
     if(k>=0)E.t.splice(k,1);else if(E.t.length>=12)toast('ach','Max 12 landlords','');else if(c[0]>=EMIN&&c[1]<ROWS&&!E.g[idx(c[0],c[1])])E.t.push([c[0],c[1]+1]);return}
   eSnap();const m=E.tool==='erase'?0:E.mat;
@@ -4877,12 +4881,73 @@ function drawBrushPanel(){
   btn(116,344,100,44,'UNDO',eUndo,{size:15});
   btn(8,392,100,40,'ERASE',()=>{E.tool='erase'},{size:14,on:E.tool==='erase'});
   btn(116,392,100,40,'LANDLORD',()=>{E.tool='lord'},{size:13,on:E.tool==='lord',col:'#ff8a8a'})}
+function drawMobileEditor(){
+  ctx.setTransform(1,0,0,1,0,0);
+  /* Show 67-ish world columns at native pixel scale, not a 960px canvas
+     shrunk to phone width. Page sideways to build across all 120 columns.
+     Only a camera translation is applied; world and save coordinates stay
+     identical to landscape. */
+  mobileEditorPan=clamp(mobileEditorPan,0,Math.max(0,WW-W));
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W,GY);ctx.clip();
+  ctx.translate(-mobileEditorPan,0);
+  const colStart=Math.max(0,Math.floor(mobileEditorPan/V)),colEnd=Math.min(COLS,Math.ceil((mobileEditorPan+W)/V));
+  for(let y=0;y<ROWS;y++)for(let x=colStart;x<colEnd;x++){
+    const m=E.g[idx(x,y)];if(m)ctx.drawImage(SPR[m][hsh(x,y)&3][0],x*V,y*V);
+  }
+  ctx.fillStyle='rgba(255,60,60,.13)';ctx.fillRect(0,0,EMIN*V,GY);
+  ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1;ctx.beginPath();
+  for(let x=0;x<=COLS;x+=5){ctx.moveTo(x*V,0);ctx.lineTo(x*V,GY)}
+  for(let y=0;y<=ROWS;y+=5){ctx.moveTo(0,y*V);ctx.lineTo(WW,y*V)}ctx.stroke();
+  E.t.forEach((p,i)=>{if(p[0]*V<mobileEditorPan-30||p[0]*V>mobileEditorPan+W+30)return;
+    ctx.save();ctx.translate(p[0]*V+V/2,p[1]*V-7);drawLandlord({t:time+i,x:0,y:0});ctx.restore()});
+  if(E.drag&&!E.drag.pen){
+    const a=E.drag.a,b=E.drag.b;
+    ctx.fillStyle=E.drag.m?MATCOL[E.drag.m]:'rgba(255,255,255,.4)';ctx.globalAlpha=.55;
+    ctx.fillRect(Math.min(a[0],b[0])*V,Math.min(a[1],b[1])*V,
+      (Math.abs(a[0]-b[0])+1)*V,(Math.abs(a[1]-b[1])+1)*V);ctx.globalAlpha=1;
+  }
+  ctx.restore();
+  /* The tool dock fills the phone's remaining height and stays tappable. */
+  ctx.fillStyle='rgba(10,14,28,.97)';ctx.fillRect(0,GY,W,H-GY);
+  const top=GY+7;
+  btn(8,top,90,39,'< MENU',goSelect,{size:15});
+  btn(104,top,103,39,'< PAN',()=>{mobileEditorPan=Math.max(0,mobileEditorPan-256)},{size:15});
+  btn(212,top,103,39,'PAN >',()=>{mobileEditorPan=Math.min(WW-W,mobileEditorPan+256)},{size:15});
+  txt(Math.round(mobileEditorPan/V)+1+'–'+Math.min(COLS,Math.round((mobileEditorPan+W)/V)),
+    W-8,top+27,13,'#ddd','right');
+  for(let m=0;m<=8;m++){
+    const x=8+(m%5)*106,y=top+46+Math.floor(m/5)*45;
+    btn(x,y,100,40,m?MAT[m].n.toUpperCase():'ERASE',()=>{
+      if(m===0)E.tool='erase';else{E.tool='mat';E.mat=m}},
+      {size:12,on:m===0?E.tool==='erase':E.tool==='mat'&&E.mat===m});
+  }
+  let yy=top+143;
+  const button=(i,label,fn,on)=>btn(8+i*106,yy,100,42,label,fn,{size:13,on:!!on});
+  button(0,E.tool==='lord'?'LANDLORD ✓':'LANDLORD',()=>{E.tool='lord'},E.tool==='lord');
+  button(1,BR_KIND[E.bk],()=>eKind(1));
+  button(2,'SIZE '+brushLabel(),()=>eSize(1));
+  button(3,E.shape==='pen'?'PEN':'RECT',()=>{E.shape=E.shape==='pen'?'rect':'pen'});
+  button(4,'UNDO',eUndo);
+  yy+=50;
+  button(0,'MEN −',()=>{E.men=Math.max(1,E.men-1)});
+  button(1,'MEN '+E.men,()=>{E.men=Math.min(12,E.men+1)});
+  button(2,'THICK '+E.bt,eThick);
+  button(3,'CLEAR',()=>{eSnap();E.g=new Uint8Array(COLS*ROWS);E.t=[]});
+  button(4,'SAVE',eSave,true);
+  yy+=50;
+  btn(8,yy,172,46,'TEST PLAY',eTest,{size:16,on:true,col:'#7dff5a'});
+  btn(188,yy,154,46,'SHARE',()=>{if(!E.t.length){toast('ach','Add a landlord first','');return}
+    exportCode({n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t})},{size:16});
+  btn(350,yy,180,46,'LEVELS',goSelect,{size:16});
+  txt('Drag to build · PAN moves the map · Rotate for full desktop tools',W/2,H-14,12,'#ddd','center');
+}
 function drawEditor(){
+  if(mobilePortrait){drawMobileEditor();return}
   ctx.setTransform(1,0,0,1,0,0);
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const m=E.g[idx(x,y)];if(m)ctx.drawImage(SPR[m][hsh(x,y)&3][0],x*V,y*V)}
   ctx.fillStyle='rgba(255,60,60,.14)';ctx.fillRect(0,0,EMIN*V,GY);ctx.strokeStyle='rgba(255,90,90,.7)';ctx.setLineDash([6,5]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(EMIN*V,0);ctx.lineTo(EMIN*V,GY);ctx.stroke();ctx.setLineDash([]);
   txt('SLING AREA',EMIN*V/2,34,14,'#ffb0b0','center');drawBrushPanel();
-  if(innerHeight>innerWidth*1.1)txt('turn your phone sideways to build',W/2+110,24,18,'#fff','center');
+  /* Landscape editor keeps the complete original tool palette. */
   ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=1;ctx.beginPath();for(let x=EMIN;x<=COLS;x+=5){ctx.moveTo(x*V,0);ctx.lineTo(x*V,GY)}for(let y=0;y<=ROWS;y+=5){ctx.moveTo(EMIN*V,y*V);ctx.lineTo(W,y*V)}ctx.stroke();
   E.t.forEach((p,i)=>{ctx.save();ctx.translate(p[0]*V+V/2,p[1]*V-7);drawLandlord({t:time+i,x:0,y:0});ctx.restore()});
   if(E.drag&&!E.drag.pen){const a=E.drag.a,b=E.drag.b;ctx.fillStyle=E.drag.m?MATCOL[E.drag.m]:'rgba(255,255,255,.4)';ctx.globalAlpha=.55;ctx.fillRect(Math.min(a[0],b[0])*V,Math.min(a[1],b[1])*V,(Math.abs(a[0]-b[0])+1)*V,(Math.abs(a[1]-b[1])+1)*V);ctx.globalAlpha=1}
