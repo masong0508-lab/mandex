@@ -1225,7 +1225,7 @@ function dive(){
 //  TARGETS: grumpy landlords
 // =====================================================================
 function solidAt(px,py){if(!grid)return false;const gx=Math.floor(px/V),gy=Math.floor(py/V);if(gy>=ROWS)return true;return inb(gx,gy)&&grid[idx(gx,gy)]>0}
-function killTarget(t,hard){if(!t.alive)return;
+function killTarget(t,hard,direct=false){if(!t.alive)return;
   if(!hard&&t.hp>1){if(t.inv>0)return;t.hp--;t.inv=.7;t.stun=.6;t.armor=0;shake=Math.max(shake,6);SFX.crunch(.6);spark(t.x,t.y-6,8,240);popText(t.x,t.y-40,'OOF!  '+t.hp+' LEFT','#ffd23f',16);return}
   t.alive=false;if(man&&man.mode==='walk'){man.wt=Math.min(man.wt+3,WALK_T+15);popText(t.x,t.y-38,'+3s','#7dff5a',18)}onLandlord();combo=comboLeft>0?Math.min(5,combo+1):1;comboLeft=2.5;comboPeak=Math.max(comboPeak,combo);
   // One BANK SHOT bonus per rubber rebound. Other TNT/rubble evictions are
