@@ -11,6 +11,8 @@ on:
       - "tools/gen_manspr.py"
       - "tools/turn_hair_finish.py"
       - "tools/gen_dc_art.py"
+      - "tools/hd_wolf_finish.py"
+      - "tools/sprite_pinhole_cleanup.py"
       - "dreamcast/main.c"
       - "test/dreamcast_wolf_atlas_test.py"
       - "test/character_turnaround_test.py"
@@ -55,6 +57,9 @@ jobs:
           python3 test/head_turnaround_test.py
           python3 test/character_turnaround_test.py
           python3 test/dreamcast_wolf_atlas_test.py
+          python3 test/hd_wolf_volume_test.py
+          python3 test/sprite_volume_continuity_test.py
+          python3 tools/sprite_pinhole_cleanup.py --check
           python3 tools/retouch_baked_heads.py --check
           python3 tools/turn_hair_finish.py --check
           python3 test/sprite_surface_test.py
@@ -126,7 +131,7 @@ jobs:
               exit 0
             fi
             changed="$(git diff --name-only "$GITHUB_SHA" origin/main)"
-            if echo "$changed" | grep -Eq '^(art/|web/|tools/(gen_manspr.py|manhead.py|gen_dc_art.py|retouch_baked_heads.py|turn_hair_finish.py)|dreamcast/main.c|ds/source/|3ds/main.c|.github/workflows/rebake-character-art.yml)'; then
+            if echo "$changed" | grep -Eq '^(art/|web/|tools/(gen_manspr.py|manhead.py|gen_dc_art.py|retouch_baked_heads.py|turn_hair_finish.py|sprite_pinhole_cleanup.py|hd_wolf_finish.py)|dreamcast/main.c|ds/source/|3ds/main.c|.github/workflows/rebake-character-art.yml)'; then
               echo "Model, atlas, renderer, or baker source changed during baking:"
               echo "$changed"
               echo "Skip publication; the validated generated atlases remain in this run's artifact."
