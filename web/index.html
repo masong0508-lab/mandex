@@ -4672,6 +4672,102 @@ function drawMobileOptions(){
   if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{MOBILE.page.options=1},{size:18});
   else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{MOBILE.page.options=0},{size:18});
 }
+/* Portrait creator: a genuine 120-column editing surface with horizontal
+   panning, unclipped world-cell touch mapping and a separate tool/action tray.
+   No copy of E.g, no second offscreen canvas and no changed save encoding. */
+function mobileEditorSurface(){
+  const h=Math.min(GY,Math.max(300,H-320));
+  MOBILE.editorHeight=h;MOBILE.editorScale=h/GY;
+  MOBILE.editorX=clamp(MOBILE.editorX,0,Math.max(0,WW-W/MOBILE.editorScale));
+  return h;
+}
+function mobileEditorToWorld(x,y){
+  return [x/MOBILE.editorScale+MOBILE.editorX,y/MOBILE.editorScale];
+}
+function drawMobileEditor(){
+  const surface=mobileEditorSurface(),sc=MOBILE.editorScale;
+  ctx.fillStyle='#24344e';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W,surface);ctx.clip();
+  ctx.scale(sc,sc);ctx.translate(-MOBILE.editorX,0);
+  ctx.drawImage(bgA,0,0);
+  const first=Math.max(0,Math.floor(MOBILE.editorX/V)-1),
+    last=Math.min(COLS,Math.ceil((MOBILE.editorX+W/sc)/V)+1);
+  for(let y=0;y<ROWS;y++)for(let x=first;x<last;x++){
+    const mat=E.g[idx(x,y)];if(mat)ctx.drawImage(SPR[mat][hsh(x,y)&3][0],x*V,y*V);
+  }
+  ctx.fillStyle='rgba(255,60,60,.13)';ctx.fillRect(0,0,EMIN*V,GY);
+  ctx.strokeStyle='rgba(255,255,255,.11)';ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let x=first;x<last;x+=5){ctx.moveTo(x*V,0);ctx.lineTo(x*V,GY)}
+  for(let y=0;y<=ROWS;y+=5){ctx.moveTo(first*V,y*V);ctx.lineTo(last*V,y*V)}
+  ctx.stroke();
+  for(const p of E.t){
+    ctx.save();ctx.translate(p[0]*V+V/2,p[1]*V-7);drawLandlord({t:time,x:0,y:0});ctx.restore();
+  }
+  if(E.drag&&!E.drag.pen){
+    const a=E.drag.a,b=E.drag.b;ctx.fillStyle=E.drag.m?MATCOL[E.drag.m]:'rgba(255,255,255,.4)';
+    ctx.globalAlpha=.5;ctx.fillRect(Math.min(a[0],b[0])*V,Math.min(a[1],b[1])*V,
+      (Math.abs(a[0]-b[0])+1)*V,(Math.abs(a[1]-b[1])+1)*V);ctx.globalAlpha=1;
+  }
+  if(mouseX>=0&&mouseY>=0&&mouseY<surface){
+    const w=mobileEditorToWorld(mouseX,mouseY),pos=eCell(w[0],w[1]),B=brushDims(),
+      ox=pos[0]-((B.w-1)>>1),oy=pos[1]-((B.h-1)>>1);
+    ctx.strokeStyle='#fff';ctx.lineWidth=2/sc;
+    if(E.tool==='lord')ctx.strokeRect(pos[0]*V,pos[1]*V,V*2,V*2);
+    else if(B.r){ctx.beginPath();ctx.arc(pos[0]*V+V/2,pos[1]*V+V/2,(B.r+.5)*V,0,7);ctx.stroke()}
+    else ctx.strokeRect(ox*V,oy*V,B.w*V,B.h*V);
+  }
+  ctx.restore();
+  ctx.fillStyle='rgba(12,17,34,.92)';ctx.fillRect(0,surface,W,H-surface);
+  btn(10,surface+8,120,48,'< PAN',()=>{MOBILE.editorX=Math.max(0,MOBILE.editorX-150)},{size:18});
+  txt('COL '+(Math.floor(MOBILE.editorX/V)+1)+'–'+
+    Math.min(COLS,Math.ceil((MOBILE.editorX+W/sc)/V)),
+    W/2,surface+38,16,'#ffd23f','center');
+  btn(W-130,surface+8,120,48,'PAN >',()=>{
+    MOBILE.editorX=Math.min(Math.max(0,WW-W/sc),MOBILE.editorX+150)
+  },{size:18});
+  const y=surface+66,p=!!MOBILE.page.edit,cols=5,cw=(W-24-4*6)/cols;
+  if(!p){
+    const mats=['ERASE',...MAT.slice(1).map(m=>m.n.toUpperCase()),'LANDLORD'];
+    mats.forEach((name,i)=>{
+      const x=12+(i%cols)*(cw+6),yy=y+Math.floor(i/cols)*48;
+      btn(x,yy,cw,42,name,()=>{
+        if(i===0)E.tool='erase';
+        else if(i===mats.length-1)E.tool='lord';
+        else{E.tool='mat';E.mat=i}
+      },{size:name.length>6?11:14,on:i===0?E.tool==='erase':i===mats.length-1?E.tool==='lord':E.tool==='mat'&&E.mat===i});
+    });
+    const labels=BR_KIND;
+    labels.forEach((name,i)=>btn(12+i*132,y+104,120,43,name,()=>eKind(i-E.bk),
+      {size:14,on:E.bk===i}));
+    btn(12,y+154,120,42,'SIZE -',()=>eSize(-1),{size:16});
+    btn(144,y+154,120,42,'SIZE +',()=>eSize(1),{size:16});
+    btn(276,y+154,120,42,'THICK '+E.bt,eThick,{size:15});
+    btn(408,y+154,120,42,E.shape==='pen'?'PEN':'RECT',()=>{
+      E.shape=E.shape==='pen'?'rect':'pen'
+    },{size:16});
+    txt('BRUSH '+brushLabel()+'  •  '+(E.tool==='mat'?MAT[E.mat].n:E.tool).toUpperCase(),
+      W/2,Math.min(H-80,y+225),14,'#cfd','center');
+  }else{
+    const actions=[
+      ['MEN -',()=>{E.men=Math.max(1,E.men-1)}],
+      ['MEN +',()=>{E.men=Math.min(12,E.men+1)}],
+      ['UNDO',eUndo],
+      ['CLEAR',()=>{eSnap();E.g=new Uint8Array(COLS*ROWS);E.t=[]}],
+      ['TEST PLAY',eTest],['SAVE',eSave],
+      ['SHARE',()=>{if(!E.t.length){toast('ach','Add a landlord first','');return}
+        exportCode({n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t})}],
+      ['EXIT',()=>{selTab=1;goSelect()}]
+    ];
+    actions.forEach((a,i)=>btn(12+(i%4)*132,y+Math.floor(i/4)*59,120,52,a[0],a[1],
+        {size:15,on:i===4}));
+    txt('MEN '+E.men+'  •  '+(E.name||'UNSAVED LEVEL'),
+      W/2,Math.min(H-76,y+164),17,'#ffd23f','center');
+  }
+  btn(30,H-57,W-60,50,p?'< BRUSH TOOLS':'LEVEL ACTIONS >',()=>{
+    MOBILE.page.edit=p?0:1
+  },{size:18,on:!p,col:'#7dff5a'});
+}
 function drawMobileScreen(){
   switch(state){
     case 'menu':drawMobileMenu();break;
