@@ -219,7 +219,45 @@ void swiWaitForVBlank(void){
   int mode = world.man.mode;
   if(vf == 1 && !getenv("INTRO_TEST") && !getenv("INTRO_SKIP")) intro_seen = 1;
   if(vf == 1 && !getenv("END_TEST")) end_seen = 6;                  /* the other scripted runs press A on the title and expect level 1 at once */
-  if(getenv("OPTIONS_LOAD")){                                      /* second boot after OPTIONS_TEST: the options come back from the chip (collapse off, splat) */
+  if(getenv("PAUSE_DRAG_TEST")){
+    static int fails, initial_men, initial_music;
+#define PAUSE_CHECK(c,msg) do{if(!(c)){printf("FAIL: %s\n",msg);fails++;}else printf("ok: %s\n",msg);}while(0)
+    /* Exercise real title-to-play input handling, not a simulated press
+       handler: START while the stylus is pulling must cancel without a
+       launch; START to resume must restore the chosen soundtrack. */
+    if(vf==2){
+      app=ST_PLAY;load_level(0);world.banner=0;
+      initial_men=world.men;initial_music=music_pref;
+      PAUSE_CHECK(initial_music==1,"test begins with music enabled");
+    }
+    if(vf==3){g_keys|=KEY_TOUCH;g_touch.px=64;g_touch.py=125;}
+    if(vf==4){g_keys|=KEY_TOUCH;g_touch.px=20;g_touch.py=145;}
+    if(vf==5){
+      PAUSE_CHECK(dragging && world.man.mode==MAN_AIM,
+                  "stylus pulled the sling before pausing");
+      g_keys|=KEY_TOUCH|KEY_START;
+      g_touch.px=20;g_touch.py=145;
+    }
+    if(vf==6){
+      PAUSE_CHECK(app==ST_PAUSE && !dragging && !pad_used,
+                  "START pauses and clears the touch/D-pad input latch");
+      PAUSE_CHECK(world.man.mode==MAN_AIM && world.men==initial_men &&
+                  world.man.x==MX_ANCHOR_X && world.man.y==MX_ANCHOR_Y,
+                  "pausing a stylus pull safely returns to anchor without firing");
+    }
+    if(vf==8)g_keys|=KEY_START;
+    if(vf==9)PAUSE_CHECK(app==ST_PLAY && music_pref==initial_music,
+                        "START resumes play without changing sound preference");
+    if(vf==10){g_keys|=KEY_TOUCH;g_touch.px=64;g_touch.py=125;}
+    if(vf==11){g_keys|=KEY_TOUCH;g_touch.px=20;g_touch.py=145;}
+    if(vf==12)PAUSE_CHECK(dragging,"a fresh stylus grab works after resuming");
+    if(vf==13){
+      PAUSE_CHECK(!dragging && world.man.mode==MAN_FLY && world.men==initial_men-1,
+                  "releasing a new pull after resume launches exactly once");
+      printf(fails?"pause and stylus drag: %d FAILED\n":"pause and stylus drag: all passed\n",fails);
+      exit(fails!=0);
+    }
+  } else if(getenv("OPTIONS_LOAD")){                                      /* second boot after OPTIONS_TEST: the options come back from the chip (collapse off, splat) */
     if(vf == 3){ int ok = opt.collapse == 0 && opt.tool == MX_TOOL_SPLAT; printf(ok ? "ok: options loaded from the chip at boot\n" : "FAIL: options not loaded (collapse=%d tool=%d)\n", opt.collapse, opt.tool); exit(!ok); }
   } else if(getenv("TOOLBAR_TEST")){
     static int fails;
