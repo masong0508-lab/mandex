@@ -3394,7 +3394,14 @@ function draw(){
     }
     ctx.restore();
   }
-  for(const t of targets)if(t.alive){const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);ctx.restore()}
+  const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';
+  for(const t of targets)if(t.alive){
+    const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);
+    // A compact locator above the surviving actor, positioned in the same
+    // transformed world coordinate system as the actual landlord artwork.
+    if(lastTargetVisible)txt('LAST',t.x,t.y-63,12,'#ff9ec8','center');
+    ctx.restore();
+  }
   if(cases.length)drawCases();
   if(man&&man.mode==='aim'&&man.stun>0){const q=Math.sin(time*14);txt('DAZED...',SX,SY-48+q*2,16,'#ffd23f','center');for(let i=0;i<3;i++){const a=time*7+i*2.1;txt('*',SX+Math.cos(a)*18,SY-28+Math.sin(a)*5,18,'#fff','center')}}
   if(tubes.length)drawTubes();
