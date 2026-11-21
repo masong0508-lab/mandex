@@ -481,7 +481,15 @@ static int title_pan(int t, int range){                 /* 0..range for tick t: 
 }
 static void draw_title(void){
   int pan = title_pan(title_t, 852 - 640);
-  tquad(&hdr_ttl, DCT_TTL_W, DCT_TTL_H, (float)-pan, 0, 852, 480, 0, 0, 852, 480, Z_BG, WHITE);
+  if(tx_ttl){
+    tquad(&hdr_ttl, DCT_TTL_W, DCT_TTL_H, (float)-pan, 0, 852, 480, 0, 0, 852, 480, Z_BG, WHITE);
+  }else{
+    /* PVR video RAM may be fragmented after a long session. Keep a fully
+       usable fallback title instead of submitting a freed texture header. */
+    quad(0,0,640,480,Z_BG,argb(19,24,42,255));
+    text("MANDEX",320,150,72,argb(255,210,63,255),1,Z_HUD);
+    text("THE LANDLORD SMASHER",320,225,29,WHITE,1,Z_HUD);
+  }
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
   { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD);
     snprintf(tb, sizeof tb, "Y: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(tb, 320, 418, 16, argb(255, 255, 255, 220), 1, Z_HUD); }
@@ -923,6 +931,28 @@ static void gfx_init(void){
   if(tx_ic_bot) make_hdr(&hdr_ic_bot, PVR_TXRFMT_RGB565, 256, 256, tx_ic_bot);
 }
 
+/* The 1 MB title is released before gameplay to keep the PVR atlas budget
+   intact. Re-upload it ONLY when returning to the menu (not every frame),
+   and recompile the header to point to the new VRAM allocation. */
+static void dc_return_to_title(int selected_level){
+  if(selected_level < 0 || selected_level >= MX_NUM_LEVELS) selected_level=0;
+  on_title=1;paused=0;in_intro=0;title_lv=selected_level;title_t=0;
+  if(!tx_ttl){
+    tx_ttl=load_tex(DCT_TTL_RLE,DCT_TTL_RLE_LEN,DCT_TTL_W,DCT_TTL_H);
+    if(tx_ttl)make_hdr(&hdr_ttl,PVR_TXRFMT_RGB565,DCT_TTL_W,DCT_TTL_H,tx_ttl);
+  }
+}
+static void dc_advance_after_end(void){
+  const int next=world.state==MX_WIN?world.level+1:world.level;
+  /* Final chapter must return to a real title, never load level #61. */
+  if(next >= MX_NUM_LEVELS){ dc_return_to_title(0);return; }
+  const int ce=(world.state==MX_WIN && next==MX_CH2_START)?1:
+               (world.state==MX_WIN && next==MX_CH3_START)?2:0;
+  if(ce && !(end_seen & (1<<ce)) && tx_ic_top && tx_ic_bot){
+    end_seen|=1<<ce;intro_level=next;in_intro=1;intro_start_end(ce);
+  }else load_level(next);
+}
+
 int main(int argc, char **argv){
   (void)argc; (void)argv;
   gfx_init();
@@ -960,16 +990,15 @@ int main(int argc, char **argv){
           else if(title_lv == MX_CH3_START && !wolf_seen && tx_ic_top && tx_ic_bot){ wolf_seen = 1; intro_level = title_lv; in_intro = 1; intro_start_wolf(); }
           else load_level(title_lv); }
       } else if(world.state != MX_PLAY){
-        if(pressed & CONT_START){
-          int next = world.state == MX_WIN ? world.level + 1 : world.level;
-          int ce = (world.state == MX_WIN && next == MX_CH2_START) ? 1 : (world.state == MX_WIN && next == MX_CH3_START) ? 2 : 0;   /* the closing cutscene of the chapter just finished */
-          if(ce && !(end_seen & (1 << ce)) && tx_ic_top && tx_ic_bot){ end_seen |= 1 << ce; intro_level = next; in_intro = 1; intro_start_end(ce); }
-          else load_level(next); }
+        if(pressed & CONT_START)dc_advance_after_end();
       } else if(paused){
-        if(pressed & CONT_START) paused = 0;
-        if(pressed & CONT_Y){ load_level(world.level); paused = 0; }
-        if(pressed & CONT_X){ nofight = !nofight; mx_set_fight(&world, !nofight); dc_save_sync(); }
-        if(pressed & CONT_B) mus_pref = !mus_pref;                                      /* B in the pause menu: music on / off */
+        /* Only one action can fire per press; LEFT is the reliable
+           back-to-title path missing from the original Dreamcast port. */
+        if(pressed & CONT_START)paused=0;
+        else if(pressed & CONT_Y){load_level(world.level);paused=0;}
+        else if(pressed & CONT_DPAD_LEFT)dc_return_to_title(world.level);
+        else if(pressed & CONT_X){nofight=!nofight;mx_set_fight(&world,!nofight);dc_save_sync();}
+        else if(pressed & CONT_B)mus_pref=!mus_pref;
       } else {
         if(pressed & CONT_START) paused = 1;
         if(pressed & CONT_Y) load_level(world.level);
@@ -1031,7 +1060,7 @@ int main(int argc, char **argv){
     pvr_list_begin(PVR_LIST_TR_POLY);
     cur_hdr = 0;
     if(in_intro){ draw_intro();
-    } else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART   B MUSIC", 320, 270, 24, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
+    } else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART   B MUSIC", 320, 270, 24, WHITE, 1, Z_HUD); text("DPAD LEFT: TITLE MENU", 320, 344, 22, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
     if(st&&st->ltrig>128&&st->rtrig>128){
       char stats_line[60];
       snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d",
