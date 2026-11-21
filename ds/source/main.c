@@ -134,6 +134,9 @@ enum { PT_DEBRIS, PT_SMOKE, PT_SPARK, PT_GOO, PT_HAT, PT_DUST, PT_STAR, PT_STINK
 typedef struct { int x, y, vx, vy; short life, max; u8 type, col; short r; } Part;      /* positions in 1/64 cell; r = a ring's final radius in 1/64 cell */
 #define NPART 128
 static Part parts[NPART];
+/* Highest slot ever populated since the last trim.  Avoid scanning the
+   untouched tail of the fixed particle pool on quiet DS frames. */
+static int part_high_water;
 #ifndef MX_DS_PARTICLE_HINT
 #define MX_DS_PARTICLE_HINT 1
 #endif
@@ -151,6 +154,7 @@ static int spawn(int type, real wx, real wy, int vx, int vy, int col, int life){
 #endif
     Part *p = &parts[i];
     p->x = wx >> 6; p->y = wy >> 6; p->vx = vx; p->vy = vy; p->life = p->max = (short)life; p->type = (u8)type; p->col = (u8)col; p->r = 0;
+    if(i >= part_high_water) part_high_water = i + 1;
 #if MX_DS_PARTICLE_HINT
     part_free_hint = i + 1;
 #endif
@@ -215,7 +219,7 @@ static void idle_fx(int fx, real wx, real wy, int face, int sc, int popups){
 
 static void update_parts(void){
   int ground = MX_ROWS * 64;
-  for(int i = 0; i < NPART; i++){
+  for(int i = 0; i < part_high_water; i++){
     Part *p = &parts[i];
     if(p->life <= 0) continue;
     p->life--;
@@ -243,6 +247,9 @@ static void update_parts(void){
     if(p->life <= 0 && i < part_free_hint) part_free_hint = i;
 #endif
   }
+  /* Only discard the empty tail; retain interior holes and draw order. */
+  while(part_high_water > 0 && parts[part_high_water - 1].life <= 0)
+    part_high_water--;
   for(int i = 0; i < 4; i++) if(pops[i].life > 0){ pops[i].life--; if(frame & 1) pops[i].y -= 1; }
 }
 
