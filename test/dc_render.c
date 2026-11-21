@@ -296,10 +296,34 @@ static int dc_damage_fastpath_probe(void){
          bins[0]+bins[1]+bins[2],bins[0],bins[1],bins[2],hash);
   return 0;
 }
+#ifdef MX_DC_PARTICLE_BENCH
+/* Render identical sprite scenes through reference and culled production
+ * painters. The PVR emulator compares all 640x480 pixels byte-for-byte. */
+static int dc_particle_view_probe(void){
+  memset(parts,0,sizeof parts);
+  for(int i=0;i<256;i++){
+    Part *p=&parts[i];
+    p->x=(float)((i*131)%1000)-175.0f;
+    p->y=(float)((i*97)%700)-125.0f;
+    p->life=.7f;p->max=1.0f;p->kind=i%7;
+    p->c=argb(150+(i&31),110+(i&63),155+(i&47),230);
+  }
+  world.time=2.5f;
+  memset(fb,0,sizeof fb);cur_hdr=0;nq=0;
+  dc_particles_rasterized=0;
+  draw_particles();
+  printf("DC_PARTICLE_VIEW_HASH %08x\n",dc_hash(fb,sizeof fb));
+  printf("DC_PARTICLE_VIEW_RASTERIZED %u\n",dc_particles_rasterized);
+  return 0;
+}
+#endif
 int main(void){
   if(getenv("DC_DAMAGE_FASTPATH_PROBE"))return dc_damage_fastpath_probe();
   if(getenv("DC_FASTPATH_PROBE"))return dc_fastpath_probe();
   gfx_init();
+#ifdef MX_DC_PARTICLE_BENCH
+  if(getenv("DC_PARTICLE_VIEW_PROBE"))return dc_particle_view_probe();
+#endif
   if(getenv("DC_OUTFIT_RECOLOR_PROBE"))return dc_outfit_memory_probe();
   sound_init(); if(!snd_ok){ puts("FAIL: dc sound did not initialise"); return 1; }
   if(getenv("DC_MENU_FLOW_TEST"))return dc_menu_flow_test();
