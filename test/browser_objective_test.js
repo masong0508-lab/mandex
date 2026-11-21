@@ -30,6 +30,10 @@ assert.strictEqual(probe(three,0,'none',-999,'lose').phase,'failed');
 assert(web.includes('const objective=objectiveSnapshot(),lb=objective.remaining;'),
   'production browser HUD uses objective helper, not old disconnected target counts');
 assert(web.includes("const oy=P?66:38;"),'objective strip is positioned for portrait and landscape');
+assert(web.includes("const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';"),
+  'a single surviving landlord is identified in the real world renderer');
+assert(web.includes("if(lastTargetVisible)txt('LAST',t.x,t.y-63,12"),
+  'the locator follows the actual landlord coordinate, not an unrelated HUD point');
 const start=web.indexOf('<script>'),stop=web.indexOf('</script>',start);
 assert(start>=0&&stop>start);
 new Function(web.slice(start+8,stop));
