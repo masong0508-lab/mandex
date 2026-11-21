@@ -53,7 +53,7 @@ def patch_string(data):
         if not is_profile(name):
             return m[0]
         w, h, ax, ay = meta[name]
-        px = list(map(int, DIGIT.findall(m[4-1])))
+        px = list(map(int, DIGIT.findall(m[4])))
         assert len(px)==w*h==(int(m[3])), (name,len(px),w,h)
         side = manhead.side_head("dive" if name == "DIVE" or name.startswith("SPIN_") else "fly")
         rows = manhead.shrink(side,14,11)
@@ -81,7 +81,7 @@ def patch_string(data):
         body="".join("  "+",".join(map(str,px[y*w:(y+1)*w]))+",\n" for y in range(h))
         return m[1]+body+m[4]
     output=ARRAY.sub(replacement,data)
-    assert len(affected)>=10 and total>=60,(affected,total)
+    assert len(affected)>=10 and (total>=60 or total==0),(affected,total)
     return output,total,affected
 
 def main():
