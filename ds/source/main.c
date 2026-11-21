@@ -1128,14 +1128,15 @@ static void draw_man(const View *v){
     int p = v->ppc * 3 / 4, phase = mx_walk_anim_phase(m);
     int fr = MSF_SPIN_6 + (phase == 0 ? -1 : phase == 2 ? 1 : 0);
     int face = m->face < 0 ? -1 : 1;
-    int fy = vy(v, m->y + R(2.375)) - (phase == 1 || phase == 3 ? 1 : 0);
+    int foot_lift = (int)((rmul(mx_walk_foot_lift(m),RI(v->ppc)) + R(0.5)) >> 12);
+    int fy = vy(v, m->y + R(2.375)) - foot_lift;
     spr_man_walk(v->buf, x, fy, p < 1 ? 1 : p, face, fr, 0);
     if(m->pT > 0){ int r = v->ppc * 5, ax = x + face * v->ppc * 4; for(int k = -3; k <= 3; k++) gfx_px(v->buf, ax + face * (r - k * k * r / 18), y + k * v->ppc * 3 / 4, C_WHITE); }   /* punch swoosh */
     return;
   }
   int pose = POSE_IDLE, face = 1;
   ManJig jg = man_jig(v);
-  if(m->mode == MAN_FLY){ pose = m->dive ? POSE_DIVE : POSE_FLY; face = m->vx >= 0 ? 1 : -1; }
+  if(m->mode == MAN_FLY){ pose = m->dive ? POSE_DIVE : POSE_FLY; face = m->face < 0 ? -1 : 1; }
   else if(m->mode == MAN_STUCK) pose = POSE_STUCK;
   else if(m->mode == MAN_AIM && dragging) pose = POSE_DRAG;
   if(m->mode == MAN_AIM) gfx_ell(v->buf, x, y + v->ppc, v->ppc * 2, v->ppc * 3 / 2, C_HAIR2);        /* sling pouch */
