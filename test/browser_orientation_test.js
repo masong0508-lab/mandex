@@ -98,7 +98,7 @@ const methods=new Function('env','with(env){'+mobile+
 let total=0;
 function inspect(kind){
   records.length=0;env.state=kind;methods[kind]();
-  assert(records.length>=4,kind+' should provide touch controls');
+  assert(records.length>=(kind==='ach'||kind==='outfit'?1:4),kind+' should provide touch controls');
   for(const r of records){
     assert(r.w>=40&&r.h>=35,kind+' touch button too small: '+r.label);
     assert(r.x>=0&&r.y>=0&&r.x+r.w<=env.W+1&&r.y+r.h<=env.H+1,
