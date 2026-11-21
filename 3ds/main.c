@@ -45,11 +45,26 @@ static short *mus_buf; static int mus_n, mus_playing, mus_pref = 1;             
 static void sound_init(void){
   if((snd_err = (int)ndspInit()) != 0) return;
   ndspSetOutputMode(NDSP_OUTPUT_STEREO);
-  static short tmp[MX_SND_MAX];
+  /* Render once, directly to the DSP-visible allocation. This reclaims the
+     permanently reserved ~47 KiB max-effect PCM scratch array and removes
+     the copy at startup; effects retain exactly the same samples. */
   for(int i = 0; i < SFX_COUNT; i++){
-    int n = mx_snd_render(i, tmp, MX_SND_MAX);
-    snd_buf[i] = (short *)linearAlloc(n * 2); if(!snd_buf[i]){ snd_err = -2; return; }
-    memcpy(snd_buf[i], tmp, n * 2); snd_len[i] = n; DSP_FlushDataCache(snd_buf[i], n * 2);
+    int n = mx_snd_sample_count(i);
+    if(n <= 0){ snd_err = -3; break; }
+    snd_buf[i] = (short *)linearAlloc((size_t)n * sizeof(short));
+    if(!snd_buf[i]){ snd_err = -2; break; }
+    if(mx_snd_render(i, snd_buf[i], n) != n){ snd_err = -3; break; }
+    snd_len[i] = n; DSP_FlushDataCache(snd_buf[i], (uint32_t)(n * sizeof(short)));
+  }
+  if(snd_err){
+    /* No partially loaded PCM allocations if linear memory runs out.
+       The game remains playable without sound, as before. */
+    for(int i = 0; i < SFX_COUNT; i++){
+      if(snd_buf[i]){ linearFree(snd_buf[i]); snd_buf[i] = NULL; }
+      snd_len[i] = 0;
+    }
+    ndspExit();
+    return;
   }
   for(int c = 0; c < 8; c++){
     float mix[12] = { 0 }; mix[0] = mix[1] = 0.45f;
