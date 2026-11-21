@@ -161,6 +161,32 @@ static int n3_fastpath_probe(void){
            f,n3_hash(fb_top[0],sizeof fb_top[0]),
            n3_hash(fb_top[1],sizeof fb_top[1]),n3_hash(fb_bot,sizeof fb_bot));
   }
+  /* Exercise the ACTUAL standing-cell and moving-rubble drawing with
+     artificial chunks that straddle all four screen edges. Both render
+     variants must hash to precisely identical stereo+bottom bytes. */
+  {
+    MxChunk *ch=&world.chunks[0];
+    ch->active=1;ch->count=24;
+    for(int k=0;k<24;k++){
+      MxCell *a=&ch->cells[k];a->dead=0;a->m=(k&1)?MX_STONE:MX_WOOD;
+      a->wx=R((k*13)%157);a->wy=R((k*11)%79);
+    }
+    View vc={&top,4,120,50,45,18};
+    View vr={&top,4,122,50,45,18};
+    View vb={&bot,4,70,35,45,18};
+    for(int sample=0;sample<3;sample++){
+      g_dim=sample==0?1.0f:sample==1?0.7f:0.93f;
+      ch->cells[sample].wx=R(45);ch->cells[sample].wy=R(18);
+      memset(fb_top,0,sizeof fb_top);memset(fb_bot,0,sizeof fb_bot);
+      top.fb=fb_top[0];draw_cells(&vc);
+      top.fb=fb_top[1];draw_cells(&vr);
+      top.fb=fb_top[0];draw_cells(&vb);
+      printf("N3_FAST_RUBBLE sample=%d left=%08x right=%08x bottom=%08x\n",
+             sample,n3_hash(fb_top[0],sizeof fb_top[0]),
+             n3_hash(fb_top[1],sizeof fb_top[1]),
+             n3_hash(fb_bot,sizeof fb_bot));
+    }
+  }
   return 0;
 }
 int main(int argc, char **argv){
