@@ -1,0 +1,53 @@
+name: DS fast stability regressions
+
+# Small independent gate for the DS renderer, audio command queue and
+# walking-animation math. Full cross-platform host tests take longer and are
+# frequently superseded during rapid optimization commits.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ds/source/**"
+      - "ds/bare/**"
+      - "core/**"
+      - "art/**"
+      - "test/landlord_motion_regression.py"
+      - "test/ds_render.c"
+      - "test/ds_sound_queue_test.c"
+      - "test/sfx_catchup_test.c"
+      - "test/music_clock_test.c"
+      - "test/gfx_clip_test.c"
+      - ".github/workflows/ds-fast-stability.yml"
+  workflow_dispatch:
+
+jobs:
+  ds-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate landlord art and travel-based gait
+        run: python3 test/landlord_motion_regression.py
+      - name: Audio queue, missed-VBlank effects and tempo
+        run: |
+          set -eu
+          cd test
+          gcc -std=gnu99 -O2 -Wno-pointer-to-int-cast -I../ds/bare ds_sound_queue_test.c -o /tmp/mx_ds_sound_queue
+          /tmp/mx_ds_sound_queue
+          gcc -std=gnu99 -O2 -Istubs -I../ds/source sfx_catchup_test.c -o /tmp/mx_ds_effects
+          /tmp/mx_ds_effects
+          gcc -std=gnu99 -O2 -Istubs -I../ds/source music_clock_test.c -o /tmp/mx_ds_music
+          /tmp/mx_ds_music
+      - name: Exact DS graphics clipping, animation phase and particle lifetimes
+        run: |
+          set -eu
+          cd test
+          gcc -std=gnu99 -O2 -DMX_FIXED -Istubs -I../core -I../ds/source -I../art \
+            gfx_clip_test.c ../ds/source/gfx.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o /tmp/mx_ds_gfx_clip
+          /tmp/mx_ds_gfx_clip
+          gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED \
+            -Istubs -I../core -I../art -I../ds/source \
+            ds_render.c ../ds/source/gfx.c ../ds/source/sfx.c ../ds/source/intro.c \
+            ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o /tmp/mx_ds_quick_render
+          DS_WALK_PHASE_PROBE=1 /tmp/mx_ds_quick_render
+          DS_PARTICLE_PROBE=1 /tmp/mx_ds_quick_render
