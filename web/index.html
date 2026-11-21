@@ -902,7 +902,7 @@ function manPlow(){
     for(const a of ch.cells){if(a.dead||Math.hypot(a.wx-m.x,a.wy-m.y)>=R+RC)continue;touched=true;hit=true;ax+=a.wx;ay+=a.wy;n++;const cost=a.h*K;
       if(E>=cost){E-=cost;a.dead=true;const c=MAT[a.m].c;for(let k=0;k<2;k++)chip(a.wx,a.wy,c,m.vx*.25+(rnd()-.5)*200,m.vy*.25-rnd()*150)}else{a.h-=E/K;E=0}}
     if(hit&&ch.hitCd<=0){ch.hitCd=.12;applyImpulse(ch,ax/n,ay/n,m.vx*mass*.9,m.vy*mass*.9)}}
-  for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<R+t.r+2&&!batBlock(t,m))killTarget(t);
+  for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<R+t.r+2&&!batBlock(t,m))killTarget(t,false,true);
   if(touched){const spent=E0-E,sc=spent/64;
     if(sc>20){const f=Math.min(.55,sc/2400);wobKick(Math.floor(m.x/V),Math.floor(m.y/V),5,m.vx/V*f,m.vy/V*f)}   // what the man gave up is shoved into the structure
     if(spent>2000&&m.hitCd<=0){m.hitCd=.06;SFX.crunch(Math.min(1,spent/160000));shake=Math.max(shake,Math.min(9,spent/28000));spark(m.x,m.y,4,200);dust(m.x,m.y,2,9)}
@@ -1230,7 +1230,7 @@ function killTarget(t,hard,direct=false){if(!t.alive)return;
   t.alive=false;if(man&&man.mode==='walk'){man.wt=Math.min(man.wt+3,WALK_T+15);popText(t.x,t.y-38,'+3s','#7dff5a',18)}onLandlord();combo=comboLeft>0?Math.min(5,combo+1):1;comboLeft=2.5;comboPeak=Math.max(comboPeak,combo);
   // One BANK SHOT bonus per rubber rebound. Other TNT/rubble evictions are
   // excluded by requiring direct proximity to the flying character.
-  const bank=bankLeft>0&&man&&man.mode==='fly'&&Math.abs(t.x-man.x)<4*V&&Math.abs(t.y-man.y)<4*V;
+  const bank=bankLeft>0&&direct&&man&&man.mode==='fly';
   const bonus=(combo-1)*1000+(bank?1500:0);if(bank)bankLeft=0;
   score+=5000+bonus;SFX.ding();slow=Math.max(slow,.25);
   const comboWords=['EVICTED!','DOUBLE TROUBLE!','THREESOME OF DOOM!','FOURCLOSED!','RENTAL ORGY!'];
