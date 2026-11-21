@@ -7,6 +7,8 @@ on:
   push:
     branches: [main]
     paths: ["dreamcast/**", "core/**", "art/**", ".github/workflows/build-dreamcast.yml"]
+  pull_request:
+    paths: ["dreamcast/**", "core/**", "art/**", ".github/workflows/build-dreamcast.yml"]
   workflow_dispatch:
     inputs:
       image:

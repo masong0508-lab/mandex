@@ -20,6 +20,7 @@
 #include <string.h>
 #include "mx.h"
 #include "mx_meta.h"
+#include "mx_tool_feedback.h"
 #include "mx_objective.h"
 #include "gfx.h"
 #include "sfx.h"
@@ -1508,15 +1509,23 @@ static void bottom_aim(View *v){
   gfx_text(v->buf,4,3,"MEN",C_GOLD,1);
   draw_men_icons(v->buf,36,1,1);
   gfx_text(v->buf,256-4-gfx_text_w("SELECT RESTART",1),3,"SELECT RESTART",C_UILINE,1);
-  const MxMan *m=&world.man;
-  real dx=m->x-MX_ANCHOR_X,dy=m->y-MX_ANCHOR_Y;
-  int pct=rsqrt(rmul(dx,dx)+rmul(dy,dy))*100/MX_PULL_MAX;
+  /* Same exact pull gauge as the other ports, now automatically disabled
+     when the valve holds him or a stun prevents a real launch. */
+  int pct=mx_sling_power_pct(&world);
   gfx_rect(v->buf,0,149,256,43,C_UIBG);
   gfx_rect(v->buf,0,149,256,1,C_UILINE);
   gfx_text(v->buf,6,172,"POWER",C_WHITE,1);
   gfx_rect(v->buf,6,180,82,8,C_UIBG);gfx_rect(v->buf,7,181,80,6,C_DARK);
   gfx_rect(v->buf,7,181,gfx_clamp(pct,0,100)*80/100,6,pct<50?C_GOO:pct<85?C_GOLD:C_RED);
-  if(pct<14&&(frame&32))gfx_text_c(v->buf,128,139,"DRAG MAN BACK - RELEASE TO FLING",C_WHITE,C_BLACK,1);
+  /* Stable and truthful shot readiness instead of a flashing generic
+     drag prompt. Selection never spends a one-shot power before launch. */
+  MxToolFeedback cue=mx_tool_feedback(&world);
+  if(world.state==MX_PLAY && cue.selected && cue.remaining>0)
+    gfx_text_c(v->buf,128,127,mx_tool_effect(cue.selected),C_GOLD,C_BLACK,1);
+  if(world.state==MX_PLAY)
+    gfx_text_c(v->buf,128,139,mx_tool_status_label(cue.phase),
+               cue.phase==MX_SHOT_DAZED?C_RED:
+               cue.phase==MX_SHOT_PULL?C_GOO:C_WHITE,C_BLACK,1);
   for(int k=0;k<6;k++){
     int pw=AIM_TOOLS[k].pw;
     int left=k==0?mx_valve_unlocked(&stats):world.pw_left[pw]>0;
@@ -1528,6 +1537,13 @@ static void bottom_aim(View *v){
     gfx_rect(v->buf,x+w-1,y,1,h,C_UILINE);
     gfx_rect(v->buf,x,y+h-1,w,1,C_UILINE);
     gfx_text_c(v->buf,x+w/2,y+(h-5)/2,AIM_TOOLS[k].name,on?C_BLACK:left?C_WHITE:C_GRAY,on?C_GOLD:C_UIBG,1);
+    /* Live inventory badge: 0 means used up, not a broken button. The
+       valve is a reusable unlock and deliberately has no stock number. */
+    if(k>0){
+      int qty=mx_tool_stock(&world,pw);
+      gfx_text(v->buf,x+w-7,y+2,gfx_int(qty),
+               on?C_BLACK:qty?C_GOLD:C_GRAY,1);
+    }
   }
 }
 
