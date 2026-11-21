@@ -11,6 +11,7 @@ const G=0,RC=4;
 let targets=[],chunks=[],shake=0,kills=0;
 const solidAt=()=>false, lordAI=()=>{},collapseSurvive=()=>false;
 const popText=()=>{},SFX={thud(){}};
+const killTarget=t=>{t.alive=false;kills++};
 `+src+`
 function run(dx,dy,speed,dead=false){
   kills=0;
