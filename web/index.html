@@ -41,7 +41,7 @@ let tubes=[];   // pneumatic tubes of the current level (chapter 2): see tubeSte
 let pads=[];    // bounce pads of the current level (walk levels): pink rubber strips that boing the man up a shaft, see padCheck / drawPads
 let level=0,state='title',shake=0,freeze=0,slow=0,needSupport=false,dragging=false;
 let score=0,shownScore=0,time=0,winT=0,loseT=0,banner=0,hint=1,waitT=0,chunkId=0,flash=0;
-let combo=0,comboPeak=0,comboLeft=0;  // 2.5-second eviction streak, matching the shared console core
+let combo=0,comboPeak=0,comboLeft=0,bankLeft=0;  // streak and optional rubber bank-shot bonus
 
 // =====================================================================
 //  AUDIO (tiny synth)
@@ -529,7 +529,7 @@ function load(l,custom){
   /* The air valve and every tool begin unequipped for each new level;
      a previously saved AIR choice cannot obstruct the very next shot. */
   OPT().tool='none';
-  pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;banner=2.4;waitT=0;
+  pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;bankLeft=0;banner=2.4;waitT=0;
   tubes=[];pads=[];CL.build();paper.fill(0);interiors.forEach((r,n)=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(inb(x,y))paper[idx(x,y)]=n+1});unclipTargets();
   zonePaid=[];if(CL.slings){const zb=CL.zones||[];for(const t of targets){t.zone=0;for(let k=0;k<zb.length;k++)if(t.x>=zb[k]*V)t.zone=k+1}setSling(0)}else{SX=128;SY=GY-118;VX=36;VY=SY+58;slingK=0}
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
@@ -547,6 +547,7 @@ function zoneAdvance(){
   zonePaid[slingK]=1;const bonus=CL.zoneMen||4;men+=bonus;score+=3000;flash=Math.max(flash,.5);SFX.wooo&&SFX.wooo();
   goSling(slingK+1);popText(SX,SY-56,'DISTRICT CLEARED!  +'+bonus+' MEN','#7dff5a',24);banner=2.2}
 function nextMan(){
+  bankLeft=0;
   if(men>0)man={mode:'aim',x:SX,y:SY,vx:0,vy:0,ang:0,spin:0,t:0,a:1,R:14,dive:false,gt:0,hitCd:0,gooT:0,pop:1,stT:0,swT:0,G:gagNew(2.5,4,3),jg:jigNew(),inf:0,seated:false,pwr:null,vlv:false,airT:0,beaned:false,bel:0,burped:false,burpT:0,chug:null};
   else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};
 }
@@ -821,7 +822,7 @@ function bounceRubber(){
     if(d>.08){nx=dx/d;ny=dy/d}else{const sp=Math.hypot(m.vx,m.vy);if(sp<=0)continue;nx=-m.vx/sp;ny=-m.vy/sp;d=0}
     m.x+=nx*(R-d);m.y+=ny*(R-d);const vn=m.vx*nx+m.vy*ny;
     if(vn<0){const k=1.92*vn;m.vx-=k*nx;m.vy-=k*ny;wobKick(x,y,5,nx*vn/V*.55,ny*vn/V*.55);
-      if(m.hitCd<=0){m.hitCd=.1;SFX.boing();popText(m.x,m.y-26,'BOING!','#ff7eb0',26);ring(m.x,m.y,38,'#ff9ec8');for(let k=0;k<6;k++)chip(m.x,m.y,'#ff9ec8',(rnd()-.5)*300,-rnd()*260)}
+      if(m.hitCd<=0){m.hitCd=.1;bankLeft=2;SFX.boing();popText(m.x,m.y-26,'BOING!','#ff7eb0',26);ring(m.x,m.y,38,'#ff9ec8');for(let k=0;k<6;k++)chip(m.x,m.y,'#ff9ec8',(rnd()-.5)*300,-rnd()*260)}
       shake=Math.max(shake,2)}}}
 function explodeMan(){const m=man;ST().pops++;pdTouch();men--;
   goo(m.x,m.y,60,420);ring(m.x,m.y,120,'#ff5a5a');ring(m.x,m.y,80,'#fff');ring(m.x,m.y,150,'#ffd23f');
@@ -1227,9 +1228,13 @@ function solidAt(px,py){if(!grid)return false;const gx=Math.floor(px/V),gy=Math.
 function killTarget(t,hard){if(!t.alive)return;
   if(!hard&&t.hp>1){if(t.inv>0)return;t.hp--;t.inv=.7;t.stun=.6;t.armor=0;shake=Math.max(shake,6);SFX.crunch(.6);spark(t.x,t.y-6,8,240);popText(t.x,t.y-40,'OOF!  '+t.hp+' LEFT','#ffd23f',16);return}
   t.alive=false;if(man&&man.mode==='walk'){man.wt=Math.min(man.wt+3,WALK_T+15);popText(t.x,t.y-38,'+3s','#7dff5a',18)}onLandlord();combo=comboLeft>0?Math.min(5,combo+1):1;comboLeft=2.5;comboPeak=Math.max(comboPeak,combo);
-  const bonus=(combo-1)*1000;score+=5000+bonus;SFX.ding();slow=Math.max(slow,.25);
+  // One BANK SHOT bonus per rubber rebound. Other TNT/rubble evictions are
+  // excluded by requiring direct proximity to the flying character.
+  const bank=bankLeft>0&&man&&man.mode==='fly'&&Math.abs(t.x-man.x)<4*V&&Math.abs(t.y-man.y)<4*V;
+  const bonus=(combo-1)*1000+(bank?1500:0);if(bank)bankLeft=0;
+  score+=5000+bonus;SFX.ding();slow=Math.max(slow,.25);
   const comboWords=['EVICTED!','DOUBLE TROUBLE!','THREESOME OF DOOM!','FOURCLOSED!','RENTAL ORGY!'];
-  popText(t.x,t.y-52,comboWords[combo-1],combo>1?'#ff9ec8':'#ffd23f',combo>1?20:16);
+  popText(t.x,t.y-52,bank?'BANK SHOT! +1500':comboWords[combo-1],bank||combo>1?'#ff9ec8':'#ffd23f',bank||combo>1?20:16);
   popText(t.x,t.y-14,'+'+(5000+bonus),'#ffd23f',24);
   for(let i=0;i<14;i++)P({k:4,x:t.x,y:t.y,vx:(rnd()-.5)*300,vy:-rnd()*300-60,l:1.6,l0:1.6,s:3+rnd()*3,r:rnd()*6});
   for(let i=0;i<10;i++)chip(t.x,t.y,['#4a5568','#f2c7a1','#111'][i%3],(rnd()-.5)*260,-rnd()*260);dust(t.x,t.y,4,9)}
@@ -1328,6 +1333,7 @@ function update(dt){
   if(state==='title'||state==='edit'||UISTATES.includes(state)){titleTick(dt);return}
   if(freeze>0){freeze--;return}
   if(comboLeft>0){comboLeft=Math.max(0,comboLeft-dt);if(!comboLeft)combo=0}
+  if(bankLeft>0)bankLeft=Math.max(0,bankLeft-dt);
   if(slow>0){slow-=dt;dt*=.4}
   if(banner>0)banner-=dt;if(flash>0)flash-=dt;
   if(man){if(man.hurtCd>0)man.hurtCd-=dt;if(man.stun>0)man.stun-=dt}
