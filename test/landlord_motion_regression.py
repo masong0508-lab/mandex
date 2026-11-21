@@ -7,7 +7,13 @@ paint=(root/"ds/source/gfx.c").read_text()
 n3=(root/"3ds/main.c").read_text()
 dc=(root/"dreamcast/main.c").read_text()
 web=(root/"web/index.html").read_text()
-assert "phase=t->mv?(int)(RTOF(t->wk)*14.0f)" in ds
+# The DS uses an integer walking phase on the common 20.12 range, with
+# the original float fallback for values outside its verified pixel-parity
+# range. The exhaustive compiled-render regression tests the actual values.
+assert "int phase=t->mv?ds_target_walk_phase(t->wk):frame+i*11;" in ds
+assert "return (wk >> 12)*14 + (((wk & 4095)*14) >> 12);" in ds
+assert "return (int)(RTOF(wk)*14.0f);" in ds
+assert "DS_WALK_PHASE_PROBE" in (root/"test/ds_render.c").read_text()
 assert "spr_landlord_impl(b,x,y,ppc,ph,scared,(st&24)!=0)" in paint
 assert "int step = moving ?" in paint
 assert "const int gait=(int)(RTOF(t->wk)*14.0f)" in n3
