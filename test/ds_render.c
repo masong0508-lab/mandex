@@ -1079,6 +1079,22 @@ static int ds_objective_probe(void){
     fprintf(stderr,"DS_OBJECTIVE_FAIL missing final target marker %08x\n",marked);
     return 1;
   }
+  /* The final NPC has moved beyond the right camera edge. Verify that
+     the new screen-space cue paints where visible in the 256x192 buffer,
+     while no cue appears when the target is still within the view. */
+  memset(buf_top,0,sizeof buf_top);draw_objective_edge(&v);
+  unsigned nearcue=objective_rect_hash(0,0,256,192);
+  world.targets[0].x=RI(400);
+  memset(buf_top,0,sizeof buf_top);draw_objective_edge(&v);
+  unsigned farcue=objective_rect_hash(0,0,256,192);
+  world.targets[1].alive=1;
+  memset(buf_top,0,sizeof buf_top);draw_objective_edge(&v);
+  unsigned manycue=objective_rect_hash(0,0,256,192);
+  if(nearcue!=manycue || farcue==nearcue){
+    fprintf(stderr,"DS_OBJECTIVE_FAIL offscreen hint visibility %08x %08x %08x\n",
+            nearcue,farcue,manycue);return 1;
+  }
+  printf("DS_OBJECTIVE_EDGE_PASS visible=%08x offscreen=%08x\n",nearcue,farcue);
   printf("DS_OBJECTIVE_RENDER_PASS multi=%08x last=%08x securing=%08x mark=%08x\n",
          many,last,secure,marked);
   return 0;
