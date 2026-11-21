@@ -1513,7 +1513,10 @@ static void apply_outfit(int o){
   for(int k=0;k<C_MAN_RIM_COUNT;k++){
     u16 shade=gfx_pal[C_MAN_RIM0+k];
     BG_PALETTE[C_MAN_RIM0+k]=shade;
-    BG_PALETTE_SUB[C_MAN_RIM0+k]=shade;
+    /* Title image owns sub-screen entries 64..253 while the title is up.
+       Do not overwrite its colors with shadow shades until the game returns;
+       present() restores this range from gfx_pal on that transition. */
+    if(app!=ST_TITLE)BG_PALETTE_SUB[C_MAN_RIM0+k]=shade;
   }
 }
 /* AIR is an explicit gameplay toolbar selection. The title's remembered
