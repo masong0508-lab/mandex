@@ -62,15 +62,15 @@ if "#define MS_CANONICAL_TURN_BAKE 1" in header:
     # A regression that merely reads the Python model would miss a stale
     # baked header, so guard actual pixels and the real sprite pivot.
     meta={}
-    for match in re.finditer(r"\\{\\s*MS_(\\w+),\\s*(\\d+),\\s*(\\d+),\\s*(-?\\d+),\\s*(-?\\d+),",header):
+    for match in re.finditer(r"\{\s*MS_(\w+),\s*(\d+),\s*(\d+),\s*(-?\d+),\s*(-?\d+),",header):
         name,w,h,ax,ay=match.groups()
         meta[name]=tuple(map(int,(w,h,ax,ay)))
     def crown_ink(name):
         m=re.search(r"static const unsigned char MS_"+name+
-                    r"\\[(\\d+)\\] = \\{(.*?)\\};",header,re.S)
+                    r"\[(\d+)\] = \{(.*?)\};",header,re.S)
         assert m,name
         w,h,ax,ay=meta[name]
-        p=[int(q) for q in re.findall(r"\\d+",m[2])]
+        p=[int(q) for q in re.findall(r"\d+",m[2])]
         assert len(p)==w*h,(name,len(p),w*h)
         return sum(p[y*w+x] in (11,12,23)
                    for y in range(5,11)
