@@ -12,6 +12,8 @@ on:
       - "tools/gen_dc_art.py"
       - "dreamcast/main.c"
       - "test/dreamcast_wolf_atlas_test.py"
+      - "test/character_turnaround_test.py"
+      - "test/head_turnaround_test.py"
       - ".github/workflows/rebake-character-art.yml"
   workflow_dispatch:
 permissions:
