@@ -289,7 +289,7 @@ static int n3_sprite_volume_probe(void){
   unsigned long long occupancy=1469598103934665603ull;
   unsigned filled=0,soft=0,lit=0;
   unsigned long long rotated_hash=1469598103934665603ull;
-  for(int fr=0;fr<MSF_COUNT;fr+=3)for(int face=-1;face<=1;face+=2){
+  for(int fr=0;fr<MSF_COUNT;fr++)for(int face=-1;face<=1;face+=2){
     rect(&top,0,0,400,240,bg);
     blit_frame(&top,fr,200,120,4,face);
     for(int y=30;y<211;y++)for(int x=120;x<281;x++){
