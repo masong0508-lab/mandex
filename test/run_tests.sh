@@ -231,7 +231,10 @@ for mode in 0 1; do
   grep '^DS_MAN_OCCUPANCY_HASH ' ds_volume_$mode.txt > ds_volume_mask_$mode.txt
 done
 cmp ds_volume_mask_0.txt ds_volume_mask_1.txt
-grep -q '^DS_MAN_CONTOUR_COUNT 0
+grep -q '^DS_MAN_CONTOUR_COUNT 0$' ds_volume_0.txt
+grep -Eq '^DS_MAN_CONTOUR_COUNT [1-9][0-9]*$' ds_volume_1.txt
+cat ds_volume_1.txt
+echo "--- DS hardware sound ring: atomic start, no dropped kills, reserved stop headroom ---"
 gcc -std=gnu99 -O2 -Wno-pointer-to-int-cast -I../ds/bare ds_sound_queue_test.c -o ds_sound_queue_test && ./ds_sound_queue_test
 echo "--- DS music clock: catch up missed ARM7 VBlank without accelerating gameplay physics ---"
 gcc -std=gnu99 -O2 -Istubs -I../ds/source music_clock_test.c -o music_clock_test && ./music_clock_test
