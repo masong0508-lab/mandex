@@ -1370,6 +1370,7 @@ function updTargets(dt){
       let dead=false;
       const radius=t.r+RC,rad2=radius*radius;
       for(const a of ch.cells){
+        if(a.dead)continue; // no invisible impacts from shattered rubble
         const dx=a.wx-t.x,dy=a.wy-t.y;
         if(dx*dx+dy*dy<rad2){
           const sp=Math.hypot(ch.vx-ch.w*(a.wy-ch.y),ch.vy+ch.w*(a.wx-ch.x));
