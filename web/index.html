@@ -2569,13 +2569,29 @@ function drawSpin(th,o){
   group(1,()=>{
     const U={ox:oU,head:1,vs:1},U2={ox:oU,head:1,rot:1},A=15,B=14.2,Cc=14.5,hcy=-44.5,C=Ch,S=Sh;                 // the head has its own turn angle (C,S here are the head's)
     E(0,-31.5,0,10,6,9,SKD,0,{ox:oU,head:1,sh:.08,hl:0,d:-900});
-    const jaw=G3(0,-34,2,11.2,8.2,11,U),hd=G3(0,-44,0,14.3,13.3,13.5,U);
+    /* One shared jaw/skull volume for front, three-quarter and profile.
+       The jaw sits slightly forward in depth instead of disappearing
+       inside the cranium as the character turns sideways. */
+    const jaw=G3(0,-34,3.8,11.4,8.2,11,U),hd=G3(0,-44,0,14.3,13.3,13.5,U);
     add(0,()=>blob([pEll(jaw.px,jaw.py,jaw.rx,jaw.b),pEll(hd.px,hd.py,hd.rx,hd.b)],{ow:1.8}));                              // jaw and skull: one head, no chin seam
     const shell={x:0,y:hcy,z:0,a:A,b:B,c:Cc,cc:C,ss:S,ox:oU,oy:0};
     for(const s of[-1,1]){const r=G3(s*14.2,-44,-1,4,5,4,U2),near=r.d>=0;
       add(near?20:-700+r.d,()=>blob([pEll(r.px,r.py,r.rx,5)],{ow:1.5,sd:1.4}))}
-    const nz=G3(0,-39.7,13.2,3.4,2.9,3.6,U2);
+    /* Nose projects in local head-space, NOT screen X. Front view keeps the
+       same centre, while the silhouette acquires a readable bridge and
+       tip as Ch approaches zero (profile). */
+    const nz=G3(0,-39.7,17,3.2,2.9,3.6,U2);
     add(nz.d>=0?21:-650,()=>{ell(nz.px,nz.py,nz.rx,2.9,'#f3a784',1.2);shade(nz.px,nz.py,nz.rx,2.9,.1,.7)});
+    /* A matching sideburn and ear root rotate with the head. They remain
+       BEHIND the cheek and forward of the rear hair mass, instead of
+       jumping to a different position in a side-on frame. */
+    for(const sign of[-1,1]){
+      const root=G3(sign*12.9,-39.1,-1.6,2.3,4.6,2.8,U);
+      add(root.d+.6,()=>{if(root.d<-3)return;
+        ell(root.px,root.py,Math.max(1.1,root.rx),4.6,HAIR,1.0);
+        shade(root.px,root.py,Math.max(1.1,root.rx),4.6,.14,.14);
+      });
+    }
     const yh=f=>{const a=Math.abs(Math.atan2(Math.sin(f),Math.cos(f)));if(a<=1.5708)return -51+5*Math.sin(a)*Math.sin(a);const s=(a-1.5708)/1.5708;return -46+10*s*s*(3-2*s)};
     const vh=f=>Math.max(-1,Math.min(1,(yh(f)-hcy)/B));
     const cpt=Math.cos(hpA),spt=Math.sin(hpA);
