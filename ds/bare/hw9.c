@@ -95,6 +95,10 @@ u32 cpuEndTiming(void){
 enum { C_PLAY_PSG = 1, C_PLAY_NOISE = 2, C_FREQ = 3, C_KILL = 4, C_WAVE_SRC = 5, C_PLAY_WAVE = 6, C_VOL = 7 };
 static u8 busy[16];
 static u16 pending_kill;
+/* Last queued PCM gain for each hardware voice. Repeated envelope values
+   cost ring slots but do not alter the sound. Failed updates are NOT cached,
+   so a congested ring still gets the latest requested gain on retry. */
+static u8 pcm_gain[8], pcm_gain_valid;
 
 /* ARM7 advances tail independently. Since it only CONSUMES commands, the
    remaining space computed here is a conservative lower bound. A channel
@@ -118,6 +122,7 @@ static void snd_flush_kills(void){
     snd_push((C_KILL << 28) | (c << 24));
     pending_kill &= (u16)~(1u << c);
     busy[c] = 0;
+    if(c < 8) pcm_gain_valid &= (u8)~(1u << c);
   }
 }
 void soundPump(void){ snd_flush_kills(); }    /* one cheap check per game frame */
@@ -125,6 +130,7 @@ static int grab(int lo, int hi){ for(int c = lo; c <= hi; c++) if(!busy[c]){ bus
 void soundEnable(void){
   MX_IPC->head = MX_IPC->tail = 0;
   pending_kill = 0;
+  pcm_gain_valid = 0;
   for(int c = 0; c < 16; c++) busy[c] = 0;
 }
 int soundPlayPSG(DutyCycle d, u16 f, u8 v, u8 pan){
@@ -152,14 +158,23 @@ int soundPlayWave(const signed char *cyc, u16 f, u8 v, u8 pan){
   snd_push((C_WAVE_SRC << 28) | ((u32)cyc & 0xFFFFFC));
   snd_push((C_FREQ << 28) | (c << 24) | f);
   snd_push((C_PLAY_WAVE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
+  pcm_gain[c] = v & 127;
+  pcm_gain_valid |= (u8)(1u << c);
   return c;
 }
 void soundSetVol(int h, u8 v){
-  /* Envelopes/glides are cosmetic. Keep a little headroom for a kill or
-     a complete new note; the next frame catches up its latest value. */
+  /* Preserve headroom for essential kills and multi-command starts.  When
+     quantization produces the same gain on several frames, don't enqueue
+     identical commands. A drop is retried because we only cache on success. */
   snd_flush_kills();
-  if(h >= 0 && h < 8 && busy[h] && snd_room() >= 4)
-    snd_push((C_VOL << 28) | (h << 24) | (v & 127));
+  if(h < 0 || h >= 8 || !busy[h]) return;
+  u8 gain = v & 127;
+  u8 bit = (u8)(1u << h);
+  if((pcm_gain_valid & bit) && pcm_gain[h] == gain) return;
+  if(snd_room() < 4) return;
+  snd_push((C_VOL << 28) | (h << 24) | gain);
+  pcm_gain[h] = gain;
+  pcm_gain_valid |= bit;
 }
 void soundSetFreq(int h, u16 f){
   snd_flush_kills();
@@ -172,6 +187,7 @@ void soundKill(int h){
     snd_push((C_KILL << 28) | (h << 24));
     pending_kill &= (u16)~(1u << h);
     busy[h] = 0;
+    if(h < 8) pcm_gain_valid &= (u8)~(1u << h);
   }else pending_kill |= (u16)(1u << h);
 }
 
