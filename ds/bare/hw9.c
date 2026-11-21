@@ -99,8 +99,11 @@ static u16 pending_kill;
    cost ring slots but do not alter the sound. Failed updates are NOT cached,
    so a congested ring still gets the latest requested gain on retry. */
 static u8 pcm_gain[8], pcm_gain_valid;
+/* Keep the latest unqueued cosmetic values when ARM7 falls behind. */
+static u8 pcm_gain_pending, pcm_gain_wanted[8];
 /* Quantized effect glides can hold an identical pitch over many ticks. */
 static u16 queued_freq[16], queued_freq_valid;
+static u16 queued_freq_pending, queued_freq_wanted[16];
 
 /* ARM7 advances tail independently. Since it only CONSUMES commands, the
    remaining space computed here is a conservative lower bound. A channel
@@ -124,17 +127,56 @@ static void snd_flush_kills(void){
     snd_push((C_KILL << 28) | (c << 24));
     pending_kill &= (u16)~(1u << c);
     busy[c] = 0;
-    if(c < 8) pcm_gain_valid &= (u8)~(1u << c);
+    if(c < 8){
+      pcm_gain_valid &= (u8)~(1u << c);
+      pcm_gain_pending &= (u8)~(1u << c);
+    }
     queued_freq_valid &= (u16)~(1u << c);
+    queued_freq_pending &= (u16)~(1u << c);
   }
 }
-void soundPump(void){ snd_flush_kills(); }    /* one cheap check per game frame */
+/* Stops outrank cosmetic changes. Preserve four free ring positions while
+   draining pending changes, so a burst cannot starve voice starts/stops. */
+static void snd_flush_controls(void){
+  if(!pcm_gain_pending && !queued_freq_pending) return;
+  for(int c=0;c<8 && pcm_gain_pending;c++){
+    u8 bit=(u8)(1u << c);
+    if(!(pcm_gain_pending & bit)) continue;
+    if(!busy[c] || (pending_kill & bit)){
+      pcm_gain_pending &= (u8)~bit;
+      continue;
+    }
+    if(snd_room()<4) return;
+    u8 gain=pcm_gain_wanted[c];
+    if(!(pcm_gain_valid & bit) || pcm_gain[c]!=gain){
+      snd_push((C_VOL << 28) | (c << 24) | gain);
+      pcm_gain[c]=gain; pcm_gain_valid |= bit;
+    }
+    pcm_gain_pending &= (u8)~bit;
+  }
+  for(int c=0;c<16 && queued_freq_pending;c++){
+    u16 bit=(u16)(1u << c);
+    if(!(queued_freq_pending & bit)) continue;
+    if(!busy[c] || (pending_kill & bit)){
+      queued_freq_pending &= (u16)~bit;
+      continue;
+    }
+    if(snd_room()<4) return;
+    u16 pitch=queued_freq_wanted[c];
+    if(!(queued_freq_valid & bit) || queued_freq[c]!=pitch){
+      snd_push((C_FREQ << 28) | (c << 24) | pitch);
+      queued_freq[c]=pitch; queued_freq_valid |= bit;
+    }
+    queued_freq_pending &= (u16)~bit;
+  }
+}
+void soundPump(void){ snd_flush_kills(); snd_flush_controls(); }
 static int grab(int lo, int hi){ for(int c = lo; c <= hi; c++) if(!busy[c]){ busy[c] = 1; return c; } return -1; }
 void soundEnable(void){
   MX_IPC->head = MX_IPC->tail = 0;
   pending_kill = 0;
-  pcm_gain_valid = 0;
-  queued_freq_valid = 0;
+  pcm_gain_valid = pcm_gain_pending = 0;
+  queued_freq_valid = queued_freq_pending = 0;
   for(int c = 0; c < 16; c++) busy[c] = 0;
 }
 int soundPlayPSG(DutyCycle d, u16 f, u8 v, u8 pan){
@@ -144,6 +186,7 @@ int soundPlayPSG(DutyCycle d, u16 f, u8 v, u8 pan){
   snd_push((C_FREQ << 28) | (c << 24) | f);
   snd_push((C_PLAY_PSG << 28) | (c << 24) | ((u32)(d & 7) << 21) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
   queued_freq[c] = f; queued_freq_valid |= (u16)(1u << c);
+  queued_freq_pending &= (u16)~(1u << c);
   return c;
 }
 int soundPlayNoise(u16 f, u8 v, u8 pan){
@@ -153,6 +196,7 @@ int soundPlayNoise(u16 f, u8 v, u8 pan){
   snd_push((C_FREQ << 28) | (c << 24) | f);
   snd_push((C_PLAY_NOISE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
   queued_freq[c] = f; queued_freq_valid |= (u16)(1u << c);
+  queued_freq_pending &= (u16)~(1u << c);
   return c;
 }
 int soundPlayWave(const signed char *cyc, u16 f, u8 v, u8 pan){
@@ -166,35 +210,52 @@ int soundPlayWave(const signed char *cyc, u16 f, u8 v, u8 pan){
   snd_push((C_PLAY_WAVE << 28) | (c << 24) | ((u32)(v & 127) << 14) | ((u32)(pan & 127) << 7));
   pcm_gain[c] = v & 127;
   pcm_gain_valid |= (u8)(1u << c);
+  pcm_gain_pending &= (u8)~(1u << c);
   queued_freq[c] = f; queued_freq_valid |= (u16)(1u << c);
+  queued_freq_pending &= (u16)~(1u << c);
   return c;
 }
 void soundSetVol(int h, u8 v){
-  /* Preserve headroom for essential kills and multi-command starts.  When
-     quantization produces the same gain on several frames, don't enqueue
-     identical commands. A drop is retried because we only cache on success. */
+  /* Deduplicate repeated gains; if the ring is congested, retain the most
+     recent intended value for soundPump to send once space is available. */
   snd_flush_kills();
-  if(h < 0 || h >= 8 || !busy[h]) return;
-  u8 gain = v & 127;
-  u8 bit = (u8)(1u << h);
-  if((pcm_gain_valid & bit) && pcm_gain[h] == gain) return;
-  if(snd_room() < 4) return;
+  if(h < 0 || h >= 8 || !busy[h] || (pending_kill & (1u << h))) return;
+  u8 gain=v & 127, bit=(u8)(1u << h);
+  if((pcm_gain_valid & bit) && pcm_gain[h]==gain){
+    pcm_gain_pending &= (u8)~bit;
+    return;
+  }
+  if(snd_room()<4){
+    pcm_gain_wanted[h]=gain;
+    pcm_gain_pending |= bit;
+    return;
+  }
   snd_push((C_VOL << 28) | (h << 24) | gain);
-  pcm_gain[h] = gain;
-  pcm_gain_valid |= bit;
+  pcm_gain[h]=gain; pcm_gain_valid |= bit;
+  pcm_gain_pending &= (u8)~bit;
 }
 void soundSetFreq(int h, u16 f){
   snd_flush_kills();
-  if(h < 0 || h >= 16 || !busy[h]) return;
-  u16 bit = (u16)(1u << h);
-  if((queued_freq_valid & bit) && queued_freq[h] == f) return;
-  if(snd_room() < 4) return; /* don't cache a dropped pitch */
+  if(h < 0 || h >= 16 || !busy[h] || (pending_kill & (1u << h))) return;
+  u16 bit=(u16)(1u << h);
+  if((queued_freq_valid & bit) && queued_freq[h]==f){
+    queued_freq_pending &= (u16)~bit;
+    return;
+  }
+  if(snd_room()<4){
+    queued_freq_wanted[h]=f;
+    queued_freq_pending |= bit;
+    return;
+  }
   snd_push((C_FREQ << 28) | (h << 24) | f);
-  queued_freq[h] = f;
-  queued_freq_valid |= bit;
+  queued_freq[h]=f; queued_freq_valid |= bit;
+  queued_freq_pending &= (u16)~bit;
 }
 void soundKill(int h){
   if(h < 0 || h >= 16 || (!busy[h] && !(pending_kill & (1u << h)))) return;
+  /* No stale pitch/volume may reach a channel awaiting a stop. */
+  queued_freq_pending &= (u16)~(1u << h);
+  if(h<8) pcm_gain_pending &= (u8)~(1u << h);
   if(snd_room()){
     snd_push((C_KILL << 28) | (h << 24));
     pending_kill &= (u16)~(1u << h);
