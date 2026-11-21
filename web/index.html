@@ -949,7 +949,11 @@ function wBlocked(x,y){
   for(let i=0;i<3;i++){
     const qx=i===0?x-WHW:i===1?x:x+WHW;
     for(let j=0;j<5;j++){
-      const qy=j===0?y-WHH:j===1?y-WHH*.5:j===2?y:j===3?y+WHH*.5:y+WHH-.01;
+      let qy=y;
+      if(j===0)qy=y-WHH;
+      else if(j===1)qy=y-WHH*.5;
+      else if(j===3)qy=y+WHH*.5;
+      else if(j===4)qy=y+WHH-.01;
       if(solidAt(qx,qy))return true;
     }
   }
@@ -962,7 +966,11 @@ function wBlocked(x,y){
         const qx=i===0?x-WHW:i===1?x:x+WHW;
         if(Math.abs(a.wx-qx)>=RC)continue;
         for(let j=0;j<5;j++){
-          const qy=j===0?y-WHH:j===1?y-WHH*.5:j===2?y:j===3?y+WHH-.01;
+          let qy=y;
+      if(j===0)qy=y-WHH;
+      else if(j===1)qy=y-WHH*.5;
+      else if(j===3)qy=y+WHH*.5;
+      else if(j===4)qy=y+WHH-.01;
           if(Math.abs(a.wy-qy)>=RC)continue;
           if(Math.hypot(ch.x-qx,ch.y-qy)<=radius)return true;
         }
