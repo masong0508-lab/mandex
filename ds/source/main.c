@@ -737,7 +737,7 @@ static void facade_prepare(void){
 }
 #endif
 #ifndef MX_DS_FACADE_FAST_RECT
-#define MX_DS_FACADE_FAST_RECT 0 /* only enable after paired pixel/FPS A/B */
+#define MX_DS_FACADE_FAST_RECT 1 /* 8-level exact-pixel A/B: 1.23-7.55% lower host frame CPU; hardware FPS still unverified */
 #endif
 #if MX_DS_FACADE_FAST_RECT
 /* The visible interior of a window needs no x/y clipping on each stroke.
