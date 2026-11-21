@@ -42,7 +42,9 @@ for(const width of [320,360,390,480,699,700,960]){
 }
 assert(web.includes("const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';"),
   'a single surviving landlord is identified in the real world renderer');
-assert(web.includes("if(lastTargetVisible)txt('LAST',t.x,t.y-63,12"),
+assert(web.includes("if(lastTargetVisible && t.collapseRolled!==2)"),
+  'rare escaped-collapse survivor gold marker supersedes the last-target locator');
+assert(web.includes("txt('LAST',t.x,t.y-63,12"),
   'the locator follows the actual landlord coordinate, not an unrelated HUD point');
 const start=web.indexOf('<script>'),stop=web.indexOf('</script>',start);
 assert(start>=0&&stop>start);
