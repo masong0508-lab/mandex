@@ -86,9 +86,26 @@ static void script(void){
     if(vf == 18){g_keys=KEY_TOUCH;g_touch.px=160;g_touch.py=212;}
     if(vf == 19)CHECK(app==ST_PLAY && world.score==0 && world.men==first_men,
                     "3DS touch RESTART resets the world and resumes");
-    if(vf == 20)g_keys=KEY_START;
-    if(vf == 21){g_keys=KEY_TOUCH;g_touch.px=264;g_touch.py=212;}
-    if(vf == 22){
+    /* The precise pickup gate must not break the optional AIR valve.
+       Unlock it, tap the bottom toolbar, then touch the visible nozzle.
+       A seated player must remain safely seated during pause. */
+    if(vf == 20){
+      stats.stars[0]=stats.stars[1]=stats.stars[2]=1;
+      CHECK(mx_valve_unlocked(&stats),"three cleared levels unlock the 3DS air valve");
+      g_keys=KEY_TOUCH;g_touch.px=25;g_touch.py=225;
+    }
+    if(vf == 21)
+      CHECK(world.valve_ok && valve_equipped,"3DS AIR requires an explicit toolbar tap");
+    if(vf == 22){g_keys=KEY_TOUCH;g_touch.px=114;g_touch.py=210;}
+    if(vf == 23)
+      CHECK(world.man.seated && world.man.vlv && !dragging,
+            "direct nozzle touch seats the player without launching him");
+    if(vf == 24)g_keys=KEY_START;
+    if(vf == 25)
+      CHECK(app==ST_PAUSE && world.man.seated,
+            "pausing an occupied air valve does not detach the player");
+    if(vf == 26){g_keys=KEY_TOUCH;g_touch.px=264;g_touch.py=212;}
+    if(vf == 27){
       CHECK(app==ST_TITLE && sel==0,"3DS touch MENU safely exits to the title");
       g_left=0;
     }
