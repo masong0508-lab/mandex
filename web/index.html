@@ -3479,8 +3479,22 @@ cv.addEventListener('pointerdown',e=>{
   audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
   if(state==='cutscene'){cutClick(x,y);return}
   if(state==='title'){goMenu();return}
+  if(isPortrait()&&['menu','select','ach','outfit','options'].includes(state)){
+    /* Defer activation until release: a swipe must change pages without
+       accidentally opening a level or erasing a custom project. */
+    MOBILE.gesture={id:e.pointerId,x,y,screen:state};
+    try{cv.setPointerCapture(e.pointerId)}catch(_){}
+    return;
+  }
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending'){hitTest(x,y);return}
-  if(state==='edit'){if(!hitTest(x,y)){eDown(x,y);try{cv.setPointerCapture(e.pointerId)}catch(_){}}return}
+  if(state==='edit'){
+    if(hitTest(x,y))return;
+    if(isPortrait()&&y>=0&&y<MOBILE.editorHeight){
+      const p=mobileEditorToWorld(x,y);eDown(p[0],p[1]);
+    }else if(!isPortrait())eDown(x,y);
+    try{cv.setPointerCapture(e.pointerId)}catch(_){}
+    return;
+  }
   if(hitTest(x,y))return;
   if(state==='play'&&man.mode==='walk'){walkTouch(x,y,e.pointerId);return}
   if(state==='win'){nextAfterWin();return}
@@ -3490,11 +3504,42 @@ cv.addEventListener('pointerdown',e=>{
   if(man.mode==='aim'&&!man.chug&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(wx-VX,wy-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}   // tap the valve: he sits and fills; drag him off to fire
   if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
-cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;if(state==='edit'){eMove(mx,my);return}if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
+cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
+  if(state==='edit'){
+    if(!isPortrait())eMove(mx,my);
+    else if(E.drag){const pos=mobileEditorToWorld(mx,clamp(my,0,MOBILE.editorHeight));eMove(pos[0],pos[1]);}
+    return;
+  }
+  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
   if(vOn&&dv<VPULL){const k=.9*(VPULL-dv)/(VPULL-VGRAB);man.x+=(VX-man.x)*k;man.y+=(VY-man.y)*k}});   // nearing the valve the sling stretches on back toward it (power stays a full pull), then he drops onto it
-cv.addEventListener('pointerup',()=>{sodaHold=false;if(sliderDrag){sliderDrag=false;pdSave();SFX.boing()}if(state==='edit'){eUp();return}if(dragging){dragging=false;if(man.mode==='aim'){if(man.vlv){man.seated=true;return}man.seated=false;launch()}}});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
+cv.addEventListener('pointerup',e=>{
+  if(MOBILE.gesture&&MOBILE.gesture.id===e.pointerId){
+    const g=MOBILE.gesture;MOBILE.gesture=null;
+    const p=pt(e),dy=p[1]-g.y;
+    if(g.screen===state&&Math.abs(dy)>65&&
+       (state==='select'||state==='ach'||state==='outfit'||state==='options')){
+      /* A vertical swipe browses the paginated mobile list. Page limits
+         are applied by mobilePage() on the next draw, without allocations. */
+      const key=state;
+      MOBILE.page[key]=Math.max(0,(MOBILE.page[key]||0)+(dy<0?1:-1));
+    }else if(g.screen===state)hitTest(p[0],p[1]);
+    return;
+  }
+  sodaHold=false;if(sliderDrag){sliderDrag=false;pdSave();SFX.boing()}
+  if(state==='edit'){eUp();return}
+  if(dragging){dragging=false;if(man.mode==='aim'){
+    if(man.vlv){man.seated=true;return}man.seated=false;launch()
+  }}
+});   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keyup',e=>{KEYS[e.code]=false});addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false});
-for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{const k=TID[e.pointerId];if(k){KEYS[k]=false;delete TID[e.pointerId]}});
+for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
+  const k=TID[e.pointerId];if(k){KEYS[k]=false;delete TID[e.pointerId]}
+  if(ev==='pointercancel'){
+    if(MOBILE.gesture&&MOBILE.gesture.id===e.pointerId)MOBILE.gesture=null;
+    if(state==='edit'&&E.drag)eUp();
+    if(dragging){dragging=false;man.seated=false}
+  }
+});
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
   if(e.code==='Space'){dive();e.preventDefault()}
