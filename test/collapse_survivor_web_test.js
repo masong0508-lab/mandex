@@ -27,8 +27,11 @@ for(let y=room.y;y<room.y+room.h;y++){grid[idx(room.x-1,y)]=1;grid[idx(room.x+ro
 if(roomFrameSupport(room)!==36)throw Error('full room fixture');
 if(collapseSurvive(t)||t.collapseRolled)throw Error('intact room escaped');
 grid.fill(0);
+if(collapseSurvive(t)||t.collapseRolled)throw Error('unsupported floating pocket escaped');
+for(let x=19;x<=31;x++)grid[idx(x,20)]=1; // floor beneath the rescue pocket
 if(!collapseSurvive(t)||t.collapseRolled!==2||t.hp!==2||!t.inv||!t.stun||t.vy!==0||t.armor)throw Error('lucky 3-HP escape');
 if(!texts.includes('SOMEHOW ALIVE!'))throw Error('no visible escape feedback');
+if(t.wind||t.swing||!t.dodge||t.dd!==-1)throw Error('survivor failed to cancel attacks and prepare retreat');
 if(collapseSurvive(t))throw Error('second free escape');
 const t2={...t,hp:1,collapseRolled:0,armor:0,roomId:0};
 chanceRoll=.999999;
