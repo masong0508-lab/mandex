@@ -22,6 +22,18 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## Browser/Android airborne rubble collision load
+
+- The flying player can be tested against scores of moving rubble cells **eight
+  times per simulation frame**. Bounding-box rejections now avoid expensive
+  `Math.hypot` calls on obviously distant chunks and individual cells.
+  Nearby collisions still use the exact old circle test; impact speed,
+  HP changes, energy loss and one-frame timing remain unchanged.
+- Regression compiles the *actual production manPlow code* in its reference
+  and optimized forms, compares resulting world/character state and counts
+  square-root distance calls on a crowded synthetic demolition scene.
+  This is a physics-CPU optimization, not a measured whole-game FPS claim.
+
 ## Browser/Android camera-zoom rubble rendering
 
 - Browser zoom now drops entirely offscreen debris chunks and individual

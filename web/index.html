@@ -905,8 +905,20 @@ function manPlow(){
     for(const c of list){const i=idx(c.x,c.y);if(!grid[i])continue;const cost=hp[i]*K;
       if(E>=cost){E-=cost;const h=kill(c.x,c.y,m.vx,m.vy);for(let d=0;d<4;d++)damageCell(c.x+DX[d],c.y+DY[d],h*.18)}
       else{hp[i]-=E/K;E=0;spark(m.x+m.vx*.02,m.y+m.vy*.02,6,260);break}}}
-  for(const ch of chunks){if(Math.hypot(ch.x-m.x,ch.y-m.y)>ch.rad+R+4)continue;let hit=false,ax=0,ay=0,n=0;
-    for(const a of ch.cells){if(a.dead||Math.hypot(a.wx-m.x,a.wy-m.y)>=R+RC)continue;touched=true;hit=true;ax+=a.wx;ay+=a.wy;n++;const cost=a.h*K;
+  /* Flying physics runs eight substeps each update. Reject far chunks and
+     cells using two cheap axes before the original exact hypot check.
+     Preserve strict '>' for chunk range and '>=' for individual contacts. */
+  const cellReach=R+RC;
+  for(const ch of chunks){
+    const cdx=ch.x-m.x,cdy=ch.y-m.y,chunkReach=ch.rad+R+4;
+    if(Math.abs(cdx)>chunkReach||Math.abs(cdy)>chunkReach||
+       Math.hypot(cdx,cdy)>chunkReach)continue;
+    let hit=false,ax=0,ay=0,n=0;
+    for(const a of ch.cells){
+      if(a.dead)continue;
+      const dx=a.wx-m.x,dy=a.wy-m.y;
+      if(Math.abs(dx)>=cellReach||Math.abs(dy)>=cellReach||
+         Math.hypot(dx,dy)>=cellReach)continue;touched=true;hit=true;ax+=a.wx;ay+=a.wy;n++;const cost=a.h*K;
       if(E>=cost){E-=cost;a.dead=true;const c=MAT[a.m].c;for(let k=0;k<2;k++)chip(a.wx,a.wy,c,m.vx*.25+(rnd()-.5)*200,m.vy*.25-rnd()*150)}else{a.h-=E/K;E=0}}
     if(hit&&ch.hitCd<=0){ch.hitCd=.12;applyImpulse(ch,ax/n,ay/n,m.vx*mass*.9,m.vy*mass*.9)}}
   /* Man-target proximity is checked for every flight substep. Squared
