@@ -102,6 +102,9 @@ static void sfx_step(int commit_audio){
 /* Clamp extreme catch-up after a pause; eight steps cover 133ms and avoid
    flooding the ARM7 command ring or monopolising an already-slow frame. */
 void sfx_tick_steps(int elapsed){
+#ifdef MX_BARE_NDS_H
+  soundPump();    /* retry an essential channel stop before more envelope updates */
+#endif
   if(elapsed < 1) elapsed = 1;
   if(elapsed > 8) elapsed = 8;
   /* Preserve 60-Hz voice/note state through every missed VBlank, but issue
