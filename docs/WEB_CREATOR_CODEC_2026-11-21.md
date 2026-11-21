@@ -11,3 +11,5 @@
 - Test in actual Android/iOS browser: paste, edit, play, save, share, rotate, and navigate back. Hardware/device verification is separate from Node tests.
 
 - The codec and editor reset to the canonical **120-column** custom-grid geometry after the 360-column finale; importing or sharing a level cannot silently change its dimensions based on the previous campaign chapter. The regression directly sets the active world width to 360 before decoding a normal share code.
+
+- A dedicated **Browser creator and responsive play gates** workflow now exercises the real level-sharing codec, portrait editor, multitouch, camera controls, browser power labels and turning pose before merge; the complete host suite remains a separate release gate.

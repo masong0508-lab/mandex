@@ -1,0 +1,41 @@
+name: Browser creator and responsive play gates
+# Focused tests run quickly even when the full float/fixed console host
+# suite is still processing long destruction/replay sweeps.
+on:
+  pull_request:
+    paths:
+      - "web/**"
+      - "test/browser_*.js"
+      - ".github/workflows/browser-creator-gates.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "test/browser_*.js"
+      - ".github/workflows/browser-creator-gates.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node version
+        run: node --version
+      - name: Canonical MX1 codes, UTF-8 names and malicious import rejection
+        run: node test/browser_creator_codec_test.js
+      - name: Portrait and landscape navigation, editor, world coordinates
+        run: node test/browser_orientation_test.js
+      - name: Captured multitouch and camera safety
+        run: node test/browser_multitouch_test.js
+      - name: Shared walk controls and collision memory
+        run: node test/browser_walk_memory_test.js
+      - name: Shot readiness and inventory labels
+        run: node test/browser_tool_feedback_test.js
+      - name: Character pose turnaround and punch timing
+        run: node test/browser_turn_pose_test.js
