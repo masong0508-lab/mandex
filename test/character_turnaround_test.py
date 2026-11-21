@@ -48,6 +48,8 @@ ok(manhead.turn_head(90)==manhead.turn_head(115),
    "profile expression and hair volume are identical across the side arc")
 ok(manhead.side_head("fly")!=manhead.side_head("dive"),
    "diving expression changes the eyes and mouth, not the skull shape")
+ok(manhead.side_head("turn") not in (manhead.side_head("fly"),manhead.side_head("dive")),
+   "calm three-quarter turning face is distinct from flying and dive expressions")
 
 header=(ROOT/"art"/"manspr.h").read_text()
 ok("#define MS_NPAL 39" in header and "#define MSF_NBASE 71" in header,
@@ -90,8 +92,8 @@ else:
     ok(all(x[1]==0 for x in frames),
        "re-running baked art migration cannot change any pixels")
 src=(ROOT/"tools"/"gen_manspr.py").read_text()
-ok('manhead.turn_head(a, "dive")' in src,
-   "future sprite exports use the same 19-row head turnaround")
+ok('manhead.turn_head(a, "turn")' in src,
+   "future sprite exports use the consistent neutral turning face, not the dive scream")
 web=(ROOT/"web"/"index.html").read_text()
 ok("const nz=G3(0,-39.7,17,3.2,2.9,3.6,U2);" in web and
    "const jaw=G3(0,-34,3.8,11.4,8.2,11,U)" in web,
