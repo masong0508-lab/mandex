@@ -1030,6 +1030,14 @@ function walkStep(dt){const m=man;
  * face, hair and outfit stay connected as it rotates. */
 function walkTurnAngle(ticks){return Math.PI/2+Math.sin(Math.PI*(12-ticks)/12)*Math.PI/2}
 function walkTurnFace(face,ticks){return ticks>6?-face:face}
+// Purely visual punch anticipation/recovery, matching the console core's
+// 0 → 0.30 cell → 0 lunge across the same 0.2-second punch timer.
+// No new animation state, hitbox displacement or sprite allocations.
+function walkPunchLunge(punchTime,turnTicks){
+  if(turnTicks>0)return 0;
+  const t=Math.max(0,Math.min(.2,punchTime||0));
+  return 3*V*Math.min(t,.2-t);
+}
 function drawWalkMan(m){
   const turning=m.turn>0,mv=!turning&&m.gr&&Math.abs(m.vx)>25,sc=.36;
   // Couple the gait to distance travelled: feet no longer keep cycling when
@@ -1042,6 +1050,10 @@ function drawWalkMan(m){
   ctx.save();ctx.translate(m.x,m.y+WHH-3);
   if(mv)ctx.translate(0,-Math.max(0,step)*1.35);
   const visualFace=turning?walkTurnFace(m.face,m.turn):m.face;
+  // Translate only the artwork. The planted contact ellipse above still
+  // follows the real floor position instead of sliding with the punch.
+  const punchLunge=walkPunchLunge(m.pT,m.turn);
+  if(punchLunge)ctx.translate(visualFace<0?-punchLunge:punchLunge,0);
   ctx.scale(visualFace<0?-sc:sc,sc);ctx.translate(0,-50);
   if(!m.gr)ctx.rotate(m.stomp?0:m.vy<0?-.08:.08);
   // A side silhouette stays side-on; walking bends the pelvis rather than
