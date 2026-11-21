@@ -1268,28 +1268,28 @@ function lordStep(t,dir,sp,dt){const ax=t.x+dir*9,gr=solidAt(t.x,t.y+t.r+1);if(!
   if(!solidAt(ax,t.y+t.r+3)&&!solidAt(ax,t.y+t.r+3+V))return false;   // a drop bigger than one step: stay put
   t.x+=dir*sp*dt;t.wk+=dt*sp/9;return true}
 // where is it dangerous to stand? returns -1/1 = run that way, 0 = fine
-function lordDanger(t){for(const ch of chunks){const dx=t.x-ch.x,dy=t.y-ch.y,sp=Math.hypot(ch.vx,ch.vy);if(sp<45||Math.abs(dx)>ch.rad+46||dy<-ch.rad-18||dy>ch.rad+120&&ch.vy<=0)continue;if(ch.vy<-20&&dy>0)continue;
-    if(Math.hypot(dx,dy)<ch.rad+70)return Math.sign(dx)||(t.face||1)}
+function lordDanger(t){for(const ch of chunks){const dx=t.x-ch.x,dy=t.y-ch.y;if(ch.vx*ch.vx+ch.vy*ch.vy<45*45||Math.abs(dx)>ch.rad+46||dy<-ch.rad-18||dy>ch.rad+120&&ch.vy<=0)continue;if(ch.vy<-20&&dy>0)continue;
+    const near=ch.rad+70;if(dx*dx+dy*dy<near*near)return Math.sign(dx)||(t.face||1)}
   return 0}
 function lordCover(t){for(let d=1;d<=14;d++)for(const sg of[-1,1]){const x=t.x+sg*d*V;if(solidAt(x,t.y-34)&&!solidAt(x,t.y-6)&&solidAt(x,t.y+t.r+3))return x}return null}   // the NEAREST roofed spot
 function lordAI(t,dt){
-  const m=man||{mode:'none',x:SX,y:SY},fight=fightOn(),tm=Math.hypot(m.x-t.x,m.y-t.y);
+  const m=man||{mode:'none',x:SX,y:SY},fight=fightOn(),tx=m.x-t.x,ty=m.y-t.y,tm2=tx*tx+ty*ty;
   if(t.say>0)t.say-=dt;if(t.stun>0)t.stun-=dt;if(t.swing>0)t.swing-=dt;if(t.pan>0)t.pan-=dt;
   t.blink-=dt;if(t.blink<-.12)t.blink=2+Math.random()*3.5;
   // everybody flinches when a man comes screaming close (cosmetic: it never changes where they stand)
-  if(m.mode==='fly'&&tm<210){if(t.pan<=0&&t.say<=0)lordSay(t,SCARES[(t.t*7|0)%SCARES.length],'#ffb0b0');t.pan=.7}
+  if(m.mode==='fly'&&tm2<210*210){if(t.pan<=0&&t.say<=0)lordSay(t,SCARES[(t.t*7|0)%SCARES.length],'#ffb0b0');t.pan=.7}
   let moving=0;
   if(MOBILE.includes(t.kind)&&t.stun<=0&&t.wind<=0){
     if(t.dodge>0)t.dodge-=dt;
     const dg=lordDanger(t);
     if(dg){t.dodge=.5;t.dd=dg;if(t.pan<=0&&t.say<=0)lordSay(t,'LOOK OUT!','#ffb0b0');t.pan=.5}
     if(t.dodge>0){if(lordStep(t,t.dd,110,dt)){moving=2;t.face=t.dd}}
-    else if(m.mode==='fly'&&tm<260){t.ckT-=dt;if(t.ckT<=0){t.ckT=.4;t.cover=lordCover(t)}
+    else if(m.mode==='fly'&&tm2<260*260){t.ckT-=dt;if(t.ckT<=0){t.ckT=.4;t.cover=lordCover(t)}
       const tx=t.cover!=null?t.cover:t.x+(Math.sign(t.x-m.x)||1)*60,d=Math.sign(tx-t.x);
       if(d&&Math.abs(tx-t.x)>3&&lordStep(t,d,95,dt)){moving=2;t.face=d}}
     else t.cover=null;
     if(moving){t.mv=moving;return}}
-  if(t.kind==='healer'){t.heal-=dt;if(t.heal<=0){t.heal=3.5;for(const o of targets)if(o.alive&&o!==t&&o.hp<o.hpMax&&Math.hypot(o.x-t.x,o.y-t.y)<110){o.hp++;spark(o.x,o.y-10,6,120);popText(o.x,o.y-40,'+HP','#7dff5a',16);t.swing=.4;break}}
+  if(t.kind==='healer'){t.heal-=dt;if(t.heal<=0){t.heal=3.5;for(const o of targets)if(o.alive&&o!==t&&o.hp<o.hpMax&&((o.x-t.x)**2+(o.y-t.y)**2)<110*110){o.hp++;spark(o.x,o.y-10,6,120);popText(o.x,o.y-40,'+HP','#7dff5a',16);t.swing=.4;break}}
     t.mv=0;t.face=(Math.sign(m.x-t.x)||t.face);return}
   if(fight&&t.kind){
     if(t.kind==='thrower'||t.kind==='boss'){if(t.mid!==m){t.mid=m;t.cd=Math.max(t.cd,2.6)}if(m.mode==='aim'&&!m.chug&&!(m.stun>0))t.cd-=dt}else t.cd-=dt;
@@ -1299,7 +1299,7 @@ function lordAI(t,dt){
       else if(WALKS.includes(t.kind)){t.swing=.3;SFX.whoosh();if(m.mode==='walk'&&Math.abs(m.x-t.x)<46&&Math.abs(m.y-t.y)<46)hurtMan(Math.sign(m.x-t.x)||1)}}}
     else if((t.kind==='thrower'||t.kind==='boss')&&m.mode==='aim'&&!m.chug&&t.cd<=0&&!(m.stun>0)){if(throwSol(t,m.x,m.y)){t.wind=.6;t.face=Math.sign(m.x-t.x)||t.face;lordSay(t,'!','#ffd23f')}else t.cd=.7}
     if(WALKS.includes(t.kind)&&t.wind<=0&&t.stun<=0){
-      let dir=0,sp=t.kind==='sprinter'?60:t.kind==='shield'?20:26;const flying=m.mode==='fly'&&tm<280,foot=m.mode==='walk'&&Math.abs(m.x-t.x)<340&&Math.abs(m.y-t.y)<50;
+      let dir=0,sp=t.kind==='sprinter'?60:t.kind==='shield'?20:26;const flying=m.mode==='fly'&&tm2<280*280,foot=m.mode==='walk'&&Math.abs(m.x-t.x)<340&&Math.abs(m.y-t.y)<50;
       if(!foot)t.eng=0;if(foot){if(!t.eng){t.eng=1;t.cd=Math.min(t.cd,.6)}dir=Math.sign(m.x-t.x);sp=t.kind==='sprinter'?140:t.kind==='shield'?55:72;if(Math.abs(m.x-t.x)<38){dir=0;if(t.cd<=0){t.wind=.36;t.cd=1.2;lordSay(t,'TAKE THIS!','#ffd23f')}}}   // he stops just out of bump range and winds up
       else if(flying){dir=Math.sign(t.x-m.x)||1;sp=t.kind==='shield'?60:90}
       else{dir=t.pdir||(t.pdir=t.face);if(Math.abs(t.x-t.hx)>t.range&&Math.sign(t.x-t.hx)===dir){t.pdir=dir=-dir}}
