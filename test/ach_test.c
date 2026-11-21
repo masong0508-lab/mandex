@@ -53,7 +53,7 @@ int main(void){
     }
     W.st_inflated = W.st_pops = W.st_pw[1] = 2;
     mx_meta_events(&S, &W);
-    W.level = -1; W.men = 2; W.score = 100;
+    S.lv_shots = 1; W.level = -1; W.men = 2; W.score = 100;
     mx_meta_win(&S, &W);
     if(S.wins != INT_MAX || S.oneShots != INT_MAX){
       puts("FAIL: win totals wrapped"); fails++;
