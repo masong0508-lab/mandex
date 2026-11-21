@@ -1006,8 +1006,35 @@ static int chunk_visibility_probe(void){
   printf("DS_CHUNK_VIEW_HASH scenes=%u visible=%u offscreen=%u checksum=%08x\n",scenes,visible,offscreen,hash);
   return 0;
 }
+static int chunk_damage_probe(void){
+  gfx_init();
+  for(int m=1;m<MX_NMAT;m++){
+    MAXHP[m]=mx_material_hp(m);
+#if MX_DS_DAMAGE_THRESH
+    HP_33[m]=MAXHP[m]/3;HP_67[m]=MAXHP[m]*2/3;
+#endif
+  }
+  memset(world.chunks,0,sizeof world.chunks);
+  MxChunk *ch=&world.chunks[0];
+  ch->active=1;ch->count=1;ch->x=RI(25);ch->y=RI(20);ch->rad=RI(2);
+  MxCell *a=&ch->cells[0];
+  a->m=MX_WOOD;a->wx=ch->x;a->wy=ch->y;
+  View view={buf_top,4,0,0};
+  a->h=RI(mx_material_hp(MX_WOOD));
+  memset(buf_top,0,sizeof buf_top);draw_chunks(&view);
+  unsigned pristine=2166136261u;
+  for(unsigned i=0;i<sizeof buf_top;i++)pristine=(pristine^buf_top[i])*16777619u;
+  a->h=RI(1);
+  memset(buf_top,0,sizeof buf_top);draw_chunks(&view);
+  unsigned cracked=2166136261u;
+  for(unsigned i=0;i<sizeof buf_top;i++)cracked=(cracked^buf_top[i])*16777619u;
+  if(pristine==cracked){fputs("FAIL: DS flying rubble lost its cracked variant\n",stderr);return 1;}
+  printf("DS_RUBBLE_DAMAGE_PASS intact=%08x damaged=%08x\n",pristine,cracked);
+  return 0;
+}
 int main(int argc, char **argv){
   if(getenv("DS_PARTICLE_EDGE_PROBE"))return particle_edge_probe();
+  if(getenv("DS_RUBBLE_DAMAGE_PROBE"))return chunk_damage_probe();
   if(getenv("DS_CHUNK_VIS_PROBE"))return chunk_visibility_probe();
   if(getenv("DS_TARGET_CULL_PROBE"))return target_visibility_probe();
   if(getenv("DS_WALK_PHASE_PROBE"))return walk_phase_probe();
