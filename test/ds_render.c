@@ -717,7 +717,11 @@ static int particle_edge_probe(void){
   static const int ypos[]={-48,-32,-24,-17,-12,-9,-8,-4,-1,0,1,191,192,196,200,208,232};
   static const int ages[]={0,1,20,50,75,95};
   unsigned hash=2166136261u, ncase=0, visible=0, exterior_visible=0;
+  unsigned ring_edge_visible=0;
   gfx_init();
+  /* mx_load also initializes the fixed-point sine/cosine LUT: testing
+     rings without it silently collapses their points to the center. */
+  mx_load(&world,0);
   memset(parts,0,sizeof parts);
   part_high_water=1;
   Part *q=&parts[0];
@@ -743,19 +747,22 @@ static int particle_edge_probe(void){
         }
         if(ink){
           visible++;
-          if(sx < -8 || sx > 264 || sy < -8 || sy > 200)
+          if(sx < -8 || sx > 264 || sy < -8 || sy > 200){
             exterior_visible++;
+            if(type==PT_RING) ring_edge_visible++;
+          }
         }
         ncase++;
       }
     }
   }
-  if(!exterior_visible){
-    fputs("DS_PARTICLE_EDGE_FAIL no off-camera visible effects tested\n",stderr);
+  if(!exterior_visible || !ring_edge_visible){
+    fprintf(stderr,"DS_PARTICLE_EDGE_FAIL clipped effects=%u rings=%u\n",
+            exterior_visible,ring_edge_visible);
     return 1;
   }
-  printf("DS_PARTICLE_EDGE_HASH cases=%u visible=%u edge_visible=%u checksum=%08x\n",
-         ncase,visible,exterior_visible,hash);
+  printf("DS_PARTICLE_EDGE_HASH cases=%u visible=%u edge_visible=%u ring_edge=%u checksum=%08x\n",
+         ncase,visible,exterior_visible,ring_edge_visible,hash);
   return 0;
 }
 
@@ -766,6 +773,7 @@ static int particle_edge_probe(void){
 static int particle_pool_probe(void){
   unsigned hash=2166136261u, peak=0, total_live=0;
   gfx_init();
+  mx_load(&world,0); /* initialize real sine/cosine for 420-frame ring parity */
   memset(parts,0,sizeof parts);
   memset(pops,0,sizeof pops);
   part_high_water=0;
