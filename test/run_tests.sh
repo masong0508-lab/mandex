@@ -324,11 +324,12 @@ for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED 
 gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_render
 N3DS_RUBBLE_DAMAGE_PROBE=1 ./n3ds_render
 echo "--- 3DS connected character silhouettes, outfit lighting and four-tap rotated edges ---"
-for config in base lit smooth; do
+for config in base lit smooth_ref smooth; do
   case "$config" in
     base) defs="-DMX_N3DS_SPRITE_VOLUME=0 -DMX_N3DS_ROT_COVERAGE=0";;
     lit) defs="-DMX_N3DS_SPRITE_VOLUME=1 -DMX_N3DS_ROT_COVERAGE=0";;
-    smooth) defs="-DMX_N3DS_SPRITE_VOLUME=1 -DMX_N3DS_ROT_COVERAGE=1";;
+    smooth_ref) defs="-DMX_N3DS_SPRITE_VOLUME=1 -DMX_N3DS_ROT_COVERAGE=1 -DMX_N3DS_ROT_SOURCE_GUARD=0 -DMX_N3DS_ROT_WORK_COUNT=1";;
+    smooth) defs="-DMX_N3DS_SPRITE_VOLUME=1 -DMX_N3DS_ROT_COVERAGE=1 -DMX_N3DS_ROT_SOURCE_GUARD=1 -DMX_N3DS_ROT_WORK_COUNT=1";;
   esac
   gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ $defs \
     -I../3ds/shim -Istubs -I../core -I../art -I../ds/source \
@@ -341,6 +342,13 @@ cmp n3d_sprite_coverage_lit.txt n3d_sprite_coverage_smooth.txt
 grep -q 'shaded=0 ' n3d_sprite_base.txt
 grep -Eq 'shaded=[1-9][0-9]* ' n3d_sprite_lit.txt
 grep -Eq 'blended_rotated=[1-9][0-9]*' n3d_sprite_smooth.txt
+grep '^N3_SPRITE_ROT_HASH ' n3d_sprite_smooth_ref.txt > n3d_rot_hash_ref.txt
+grep '^N3_SPRITE_ROT_HASH ' n3d_sprite_smooth.txt > n3d_rot_hash_new.txt
+cmp n3d_rot_hash_ref.txt n3d_rot_hash_new.txt
+n3_sample_ref=$(awk -F'sampled=' '/^N3_ROT_WORK /{print $2}' n3d_sprite_smooth_ref.txt)
+n3_sample_new=$(awk -F'sampled=' '/^N3_ROT_WORK /{print $2}' n3d_sprite_smooth.txt)
+test "$n3_sample_new" -lt "$n3_sample_ref"
+echo "N3_ROT_SOURCE_GUARD_PASS sampled=$n3_sample_new reference=$n3_sample_ref pixel_identical=1"
 cat n3d_sprite_smooth.txt
 echo "--- 3DS stereo/bottom particle culling: pixel parity and measured raster work ---"
 for mode in 0 1; do
