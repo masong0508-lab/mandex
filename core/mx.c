@@ -1281,7 +1281,11 @@ static MX_HOT void man_plow(MxWorld *w){
     MxTarget *t = &w->targets[i];
     if(!t->alive) continue;
     real dx = t->x - m->x, dy = t->y - m->y, r = MAN_R + R(0.875) + R(0.25);
-    if(rmul(dx, dx) + rmul(dy, dy) < rmul(r, r) && !bat_block(w, t)) kill_target(w, t);
+    if(rmul(dx, dx) + rmul(dy, dy) < rmul(r, r) && !bat_block(w, t)){
+      w->bank_contact = 1;
+      kill_target(w, t);
+      w->bank_contact = 0;
+    }
   }
   if(touched){
     real spent = E0 - E;
