@@ -1360,7 +1360,7 @@ function lordAI(t,dt){
       if(lordStep(t,t.dd,75,dt)){t.face=t.dd;t.mv=2;return}
     }
   }
-  if(WEB_UI.includes(t.kind)&&t.stun<=0&&t.wind<=0){
+  if(MOBILE.includes(t.kind)&&t.stun<=0&&t.wind<=0){
     if(t.dodge>0)t.dodge-=dt;
     const dg=lordDanger(t);
     if(dg){t.dodge=.5;t.dd=dg;if(t.pan<=0&&t.say<=0)lordSay(t,'LOOK OUT!','#ffb0b0');t.pan=.5}
