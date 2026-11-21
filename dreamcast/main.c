@@ -17,7 +17,9 @@
  *   title        : D-pad left/right = level, triggers = outfit
  *
  * Not done yet: sound via AICA, and the real-3D voxel upgrade described in MANDEX_DESIGN.md.
- * Texture memory: ~3.8 MB (the title picture, 1 MB of it, is freed when the game starts).
+ * Texture memory: +1 MB for a dedicated 1024x512 Wolfman atlas so none
+ * of his 71 face/body poses reuse human art. The title image (1 MB)
+ * is still freed during gameplay; the total stays below the 8 MB PVR VRAM.
  */
 #include <kos.h>
 #include <stdio.h>
@@ -130,8 +132,8 @@ static void ic_upload(pvr_ptr_t tx, const unsigned char *src){                 /
 }
 
 /* ---- textures ---- */
-static pvr_ptr_t tx_bga, tx_bgb, tx_atl, tx_man, tx_ttl;
-static pvr_poly_hdr_t hdr_col, hdr_bga, hdr_bgb, hdr_atl, hdr_man, hdr_ttl;
+static pvr_ptr_t tx_bga, tx_bgb, tx_atl, tx_man, tx_wman, tx_ttl;
+static pvr_poly_hdr_t hdr_col, hdr_bga, hdr_bgb, hdr_atl, hdr_man, hdr_wman, hdr_ttl;
 static const pvr_poly_hdr_t *cur_hdr;
 static void use(const pvr_poly_hdr_t *h){ if(cur_hdr != h){ pvr_prim((void *)h, sizeof *h); cur_hdr = h; } }
 
@@ -344,6 +346,10 @@ static float blob(float dx, float dy, float rad){ float d2 = dx * dx + dy * dy, 
 static float man_rot;                                                       /* radians the next draw_frame turns the sprite by (flight pitch, tumble, a stuck man's rock) */
 static void draw_frame(int fr, float cx, float cy, int face, float z, const Jig *jg){
   if(man_fur && fr >= 0 && fr < MSF_NBASE) fr += MSF_NBASE;                  /* the Wolfman's frames follow the human ones */
+  /* Two independent 1 MB PVR atlases avoid substituting human face/hair
+     textures for the 32 Wolfman poses which did not fit in the old shared
+     sheet. A failed Wolfman allocation degrades safely to human imagery. */
+  if(fr >= MSF_NBASE && !tx_wman) fr -= MSF_NBASE;
   const short *f = DCM_FR[fr];
   float sc = DCM_SCALE * man_zoom, s = PXC / 4.0f;
   int live = jg && (jg->bx != 0 || jg->by != 0 || jg->rx != 0 || jg->ry != 0 || jg->sx != 1 || jg->sy != 1);
@@ -370,7 +376,7 @@ static void draw_frame(int fr, float cx, float cy, int face, float z, const Jig 
     int fall=3*i/gx+10*j/gy,bright=255-fall;
     light[j][i]=argb(bright,bright-1,bright-3,255);
   }
-  use(&hdr_man);
+  use(fr >= MSF_NBASE ? &hdr_wman : &hdr_man);
   for(int j = 0; j < gy; j++) for(int i = 0; i < gx; i++){
     float u0 = (f[0] + f[2] * (float)i / gx) / DCT_MAN_W, u1 = (f[0] + f[2] * (float)(i + 1) / gx) / DCT_MAN_W;
     float v0 = (f[1] + f[3] * (float)j / gy) / DCT_MAN_H, v1 = (f[1] + f[3] * (float)(j + 1) / gy) / DCT_MAN_H;
@@ -930,14 +936,19 @@ static void gfx_init(void){
   tx_bgb = load_tex(DCT_BGB_RLE, DCT_BGB_RLE_LEN, DCT_BGB_W, DCT_BGB_H);
   tx_atl = load_tex(DCT_ATL_RLE, DCT_ATL_RLE_LEN, DCT_ATL_W, DCT_ATL_H);
   tx_man = load_tex(DCT_MAN_RLE, DCT_MAN_RLE_LEN, DCT_MAN_W, DCT_MAN_H);
+  /* Wolfman is an independent texture; its fur is pre-rendered offline.
+     Cost: 1 MB of PVR RAM, zero extra CPU-side atlas copies and zero
+     additional per-frame framebuffer or pixel conversion. */
+  tx_wman = load_tex(DCT_WMAN_RLE, DCT_WMAN_RLE_LEN, DCT_WMAN_W, DCT_WMAN_H);
   { size_t tot = (size_t)DCT_MAN_W * DCT_MAN_H; man_px = (unsigned short *)malloc(tot * 2);       /* a copy of the atlas so outfits can re-tint it */
     if(man_px){ size_t n = 0; for(int i = 0; i + 1 < DCT_MAN_RLE_LEN && n < tot; i += 2){ unsigned cnt = DCT_MAN_RLE[i]; unsigned short v = DCT_MAN_RLE[i + 1]; while(cnt-- && n < tot) man_px[n++] = v; } } }
   tx_ttl = load_tex(DCT_TTL_RLE, DCT_TTL_RLE_LEN, DCT_TTL_W, DCT_TTL_H);
   make_hdr(&hdr_bga, PVR_TXRFMT_RGB565, DCT_BGA_W, DCT_BGA_H, tx_bga);
   make_hdr(&hdr_bgb, PVR_TXRFMT_ARGB1555, DCT_BGB_W, DCT_BGB_H, tx_bgb);
   make_hdr(&hdr_atl, PVR_TXRFMT_ARGB4444, DCT_ATL_W, DCT_ATL_H, tx_atl);
-  make_hdr(&hdr_man, PVR_TXRFMT_ARGB4444, DCT_MAN_W, DCT_MAN_H, tx_man);
-  make_hdr(&hdr_ttl, PVR_TXRFMT_RGB565, DCT_TTL_W, DCT_TTL_H, tx_ttl);
+  if(tx_man) make_hdr(&hdr_man, PVR_TXRFMT_ARGB4444, DCT_MAN_W, DCT_MAN_H, tx_man);
+  if(tx_wman) make_hdr(&hdr_wman, PVR_TXRFMT_ARGB4444, DCT_WMAN_W, DCT_WMAN_H, tx_wman);
+  if(tx_ttl) make_hdr(&hdr_ttl, PVR_TXRFMT_RGB565, DCT_TTL_W, DCT_TTL_H, tx_ttl);
   ds_gfx_init();
   tx_ic_top = pvr_mem_malloc(256 * 256 * 2); tx_ic_bot = pvr_mem_malloc(256 * 256 * 2);
   if(tx_ic_top) make_hdr(&hdr_ic_top, PVR_TXRFMT_RGB565, 256, 256, tx_ic_top);
