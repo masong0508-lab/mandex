@@ -22,6 +22,24 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 21 continuation — verified AI distance optimization
+
+- The native core now avoids fixed-point square roots for landlords farther
+  than the **36-cell interaction envelope**, while using the original
+  distance result for every nearby attack, chase, and panic threshold.
+  Browser/Android AI already uses squared-distance comparisons and now also
+  fixes a stale variable in the bat-flight reaction that could crash play.
+- [Simulation/render A/B workflow](https://github.com/masong0508-lab/mandex/actions/runs/44861837277)
+  checked **all 60 levels × 360 scripted frames** for exact complete-world
+  parity in both floating and fixed physics. Its *combined* optimization
+  measurements were **1.65% lower host fixed-point simulation CPU time**
+  and **0.61% lower host floating-point simulation CPU time**. These are
+  combined fast-path results, not isolated AI savings, and do not
+  establish DS/3DS/Dreamcast hardware FPS.
+- Wounded survivors now require a grounded escape pocket, briefly flee
+  using existing physics, and remain visibly marked in every port.
+  Destroyed rubble cannot collide with landlords.
+
 ## Rare collapse survivors — all ports
 
 Landlords can now *occasionally* emerge alive from a near-total building
@@ -30,7 +48,8 @@ moving-rubble impact, never by doing extra room scans every frame.
 
 - A landlord must belong to a room whose original roof, floor and structural
   posts have lost **at least 60%** of their support, and a nearby empty body
-  pocket must actually exist. No outdoor or intact-building miracles.
+  pocket with **real supporting floor beneath it** must exist. No floating,
+  outdoor or intact-building miracles.
 - The probability is deliberately small: about **1–3.5% for a one-HP enemy**
   and up to approximately **7% for a three-HP boss**, depending on how much of
   the room survives. More current HP and a few more standing supports
@@ -38,14 +57,21 @@ moving-rubble impact, never by doing extra room scans every frame.
 - A survivor loses one HP if it has more than one, drops armor, and becomes
   briefly stunned and impact-protected. It gets **one attempt per landlord**,
   success or failure, and normal hazards resume after the short recovery.
-  Direct shots and subsequent hits can still evict it. The exit message
-  *SOMEHOW ALIVE!* / *STILL ALIVE!* appears with light reused dust effects.
-- The unchanged core layout and destruction solver are still shared by
-  Nintendo DS, Nintendo 3DS and Dreamcast; browser uses corresponding JS
-  rules. There are **no new textures or per-frame room loops**.
+  Once recovered, even normally stationary enemies attempt a short retreat
+  away from the fallen room using the real wall/floor collision rules. Direct
+  shots and subsequent hits can still evict them. A small persistent gold
+  marker identifies survivors after the *SOMEHOW ALIVE!* / *STILL ALIVE!*
+  message and reused dust effects fade.
+- The destruction solver remains shared by Nintendo DS, Nintendo 3DS and
+  Dreamcast; browser uses corresponding JS rules. Survivor identity uses a
+  few small world-state fields, with **no new textures, framebuffers, heap
+  allocations or per-frame room-support scans**.
 - `test/collapse_survivor_test.c` and
   `test/collapse_survivor_web_test.js` cover surviving room geometry,
-  unescapable entombment, reduced HP, one-time rolls, and continued killability.
+  supported rescue pockets, stunned recovery, reduced HP, one-time rolls,
+  and continued killability. `test/landlord_ai_web_test.js` executes the
+  actual bat AI (fixing a formerly undefined-distance crash) and checks
+  post-collapse retreat.
 
 ## Bank Shot trick scoring + another measured speed pass
 
