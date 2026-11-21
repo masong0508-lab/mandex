@@ -126,7 +126,17 @@ void gfx_ell(u8 *b, int cx, int cy, int rx, int ry, u8 c){
 #endif
 }
 
+#ifndef MX_DS_OFFSCREEN_LINES
+#define MX_DS_OFFSCREEN_LINES 1
+#endif
 void gfx_line(u8 *b, int x0, int y0, int x1, int y1, u8 c){
+#if MX_DS_OFFSCREEN_LINES
+  /* Bresenham stays within the endpoints' bounding rectangle. Reject
+     strokes entirely off one edge before running up to 600 pixel checks.
+     Visible lines still use exactly the original raster path. */
+  if((x0<0 && x1<0) || (x0>=256 && x1>=256) ||
+     (y0<0 && y1<0) || (y0>=192 && y1>=192)) return;
+#endif
   int dx = x1 > x0 ? x1 - x0 : x0 - x1, dy = y1 > y0 ? y0 - y1 : y1 - y0;
   int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
   for(int n = 0; n < 600; n++){
@@ -179,6 +189,16 @@ void gfx_tri(u8 *b, int x0, int y0, int x1, int y1, int x2, int y2, u8 c){
 
 void gfx_tline(u8 *b, int x0, int y0, int x1, int y1, int th, u8 c){
   if(th <= 1){ gfx_line(b, x0, y0, x1, y1, c); return; }
+#if MX_DS_OFFSCREEN_LINES
+  /* A thick point uses gfx_rect(x-th/2, y-th/2, th, th), which
+     extends a little farther right/bottom for odd widths. Include the
+     actual stroke width before rejecting its endpoint bounds. */
+  int left=th/2, right=th-1-left;
+  if((x0<-right && x1<-right) ||
+     (x0>=256+left && x1>=256+left) ||
+     (y0<-right && y1<-right) ||
+     (y0>=192+left && y1>=192+left)) return;
+#endif
   int dx = x1 > x0 ? x1 - x0 : x0 - x1, dy = y1 > y0 ? y0 - y1 : y1 - y0;
   int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy, h = th / 2;
   for(int n = 0; n < 600; n++){
