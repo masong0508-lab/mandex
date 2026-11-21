@@ -32,6 +32,8 @@ echo "--- Browser refresh-rate-independent fixed-step simulation ---"
 if command -v node >/dev/null 2>&1;then node browser_fixed_step_test.js;fi
 echo "--- Browser walk physics parity, reusable touch controls and character-detail GC ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_memory_test.js;fi
+echo "--- Web portrait and landscape: actual viewport sizing, touch targets and level menu ---"
+if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
 echo "--- Browser side -> rear -> side pose coherence at 60Hz ---"
 if command -v node >/dev/null 2>&1;then node browser_turn_pose_test.js;fi
 echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
