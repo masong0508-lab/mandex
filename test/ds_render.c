@@ -436,7 +436,7 @@ void swiWaitForVBlank(void){
     if(vf == 36){ OCHECK(!out_open, "B closes the screen"); shot("out5");
       printf(fails ? "outfits screen: %d FAILED\n" : "outfits screen: all passed\n", fails); exit(fails != 0); }
   } else if(getenv("WALK_TEST") && app == ST_PLAY){                      /* chapter 2: walk levels (22 = Walk-Up Wreckage), fight-back landlords (25 Collection Day, 26 Batter Up) */
-    static int fails, st, f0, x0, y0, music_before;
+    static int fails, st, f0, x0, y0, music_before, debug_before;
 #define WCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
     int wt = atoi(getenv("WALK_TEST"));
     if(wt == 1){                                                       /* Walk-Up Wreckage */
@@ -463,8 +463,12 @@ void swiWaitForVBlank(void){
       if(st == 5 && vf == f0 + 30){ g_keys |= KEY_TOUCH; g_touch.px = 70; g_touch.py = 176; }                      /* the JUMP button */
       if(st == 5 && vf == f0 + 31){ g_keys |= KEY_TOUCH; g_touch.px = 70; g_touch.py = 176; y0 = world.man.y; }
       if(st == 5 && vf == f0 + 38){ WCHECK(world.man.y < y0 - R(0.5) || !world.man.gr, "the touch JUMP button jumps"); shot("walkbtn"); st = 6; f0 = vf; }
-      if(st == 6 && vf == f0 + 40){ g_keys |= KEY_L; }
-      if(st == 6 && vf == f0 + 44){ WCHECK(world.man.mode != MAN_WALK, "L gives up the walk"); printf(fails ? "walk: %d FAILED\n" : "walk: all passed\n", fails); exit(fails != 0); }
+      if(st == 6 && vf == f0 + 40){ debug_before=debug_on; g_keys |= KEY_L; }
+      if(st == 6 && vf == f0 + 44){
+        WCHECK(world.man.mode != MAN_WALK, "L gives up the walk");
+        WCHECK(debug_on == debug_before, "L exit does not toggle the debug overlay");
+        printf(fails ? "walk: %d FAILED\n" : "walk: all passed\n", fails); exit(fails != 0);
+      }
     } else {                                                           /* fight-back levels: just watch for 12 s and photograph the first of each kind of thing */
       static int sh_case, sh_throw, sh_swing;
       for(int i = 0; i < world.nev; i++){ int ty = world.ev[i].type; if(ty == EV_THROW) sh_throw++; if(ty == EV_SWING) sh_swing++; }
