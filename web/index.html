@@ -211,7 +211,7 @@ function mound(x,width,height){for(let r=0;r<height&&width-2*r>0;r++)rect(x+r,RO
 //   'walker' patrols his floor, scatters when the man flies close, and swings at a man on foot     'thrower' lobs briefcases at the man waiting in the sling
 //   'bat'    swats away any weak shot (the man must arrive faster than BAT_BREAK px/s to plough through)
 const KHP={shield:2,boss:3,sprinter:1,healer:1};
-const tgt=(cx,row,kind,range)=>targets.push({hp:KHP[kind]||1,hpMax:KHP[kind]||1,armor:kind==='shield'?1:0,inv:0,dodge:0,cover:null,heal:3,b2:0,ckT:0,x:cx*V+V/2,y:row*V-7,vy:0,r:7,alive:true,t:rnd()*6,kind:kind||'',range:(range||7)*V,hx:cx*V+V/2,face:rnd()<.5?-1:1,cd:2+rnd()*2,wind:0,swing:0,stun:0,pan:0,say:0,wk:0,blink:1+rnd()*3});
+const tgt=(cx,row,kind,range)=>targets.push({roomId:-1,collapseRolled:0,hp:KHP[kind]||1,hpMax:KHP[kind]||1,armor:kind==='shield'?1:0,inv:0,dodge:0,cover:null,heal:3,b2:0,ckT:0,x:cx*V+V/2,y:row*V-7,vy:0,r:7,alive:true,t:rnd()*6,kind:kind||'',range:(range||7)*V,hx:cx*V+V/2,face:rnd()<.5?-1:1,cd:2+rnd()*2,wind:0,swing:0,stun:0,pan:0,say:0,wk:0,blink:1+rnd()*3});
 // pneumatic tube (chapter 2): fly into the mouth at (ax,ay) and you are posted out of the nozzle at (bx,by), shot along `ang` at `sp` px/s
 const tube=(col,ax,ay,bx,by,ang)=>tubes.push({col,ax,ay,bx,by,ang,r:30,sp:760});
 const LEVELS=[
@@ -533,7 +533,14 @@ function load(l,custom){
   tubes=[];pads=[];CL.build();paper.fill(0);interiors.forEach((r,n)=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(inb(x,y))paper[idx(x,y)]=n+1});unclipTargets();
   zonePaid=[];if(CL.slings){const zb=CL.zones||[];for(const t of targets){t.zone=0;for(let k=0;k<zb.length;k++)if(t.x>=zb[k]*V)t.zone=k+1}setSling(0)}else{SX=128;SY=GY-118;VX=36;VY=SY+58;slingK=0}
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
-  paperFrameInit=interiors.map(roomFrameSupport);paperDirty=false;paperTorn=false;
+  paperFrameInit=interiors.map(roomFrameSupport);paperFrameOrig=paperFrameInit.slice();
+  for(const t of targets){t.roomId=-1;t.collapseRolled=0;
+    const gx=Math.floor(t.x/V),gy=Math.floor(t.y/V);
+    for(let i=0;i<interiors.length;i++){const r=interiors[i];
+      if(gx>=r.x&&gx<r.x+r.w&&gy>=r.y-1&&gy<=r.y+r.h){t.roomId=i;break}
+    }
+  }
+  paperDirty=false;paperTorn=false;
   man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};nextMan();
 }
 // ---- the wide finale: three slings along a 360-cell world.  Clear the landlords of the sling you are at and you are resupplied and moved to the next one.
@@ -569,7 +576,7 @@ function goo(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd(
 function ring(x,y,r,col){P({k:5,x,y,vx:0,vy:0,l:.45,l0:.45,s:r,c:col||'#fff'})}
 function popText(x,y,s,c,size){texts.push({x,y,s,c:c||'#fff',t:0,l:1.3,z:size||22})}
 let paper=new Uint16Array(COLS*ROWS);   // wallpaper per cell (index into interiors + 1): knocked out around every lost voxel, so rooms are destructible
-let paperFrameInit=[],paperDirty=false,paperTorn=false;
+let paperFrameInit=[],paperFrameOrig=[],paperDirty=false,paperTorn=false;
 function roomFrameSupport(r){
   const x0=r.x,x1=r.x+r.w,y0=r.y,y1=r.y+r.h;let n=0;
   for(let x=x0;x<x1;x++){
@@ -1318,13 +1325,42 @@ function updCases(dt){for(let i=cases.length-1;i>=0;i--){const c=cases[i];c.vy+=
     if(!dead&&solidAt(c.x,c.y)){dead=true;SFX.thud(.4)}
     if(!dead&&m&&(m.mode==='aim'||m.mode==='walk')&&Math.hypot(m.x-c.x,m.y-c.y)<(m.mode==='walk'?22:m.R+6)&&hurtMan(Math.sign(c.vx)||1))dead=true;
     if(dead){for(let k=0;k<7;k++)P({k:4,x:c.x,y:c.y,vx:(rnd()-.5)*160,vy:-rnd()*140,l:1.3,l0:1.3,s:2.5+rnd()*2,r:rnd()*6});cases.splice(i,1)}}}
+/* Only a collapsing room can grant this one-time rare escape. Intact HP
+   and surviving roof/floor posts improve the odds, but no magic immunity:
+   a nearby unoccupied pocket must exist. Called only for lethal impacts. */
+const COLLAPSE_POCKETS=[[0,0],[-1,0],[1,0],[0,-1],[0,-2],[-2,0],[2,0],[-1,-1],[1,-1]];
+function collapseSurvive(t){
+  if(t.collapseRolled||t.roomId<0)return false;
+  const r=interiors[t.roomId],initial=paperFrameOrig[t.roomId];
+  if(!r||initial<6)return false;
+  const left=roomFrameSupport(r);
+  if(left*5>initial*2)return false; // at least 60% of frame destroyed
+  let px=t.x,py=t.y,found=false;
+  for(const [dx,dy] of COLLAPSE_POCKETS){
+    const x=t.x+dx*V,y=t.y+dy*V;
+    if(x<V||x>=WW-V||y<2*V||y>=GY)continue;
+    if(solidAt(x,y)||solidAt(x,y-t.r)||solidAt(x-V*.25,y)||solidAt(x+V*.25,y))continue;
+    px=x;py=y;found=true;break;
+  }
+  if(!found)return false;
+  t.collapseRolled=1; // failed attempt cannot reroll each frame
+  const chance=45+Math.max(0,t.hp-1)*65+Math.floor(left*250/initial);
+  if(rnd()*4096>=chance)return false;
+  t.collapseRolled=2;t.hp=Math.max(1,t.hp-1);t.armor=0;
+  t.inv=1.5;t.stun=1.8;t.vy=0;t.x=px;t.y=py;
+  popText(t.x,t.y-50,'SOMEHOW ALIVE!','#ffdf84',23);
+  popText(t.x,t.y-25,t.hp+' HP LEFT','#ff9ec8',17);
+  ring(t.x,t.y,37,'#ffd23f');spark(t.x,t.y-12,6,145);
+  SFX.thud(.6);return true;
+}
 function updTargets(dt){
   for(const t of targets){if(!t.alive)continue;t.t+=dt;if(t.inv>0)t.inv-=dt;lordAI(t,dt);
     const gr=solidAt(t.x,t.y+t.r+1)||solidAt(t.x-4,t.y+t.r+1)||solidAt(t.x+4,t.y+t.r+1);
-    if(gr){if(t.vy>430){killTarget(t,true);continue}if(t.vy>300&&t.inv<=0){t.stun=.8;t.inv=.8;popText(t.x,t.y-38,'OOF!','#ffd23f',16)}t.vy=0}else{t.vy+=G*dt;t.y+=t.vy*dt}
+    if(gr){if(t.vy>430){if(!collapseSurvive(t))killTarget(t,true);continue}if(t.vy>300&&t.inv<=0){t.stun=.8;t.inv=.8;popText(t.x,t.y-38,'OOF!','#ffd23f',16)}t.vy=0}else{t.vy+=G*dt;t.y+=t.vy*dt}
     if(solidAt(t.x,t.y)){   // buried by settling rubble: dig out if there is air within 3 cells above (a light collapse), else crushed
       let up=0;for(let d=2;d<=V*3;d+=2)if(!solidAt(t.x,t.y-d)&&!solidAt(t.x,t.y-d-t.r)){up=d;break}
-      if(up){t.y-=up;t.vy=0;t.stun=1;t.inv=1;popText(t.x,t.y-38,'PHEW!','#7dff5a',16)}else{killTarget(t,true);continue}}
+      if(up){t.y-=up;t.vy=0;t.stun=1;t.inv=1;popText(t.x,t.y-38,'PHEW!','#7dff5a',16)}else{if(!collapseSurvive(t))killTarget(t,true);continue}}
+    if(t.collapseRolled===2&&t.inv>0)continue; // temporary escape grace, never permanent invulnerability
     /* Rubble can hold hundreds of cells. Test squared proximity before
        entering each particle collision: there is no need for Math.hypot
        until a cell actually strikes a landlord and impact speed matters. */
@@ -1338,11 +1374,12 @@ function updTargets(dt){
         if(dx*dx+dy*dy<rad2){
           const sp=Math.hypot(ch.vx-ch.w*(a.wy-ch.y),ch.vy+ch.w*(a.wx-ch.x));
           if(sp>70){
-            if(sp>150){dead=true;break}
+            if(sp>150){if(!collapseSurvive(t))dead=true;break}
             if(t.inv<=0){t.inv=.8;t.stun=.9;t.vx=0;popText(t.x,t.y-38,'OOF!','#ffd23f',16);shake=Math.max(shake,4);SFX.thud(.5)}
           }
         }
       }
+      if(t.collapseRolled===2&&t.inv>0)break;
       if(dead){killTarget(t);break}
     }}}
 
