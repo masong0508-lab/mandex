@@ -3644,6 +3644,7 @@ cv.addEventListener('pointerdown',e=>{
   if(state==='menu'||state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending'){hitTest(x,y);return}
   if(state==='edit'){
     if(hitTest(x,y))return;
+    if(E.starters)return; // Overlay buttons cannot accidentally paint the map.
     if(isPortrait()&&y>=0&&y<WEB_UI.editorHeight){
       const p=mobileEditorToWorld(x,y);eDown(p[0],p[1]);
     }else if(!isPortrait())eDown(x,y);
@@ -3721,9 +3722,18 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
   if(state==='title')return;
   if(state==='play'&&CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){if(e.key==='[')goSling(slingK-1);if(e.key===']')goSling(slingK+1)}
-  if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending')goMenu();return}
+  if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'&&E.starters){E.starters=false}else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending')goMenu();return}
   if(state==='select'&&(e.key==='u'||e.key==='U')){PD.unlockAll=!PD.unlockAll;pdTouch();toast('ach',PD.unlockAll?'All levels unlocked':'Levels locked again','');return}
-  if(state==='edit'){const k=e.key.toLowerCase();if(k>='1'&&k<='8'){E.tool='mat';E.mat=+k}else if(k==='e')E.tool='erase';else if(k==='l')E.tool='lord';else if(k==='r')E.shape=E.shape==='pen'?'rect':'pen';else if(k==='z')eUndo();else if(k==='b')eSize(e.shiftKey?-1:1);else if(k==='v')eKind(1);else if(k==='t')eThick();return}
+  if(state==='edit'){const k=e.key.toLowerCase();
+    if((e.ctrlKey||e.metaKey)&&(k==='z'||k==='y')){
+      e.preventDefault();if(k==='y'||e.shiftKey)eRedo();else eUndo();return
+    }
+    if(E.starters)return;
+    if(k>='1'&&k<='8'){E.tool='mat';E.mat=+k}else if(k==='e')E.tool='erase';
+    else if(k==='l')E.tool='lord';else if(k==='r')E.shape=E.shape==='pen'?'rect':'pen';
+    else if(k==='z')eUndo();else if(k==='y')eRedo();else if(k==='p')E.starters=true;
+    else if(k==='b')eSize(e.shiftKey?-1:1);else if(k==='v')eKind(1);
+    else if(k==='t')eThick();return}
   if(state!=='play'&&state!=='win'&&state!=='lose')return;
   if(e.key==='r'||e.key==='R')retry();
   if(e.key==='n'||e.key==='N')nextAfterWin();
@@ -4977,23 +4987,29 @@ function drawMobileEditor(){
     },{size:16});
     txt('BRUSH '+brushLabel()+'  •  '+(E.tool==='mat'?MAT[E.mat].n:E.tool).toUpperCase(),
       W/2,Math.min(H-80,y+225),14,'#cfd','center');
+  }else if(E.starters){
+    txt('START A BUILD — Undo restores the old one',W/2,y+13,17,'#ffd23f','center');
+    E_STARTERS.forEach((name,i)=>btn(12,y+28+i*52,W-24,44,name,
+      ()=>eApplyStarter(i),{size:16}));
   }else{
     const actions=[
       ['MEN -',()=>{E.men=Math.max(1,E.men-1)}],
       ['MEN +',()=>{E.men=Math.min(12,E.men+1)}],
-      ['UNDO',eUndo],
+      ['UNDO',eUndo],['REDO',eRedo],
       ['CLEAR',()=>{eSnap();E.g=new Uint8Array(COLS*ROWS);E.t=[]}],
       ['TEST PLAY',eTest],['SAVE',eSave],
       ['SHARE',()=>{if(!E.t.length){toast('ach','Add a landlord first','');return}
         exportCode({n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t})}],
+      ['STARTERS',()=>{E.starters=true}],
       ['EXIT',()=>{selTab=1;goSelect()}]
     ];
-    actions.forEach((a,i)=>btn(12+(i%4)*132,y+Math.floor(i/4)*59,120,52,a[0],a[1],
-        {size:15,on:i===4}));
+    actions.forEach((a,i)=>btn(12+(i%4)*132,y+Math.floor(i/4)*48,120,42,a[0],a[1],
+        {size:14,on:i===5}));
     txt('MEN '+E.men+'  •  '+(E.name||'UNSAVED LEVEL'),
-      W/2,Math.min(H-76,y+164),17,'#ffd23f','center');
+      W/2,Math.min(H-77,y+164),15,'#ffd23f','center');
   }
-  btn(30,H-57,W-60,50,p?'< BRUSH TOOLS':'LEVEL ACTIONS >',()=>{
+  btn(30,H-57,W-60,50,E.starters?'CANCEL STARTERS':p?'< BRUSH TOOLS':'LEVEL ACTIONS >',()=>{
+    if(E.starters){E.starters=false;return}
     WEB_UI.page.edit=p?0:1
   },{size:18,on:!p,col:'#7dff5a'});
 }
@@ -5223,7 +5239,7 @@ function importCode(){
 }
 
 // ---------- the editor ----------
-const E={g:new Uint8Array(COLS*ROWS),t:[],men:5,mat:1,tool:'mat',shape:'pen',bk:0,bs:0,bt:1,undo:[],id:-1,name:'',drag:null};
+const E={g:new Uint8Array(COLS*ROWS),t:[],men:5,mat:1,tool:'mat',shape:'pen',bk:0,bs:0,bt:1,undo:[],redo:[],starters:false,id:-1,name:'',drag:null};
 const EMIN=28;   // columns left of this stay empty: the sling lives there
 function openEditor(back,which){
   testing=false;state='edit';hits=[];
@@ -5232,10 +5248,66 @@ function openEditor(back,which){
   if(back)return;
   if(which!==undefined&&which>=0){const L=PD.custom[which];E.g=decodeCells(L.c);E.t=L.t.map(p=>p.slice());E.men=L.m|0||5;E.id=which;E.name=L.n}
   else{E.g=new Uint8Array(COLS*ROWS);E.t=[];E.men=5;E.id=-1;E.name=''}
-  E.undo=[];E.mat=1;E.tool='mat';E.shape='pen';E.bk=0;E.bs=0;E.bt=1}
+  E.undo=[];E.redo=[];E.starters=false;E.mat=1;E.tool='mat';E.shape='pen';E.bk=0;E.bs=0;E.bt=1}
 
-function eSnap(){E.undo.push([E.g.slice(),E.t.map(p=>p.slice())]);if(E.undo.length>30)E.undo.shift()}
-function eUndo(){const s=E.undo.pop();if(s){E.g=s[0];E.t=s[1]}}
+// Editor-only snapshots are capped at 24 states (~175 KiB of grid data).
+// They never enter the console core, the save payload or the frame loop.
+function eState(){return [E.g.slice(),E.t.map(p=>p.slice()),E.id,E.name,E.men]}
+function eRestore(s){E.g=s[0];E.t=s[1];E.id=s[2];E.name=s[3];E.men=s[4];E.drag=null}
+function eSnap(){E.undo.push(eState());if(E.undo.length>24)E.undo.shift();E.redo.length=0}
+function eUndo(){const s=E.undo.pop();if(!s)return;E.redo.push(eState());eRestore(s)}
+function eRedo(){const s=E.redo.pop();if(!s)return;E.undo.push(eState());eRestore(s)}
+// Deterministic starter structures: no generated textures, random levels,
+// extra draw calls or terrain outside the canonical 120x60 creator grid.
+const E_STARTERS=['THREE-STOREY TOWER','BREAKAWAY BRIDGE','FACTORY WORKSHOP'];
+function eStarterPattern(kind){
+  if(!Number.isInteger(kind)||kind<0||kind>=E_STARTERS.length)throw Error('Unknown starter');
+  const g=new Uint8Array(120*ROWS);
+  const fill=(x0,y0,x1,y1,m)=>{
+    for(let y=Math.max(0,y0);y<=Math.min(ROWS-1,y1);y++)
+      for(let x=Math.max(EMIN,x0);x<=Math.min(119,x1);x++)g[y*120+x]=m;
+  };
+  let t;
+  if(kind===0){ // brick tower with three reachable platforms
+    fill(47,52,86,53,2);fill(47,38,86,39,1);fill(47,24,86,25,1);
+    fill(47,15,86,16,3);fill(48,17,49,51,2);fill(84,17,85,51,2);
+    fill(49,45,49,47,4);fill(84,31,84,33,4);fill(60,52,61,52,5);
+    t=[[60,24],[74,38],[58,52]];
+  }else if(kind===1){ // tensile bridge whose piers can be demolished
+    fill(42,54,56,55,3);fill(93,54,108,55,3);
+    fill(45,36,48,53,2);fill(101,36,104,53,2);
+    fill(48,34,102,35,1);fill(48,31,53,32,6);fill(97,31,102,32,6);
+    fill(55,32,60,32,4);fill(92,32,96,32,4);
+    fill(47,50,48,51,5);fill(101,50,102,51,5);
+    t=[[68,34],[84,34]];
+  }else{ // warehouse with glass windows, mezzanines and TNT supports
+    fill(40,54,110,55,3);fill(41,20,108,21,2);
+    fill(41,22,42,53,2);fill(107,22,108,53,2);
+    fill(42,39,107,40,1);fill(42,27,107,28,1);
+    fill(41,30,42,32,4);fill(107,31,108,33,4);
+    fill(82,40,83,53,6);fill(48,53,49,53,5);
+    fill(103,53,104,53,5);
+    t=[[54,27],[75,39],[95,54]];
+  }
+  const level={n:E_STARTERS[kind],m:6,c:encodeCells(g),t};
+  validateSharedLevel(level); // Refuse a bad template before touching an edit.
+  return {grid:g,level};
+}
+function eApplyStarter(kind){
+  const p=eStarterPattern(kind);
+  eSnap(); // One undo restores the previous world, name and custom-level ID.
+  E.g=p.grid;E.t=p.level.t.map(x=>x.slice());E.men=p.level.m;
+  E.name=p.level.n;E.id=-1;E.drag=null;E.starters=false;
+  toast('outfit','Starter loaded',E.name+' — UNDO restores the previous design');
+}
+function drawStarterMenu(x,y,w){
+  panel(x,y,w,256);
+  txt('CHOOSE A STARTER',x+w/2,y+27,20,'#ffd23f','center');
+  txt('Replaces the grid — Undo restores it',x+w/2,y+48,12,'#cfd','center');
+  E_STARTERS.forEach((name,i)=>btn(x+12,y+60+i*52,w-24,44,name,
+    ()=>eApplyStarter(i),{size:15}));
+  btn(x+12,y+216,w-24,30,'CANCEL',()=>{E.starters=false},{size:13});
+}
 function eCell(px,py){return[Math.floor(px/V),Math.floor(py/V)]}
 function eClearLord(x,y){E.t=E.t.filter(p=>!(p[0]===x&&p[1]-1===y))}
 // brushes: SQUARE n x n, WIDE n x thickness (long beams), TALL thickness x n (columns), ROUND radius n (discs)
@@ -5328,12 +5400,15 @@ function drawEditor(){
   const y2=y1+28;x=8;
   btn(x,y2,26,24,'-',()=>{E.men=Math.max(1,E.men-1)},{size:16});txt('MEN '+E.men,x+62,y2+17,14,'#fff','center');btn(x+98,y2,26,24,'+',()=>{E.men=Math.min(12,E.men+1)},{size:16});x+=134;
   btn(x,y2,64,24,'UNDO',eUndo,{size:12});x+=70;
+  btn(x,y2,64,24,'REDO',eRedo,{size:12});x+=70;
   btn(x,y2,64,24,'CLEAR',()=>{eSnap();E.g=new Uint8Array(COLS*ROWS);E.t=[]},{size:12});x+=70;
   btn(x,y2,90,24,'TEST PLAY',eTest,{size:13,on:true,col:'#7dff5a'});x+=96;
   btn(x,y2,64,24,'SAVE',eSave,{size:13,on:true});x+=70;
   btn(x,y2,70,24,'SHARE',()=>{if(!E.t.length){toast('ach','Add a landlord first','');return}exportCode({n:E.name||'My Level',m:E.men,c:encodeCells(E.g),t:E.t})},{size:12});x+=76;
-  btn(x,y2,56,24,'EXIT',()=>{selTab=1;goSelect()},{size:12});
-  txt(E.name?E.name:'unsaved level',W-8,y2+17,13,'#99a','right')}
+  btn(x,y2,56,24,'EXIT',()=>{selTab=1;goSelect()},{size:12});x+=62;
+  btn(x,y2,106,24,'STARTER BUILDS',()=>{E.starters=!E.starters},{size:12,on:E.starters});
+  txt(E.name?E.name:'unsaved level',W-8,y2+17,13,'#99a','right');
+  if(E.starters)drawStarterMenu(W-308,66,296)}
 
 // ---------- level finished: stars, achievements ----------
 function onWin(){
