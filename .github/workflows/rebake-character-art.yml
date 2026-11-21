@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 50   # enough ancestry to fast-forward over concurrent test-only commits
           persist-credentials: true
       - uses: actions/setup-python@v5
         with:
