@@ -1,0 +1,31 @@
+name: Creator starter buildings and undo/redo
+on:
+  pull_request:
+    paths:
+      - "web/index.html"
+      - "test/browser_creator_starters_test.js"
+      - ".github/workflows/browser-starters.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/index.html"
+      - "test/browser_creator_starters_test.js"
+      - ".github/workflows/browser-starters.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  creator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Three distinct valid level blueprints and bounded undo/redo
+        run: node test/browser_creator_starters_test.js
+      - name: Share codes and preflight remain backwards-compatible
+        run: node test/browser_creator_codec_test.js
+      - name: Portrait and landscape touch input regression
+        run: |
+          node test/browser_orientation_test.js
+          node test/browser_multitouch_test.js
