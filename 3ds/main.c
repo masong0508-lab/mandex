@@ -109,13 +109,18 @@ static unsigned char man_pal[MS_NPAL][3];              /* the man's palette, re-
 #endif
 static u32 man_tone[3][MS_NPAL];   /* regular, warm-facing edge, cool trailing edge */
 static int man_tone_ready; /* standalone sprite host tools may draw before game init */
+/* This cache is initialized before the later software rasterizer's RGB macro
+   is declared. Keep the packer local and byte-order-identical. */
+static inline u32 man_rgb(int r,int g,int b){
+  return ((u32)r<<16)|((u32)g<<8)|(u32)b;
+}
 static void man_tone_prepare(void){
   for(int i=0;i<MS_NPAL;i++){
     int r=man_pal[i][0],g=man_pal[i][1],b=man_pal[i][2];
-    man_tone[0][i]=RGB(r,g,b);
+    man_tone[0][i]=man_rgb(r,g,b);
     if(i==0){man_tone[1][i]=man_tone[2][i]=man_tone[0][i];continue;} /* retain the dark ink outline */
-    man_tone[1][i]=RGB(r+(255-r)/9,g+(255-g)/11,b+(255-b)/13);
-    man_tone[2][i]=RGB(r*4/5,g*4/5,b*17/20);
+    man_tone[1][i]=man_rgb(r+(255-r)/9,g+(255-g)/11,b+(255-b)/13);
+    man_tone[2][i]=man_rgb(r*4/5,g*4/5,b*17/20);
   }
   man_tone_ready=1;
 }
