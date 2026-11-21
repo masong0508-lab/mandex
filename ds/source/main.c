@@ -925,6 +925,11 @@ static void draw_voxels(const View *v){
 #ifndef MX_DS_CHUNK_VIEW_CULL
 #define MX_DS_CHUNK_VIEW_CULL 1
 #endif
+/* Rubble should retain the same health-dependent cracked tile appearance
+   it had while attached to the building; no new palette or texture data. */
+#ifndef MX_DS_RUBBLE_DAMAGE
+#define MX_DS_RUBBLE_DAMAGE 1
+#endif
 static void draw_chunks(const View *v){
   const int ppc=v->ppc, h=ppc/2;
   for(int c=0;c<MX_MAX_CHUNKS;c++){
@@ -944,10 +949,20 @@ static void draw_chunks(const View *v){
       if(sx+ppc<=0 || sx>=256)continue;
       int sy=vy(v,a->wy)-h;
       if(sy+ppc<=0 || sy>=192)continue;
-      gfx_tile(v,a->m,0,k&1,sx,sy);
 #else
-      gfx_tile(v,a->m,0,k&1,vx(v,a->wx)-h,vy(v,a->wy)-h);
+      int sx=vx(v,a->wx)-h,sy=vy(v,a->wy)-h;
 #endif
+#if MX_DS_RUBBLE_DAMAGE
+      const int hp=a->h>>12,mat=a->m;
+#if MX_DS_DAMAGE_THRESH
+      const int damage=hp>HP_67[mat]?0:hp>HP_33[mat]?1:2;
+#else
+      const int damage=hp*3>MAXHP[mat]*2?0:hp*3>MAXHP[mat]?1:2;
+#endif
+#else
+      const int damage=0;
+#endif
+      gfx_tile(v,a->m,damage,k&1,sx,sy);
     }
   }
 }
