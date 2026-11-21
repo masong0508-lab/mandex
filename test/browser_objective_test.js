@@ -30,6 +30,16 @@ assert.strictEqual(probe(three,0,'none',-999,'lose').phase,'failed');
 assert(web.includes('const objective=objectiveSnapshot(),lb=objective.remaining;'),
   'production browser HUD uses objective helper, not old disconnected target counts');
 assert(web.includes("const oy=P?66:38;"),'objective strip is positioned for portrait and landscape');
+assert(web.includes("const cy=P?100:39;"),
+  'portrait streak must start below the persistent mission tracker');
+for(const width of [320,360,390,480,699,700,960]){
+  const portrait=width<700,goalX=7,goalW=Math.min(304,width-14);
+  const goalY=portrait?66:38,goalH=28;
+  const streakX=width-170,streakY=portrait?100:39,streakW=158,streakH=30;
+  const overlapX=Math.max(goalX,streakX)<Math.min(goalX+goalW,streakX+streakW);
+  const overlapY=Math.max(goalY,streakY)<Math.min(goalY+goalH,streakY+streakH);
+  assert(!(overlapX&&overlapY),'goal and streak overlap at '+width+'px viewport');
+}
 assert(web.includes("const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';"),
   'a single surviving landlord is identified in the real world renderer');
 assert(web.includes("if(lastTargetVisible)txt('LAST',t.x,t.y-63,12"),
