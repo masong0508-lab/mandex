@@ -1646,14 +1646,19 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
     t->mv = 0; if(sgn(mx_ - t->x)) t->face = (int8_t)sgn(mx_ - t->x);
     return;
   }
+  /* Close walking encounters make the timed briefcase counter playable
+     outside the sling. Range gates keep distant floor-to-floor sniping out
+     of the level while preserving the original aim-mode throw behavior. */
+  const int can_throw=(m->mode==MAN_AIM && !(m->stun>0)) ||
+      (m->mode==MAN_WALK && rabs(ddx)<RI(32) && rabs(ddy)<RI(12));
   if(fight){
-    if(IS_THROW(t->kind)){ if(m->mode == MAN_AIM && !(m->stun > 0)) t->cd -= dt; } else t->cd -= dt;
+    if(IS_THROW(t->kind)){ if(can_throw) t->cd -= dt; } else t->cd -= dt;
     if(t->wind > 0){
       t->wind -= dt;
       if(t->wind <= 0){
         if(IS_THROW(t->kind)){
           real vx, vy; int sl = 0;
-          if(m->mode == MAN_AIM && throw_sol(w, t, m->x, m->y, &vx, &vy)){
+          if(can_throw && throw_sol(w, t, m->x, m->y, &vx, &vy)){
             sl = 1;
             for(int k = 0; k < MX_MAX_CASES; k++) if(!w->cases[k].active){
               MxCase *c = &w->cases[k];
@@ -1671,7 +1676,7 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
           if(m->mode == MAN_WALK && rabs(ddx) < R(5.75) && rabs(ddy) < R(5.75)) hurt_man(w, sgn(m->x - t->x) ? sgn(m->x - t->x) : 1);
         }
       }
-    } else if(IS_THROW(t->kind) && m->mode == MAN_AIM && !(m->stun > 0) && t->cd <= 0){
+    } else if(IS_THROW(t->kind) && can_throw && t->cd <= 0){
       real vx, vy;
       if(throw_sol(w, t, m->x, m->y, &vx, &vy)){ t->wind = R(0.6); if(sgn(m->x - t->x)) t->face = (int8_t)sgn(m->x - t->x); }
       else t->cd = R(0.7);
@@ -2375,7 +2380,9 @@ static void build(MxWorld *w, int l){
   case 37: {    /* rent strike: a 3-storey walk-up like Walk-Up Wreckage, but some of the tenants are walkers who fight back */
     static const int PT[3] = {71, 83, 95}, PADS[2][2] = {{100, 0}, {60, 1}};
     static const uint8_t DR[3][3] = {{1,0,1},{0,1,0},{1,0,1}};
-    static const int TG[8][3] = {{89,59,1},{77,59,0},{67,49,0},{77,49,1},{89,49,0},{90,39,0},{80,39,1},{67,39,0}};
+    /* kind: 0 ordinary, 1 close-fighting walker, 2 briefcase thrower.
+       One top-floor thrower teaches a timed parry; the 3 walkers remain. */
+    static const int TG[8][3] = {{89,59,1},{77,59,0},{67,49,0},{77,49,1},{89,49,0},{90,39,2},{80,39,1},{67,39,0}};
     const int g = 59, fh = 10, ft = 2, X = 58, Wd = 48, F = 3;
     w->walk = 1;
     rect_fill(w, X, g, Wd, 1, S);
@@ -2393,7 +2400,8 @@ static void build(MxWorld *w, int l){
       rect_fill(w, c, ys, 4, ft, 0); room(w, c, ys, 4, ft, f + 1);
       rect_fill(w, c, yb - 1, 4, 1, RU); pad(w, c, yb - 1, 4);
     }
-    for(int k = 0; k < 8; k++) tgtk(w, TG[k][0], TG[k][1], TG[k][2] ? LK_WALKER : LK_NONE);
+    for(int k = 0; k < 8; k++) tgtk(w,TG[k][0],TG[k][1],TG[k][2]==2 ? LK_THROWER :
+                                  TG[k][2] ? LK_WALKER : LK_NONE);
     tnt(w, 82, 59); tnt(w, 86, 49); tnt(w, 72, 39); break; }
   case 38:      /* sand standoff: a 2-storey brick house with a glass tank of sand on its wooden roof, two bat landlords at the gate */
     HX(64, GR, 26, 2, 10, 1, 1, B, W_, W_, 0, 0);
