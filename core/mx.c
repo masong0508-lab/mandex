@@ -1799,7 +1799,7 @@ void mx_walk_input(MxWorld *w, int ax, int jump, int punch, int stomp){
   m->in_ax = (int8_t)(ax > 0 ? 1 : ax < 0 ? -1 : 0); m->in_jump = (uint8_t)(jump != 0); m->in_punch = (uint8_t)(punch != 0); m->in_stomp = (uint8_t)(stomp != 0);
 }
 /* hit everything in a box (cells, loose rubble, landlords); returns the damage dealt.  Bounce pads shrug off fists. */
-static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg){
+static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg, int *parried){
   real dealt = 0;
   int x0 = rfloor(cx - hw), x1 = rfloor(cx + hw), y0 = rfloor(cy - hh), y1 = rfloor(cy + hh);
   for(int y = y0; y <= y1; y++) for(int x = x0; x <= x1; x++){ if(INB(x, y) && w->grid[IDX(x, y)] == MX_RUBBER) continue; dealt += damage_cell(w, x, y, dmg); }
@@ -1824,6 +1824,7 @@ static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg){
     if(!c->active || rabs(c->x-cx)>=hw+R(0.75) ||
        rabs(c->y-cy)>=hh+R(0.75)) continue;
     parry_case(w,c); dealt+=RI(8);
+    if(parried)*parried=1;
   }
   for(int i = 0; i < w->ntargets; i++){
     MxTarget *t = &w->targets[i];
@@ -1835,19 +1836,21 @@ static void walk_punch(MxWorld *w){
   MxMan *m = &w->man;
   real cx = m->x + (m->face > 0 ? R(2.125) : -R(2.125)), cy = m->y - R(0.375);
   int run = rabs(m->vx) > R(12.5);
-  real d = walk_hit(w, cx, cy, R(1.625), RI(2), RI(run ? 24 : 16));
+  int parried=0;
+  real d = walk_hit(w, cx, cy, R(1.625), RI(2), RI(run ? 24 : 16), &parried);
   m->pT = R(0.2); m->pCd = R(0.3);
-  ev(w, EV_PUNCH, cx, cy, run, d, 0);
+  ev(w, EV_PUNCH, cx, cy, run, d, RI(parried));
   if(d > 0){ if(w->shake < RI(3)) w->shake = RI(3); wob_kick(w, rfloor(cx), rfloor(cy), 4, m->face > 0 ? R(0.9) : -R(0.9), 0); }
 }
 static void walk_slam(MxWorld *w){
   MxMan *m = &w->man;
   real cx = m->x, cy = m->y + WHH + R(0.5) + R(0.5), d = 0;
-  d += walk_hit(w, cx, cy, R(1.75), R(1.25), RI(34));
-  d += walk_hit(w, cx, cy, R(3.25), R(1.25), RI(18));
+  int parried=0;
+  d += walk_hit(w, cx, cy, R(1.75), R(1.25), RI(34), &parried);
+  d += walk_hit(w, cx, cy, R(3.25), R(1.25), RI(18), &parried);
   m->stomp = 0;
   if(w->shake < RI(9)) w->shake = RI(9);
-  ev(w, EV_SLAM, cx, cy, 0, d, 0);
+  ev(w, EV_SLAM, cx, cy, 0, d, RI(parried));
   wob_kick(w, rfloor(cx), rfloor(cy), 6, 0, R(0.9));
 }
 static void walk_step(MxWorld *w, real dt){
