@@ -22,6 +22,15 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 22 browser combat budget: no projectile storms
+
+- The browser now caps simultaneously flying briefcases at **four**, matching
+  the shared DS/3DS/Dreamcast core. Crowded bosses cannot flood the screen
+  with extra enemy projectiles or excess case-collision work.
+- Real throws retain their windups and sounds; full-pool attempts never
+  erase existing cases, and parrying frees a slot for later attacks.
+- [Projectile budget parity and regression evidence](docs/BROWSER_BRIEFCASE_BUDGET_2026-11-22.md).
+
 ## November 22 combat counterplay: briefcase parries
 
 - While walking, punch an incoming thrown briefcase to smash it before it
