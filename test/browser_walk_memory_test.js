@@ -9,16 +9,29 @@ function between(first,last){
   assert(a>=0&&b>a,'browser source missing '+first+' / '+last);
   return html.slice(a,b);
 }
-/* The pre-optimization logic retained verbatim for bitwise collision parity. */
+/* Independent geometric reference for the new walking collider:
+   sample the character's original 3x5 probe points against each actual
+   live voxel. A conservative broadphase may ignore impossible far chunks,
+   but the chunk centroid is NOT the contact hitbox of a fallen wall. */
 function oldCollision(chunks,solidAt,RC,WHW,WHH,x,y){
   const xs=[x-WHW,x,x+WHW],ys=[y-WHH,y-WHH*.5,y,y+WHH*.5,y+WHH-.01];
-  for(const qx of xs)for(const qy of ys){if(solidAt(qx,qy))return true;
-    for(const ch of chunks){if(Math.hypot(ch.x-qx,ch.y-qy)>ch.rad+RC)continue;for(const a of ch.cells)if(!a.dead&&Math.abs(a.wx-qx)<RC&&Math.abs(a.wy-qy)<RC)return true}}
+  for(const qx of xs)for(const qy of ys)if(solidAt(qx,qy))return true;
+  for(const ch of chunks){
+    const radius=ch.rad+RC;
+    if(Math.abs(ch.x-x)>radius+WHW||Math.abs(ch.y-y)>radius+WHH)continue;
+    for(const a of ch.cells){
+      if(a.dead||Math.abs(a.wx-x)>=WHW+RC||Math.abs(a.wy-y)>=WHH+RC)continue;
+      for(const qx of xs)for(const qy of ys)
+        if(Math.abs(a.wx-qx)<RC&&Math.abs(a.wy-qy)<RC)return true;
+    }
+  }
   return false;
 }
 const collisionCode=between('function wBlocked(', 'function enterWalk(');
 assert(!collisionCode.includes('const xs=['),'walk broadphase makes no per-call sample arrays');
-assert(collisionCode.includes('Math.hypot(ch.x-qx,ch.y-qy)<=radius'),'old exact circular narrow-phase retained');
+assert(!collisionCode.includes('Math.hypot(ch.x-qx,ch.y-qy)<=radius'),
+       'walk collider must use actual transformed debris rather than the centroid');
+assert(collisionCode.includes('Math.abs(a.wx-qx)'),'voxel-based walk hitbox retained');
 const makeFast=new Function('chunks','solidAt','RC','WHW','WHH','Math',collisionCode+'\nreturn wBlocked;');
 let seed=0xc001d00d;
 function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
