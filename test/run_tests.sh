@@ -15,6 +15,8 @@ python3 sprite_turn_anchor_test.py
 python3 head_turnaround_test.py
 echo "--- Dreamcast: all 71 Wolfman profiles use independent HD UV rectangles ---"
 python3 dreamcast_wolf_atlas_test.py
+echo "--- DS emulator smoke validator: reject frozen, blank and incomplete boot captures ---"
+python3 ds_smoke_test.py
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c host_test.c -lm -o test_float
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c host_test.c -lm -o test_fixed
 ./test_float > float.txt && tail -n 1 float.txt
@@ -41,6 +43,13 @@ for mode in float fixed; do
   test "$mode" = fixed && flags="-DMX_FIXED"
   gcc -std=c99 -O2 -Wall $flags -I../core ../core/mx.c visual_feedback_test.c -lm -o visual_feedback_$mode
   ./visual_feedback_$mode
+done
+echo "--- walking countersteer: interrupted rear turns remain continuous (float/fixed) ---"
+for mode in float fixed; do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=c99 -O2 -Wall $flags -I../core ../core/mx.c walk_turn_interrupt_test.c -lm -o walk_turn_interrupt_$mode
+  ./walk_turn_interrupt_$mode
 done
 echo "--- real-time frame meter: rendered FPS vs simulation steps/s ---"
 gcc -std=gnu99 -O2 -I../core fps_meter_test.c -o fps_meter_test && ./fps_meter_test
@@ -367,6 +376,7 @@ N3D_UNITS="n3d_gfx.o n3d_intro.o"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o n3d_$f.o; done   # the shared DS cutscene code, as its own fixed-point unit, exactly as 3ds/Makefile builds it
 gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_render
 N3DS_RUBBLE_DAMAGE_PROBE=1 ./n3ds_render
+N3DS_TILE_CLIP_PROBE=1 ./n3ds_render
 echo "--- 3DS silhouette, outfit colors and antialiased rotated edges ---"
 for config in base lit smooth; do
   case "$config" in

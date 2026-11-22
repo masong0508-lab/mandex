@@ -21,6 +21,7 @@ on:
       - "test/collapse_survivor_test.c"
       - "test/bank_shot_test.c"
       - "test/landlord_shock_test.c"
+      - "test/walk_turn_interrupt_test.c"
       - "test/n3ds_render.c"
       - "test/n3ds_walk.c"
       - "test/dc_render.c"
@@ -50,6 +51,14 @@ jobs:
         run: |
           node test/collapse_survivor_web_test.js
           node test/landlord_ai_web_test.js
+      - name: Keep walking countersteer continuous in both core numeric modes
+        run: |
+          for mode in float fixed; do
+            flags=""
+            if test "$mode" = fixed; then flags="-DMX_FIXED"; fi
+            gcc -std=c99 -O2 -Wall $flags -Icore core/mx.c test/walk_turn_interrupt_test.c -lm -o /tmp/walk_turn_interrupt_$mode
+            /tmp/walk_turn_interrupt_$mode
+          done
       - name: Require exact rubble collision behavior with fast rectangle rejection
         run: |
           for mode in float fixed; do
@@ -139,6 +148,7 @@ jobs:
           N3DS_FASTPATH_PROBE=1 /tmp/n3d_smoke_1 > /tmp/n3d_smoke_new.txt
           diff -u /tmp/n3d_smoke_old.txt /tmp/n3d_smoke_new.txt
           cat /tmp/n3d_smoke_new.txt
+          N3DS_TILE_CLIP_PROBE=1 /tmp/n3d_smoke_1
       - name: Exercise real 3DS pad/touch pause, restart and music controls
         run: |
           set -eu

@@ -4,11 +4,15 @@ name: ROMs
 #   mandex.nds  - Nintendo DS, hardware build: own crt0 + ARM7, no libnds/calico (ds/bare)
 #   mandex.cdi  - Sega Dreamcast disc image (Flycast / redream / burn or SD-card loaders)
 #   mandex.elf  - the same Dreamcast program as a bare ELF (dev loaders only; emulators want the .cdi)
-# The DS ROM is also launched for a few seconds in DeSmuME under a virtual display as a smoke test (does it boot, does the screen show anything).
+# The DS boot/title must remain alive with two nonblank screens and changing
+# client pixels in DeSmuME before packaging. This is not gameplay or hardware FPS validation.
 on:
   push:
     branches: [main]
-    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", ".github/workflows/roms.yml"]
+    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/validate_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/validate_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
   workflow_dispatch:
 
 # Only the newest commit should occupy heavy build/emulator resources.
@@ -87,34 +91,50 @@ jobs:
     needs: ds
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
+      - uses: actions/checkout@v4
+      - name: Verify boot capture rejection cases
+        run: python3 test/ds_smoke_test.py
       - uses: actions/download-artifact@v8
         with: { name: rom-nds }
-      - name: Launch in DeSmuME
+      - name: Check DS boot and title animation in DeSmuME
         run: |
+          set -euo pipefail
+          touch desmume.log
           sudo apt-get update -qq
           sudo apt-get install -y -qq desmume xvfb imagemagick x11-utils >/dev/null
           export LIBGL_ALWAYS_SOFTWARE=1
-          xvfb-run -a -s "-screen 0 1024x768x24" bash -c '
+          timeout 90s xvfb-run -a -s "-screen 0 1024x768x24" bash -c '
+            set -euo pipefail
             desmume-cli --disable-sound mandex.nds > desmume.log 2>&1 &
             PID=$!
+            trap '\''kill "$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true'\'' EXIT
             for t in 4 8 14; do
               sleep $t
-              if kill -0 $PID 2>/dev/null; then echo "t+$t: still running"; else echo "t+$t: EXITED"; fi
-              xwininfo -root -tree 2>/dev/null | grep -v "has no name" | head -8
-              import -window root shot$t.png 2>/dev/null || true
-              echo "mean brightness of the screen: $(convert shot$t.png -colorspace Gray -format "%[fx:mean]" info: 2>/dev/null)"
-              echo "distinct colours: $(convert shot$t.png -format "%k" info: 2>/dev/null)"
+              kill -0 "$PID" || { echo "DS_BOOT_SMOKE_FAIL: emulator exited"; exit 1; }
+              xwininfo -root -tree > "windows$t.txt"
+              # Capture the client, excluding the animated FPS window title and desktop.
+              wid=$(awk '\''/"[Dd]e[Ss]mu[Mm][Ee][^\"]*"/ { print $1; exit }'\'' "windows$t.txt")
+              test -n "$wid" || { echo "DS_BOOT_SMOKE_FAIL: no emulator window"; exit 1; }
+              import -window "$wid" "shot$t.png"
+              convert "shot$t.png" -depth 8 "shot$t.ppm"
+              kill -0 "$PID" || { echo "DS_BOOT_SMOKE_FAIL: emulator exited during capture"; exit 1; }
             done
-            kill $PID 2>/dev/null || true'
-          echo "--- desmume log"; tail -20 desmume.log
+            python3 tools/validate_ds_smoke.py shot4.ppm shot8.ppm shot14.ppm
+            kill -0 "$PID"
+          '
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: smoke-ds-shots, path: "shot*.png", if-no-files-found: ignore }
+        with:
+          name: smoke-ds-shots
+          path: |
+            shot*.png
+            windows*.txt
+            desmume.log
+          if-no-files-found: warn
 
   package:
-    needs: [ds, dreamcast, n3ds]
+    needs: [ds, dreamcast, n3ds, smoke-ds]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

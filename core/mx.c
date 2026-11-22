@@ -1827,7 +1827,9 @@ static void walk_step(MxWorld *w, real dt){
   int ax = m->in_ax;
   if(ax && ax != m->face){ /* gameplay turns immediately; silhouette completes a short back-view turn */
     m->face=(int8_t)ax;
-    m->turn_ticks=12;
+    /* Countersteering reverses the current arc from its visible pose.
+       Restarting all 12 ticks would mirror the old profile instantly. */
+    m->turn_ticks=m->turn_ticks ? 12-m->turn_ticks : 12;
   } else if(ax) m->face=(int8_t)ax;
   if(m->turn_ticks) m->turn_ticks--;
   { real tv = ax > 0 ? R(16.875) : ax < 0 ? -R(16.875) : 0, k = rmul(dt, m->gr ? RI(14) : RI(5)); if(k > RI(1)) k = RI(1); m->vx += rmul(tv - m->vx, k); }

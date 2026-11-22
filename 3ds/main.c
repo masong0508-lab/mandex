@@ -768,17 +768,33 @@ static void tile_build(int p){
   }
   tile_ready |= 1u << slot;
 }
+/* Clip the known tile footprint once, then walk the column-major BGR
+   bytes directly. Both stereo eyes avoid repeated pixel edge tests and
+   address multiplication. The old path remains for byte-exact host A/B. */
+#ifndef MX_N3DS_TILE_CLIP_RANGES
+#define MX_N3DS_TILE_CLIP_RANGES 1
+#endif
 /* one voxel: dm = brightness in 1/256ths (damage tint, dim), per-pixel alpha for glass */
 static void draw_tile(Scr *s, int sx, int sy, int p, int m, int v, int d, int dm){
   int slot = p == 4 ? 1 : 0;
   const u32 *tc = tcol[slot][m][v][d]; const u8 *ta = talp[slot][m][v][d];
+#if MX_N3DS_TILE_CLIP_RANGES
+  if(sx >= s->w || sy >= s->h || sx <= -p || sy <= -p) return;
+  const int i0 = sx < 0 ? -sx : 0, j0 = sy < 0 ? -sy : 0;
+  const int i1 = sx + p > s->w ? s->w - sx : p;
+  const int j1 = sy + p > s->h ? s->h - sy : p;
+  for(int i = i0; i < i1; i++){
+    u8 *q = s->fb + (((sx + i) * s->h) + (s->h - sy - j1)) * 3;
+    for(int j = j1 - 1; j >= j0; j--, q += 3){
+#else
   for(int i = 0; i < p; i++){
     int X = sx + i; if((unsigned)X >= (unsigned)s->w) continue;
     for(int j = 0; j < p; j++){
       int Y = sy + j; if((unsigned)Y >= (unsigned)s->h) continue;
+      u8 *q = s->fb + ((X * s->h) + (s->h - 1 - Y)) * 3;
+#endif
       int a = ta[j * 8 + i]; if(!a) continue;
       u32 c = tc[j * 8 + i]; int r = ((c >> 16) & 255) * dm >> 8, g = ((c >> 8) & 255) * dm >> 8, b = (c & 255) * dm >> 8;
-      u8 *q = s->fb + ((X * s->h) + (s->h - 1 - Y)) * 3;
       if(a >= 250){ q[0] = (u8)(b > 255 ? 255 : b); q[1] = (u8)(g > 255 ? 255 : g); q[2] = (u8)(r > 255 ? 255 : r); }
       else { q[0] = (u8)((q[0] * (255 - a) + b * a) / 255); q[1] = (u8)((q[1] * (255 - a) + g * a) / 255); q[2] = (u8)((q[2] * (255 - a) + r * a) / 255); }
     }
