@@ -27,7 +27,13 @@ int main(void){
   /* the three levels that fill the chapter 2 screen (36-38), then the finale at 39 */
   mx_load(&W, 36); CHECK(W.ntubes == 2 && W.ntargets == 6 && W.targets[0].kind == LK_THROWER && W.targets[3].kind == LK_THROWER && W.walk == 0, "Mail Room Mayhem: 2 tubes, a thrower per floor");
   mx_load(&W, 37); CHECK(W.walk == 1 && W.npads == 2 && W.ntargets == 8 && W.men == 4, "Rent Strike: walk level, 2 pads, 8 landlords, 4 men");
-  { int walkers = 0; for(int i = 0; i < W.ntargets; i++) walkers += W.targets[i].kind == LK_WALKER; CHECK(walkers == 3, "Rent Strike: three walkers"); }
+  { int walkers = 0, throwers = 0;
+    for(int i = 0; i < W.ntargets; i++){
+      walkers += W.targets[i].kind == LK_WALKER;
+      throwers += W.targets[i].kind == LK_THROWER;
+    }
+    CHECK(walkers == 3 && throwers == 1 && W.targets[5].kind == LK_THROWER,
+          "Rent Strike: three walkers plus one telegraphed parry challenge"); }
   mx_load(&W, 38); CHECK(W.ntargets == 6 && W.targets[0].kind == LK_BAT && W.targets[1].kind == LK_BAT && W.men == 7, "Sand Standoff: two bat guards, 6 landlords");
   CHECK(MX_NUM_LEVELS == 60 && MX_CH3_START == 40 && strcmp(mx_level_name(39), "Landlord HQ") == 0 && strcmp(mx_level_name(36), "Mail Room Mayhem") == 0 && strcmp(mx_level_name(40), "Full Moon Rising") == 0 && strcmp(mx_level_name(59), "Alpha Landlord") == 0, "60 levels: chapter 2 ends with Landlord HQ, chapter 3 is 40-59");
 
