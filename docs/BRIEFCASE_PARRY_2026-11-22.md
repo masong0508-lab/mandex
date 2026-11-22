@@ -2,7 +2,7 @@
 
 ## Player-facing behavior
 
-Thrower and boss briefcases are no longer purely unavoidable when the player is on foot. A **timely forward punch** can intercept an incoming briefcase in the existing punch hitbox; a **descending belly slam** can also smash one. Every actual interception:
+Thrower and boss briefcases are no longer purely unavoidable when the player is on foot. A **timely forward punch** can intercept an incoming briefcase in the existing punch hitbox, including when it arrives during the current **0.2-second punch animation**; a **descending belly slam** can also smash one. Every actual interception:
 
 - Destroys that one active briefcase before its next collision update
 - Awards a modest **+150 points**, once per case
@@ -12,7 +12,7 @@ Behind-the-back punches, out-of-height and out-of-range cases do not get interce
 
 ## Engineering
 
-The shared C core checks the **four existing MxCase slots** while processing an actual walk hit, not on every physics step. It deactivates a caught case, issues an existing **EV_BONK** with `m=2` (0/1 retain bat/shield swat semantics), awards the fixed 150-point bonus and reports a small positive hit impact. This adds **no new world state, heap allocations, arrays, framebuffers, sprite sheets or projectile capacity**.
+The shared C core checks the **four existing MxCase slots** while processing an actual walk hit and, only for the already-active punch pose, within the existing thrown-projectile update. It does not add a new world scan or extend punch cooldown. It deactivates a caught case, issues an existing **EV_BONK** with `m=2` (0/1 retain bat/shield swat semantics), awards the fixed 150-point bonus and reports a small positive hit impact. This adds **no new world state, heap allocations, arrays, framebuffers, sprite sheets or projectile capacity**.
 
 The browser uses an equivalent radius margin of 6 pixels (0.75 world cell), removes cases in reverse index order from its existing array, and uses the already available popup/sparks. Both punch and slam share the walk-hit collision path; its inactive flag prevents duplicate scores when a slam checks two overlapping hitboxes.
 
@@ -20,7 +20,7 @@ The feature is deliberately defensive and skill-based, not automatic deflection.
 
 ## Tests
 
-- `test/case_parry_test.c`, float and fixed: actual public update, punch, multi-case contact, misses, exact bounds, slam two-hitbox deduplication, no repeat scoring, non-parry damage, event flag integrity and normal empty punches.
+- `test/case_parry_test.c`, float and fixed: actual public update, punch, multi-case contact, misses, exact bounds, active-animation timing, expired/back-facing fist suppression, slam two-hitbox deduplication, no repeat scoring, non-parry damage, event flag integrity and normal empty punches.
 - `test/browser_case_parry_test.js`: executes the shipped walking attack functions and projectile update; mirrors the native cases and validates browser parse.
 - `test/browser_input_smoke.py`: actual Chromium keydown/keyup, portrait visual capture of **PARRY! +150** and an identically prepared unguarded briefcase that must still hurt the player.
 - New `.github/workflows/briefcase-parry.yml` runs the focused tests, and `test/run_tests.sh` includes them in the long float/fixed/console host suite.
