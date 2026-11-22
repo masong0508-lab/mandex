@@ -72,6 +72,26 @@ int main(void){
   CHECK(w.score==0&&events(EV_BONK)==0&&events(EV_PUNCH)==1,
         "ordinary punch without a case is unchanged");
 
+  /* Timing window: a briefcase can arrive on a later animation frame.
+     Start outside the fist and move inside during the projectile step. */
+  setup();w.man.pT=R(.15);
+  case_at(0,punch_x()+R(2.875),punch_y());w.cases[0].vx=-RI(80);
+  upd_cases(&w,DT);
+  CHECK(!w.cases[0].active&&w.score==150,
+        "briefcase entering a visible punch arc must be parried");
+  expect_parry(1);
+  CHECK(events(EV_HURT)==0,"animation-window parry cannot hurt the player");
+
+  setup();w.man.pT=0;case_at(0,punch_x(),punch_y());
+  upd_cases(&w,DT);
+  CHECK(w.score==0&&events(EV_BONK)==0&&events(EV_HURT)==1,
+        "expired punch cannot grant a free automatic shield");
+
+  setup();w.man.pT=R(.15);case_at(0,w.man.x-R(3),punch_y());
+  upd_cases(&w,DT);
+  CHECK(w.cases[0].active&&w.score==0&&events(EV_BONK)==0,
+        "back-facing case cannot be parried during fist recovery");
+
   setup();case_at(0,w.man.x,w.man.y);w.nofight=0;
   mx_walk_input(&w,0,0,0,0);mx_update(&w,DT);
   CHECK(events(EV_BONK)==0&&w.score==0,
