@@ -22,6 +22,28 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 21: continuous turns, debris draw work and boot verification
+
+- Rapid left/right changes now reverse the current walking turn smoothly in
+  the shared console core and browser. Punch and movement facing respond
+  immediately; the artwork no longer jumps across the rear-turn sequence.
+- Browser wallpaper and debris culling remain active during screen shake,
+  with bounds expanded by the maximum camera displacement. A crowded
+  regression scene draws 250 of 1,472 live debris sprites during shake,
+  preserving every potentially visible sprite and its paint order.
+- 3DS clips each voxel tile once before traversing its column-major
+  framebuffer. An independent pixel oracle checks 194,688 material, damage,
+  brightness and viewport-edge combinations; both stereo views also match
+  the reference renderer exactly. No additional production buffers or
+  persistent state are needed.
+- Console builds now run on pull requests. DS packaging requires a live
+  emulator, valid images of both screens and changing game pixels. Missing,
+  blank and frozen captures fail the job; diagnostic screenshots and logs
+  are retained. This verifies boot/title liveness.
+
+See [the implementation and test evidence](docs/RENDER_TURN_SMOKE_2026-11-21.md)
+for reproduction commands and the limits of the host measurements.
+
 ## Browser/Android airborne rubble collision load
 
 - The flying player can be tested against scores of moving rubble cells **eight
@@ -39,11 +61,12 @@ outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 - Browser zoom now drops entirely offscreen debris chunks and individual
   offscreen debris sprites before issuing Canvas transforms/drawImage calls.
   The original raster path remains for every potentially visible rotated
-  fragment; screen shake and normal full-world camera mode bypass the filter.
+  fragment; screen shake expands its conservative bounds, while normal
+  full-world camera mode bypasses the filter.
 - Shattered cells are no longer drawn during the frame before debris cleanup.
   A dedicated headless Canvas transform test compares every visible sprite
   and draw order with the original across 1,600 randomly positioned rubble
-  cells, camera zoom, no-zoom and screen shake.
+  cells plus rotating edge fixtures, with 1,215 layout/zoom/shake cases.
 - This changes only drawing, not destruction physics, controls, music clock
   or collision. No new images, heap pools or framebuffers.
 

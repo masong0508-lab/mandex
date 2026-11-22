@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 #include "3ds.h"
 
 static u8 fb_top[2][400 * 240 * 3], fb_bot[320 * 240 * 3];
@@ -98,6 +99,76 @@ static unsigned n3_hash(const u8 *p, size_t n){
   unsigned h=2166136261u;
   for(size_t i=0;i<n;i++){h^=p[i];h*=16777619u;}
   return h;
+}
+/* The previous production rasterizer is an independent pixel oracle.
+   Exercise every tile/material/damage/alpha combination at all clip edges,
+   with guard bytes around a small column-major framebuffer. */
+static void n3_tile_reference(Scr *s,int sx,int sy,int p,int m,int v,int d,int dm){
+  int slot=p==4?1:0;
+  const u32 *tc=tcol[slot][m][v][d];
+  const u8 *ta=talp[slot][m][v][d];
+  for(int i=0;i<p;i++){
+    int X=sx+i;if((unsigned)X>=(unsigned)s->w)continue;
+    for(int j=0;j<p;j++){
+      int Y=sy+j;if((unsigned)Y>=(unsigned)s->h)continue;
+      int a=ta[j*8+i];if(!a)continue;
+      u32 c=tc[j*8+i];
+      int r=((c>>16)&255)*dm>>8,g=((c>>8)&255)*dm>>8,b=(c&255)*dm>>8;
+      u8 *q=s->fb+((X*s->h)+(s->h-1-Y))*3;
+      if(a>=250){q[0]=(u8)(b>255?255:b);q[1]=(u8)(g>255?255:g);q[2]=(u8)(r>255?255:r);}
+      else{q[0]=(u8)((q[0]*(255-a)+b*a)/255);q[1]=(u8)((q[1]*(255-a)+g*a)/255);q[2]=(u8)((q[2]*(255-a)+r*a)/255);}
+    }
+  }
+}
+typedef void (*N3TileDraw)(Scr *,int,int,int,int,int,int,int);
+static double n3_tile_bench(N3TileDraw draw,Scr *s){
+  const clock_t started=clock();
+  for(int k=0;k<500000;k++){
+    int p=3+(k&1),m=1+((k>>1)&7);
+    /* Mostly complete on-screen tiles, with edge-crossing rubble. */
+    int x=(k*37)%408-4,y=(k*19)%248-4;
+    draw(s,x,y,p,m,(k>>4)&3,k%3,(k&16)?256:179);
+  }
+  return (double)(clock()-started)*1000.0/CLOCKS_PER_SEC;
+}
+static int n3_tile_clip_probe(void){
+  enum{W=32,H=24,GUARD=32,BYTES=W*H*3+GUARD*2};
+  unsigned char expected[BYTES],actual[BYTES];
+  Scr ref={expected+GUARD,W,H},opt={actual+GUARD,W,H};
+  static const int brightness[]={0,1,127,179,256,300};
+  unsigned cases=0;unsigned digest=2166136261u;
+  for(int p=3;p<=4;p++){
+    tile_build(p);
+    const int xs[]={-p-1,-p,1-p,-1,0,1,13,W-p-1,W-p,W-p+1,W-1,W,W+1};
+    const int ys[]={-p-1,-p,1-p,-1,0,1,9,H-p-1,H-p,H-p+1,H-1,H,H+1};
+    for(int m=1;m<MX_NMAT;m++)for(int v=0;v<4;v++)for(int d=0;d<3;d++)
+    for(unsigned b=0;b<sizeof brightness/sizeof *brightness;b++)
+    for(unsigned x=0;x<sizeof xs/sizeof *xs;x++)for(unsigned y=0;y<sizeof ys/sizeof *ys;y++){
+      memset(expected,37,sizeof expected);memset(actual,37,sizeof actual);
+      n3_tile_reference(&ref,xs[x],ys[y],p,m,v,d,brightness[b]);
+      draw_tile(&opt,xs[x],ys[y],p,m,v,d,brightness[b]);
+      if(memcmp(expected,actual,sizeof expected)){
+        fprintf(stderr,"FAIL: 3DS tile clip p=%d material=%d variant=%d damage=%d dim=%d x=%d y=%d\n",
+                p,m,v,d,brightness[b],xs[x],ys[y]);return 1;
+      }
+      digest=(digest^n3_hash(actual,sizeof actual))*16777619u;cases++;
+    }
+  }
+  printf("N3_TILE_CLIP_PASS cases=%u materials=8 variants=4 damage=3 brightness=6 sizes=2 guards=1 hash=%08x\n",cases,digest);
+  if(getenv("N3DS_TILE_CLIP_BENCH")){
+    Scr r={fb_top[0],400,240},o={fb_top[1],400,240};
+    for(int round=0;round<6;round++){
+      double old_ms,new_ms;
+      memset(fb_top,37,sizeof fb_top);
+      if(round&1){new_ms=n3_tile_bench(draw_tile,&o);old_ms=n3_tile_bench(n3_tile_reference,&r);}
+      else{old_ms=n3_tile_bench(n3_tile_reference,&r);new_ms=n3_tile_bench(draw_tile,&o);}
+      if(memcmp(fb_top[0],fb_top[1],sizeof fb_top[0])){
+        fputs("FAIL: 3DS repeated tile render differs from reference\n",stderr);return 1;
+      }
+      printf("N3_TILE_HOST_BENCH round=%d reference_ms=%.3f clipped_ms=%.3f tiles=500000 pixel_identical=1\n",round,old_ms,new_ms);
+    }
+  }
+  return 0;
 }
 static int n3_fastpath_probe(void){
   static u8 indices[256*192];
@@ -414,6 +485,7 @@ static int n3_rot_tight_bounds_probe(void){
 }
 #endif
 int main(int argc, char **argv){
+  if(getenv("N3DS_TILE_CLIP_PROBE"))return n3_tile_clip_probe();
 #ifdef MX_N3DS_ROT_WORK_COUNT
   if(getenv("N3DS_ROT_TIGHT_PROBE"))return n3_rot_tight_bounds_probe();
 #endif

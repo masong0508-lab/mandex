@@ -88,7 +88,7 @@ jobs:
           done
           for fast in 0 1; do
             gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ \
-              -DMX_N3DS_AIM_CACHE=$fast -DMX_N3DS_FAST_PALETTE=$fast -DMX_N3DS_INT_CIRCLE=$fast -DMX_N3DS_PARTICLE_HINT=$fast -DMX_N3DS_TILE_DIM_CACHE=$fast -DMX_N3DS_RUBBLE_CULL=$fast -DMX_N3DS_CHUNK_VIS_CULL=$fast \
+              -DMX_N3DS_AIM_CACHE=$fast -DMX_N3DS_FAST_PALETTE=$fast -DMX_N3DS_INT_CIRCLE=$fast -DMX_N3DS_PARTICLE_HINT=$fast -DMX_N3DS_TILE_DIM_CACHE=$fast -DMX_N3DS_TILE_CLIP_RANGES=$fast -DMX_N3DS_RUBBLE_CULL=$fast -DMX_N3DS_CHUNK_VIS_CULL=$fast \
               -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source \
               test/n3ds_render.c /tmp/n3d_gfx.o /tmp/n3d_intro.o \
               core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c -lm -o /tmp/n3d_fast_$fast

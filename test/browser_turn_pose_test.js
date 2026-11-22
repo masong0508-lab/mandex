@@ -30,9 +30,72 @@ for(const initial of[-1,1]){
   }
   assert.strictEqual(helper.face(facing,0),facing,'final facing follows responsive controls');
 }
-assert(html.includes('if(ax&&ax!==m.face){m.face=ax;m.turn=12}'),'visual rotation triggered by actual direction flip');
+// Execute the real movement function, including its input decoding, turn
+// update and immediate punch direction. A simple empty room/floor keeps the
+// test about countersteering without duplicating the turn implementation.
+const walkStart=html.indexOf('function walkStep(');
+const walkEnd=html.indexOf('/* Match the console sprite turnaround:',walkStart);
+assert(walkStart>=0&&walkEnd>walkStart,'real walking simulation exists');
+const walk=new Function(`
+  const V=8,G=800,WHH=16,WHW=8,WW=960,RUBBER=8;
+  let man,grounded,time=0,punchFace=0;const KEYS={},targets=[];
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=()=>1;
+  const wBlocked=(x,y)=>grounded&&y>200,inb=()=>false;
+  const SFX={pop(){},whoosh(){},boing(){}};
+  function dust(){} function popText(){} function ring(){}
+  function walkQuit(){throw Error('unexpected walking timeout')}
+  function walkPunch(){punchFace=man.face;man.pCd=.3;man.pT=.2}
+  function walkSlam(){throw Error('unexpected slam')}
+  function killTarget(){throw Error('unexpected target')}
+  ${html.slice(walkStart,walkEnd)}
+  return {
+    reset(face,onFloor){
+      grounded=onFloor;punchFace=0;
+      man={x:480,y:200,vx:0,vy:0,wt:1000,face,turn:0,
+           gr:onFloor,stomp:false,pCd:0,pT:0,padCd:0};
+      return man;
+    },
+    tick(ax,punch=false){
+      KEYS.ArrowLeft=ax<0;KEYS.ArrowRight=ax>0;KEYS.KeyX=punch;
+      walkStep(1/60);return {man,punchFace};
+    }
+  };
+`)();
+function yaw(m){
+  const a=helper.angle(m.turn),f=helper.face(m.face,m.turn);
+  return f<0?2*Math.PI-a:a;
+}
+let samples=0;
+function tickContinuous(m,ax,punch=false){
+  const before=yaw(m),result=walk.tick(ax,punch),after=yaw(m);
+  const delta=Math.abs(Math.atan2(Math.sin(after-before),Math.cos(after-before)));
+  assert(delta<.407,'countersteering advances at most one normal turn step, never snaps sides');
+  assert(m.turn>=0&&m.turn<12,'turn counter remains bounded');
+  if(ax)assert.strictEqual(m.face,ax,'gameplay facing responds immediately');
+  if(punch)assert.strictEqual(result.punchFace,ax,'punch uses new gameplay facing on the reversal tick');
+  samples++;
+}
+for(const initial of [-1,1])for(const grounded of [false,true]){
+  for(let elapsed=1;elapsed<=12;elapsed++){
+    const m=walk.reset(initial,grounded);
+    for(let i=0;i<elapsed;i++)tickContinuous(m,-initial);
+    tickContinuous(m,initial,true);
+    for(let i=0;i<12;i++)tickContinuous(m,0);
+    assert.strictEqual(m.turn,0,'released controls complete the reversed turn');
+    assert.strictEqual(helper.face(m.face,m.turn),initial,'turn settles on requested side');
+  }
+  for(let dwell=1;dwell<=7;dwell++){
+    const m=walk.reset(initial,grounded);
+    for(let i=0;i<84;i++)tickContinuous(m,Math.floor(i/dwell)%2?initial:-initial);
+    for(let i=0;i<12;i++)tickContinuous(m,0);
+    assert.strictEqual(m.turn,0,'repeated direction changes still settle');
+  }
+  const m=walk.reset(initial,grounded);
+  for(let i=0;i<12;i++)tickContinuous(m,initial);
+  assert.strictEqual(m.turn,0,'holding current facing does not start a turn');
+}
 assert(html.includes('m.turn=0;m.vx=m.vy=0'),'new walk does not inherit an old turn');
 const start=html.indexOf('<script>'),stop=html.indexOf('</script>',start);
 assert(start>=0&&stop>start,'single-file browser game script exists');
 new Function(html.slice(start+8,stop));
-console.log('WEB_TURN_PASS side_back_side=1 directions=2 steps=12 no_new_buffers=1');
+console.log('WEB_TURN_PASS side_back_side=1 directions=2 steps=12 interrupted_samples='+samples+' no_new_buffers=1');
