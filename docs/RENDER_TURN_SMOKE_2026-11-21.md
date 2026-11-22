@@ -29,6 +29,14 @@ including its input decoder and punch timing, for 3,672 samples. It checks
 that each visible angle advances by no more than one normal animation step.
 The old browser implementation reproduces the same failure.
 
+Visual review of the real Chromium input screenshots also exposed a portrait
+HUD overlap: the mission strip covered part of the walking instructions, and
+the top bar overpainted the walking timer. Portrait now groups the timer and
+instruction line immediately above the existing touch buttons. Landscape
+positions stay the same. The objective regression executes the actual HUD
+draw function and checks timer, hint and button separation at four portrait
+heights, including the captured 540×1169 layout.
+
 ## Destruction culling continues during screen shake
 
 The browser multiplied shake by 0.9 each update, while both wallpaper and
@@ -63,6 +71,15 @@ edges, room details and real collapse frames. Its live-input companion uses
 the page's mouse and keyboard handlers for launching, walking, reversing,
 jumping and changing orientation. Both retain screenshots and JSON reports
 as CI artifacts.
+
+The [first real Chromium run](https://github.com/masong0508-lab/mandex/actions/runs/44967331543)
+passed all 177 full-frame comparisons: 385,171,200 RGBA bytes compared, zero
+different pixels, and no page errors. Across the test corpus it skipped
+88,904 image submissions and 109,970 rectangle fills. Its companion input
+smoke passed 914 fixed simulation steps, observed 95 trusted keydowns and
+matching releases, and verified launch, collapse, walking, jumping and both
+orientation transitions. Those screenshots prompted the portrait HUD
+spacing correction described above.
 
 ## 3DS voxel raster work
 

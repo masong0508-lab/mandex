@@ -1145,9 +1145,12 @@ function walkBtns(){
   return WALK_BUTTONS;
 }
 function drawWalkHUD(){const m=man;if(state!=='play'||m.mode!=='walk')return;
-  const k=clamp(m.wt/WALK_T,0,1);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W/2-80,40,160,9);ctx.fillStyle=k>.3?'#7dff5a':'#ff4a4a';ctx.fillRect(W/2-79,41,158*k,7);
-  if(!isPortrait())txt('A/D MOVE  W JUMP  X PUNCH  S STOMP  G GIVE UP',W/2,66,12,'#fff','center');
-  else txt('HOLD LEFT / RIGHT  ·  JUMP  ·  PUNCH  ·  STOMP',W/2,92,13,'#fff','center');
+  // Keep portrait walking feedback with its controls, below the mission
+  // and streak HUD. The top bar used to paint over the timer and hint.
+  const portrait=isPortrait(),barY=portrait?H-153:40;
+  const k=clamp(m.wt/WALK_T,0,1);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W/2-80,barY,160,9);ctx.fillStyle=k>.3?'#7dff5a':'#ff4a4a';ctx.fillRect(W/2-79,barY+1,158*k,7);
+  if(!portrait)txt('A/D MOVE  W JUMP  X PUNCH  S STOMP  G GIVE UP',W/2,66,12,'#fff','center');
+  else txt('HOLD LEFT / RIGHT  ·  JUMP  ·  PUNCH  ·  STOMP',W/2,H-120,13,'#fff','center');
   for(const b of walkBtns()){ctx.globalAlpha=KEYS[b.k]?.85:.45;rrect(b.x,b.y,b.w,b.h,10);ctx.fillStyle='#1a2038';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.globalAlpha=1;txt(b.t,b.x+b.w/2,b.y+b.h/2+5,b.t.length>2?12:20,'#fff','center')}}
 function manStep(dt){
   const m=man;m.vy+=G*dt*(m.pwr==='towel'&&m.gt<1.8&&!m.dive?.3:1)*(m.tubeT>0?.1:1);m.x+=m.vx*dt;m.y+=m.vy*dt;m.gt+=dt;if(m.hitCd>0)m.hitCd-=dt;

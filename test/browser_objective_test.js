@@ -63,6 +63,45 @@ for(const width of [320,360,390,480,699,700,960]){
   const overlapY=Math.max(goalY,streakY)<Math.min(goalY+goalH,streakY+streakH);
   assert(!(overlapX&&overlapY),'goal and streak overlap at '+width+'px viewport');
 }
+// Execute the actual walking HUD and its shared button layout. Canvas/text
+// spies observe production coordinates; no copied layout formulas can make
+// this pass while the painted timer or instructions still overlap the HUD.
+const walkBegin=web.indexOf('const WALK_BUTTONS=');
+const walkEnd=web.indexOf('function manStep(',walkBegin);
+assert(walkBegin>=0&&walkEnd>walkBegin,'production walking HUD block exists');
+const paintWalkHUD=new Function('W','H','portrait',`
+  const KEYS={},man={mode:'walk',wt:22.5},state='play',WALK_T=45;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),isPortrait=()=>portrait;
+  const fills=[],buttons=[],texts=[];
+  const ctx={fillRect(x,y,w,h){fills.push({x,y,w,h})},fill(){},stroke(){}};
+  const rrect=(x,y,w,h)=>buttons.push({x,y,w,h});
+  const txt=(text,x,y,size)=>texts.push({text,x,y,size});
+  ${web.slice(walkBegin,walkEnd)}
+  drawWalkHUD();return {fills,buttons,texts};
+`);
+for(const height of [720,960,1169,1240]){
+  const drawn=paintWalkHUD(540,height,true),timer=drawn.fills[0];
+  const hint=drawn.texts.find(t=>t.text.startsWith('HOLD LEFT / RIGHT'));
+  assert(timer&&hint,'portrait paints its walking timer and hint');
+  assert.strictEqual(drawn.buttons.length,5,'actual walk HUD paints all five controls');
+  // Reserve a full font height above the baseline, a descender below it,
+  // and two pixels for the outlined text. Header/objective/streak end at134.
+  const hintTop=hint.y-hint.size-2,hintBottom=hint.y+hint.size*.3+2;
+  const buttonTop=Math.min(...drawn.buttons.map(b=>b.y));
+  assert(timer.y>=134,'portrait walking timer overlaps header/objective/streak at '+height);
+  assert(hintTop>=134,'portrait walking hint overlaps header/objective/streak at '+height);
+  assert(timer.y+timer.h<=hintTop,'portrait walking timer overlaps its hint at '+height);
+  assert(hintBottom<=buttonTop,'portrait walking hint overlaps touch controls at '+height);
+  assert(timer.y+timer.h<=buttonTop,'portrait walking timer overlaps touch controls at '+height);
+  for(const b of drawn.buttons){
+    assert(b.x>=0&&b.y>=0&&b.x+b.w<=540&&b.y+b.h<=height,
+      'portrait touch control escapes canvas at '+height);
+  }
+}
+const landscapeWalk=paintWalkHUD(960,540,false);
+assert.strictEqual(landscapeWalk.fills[0].y,40,'landscape walking timer retains its baseline');
+assert.strictEqual(landscapeWalk.texts.find(t=>t.text.startsWith('A/D MOVE')).y,66,
+  'landscape walking instructions retain their baseline');
 assert(web.includes("const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';"),
   'a single surviving landlord is identified in the real world renderer');
 assert(web.includes("if(lastTargetVisible && t.collapseRolled!==2)"),
@@ -72,4 +111,4 @@ assert(web.includes("txt('LAST',t.x,t.y-63,12"),
 const start=web.indexOf('<script>'),stop=web.indexOf('</script>',start);
 assert(start>=0&&stop>start);
 new Function(web.slice(start+8,stop));
-console.log('OBJECTIVE_WEB_PASS target_counts=1 last_directions=3 secure_delay=1 mobile_layout=1');
+console.log('OBJECTIVE_WEB_PASS target_counts=1 last_directions=3 secure_delay=1 mobile_layout=1 walking_hud_heights=4');

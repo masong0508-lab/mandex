@@ -41,6 +41,8 @@ jobs:
         run: node test/browser_tool_feedback_test.js
       - name: Character pose turnaround and punch timing
         run: node test/browser_turn_pose_test.js
+      - name: Walking HUD, objectives and portrait spacing
+        run: node test/browser_objective_test.js
       - name: Shaking camera debris visibility and draw work
         run: node test/browser_rubble_draw_test.js
 

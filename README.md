@@ -27,6 +27,8 @@ outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 - Rapid left/right changes now reverse the current walking turn smoothly in
   the shared console core and browser. Punch and movement facing respond
   immediately; the artwork no longer jumps across the rear-turn sequence.
+- Portrait walking instructions and the time bar sit above the touch
+  buttons, where the objective and streak HUD cannot cover them.
 - Browser wallpaper and debris culling remain active during screen shake,
   with bounds expanded by the maximum camera displacement. A crowded
   regression scene draws 250 of 1,472 live debris sprites during shake,
