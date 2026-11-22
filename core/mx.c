@@ -1723,6 +1723,13 @@ static int bat_block(MxWorld *w, MxTarget *t){
   return 1;
 }
 
+/* Shared parry result for both the immediate fist hitbox and a projectile
+   entering the already visible punch animation. No extra world state. */
+static void parry_case(MxWorld *w, MxCase *c){
+  c->active=0; w->score+=150;
+  ev(w, EV_BONK, c->x, c->y, 2, 0, 0);
+}
+
 static void upd_cases(MxWorld *w, real dt){
   MxMan *m = &w->man;
   for(int k = 0; k < MX_MAX_CASES; k++){
@@ -1731,6 +1738,14 @@ static void upd_cases(MxWorld *w, real dt){
     c->vy += rmul(GRAV, dt); c->x += rmul(c->vx, dt); c->y += rmul(c->vy, dt); c->rot += rmul(c->vx > 0 ? RI(9) : -RI(9), dt); c->l -= dt;
     int dead = c->l <= 0 || c->y > RI(MX_ROWS) - R(0.5) || c->x < -R(2.5) || c->x > RI(MX_COLS) + R(2.5);
     if(!dead && solid_at(w, c->x, c->y)) dead = 1;
+    /* A case arriving during the 0.2 s visible fist lunge can also be
+       countered, not just on the exact button-down frame. */
+    if(!dead && m->mode==MAN_WALK && m->pT>0){
+      real hx=m->x+(m->face>0?R(2.125):-R(2.125)), hy=m->y-R(.375);
+      if(rabs(c->x-hx)<R(2.375) && rabs(c->y-hy)<R(2.75)){
+        parry_case(w,c);continue;
+      }
+    }
     if(!dead && (m->mode == MAN_AIM || m->mode == MAN_WALK)){
       real dx = m->x - c->x, dy = m->y - c->y, lim = m->mode == MAN_WALK ? R(2.75) : m->rad + R(0.75);
       if(rmul(dx, dx) + rmul(dy, dy) < rmul(lim, lim) && hurt_man(w, c->vx < 0 ? -1 : 1)) dead = 1;
@@ -1802,9 +1817,7 @@ static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg){
     MxCase *c=&w->cases[k];
     if(!c->active || rabs(c->x-cx)>=hw+R(0.75) ||
        rabs(c->y-cy)>=hh+R(0.75)) continue;
-    c->active=0;
-    w->score+=150; dealt+=RI(8);
-    ev(w, EV_BONK, c->x, c->y, 2, 0, 0);
+    parry_case(w,c); dealt+=RI(8);
   }
   for(int i = 0; i < w->ntargets; i++){
     MxTarget *t = &w->targets[i];
