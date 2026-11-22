@@ -1494,8 +1494,9 @@ function lordAI(t,dt){
     t.mv=0;t.face=(Math.sign(m.x-t.x)||t.face);return}
   // The walking parry has a real campaign counter: a nearby thrower aims
   // through the existing 0.6s windup, but cannot snipe across whole floors.
-  const canThrow=(m.mode==='aim'&&!m.chug&&!(m.stun>0))||
-    (m.mode==='walk'&&Math.abs(tx)<256&&Math.abs(ty)<96);
+  const canThrow=(t.kind==='thrower'||t.kind==='boss')&&
+    ((m.mode==='aim'&&!m.chug&&!(m.stun>0))||
+     (m.mode==='walk'&&Math.abs(tx)<256&&Math.abs(ty)<96));
   if(fight&&t.kind){
     if(t.kind==='thrower'||t.kind==='boss'){if(t.mid!==m){t.mid=m;t.cd=Math.max(t.cd,2.6)}if(canThrow)t.cd-=dt}else t.cd-=dt;
     if(t.wind>0){t.wind-=dt;if(t.wind<=0){
