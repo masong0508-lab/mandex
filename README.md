@@ -22,6 +22,26 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 21 gameplay pass: counterpunches and stomp boosts
+
+- Multi-hit landlords keep their recovery window on the final HP. A punch
+  plus body overlap or repeated flight substeps now consumes one hit point.
+  Hard destruction still defeats them, and ordinary single-HP enemies keep
+  their established collision behavior.
+- Stun interrupts queued punches, briefcase throws and a boss's second
+  throw. Stunned healers pause their healing; recovery starts a fresh attack
+  windup instead of releasing an old attack unexpectedly.
+- Stomping onto rubber pads now gives the intended stronger bounce.
+  Holding STOMP through the landing preserves its upward launch; a ceiling
+  or the existing cooldown restores stomp control. Existing effects identify
+  the boosted bounce without adding pools or persistent state.
+- The DS release gate waits for two ready screens before its three required
+  animated captures. It rejects failed captures and frozen/blank running
+  output, while tolerating the observed initial black startup frame.
+
+See [the gameplay and release verification notes](docs/GAMEPLAY_RECOVERY_PADS_2026-11-21.md)
+for reproduced defects, compatibility checks and test commands.
+
 ## November 21 continuation: rubble contact lifetime and portrait walking
 
 - A fragment that shatters during a collision stops contacting immediately

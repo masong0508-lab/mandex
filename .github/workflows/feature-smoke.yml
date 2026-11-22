@@ -25,6 +25,10 @@ on:
       - "test/bank_shot_test.c"
       - "test/landlord_shock_test.c"
       - "test/walk_turn_interrupt_test.c"
+      - "test/combat_recovery_test.c"
+      - "test/walk_pad_stomp_test.c"
+      - "test/browser_combat_recovery_test.js"
+      - "test/browser_pad_stomp_test.js"
       - "test/n3ds_render.c"
       - "test/n3ds_walk.c"
       - "test/dc_render.c"
@@ -62,6 +66,18 @@ jobs:
             gcc -std=c99 -O2 -Wall $flags -Icore core/mx.c test/walk_turn_interrupt_test.c -lm -o /tmp/walk_turn_interrupt_$mode
             /tmp/walk_turn_interrupt_$mode
           done
+      - name: Verify combat recovery and stomp-pad ascent in all numeric paths
+        run: |
+          for mode in float fixed; do
+            flags=""
+            if test "$mode" = fixed; then flags="-DMX_FIXED"; fi
+            for probe in combat_recovery walk_pad_stomp; do
+              gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore "test/${probe}_test.c" -lm -o "/tmp/${probe}_$mode"
+              "/tmp/${probe}_$mode"
+            done
+          done
+          node test/browser_combat_recovery_test.js
+          node test/browser_pad_stomp_test.js
       - name: Require exact rubble collision behavior with fast rectangle rejection
         run: |
           for mode in float fixed; do

@@ -65,6 +65,11 @@ HARNESS = r"""
       face: man.face, turn: man.turn || 0,
       yaw: face < 0 ? 2 * Math.PI - angle : angle,
       grounded: !!man.gr, wt: man.wt, punch: man.pT || 0,
+      stomp: !!man.stomp, pad_cooldown: man.padCd || 0,
+      hurt_cooldown: man.hurtCd || 0,
+      opponent: targets[0] ? { alive: targets[0].alive, hp: targets[0].hp,
+        hp_max: targets[0].hpMax, inv: targets[0].inv, stun: targets[0].stun,
+        wind: targets[0].wind, x: targets[0].x, y: targets[0].y } : null,
       invalid, camera: { ...CAM }, world: [COLS, ROWS, WW, WH],
       actor_screen: toScreen(man.x, man.y),
       canvas: [W, H], portrait: isPortrait(),
@@ -119,7 +124,31 @@ HARNESS = r"""
     return { x: r.left + x * r.width / W, y: r.top + y * r.height / H,
       sx: r.width / W, sy: r.height / H };
   }
-  window.__inputSmokeGame = { snapshot, tick, prepare,
+  function prepareGameplay(kind) {
+    // Stable encounter setups isolate recovery and pad landing. Initial
+    // actor placement is fixture data; all following attacks and movement
+    // use real keyboard events, production update and the actual renderer.
+    muted = true; OPT().muted = true; OPT().fight = kind === 'counterpunch';
+    OPT().collapse = true; shake = 0; freeze = 0; slow = 0;
+    for (const key of Object.keys(KEYS)) KEYS[key] = false;
+    load(-1, { name: kind === 'pad' ? 'Stomp boost input check' : 'Counterpunch input check',
+      men: 3, walk: true, custom: true, build() {
+        if (kind === 'pad') rect(38, 59, 5, 1, RUBBER);
+        else tgt(26.5, 60, kind === 'counterpunch' ? 'walker' : '');
+        tgt(110, 60); // A distant objective prevents a fixture victory.
+      } });
+    man.x = kind === 'pad' ? 324 : 200;
+    man.y = kind === 'pad' ? 410 : 461;
+    enterWalk(); man.hurtCd = 0;
+    if (kind !== 'pad') {
+      const t = targets[0]; t.hp = t.hpMax = kind === 'counterpunch' ? 3 : 2;
+      t.wind = kind === 'counterpunch' ? WEB_SIM_DT / 2 : 0;
+      t.cd = 2; t.face = -1; man.gr = true;
+    }
+    banner = 0; layoutTick(); camTick(0); frameDt = 0; draw();
+    return snapshot();
+  }
+  window.__inputSmokeGame = { snapshot, tick, prepare, prepareGameplay,
     slingPoint() {
       const p = toScreen(man.x, man.y), q = screenPoint(p[0], p[1]);
       q.sx *= CAM.on ? CAM.z : 1; q.sy *= CAM.on ? CAM.z : 1;
@@ -238,6 +267,64 @@ class Smoke:
             deltas.append(delta)
             previous = row
         return frames, deltas
+
+    def gameplay_checks(self):
+        p, report = self.page, self.report
+        report['gameplay'] = {}
+        for kind in ('recovery', 'counterpunch'):
+            report['stage'] = 'gameplay_' + kind
+            before = p.evaluate('kind => __inputSmokeGame.prepareGameplay(kind)', kind)
+            p.keyboard.down('KeyX')
+            hit = self.continuous()[0][-1]
+            p.keyboard.up('KeyX')
+            opponent = hit['opponent']
+            require(opponent['alive'] and opponent['hp'] == before['opponent']['hp'] - 1,
+                    'Punch plus body overlap did not consume exactly one enemy HP', hit)
+            require(opponent['inv'] > 0 and opponent['stun'] > 0,
+                    'A surviving punch lost its recovery window', hit)
+            require(hit['hurt_cooldown'] == 0 and
+                    abs(before['wt'] - hit['wt'] - 1 / 60) < 1e-8,
+                    'Counterpunched enemy hit through its stun', hit)
+            require(opponent['wind'] == 0 and hit['score'] == 0,
+                    'Interrupted attack survived or a nonfatal punch scored an eviction', hit)
+            later = self.continuous(8)[0][-1]
+            require(later['opponent']['alive'] and later['opponent']['hp'] == opponent['hp'],
+                    'Repeated real body contacts bypassed enemy recovery', later)
+            self.screenshot('08-gameplay-' + kind)
+            report['gameplay'][kind] = {'initial': before, 'after_punch': hit,
+                                        'after_overlap': later}
+
+        p.set_viewport_size({'width': 390, 'height': 844})
+        launches = {}
+        for boosted in (False, True):
+            name = 'boosted_pad' if boosted else 'ordinary_pad'
+            report['stage'] = 'gameplay_' + name
+            initial = p.evaluate('__inputSmokeGame.prepareGameplay("pad")')
+            if boosted:
+                p.keyboard.down('KeyS')
+            launch = None
+            for frames_to_land in range(1, 91):
+                row = self.continuous()[0][-1]
+                if row['pad_cooldown'] > 0 and row['vy'] < 0:
+                    launch = row
+                    break
+            require(launch is not None, 'Real falling walker never reached the rubber pad')
+            expected = -540 if boosted else -470
+            require(abs(launch['vy'] - expected) < 1e-8,
+                    'Rubber pad produced the wrong ordinary/stomp launch speed', launch)
+            require(not launch['grounded'] and not launch['stomp'],
+                    'Pad launch kept grounded/stomping state', launch)
+            rising = self.continuous(6)[0]
+            require(all(row['vy'] < 0 and not row['stomp'] for row in rising),
+                    'Held STOMP cancelled the fresh pad ascent', rising[-1])
+            if boosted:
+                p.keyboard.up('KeyS')
+            self.screenshot('09-gameplay-' + name)
+            launches[name] = {'initial': initial, 'frames_to_land': frames_to_land,
+                              'launch': launch, 'after_six_ticks': rising[-1]}
+        require(launches['boosted_pad']['launch']['vy'] <
+                launches['ordinary_pad']['launch']['vy'], 'Stomp never increased the pad launch')
+        report['gameplay']['pads'] = launches
 
     def run(self):
         p, report = self.page, self.report
@@ -401,6 +488,7 @@ class Smoke:
                     'physical_body_css_px': 38 * landing['camera']['z'] * h / after['canvas'][1]}
             report['orientations'].append(observation)
 
+        self.gameplay_checks()
         report['events'] = p.evaluate('__inputSmoke.events')
         report['raf_requests'] = p.evaluate('__inputSmoke.rafRequests')
         require(report['raf_requests'] == 1, 'The disabled display scheduler unexpectedly ran')

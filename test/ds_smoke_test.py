@@ -7,11 +7,17 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 VALIDATOR = Path(__file__).resolve().parents[1] / "tools/validate_ds_smoke.py"
 spec = importlib.util.spec_from_file_location("ds_smoke", VALIDATOR)
 smoke = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(smoke)
+sys.modules["validate_ds_smoke"] = smoke
+RUNNER = VALIDATOR.with_name("run_ds_smoke.py")
+spec = importlib.util.spec_from_file_location("ds_smoke_runner", RUNNER)
+runner = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(runner)
 
 
 class BootCaptureTest(unittest.TestCase):
@@ -72,6 +78,132 @@ class BootCaptureTest(unittest.TestCase):
                                    capture_output=True, text=True)
                 self.assertNotEqual(p.returncode, 0)
                 self.assertIn("DS_BOOT_SMOKE_FAIL", p.stderr)
+
+    def sequence(self, startup, titles=None, alive=None, timeout=4):
+        """Drive the real sequence with fixture frames and a deterministic clock."""
+        report, calls = {}, []
+        now = [0.0]
+        startup = list(startup)
+        titles = list(titles if titles is not None else startup[-1:] * 3)
+
+        def sleep(seconds):
+            now[0] += seconds
+
+        def capture(label, *, allow_missing):
+            calls.append((label, allow_missing))
+            frames = startup if allow_missing else titles
+            value = frames.pop(0) if len(frames) > 1 else frames[0]
+            if isinstance(value, Exception):
+                raise value
+            return value
+
+        self.report, self.calls, self.clock = report, calls, now
+        return runner.run_sequence(capture, alive or (lambda: None), report,
+                                   clock=lambda: now[0], sleep=sleep,
+                                   startup_timeout=timeout)
+
+    def test_delayed_first_game_frame_then_three_animated_captures(self):
+        # Main c5735b6: the four-second capture was all black; the later
+        # captures were a healthy animated title. A blank warmup frame is
+        # not an accepted title sample and must remain in the probe report.
+        black = self.capture("startup-black.ppm", b"\0" * 256 * 384 * 3)
+        a = self.capture("title-a.ppm")
+        b = self.capture("title-b.ppm", self.next_frame)
+        with self.assertRaisesRegex(ValueError, "blank or diagnostic"):
+            smoke.validate([black, a, b])
+        result = self.sequence([black, black, a], [a, b, a])
+        self.assertEqual(len(result), 3)
+        self.assertEqual([probe["ready"] for probe in self.report["startup_probes"]],
+                         [False, False, True])
+        self.assertEqual(self.report["ready_after_seconds"], 2)
+        self.assertEqual(self.report["stage"], "complete")
+        self.assertEqual([allow for _, allow in self.calls],
+                         [True, True, True, False, False, False])
+
+    def test_permanently_blank_diagnostic_or_one_screen_boot_times_out(self):
+        for pixels in (b"\0" * 256 * 384 * 3,
+                       b"\xff\0\0" * 256 * 384,
+                       self.frame[:256 * 192 * 3] + b"\0" * 256 * 192 * 3):
+            with self.subTest(pixels=pixels[:6]):
+                frame = self.capture("not-ready.ppm", pixels)
+                with self.assertRaisesRegex(RuntimeError, "within 4s"):
+                    self.sequence([frame])
+                self.assertEqual(self.clock[0], 4)
+                self.assertEqual(len(self.calls), 4)
+                self.assertEqual(self.report["captures"], [])
+
+    def test_frozen_title_after_readiness_still_fails(self):
+        a = self.capture("title.ppm")
+        with self.assertRaisesRegex(ValueError, "frozen"):
+            self.sequence([a], [a, a, a])
+        self.assertEqual(len(self.calls), 4)
+
+    def test_blank_capture_after_readiness_is_not_retried(self):
+        a = self.capture("title.ppm")
+        black = self.capture("late-black.ppm", b"\0" * 256 * 384 * 3)
+        with self.assertRaisesRegex(ValueError, "blank or diagnostic"):
+            self.sequence([a], [a, black, a])
+        self.assertEqual(len(self.calls), 3)
+
+    def test_corrupt_startup_capture_is_fatal_without_retry(self):
+        bad = self.capture("broken.ppm", b"", b"not an image")
+        with self.assertRaisesRegex(ValueError, "expected binary RGB PPM"):
+            self.sequence([bad])
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.clock[0], 0)
+
+    def test_missing_startup_window_is_bounded_but_later_loss_is_fatal(self):
+        a = self.capture("title-a.ppm")
+        b = self.capture("title-b.ppm", self.next_frame)
+        self.sequence([None, a], [a, b, a])
+        self.assertEqual(self.report["ready_after_seconds"], 1)
+        with self.assertRaisesRegex(RuntimeError, "within 4s"):
+            self.sequence([None])
+        self.assertEqual(self.clock[0], 4)
+        with self.assertRaisesRegex(RuntimeError, "window disappeared"):
+            self.sequence([a], [None])
+        self.assertEqual(len(self.calls), 2)
+
+    def test_capture_command_failure_is_fatal_without_retry(self):
+        error = subprocess.CalledProcessError(1, ["import", "-window", "0x200007"])
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.sequence([error])
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.clock[0], 0)
+
+    def test_process_exit_before_or_during_capture_is_fatal(self):
+        a = self.capture("title.ppm")
+        for checks_before_death in (0, 1):
+            with self.subTest(checks_before_death=checks_before_death):
+                checks = [checks_before_death]
+
+                def alive():
+                    if not checks[0]:
+                        raise RuntimeError("emulator exited with code 7")
+                    checks[0] -= 1
+
+                with self.assertRaisesRegex(RuntimeError, "emulator exited"):
+                    self.sequence([a], alive=alive)
+                self.assertEqual(len(self.calls), checks_before_death)
+
+    def test_real_capture_wrapper_preserves_command_failures_and_missing_window(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        capture = runner.EmulatorCapture(process, self.directory)
+        missing = subprocess.CompletedProcess(["xwininfo"], 0, "no children\n", "")
+        with mock.patch.object(runner.subprocess, "run", return_value=missing):
+            self.assertIsNone(capture("initial", allow_missing=True))
+            with self.assertRaisesRegex(RuntimeError, "no emulator client window"):
+                capture("later", allow_missing=False)
+        windows = subprocess.CompletedProcess(["xwininfo"], 0,
+            '  0x200007 "Desmume SDL": ("desmume-cli" "desmume-cli") 256x384\n', "")
+        failed = subprocess.CalledProcessError(1, ["import"])
+        with mock.patch.object(runner.subprocess, "run", side_effect=[windows, failed]) as run:
+            with self.assertRaises(subprocess.CalledProcessError):
+                capture("failed", allow_missing=True)
+            self.assertEqual(run.call_count, 2)
+            self.assertEqual(run.call_args_list[-1].kwargs["check"], True)
+        self.assertTrue((self.directory / "windows-failed.txt").is_file())
 
 
 if __name__ == "__main__":

@@ -312,7 +312,7 @@ static void on_events(void){
       break;
     case EV_PAD:
       for(int k = 0; k < 5; k++) spawn(PT_STAR, e->x, e->y, rnd(17) - 8, -rnd(12) - 2, 0, 24 + rnd(10));
-      spawn_ring(e->x, e->y, 5, C_PINK); popup(e->x, e->y - RI(5), "BOING!", C_PINK); sfx_play(SFX_BOING, pan);
+      spawn_ring(e->x, e->y, 5, C_PINK); popup(e->x, e->y - RI(5), e->m ? "BOOST!" : "BOING!", C_PINK); sfx_play(SFX_BOING, pan);
       break;
     case EV_HURT:                                           /* a landlord got him: on foot (m=1) or in the sling (m=0, the pull is let go) */
       for(int k = 0; k < 8; k++) spawn(PT_SPARK, e->x, e->y - RI(1), rnd(41) - 20, -rnd(20), k & 1 ? C_GOLD : C_WHITE, 14 + rnd(8));

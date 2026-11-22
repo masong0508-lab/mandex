@@ -1053,7 +1053,10 @@ function walkStep(dt){const m=man;
   m.vx+=(ax*135-m.vx)*Math.min(1,dt*(m.gr?14:5));
   if(m.pCd>0)m.pCd-=dt;if(m.pT>0)m.pT-=dt;if(PU&&m.pCd<=0)walkPunch();
   if(UP&&m.gr&&!m.stomp){m.vy=-345;m.gr=false;SFX.pop();dust(m.x,m.y+WHH,4,8)}
-  if(DN&&!m.gr&&!m.stomp){m.stomp=true;m.vy=Math.max(m.vy,720);SFX.whoosh()}
+  // Holding stomp through a pad landing cannot cancel its upward launch.
+  // A ceiling or the existing pad cooldown restores ordinary stomp control.
+  if(DN&&!m.gr&&!m.stomp&&!(m.padCd>0&&m.vy<0)){m.stomp=true;m.vy=Math.max(m.vy,720);SFX.whoosh()}
+  const stompLanding=m.stomp; // walkSlam clears the pose before pad detection
   const dx=m.vx*dt,nx=Math.max(1,Math.ceil(Math.abs(dx)/2));
   for(let i=0;i<nx;i++){const sx=dx/nx;
     if(!wBlocked(m.x+sx,m.y))m.x+=sx;
@@ -1069,7 +1072,7 @@ function walkStep(dt){const m=man;
       break}}
   m.gr=wBlocked(m.x,m.y+1.5);if(m.gr)m.stomp=false;
   if(m.padCd>0)m.padCd-=dt;
-  if(m.gr&&!(m.padCd>0)){const by=Math.floor((m.y+WHH+2)/V);for(const o of[-4,0,4]){const bx=Math.floor((m.x+o)/V);if(inb(bx,by)&&grid[idx(bx,by)]===RUBBER){m.vy=m.stomp?-540:-470;m.gr=false;m.stomp=false;m.padCd=.3;SFX.boing();popText(m.x,m.y-34,'BOING!','#ff7eb0',26);ring(m.x,m.y+WHH,40,'#ff9ec8');dust(m.x,m.y+WHH,5,8);break}}}
+  if(m.gr&&!(m.padCd>0)){const by=Math.floor((m.y+WHH+2)/V);for(const o of[-4,0,4]){const bx=Math.floor((m.x+o)/V);if(inb(bx,by)&&grid[idx(bx,by)]===RUBBER){m.vy=stompLanding?-540:-470;m.gr=false;m.stomp=false;m.padCd=.3;SFX.boing();popText(m.x,m.y-34,stompLanding?'BOOST!':'BOING!','#ff7eb0',26);ring(m.x,m.y+WHH,40,'#ff9ec8');dust(m.x,m.y+WHH,5,8);break}}}
   if(m.gr&&Math.abs(m.vx)>60&&((time*9)|0)%2===0&&rnd()<.25)dust(m.x,m.y+WHH,1,6);
   for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<WHH+t.r-4)killTarget(t)}   // bump into a landlord and he is done for
 /* Match the console sprite turnaround: side -> rear -> opposite side.
@@ -1391,7 +1394,10 @@ function dive(){
 // =====================================================================
 function solidAt(px,py){if(!grid)return false;const gx=Math.floor(px/V),gy=Math.floor(py/V);if(gy>=ROWS)return true;return inb(gx,gy)&&grid[idx(gx,gy)]>0}
 function killTarget(t,hard,direct=false){if(!t.alive)return;
-  if(!hard&&t.hp>1){if(t.inv>0)return;t.hp--;t.inv=.7;t.stun=.6;t.armor=0;shake=Math.max(shake,6);SFX.crunch(.6);spark(t.x,t.y-6,8,240);popText(t.x,t.y-40,'OOF!  '+t.hp+' LEFT','#ffd23f',16);return}
+  // Multi-hit recovery protects the final HP too. Single-HP enemies also
+  // use inv for environmental stagger, which must not block their eviction.
+  if(!hard&&t.inv>0&&(t.hp>1||t.hpMax>1))return;
+  if(!hard&&t.hp>1){t.hp--;t.inv=.7;t.stun=.6;t.armor=0;shake=Math.max(shake,6);SFX.crunch(.6);spark(t.x,t.y-6,8,240);popText(t.x,t.y-40,'OOF!  '+t.hp+' LEFT','#ffd23f',16);return}
   t.alive=false;if(man&&man.mode==='walk'){man.wt=Math.min(man.wt+3,WALK_T+15);popText(t.x,t.y-38,'+3s','#7dff5a',18)}onLandlord();combo=comboLeft>0?Math.min(5,combo+1):1;comboLeft=2.5;comboPeak=Math.max(comboPeak,combo);
   // One BANK SHOT bonus per rubber rebound. Other TNT/rubble evictions are
   // excluded by requiring direct proximity to the flying character.
@@ -1432,10 +1438,14 @@ function lordDanger(t){for(const ch of chunks){const dx=t.x-ch.x,dy=t.y-ch.y;if(
 function lordCover(t){for(let d=1;d<=14;d++)for(const sg of[-1,1]){const x=t.x+sg*d*V;if(solidAt(x,t.y-34)&&!solidAt(x,t.y-6)&&solidAt(x,t.y+t.r+3))return x}return null}   // the NEAREST roofed spot
 function lordAI(t,dt){
   const m=man||{mode:'none',x:SX,y:SY},fight=fightOn(),tx=m.x-t.x,ty=m.y-t.y,tm2=tx*tx+ty*ty;
+  // A hit interrupts the attack, including the boss's queued second throw.
+  // Cancel before ticking stun so recovery cannot discharge an old windup.
+  if(t.stun>0){t.wind=0;t.b2=0}
   if(t.say>0)t.say-=dt;if(t.stun>0)t.stun-=dt;if(t.swing>0)t.swing-=dt;if(t.pan>0)t.pan-=dt;
   t.blink-=dt;if(t.blink<-.12)t.blink=2+Math.random()*3.5;
   // everybody flinches when a man comes screaming close (cosmetic: it never changes where they stand)
   if(m.mode==='fly'&&tm2<210*210){if(t.pan<=0&&t.say<=0)lordSay(t,SCARES[(t.t*7|0)%SCARES.length],'#ffb0b0');t.pan=.7}
+  if(t.stun>0){t.mv=0;return}
   let moving=0;
   if(t.collapseRolled===2){
     if(t.stun>0){t.mv=0;return}

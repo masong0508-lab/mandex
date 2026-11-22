@@ -351,9 +351,10 @@ const char *mx_combo_taunt(int count){
 #define kill_target(w, t) kill_target_ex(w, t, 0)
 #define kill_hard(w, t) kill_target_ex(w, t, 1)
 static void kill_target_ex(MxWorld *w, MxTarget *t, int hard){
-  if(!t->alive) return;
+  /* Multi-hit targets retain recovery on their final HP. Ordinary one-HP
+   * landlords keep their existing vulnerability during environmental stuns. */
+  if(!t->alive || (!hard && t->inv > 0 && (t->hp > 1 || t->hpmax > 1))) return;
   if(!hard && t->hp > 1){
-    if(t->inv > 0) return;
     t->hp--; t->inv = R(0.7); t->stun = R(0.6); t->armor = 0;
     if(w->shake < RI(6)) w->shake = RI(6);
     ev(w, EV_OOF, t->x, t->y, 0, RI(t->hp), 0);
@@ -1596,11 +1597,14 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
   tm=rsqrt(rmul(ddx,ddx)+rmul(ddy,ddy));
 #endif
   int fight = !w->nofight && w->state == MX_PLAY && t->kind;
-  if(t->stun > 0) t->stun -= dt;
+  /* Interrupt the queued attack even when this tick exhausts the stun.
+   * Recovery requires a fresh windup; existing swing feedback may finish. */
+  if(t->stun > 0){ t->stun -= dt; t->wind = 0; t->b2 = 0; }
   if(t->swing > 0) t->swing -= dt;
   if(t->pan > 0) t->pan -= dt;
   if(m->mode == MAN_FLY && tm < R(26.25)) t->pan = R(0.7);          /* everybody flinches when a man comes screaming close (cosmetic) */
   int moving = 0;
+  if(t->stun > 0){ t->mv = 0; return; }
   /* Collapse survivors are disoriented, then flee for a short spell even
      if their normal kind would stand still. Uses the existing walk solver,
      never passes through walls, and adds no new per-frame scans. */
@@ -1841,7 +1845,13 @@ static void walk_step(MxWorld *w, real dt){
   if(m->pT > 0) m->pT -= dt;
   if(m->in_punch && m->pCd <= 0) walk_punch(w);
   if(m->in_jump && m->gr && !m->stomp){ m->vy = R(-43.125); m->gr = 0; }
-  if(m->in_stomp && !m->gr && !m->stomp){ m->stomp = 1; if(m->vy < RI(90)) m->vy = RI(90); }
+  /* A held stomp must not reverse a fresh pad launch on the next tick.
+     The existing cooldown protects ascent only; a ceiling or expiry gives
+     the player stomp control again immediately. */
+  if(m->in_stomp && !m->gr && !m->stomp && !(m->padCd > 0 && m->vy < 0)){ m->stomp = 1; if(m->vy < RI(90)) m->vy = RI(90); }
+  /* walk_slam() clears the impact pose before pad detection. Retain this
+     frame's stomp intent locally so the pad can still apply its boost. */
+  const int stomp_landing=m->stomp;
   { real dx = rmul(m->vx, dt); int nx = rfloor(rdiv(rabs(dx), R(0.25))) + 1; if(nx > 12) nx = 12;
     real sx = rdiv(dx, RI(nx));
     for(int i = 0; i < nx; i++){
@@ -1887,8 +1897,8 @@ static void walk_step(MxWorld *w, real dt){
     for(int k = 0; k < 3; k++){
       int bx = rfloor(m->x + (k == 0 ? -R(0.5) : k == 1 ? 0 : R(0.5)));
       if(INB(bx, by) && w->grid[IDX(bx, by)] == MX_RUBBER){
-        m->vy = R(-58.75); m->gr = 0; m->stomp = 0; m->padCd = R(0.3);
-        ev(w, EV_PAD, m->x, m->y + WHH, 0, 0, 0);
+        m->vy = stomp_landing ? R(-67.5) : R(-58.75); m->gr = 0; m->stomp = 0; m->padCd = R(0.3);
+        ev(w, EV_PAD, m->x, m->y + WHH, stomp_landing, 0, 0);
         break;
       }
     }
