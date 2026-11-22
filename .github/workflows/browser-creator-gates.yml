@@ -37,6 +37,8 @@ jobs:
         run: node test/browser_multitouch_test.js
       - name: Shared walk controls and collision memory
         run: node test/browser_walk_memory_test.js
+      - name: Portrait walking focus and bounded camera transitions
+        run: node test/browser_walk_camera_test.js
       - name: Shot readiness and inventory labels
         run: node test/browser_tool_feedback_test.js
       - name: Character pose turnaround and punch timing
@@ -45,6 +47,8 @@ jobs:
         run: node test/browser_objective_test.js
       - name: Shaking camera debris visibility and draw work
         run: node test/browser_rubble_draw_test.js
+      - name: Shattered debris stops contacting during its solver step
+        run: node test/browser_dead_rubble_test.js
 
   canvas:
     runs-on: ubuntu-latest
