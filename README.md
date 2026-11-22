@@ -22,6 +22,24 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 22: falling TNT, impact hitboxes and fuse guidance
+
+- **Detached TNT can fall safely.** Gentle contacts and rubber/sand cushions
+  do not automatically detonate it. Moderate collisions may arm a short fuse;
+  violent collisions or direct destruction still explode, as do nearby blasts.
+- An armed loose TNT voxel continues falling, rotating and colliding until the
+  fuse expires. The explosion occurs at its **current position**, including
+  after a building collapses or rubble moves across the map. Nearby TNT inside
+  moving debris can ignite too, but only if its actual voxel is within range.
+- Walking punches now use rounded-corner hitboxes for individual falling
+  blocks; browser walking collision uses the contacted voxel rather than the
+  debris chunk's average position. This removes false corner hits and ghost
+  gaps around unusually shaped debris.
+- Browser and console UI report **TNT FUSE** or a charge that **SURVIVED**
+  a risky fall. The browser also shows an active-fuse warning and explains
+  the rules in Options. No new art, framebuffers or save changes.
+- [Explosion behavior, performance boundaries and focused regressions](docs/MOBILE_TNT_IMPACTS_2026-11-22.md).
+
 ## November 22: Wolfman street encounters across chapter 3
 
 - All 20 Wolfman levels now feature one of **four** new tactical street
