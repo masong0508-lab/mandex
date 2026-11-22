@@ -76,7 +76,7 @@ function make(source,initial={}){
     if(keys!==undefined){for(const key of Object.keys(e.KEYS))delete e.KEYS[key];Object.assign(e.KEYS,keys)}
     const before=e.events.length;e.time+=1/60;step(1/60);
     return {man:{...e.man},events:e.events.slice(before)};
-  },snapshot(){return {man:{...e.man},grid:Array.from(e.grid),hp:Array.from(e.hp),
+  },snapshot(){const {ledgeGrace,jumpHold,...man}=e.man;return {man,grid:Array.from(e.grid),hp:Array.from(e.hp),
     events:e.events.slice(),shake:e.shake,time:e.time}}};
 }
 const count=(row,event)=>row.events.filter(e=>e[0]===event).length;
@@ -155,8 +155,9 @@ verify('ordinary hard-floor slam',
     assert(h.e.hp[h.e.idx(20,40)]<150,'ordinary slam still damages a non-pad floor');
   });
 
-// Full state/effect parity for ordinary walking, jumping, punching and pad
-// launches with no stomp input. Only the explicitly changed paths may differ.
+// Full state/effect parity for ordinary walking, punching and pad launches
+// without jump input. Short hops and coyote timing intentionally differ and
+// are checked against their own behavioral references in the jump tests.
 let seed=0x31d46bf8;
 const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
 let ordinaryScenes=0;
@@ -166,7 +167,7 @@ for(let scene=0;scene<96;scene++){
   const current=make(production,setup),old=make(reference,setup);
   for(let frame=0;frame<80;frame++){
     const keys={KeyA:frame%70>=35,KeyD:frame%70<35,
-      Space:frame%31<5,KeyX:frame%23<3};
+      KeyX:frame%23<3};
     current.tick(keys);old.tick(keys);
   }
   assert.deepStrictEqual(current.snapshot(),old.snapshot(),'ordinary controls changed in scene '+scene);

@@ -175,6 +175,9 @@ typedef struct {
      stun: in the sling, a briefcase hit leaves him dazed (aim is locked) for this long. */
   int8_t face; uint8_t gr, stomp, walked, turn_ticks; /* 12-tick cosmetic side/back/side reverse */
   real wt, pT, pCd, padCd, hurtCd, stun;
+  /* Walking forgiveness: short coyote window after leaving a ledge, and
+     short-hop release after an ordinary player jump. No new buffers. */
+  real ledge_grace, jump_hold;
   real gait;            /* cosmetic ground distance, modulo 4 cells; no renderer memory or save data */
   int8_t in_ax; uint8_t in_jump, in_punch, in_stomp;
   real tubeT, tubeCd;  /* just posted out of a tube: gravity is 10 % for tubeT seconds, no second tube for tubeCd seconds */

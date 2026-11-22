@@ -1,0 +1,42 @@
+name: Walking jump controls
+on:
+  pull_request:
+    paths:
+      - "core/mx.h"
+      - "core/mx.c"
+      - "web/index.html"
+      - "test/walk_jump_forgiveness_test.c"
+      - "test/browser_walk_jump_forgiveness_test.js"
+      - "test/browser_pad_stomp_test.js"
+      - ".github/workflows/walk-jump-controls.yml"
+  push:
+    branches: [main]
+    paths:
+      - "core/mx.h"
+      - "core/mx.c"
+      - "web/index.html"
+      - "test/walk_jump_forgiveness_test.c"
+      - "test/browser_walk_jump_forgiveness_test.js"
+      - "test/browser_pad_stomp_test.js"
+  workflow_dispatch:
+jobs:
+  jump-and-movement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native walking solver (both numeric modes)
+        run: |
+          for mode in float fixed; do
+            flags=""
+            if [ "$mode" = fixed ]; then flags="-DMX_FIXED"; fi
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/walk_jump_forgiveness_test.c -lm -o "/tmp/jump_$mode"
+            "/tmp/jump_$mode"
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/walk_pad_stomp_test.c -lm -o "/tmp/pad_$mode"
+            "/tmp/pad_$mode"
+          done
+      - name: Browser walking jump and pad parity
+        run: |
+          node test/browser_walk_jump_forgiveness_test.js
+          node test/browser_pad_stomp_test.js
+          node test/browser_combat_recovery_test.js

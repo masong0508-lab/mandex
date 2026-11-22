@@ -55,7 +55,7 @@ echo "--- gameplay recovery and stomp-pad ascent (float/fixed/browser) ---"
 for mode in float fixed; do
   flags=""
   if test "$mode" = fixed; then flags="-DMX_FIXED"; fi
-  for probe in combat_recovery walk_pad_stomp; do
+  for probe in combat_recovery walk_pad_stomp walk_jump_forgiveness; do
     gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core "${probe}_test.c" -lm -o "${probe}_$mode"
     "./${probe}_$mode"
   done
@@ -63,6 +63,7 @@ done
 if command -v node >/dev/null 2>&1;then
   node browser_combat_recovery_test.js
   node browser_pad_stomp_test.js
+  node browser_walk_jump_forgiveness_test.js
 fi
 echo "--- real-time frame meter: rendered FPS vs simulation steps/s ---"
 gcc -std=gnu99 -O2 -I../core fps_meter_test.c -o fps_meter_test && ./fps_meter_test

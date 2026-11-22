@@ -22,6 +22,17 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 22 walking controls: short hops and ledge grace
+
+- Tap JUMP for a short hop, or hold it to keep the original full-height jump.
+- A 0.10-second grace period after running off an edge lets the player recover
+  with a last-second jump; it is consumed immediately and never allows a
+  double jump. Bounce pads and stomps retain their normal physics.
+- Native float/fixed and browser tests exercise actual walking functions.
+  All three console ports share the same C change, with no new textures,
+  framebuffers, heap allocations or per-frame drawing work.
+- [Jump-control implementation and verification](docs/WALK_JUMP_FORGIVENESS_2026-11-22.md).
+
 ## November 21 gameplay pass: counterpunches and stomp boosts
 
 - Multi-hit landlords keep their recovery window on the final HP. A punch
