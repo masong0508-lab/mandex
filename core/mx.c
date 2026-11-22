@@ -1759,7 +1759,7 @@ static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
   mx_flight_face_update(m);
   if(m->face != -1) m->face = 1;
-  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0;
+  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=0;
   m->in_ax = 0; m->in_jump = m->in_punch = m->in_stomp = 0;
   int ok = !wblocked(w, m->x, m->y);
   for(int u = 1; u <= 110 && !ok; u++) if(!wblocked(w, m->x, m->y - PX(u))){ m->y -= PX(u); ok = 1; }
@@ -1844,11 +1844,29 @@ static void walk_step(MxWorld *w, real dt){
   if(m->pCd > 0) m->pCd -= dt;
   if(m->pT > 0) m->pT -= dt;
   if(m->in_punch && m->pCd <= 0) walk_punch(w);
-  if(m->in_jump && m->gr && !m->stomp){ m->vy = R(-43.125); m->gr = 0; }
+  /* Walkers get 0.1s to jump after leaving a ledge. A jump consumes the
+     window immediately so it can never turn into a double jump. */
+  if(m->gr) m->ledge_grace=R(0.1);
+  if(m->in_jump && (m->gr || m->ledge_grace > 0) && !m->stomp){
+    m->vy=R(-43.125); m->gr=0; m->ledge_grace=0; m->jump_hold=R(0.16);
+  }
+  /* A tap makes a controllable short hop; holding jump keeps the original
+     full-height trajectory. Only the player's jump sets this flag, so rubber
+     pads, pneumatic tubes and other launches are never cut. */
+  if(m->jump_hold > 0){
+    if(!m->in_jump){
+      if(m->vy < R(-22.5)) m->vy=R(-22.5);
+      m->jump_hold=0;
+    } else if(m->vy>=0) m->jump_hold=0;
+    else {m->jump_hold-=dt; if(m->jump_hold<0) m->jump_hold=0;}
+  }
   /* A held stomp must not reverse a fresh pad launch on the next tick.
      The existing cooldown protects ascent only; a ceiling or expiry gives
      the player stomp control again immediately. */
-  if(m->in_stomp && !m->gr && !m->stomp && !(m->padCd > 0 && m->vy < 0)){ m->stomp = 1; if(m->vy < RI(90)) m->vy = RI(90); }
+  if(m->in_stomp && !m->gr && !m->stomp && !(m->padCd > 0 && m->vy < 0)){
+    m->stomp=1; m->jump_hold=0; m->ledge_grace=0;
+    if(m->vy < RI(90)) m->vy=RI(90);
+  }
   /* walk_slam() clears the impact pose before pad detection. Retain this
      frame's stomp intent locally so the pad can still apply its boost. */
   const int stomp_landing=m->stomp;
@@ -1882,6 +1900,11 @@ static void walk_step(MxWorld *w, real dt){
     }
   }
   m->gr = (uint8_t)wblocked(w, m->x, m->y + R(0.1875));
+  if(m->gr){m->ledge_grace=R(0.1);m->jump_hold=0;}
+  else if(m->ledge_grace>0){
+    m->ledge_grace-=dt;
+    if(m->ledge_grace<0)m->ledge_grace=0;
+  }
   /* Drive feet from REAL horizontal travel after wall collisions and
      stepping, not from time or requested input. While airborne, blocked,
      or paused, the grounded gait does not move. Cosmetics never feed
@@ -1898,6 +1921,7 @@ static void walk_step(MxWorld *w, real dt){
       int bx = rfloor(m->x + (k == 0 ? -R(0.5) : k == 1 ? 0 : R(0.5)));
       if(INB(bx, by) && w->grid[IDX(bx, by)] == MX_RUBBER){
         m->vy = stomp_landing ? R(-67.5) : R(-58.75); m->gr = 0; m->stomp = 0; m->padCd = R(0.3);
+        m->ledge_grace=m->jump_hold=0;
         ev(w, EV_PAD, m->x, m->y + WHH, stomp_landing, 0, 0);
         break;
       }
