@@ -366,7 +366,7 @@ static void handle_events(void){
       break;
     case EV_DISTRICT: break;                               /* Landlord HQ: next district; the banner (below) announces it */
     case EV_HEAL:  for(int k = 0; k < 8; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 520); break;
-    case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), 520); break;
+    case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), e->m == 2 ? 580 : 520); break;
     case EV_THROW: case EV_SWING: for(int k = 0; k < 4; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 160); break;
     default: break;   /* AICA sounds are routed through mx_event_sfx above. */
     }
