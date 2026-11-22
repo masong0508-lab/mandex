@@ -93,6 +93,7 @@ check(edge.tick({Space:true}).vy<0,'jump after real ledge edge works');
 
 const stomp=make();
 stomp.tick({Space:true});
+stomp.e.man.y=160; // Let the downward stomp begin before floor contact.
 m=stomp.tick({KeyS:true});
 check(m.stomp&&m.vy>=720&&m.jumpHold===0,'stomp overrides jump cutting');
 
