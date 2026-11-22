@@ -26,6 +26,9 @@ outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
 - While walking, punch an incoming thrown briefcase to smash it before it
   hits you, earning **150 points**. A well-timed belly slam also works.
+- **Rent Strike** now introduces a single nearby briefcase thrower with a
+  visible warning and existing attack cooldown. His short-range throws let
+  players discover this defensive move naturally without long-distance sniping.
 - Parrying uses the original close-range attack hitbox; ordinary projectiles
   remain dangerous and missed punches have no defensive effect.
 - Browser, DS, 3DS and Dreamcast use their existing impact particles,
