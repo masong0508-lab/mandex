@@ -42,7 +42,8 @@ first.walkPunch();
 check(first.e.cases.length===0,'front-facing punch must remove the incoming case');
 check(first.e.score===150,'one briefcase parry earns 150 points exactly once');
 check(popups(first.e).includes('PARRY! +150'),'parry must produce readable impact feedback');
-check(popups(first.e).includes('POW!'),'punch impact feedback still uses the existing hit effect');
+check(!popups(first.e).includes('POW!'),
+  'PARRY text must not collide with an ordinary POW popup');
 first.updCases(1/60);
 check(first.e.hurtCount===0,'removed case must not hit the player in the same step');
 
@@ -65,10 +66,19 @@ check(slam.e.cases.length===0&&slam.e.score===150,
   'belly slam must parry the case exactly once across two hitboxes');
 check(popups(slam.e).filter(x=>x==='PARRY! +150').length===1,
   'dual-hit slam may not duplicate parry feedback');
+check(!popups(slam.e).includes('BELLY SLAM!'),
+  'belly slam may not obscure its own successful parry');
 
 const empty=make();empty.walkPunch();
 check(empty.e.score===0&&count(empty.e,'spark')===0,
   'ordinary empty punch must not invent a parry');
+const ordinary=make();ordinary.e.damageCell=()=>1;ordinary.walkPunch();
+check(popups(ordinary.e).includes('POW!') &&
+      !popups(ordinary.e).includes('PARRY! +150'),
+  'ordinary damage must still show a regular punch popup');
+const plainSlam=make();plainSlam.walkSlam();
+check(popups(plainSlam.e).includes('BELLY SLAM!'),
+  'ordinary slam retains its existing textual feedback');
 
 const animated=make();
 animated.e.man.pT=.15;
@@ -100,4 +110,4 @@ check(unguarded.e.hurtCount===1&&unguarded.e.score===0&&unguarded.e.cases.length
 const parseStart=html.indexOf('<script>'),parseEnd=html.indexOf('</script>',parseStart);
 new Function(html.slice(parseStart+8,parseEnd));
 console.log('BROWSER_CASE_PARRY_PASS checks='+checks+
-  ' front=1 miss=1 multi=1 slam=1 active_window=1 score_once=1 vulnerable=1 syntax=1');
+  ' front=1 miss=1 multi=1 slam=1 popup_priority=1 active_window=1 score_once=1 vulnerable=1 syntax=1');
