@@ -66,6 +66,7 @@ HARNESS = r"""
       yaw: face < 0 ? 2 * Math.PI - angle : angle,
       grounded: !!man.gr, wt: man.wt, punch: man.pT || 0,
       stomp: !!man.stomp, pad_cooldown: man.padCd || 0,
+      jump_hold: man.jumpHold || 0, ledge_grace: man.ledgeGrace || 0,
       hurt_cooldown: man.hurtCd || 0,
       opponent: targets[0] ? { alive: targets[0].alive, hp: targets[0].hp,
         hp_max: targets[0].hpMax, inv: targets[0].inv, stun: targets[0].stun,
@@ -131,16 +132,18 @@ HARNESS = r"""
     muted = true; OPT().muted = true; OPT().fight = kind === 'counterpunch';
     OPT().collapse = true; shake = 0; freeze = 0; slow = 0;
     for (const key of Object.keys(KEYS)) KEYS[key] = false;
-    load(-1, { name: kind === 'pad' ? 'Stomp boost input check' : 'Counterpunch input check',
+    load(-1, { name: kind === 'pad' ? 'Stomp boost input check' :
+      kind === 'jump' ? 'Jump height input check' : 'Counterpunch input check',
       men: 3, walk: true, custom: true, build() {
         if (kind === 'pad') rect(38, 59, 5, 1, RUBBER);
+        else if(kind === 'jump') rect(15, 59, 80, 1, STEEL);
         else tgt(26.5, 60, kind === 'counterpunch' ? 'walker' : '');
         tgt(110, 60); // A distant objective prevents a fixture victory.
       } });
     man.x = kind === 'pad' ? 324 : 200;
-    man.y = kind === 'pad' ? 410 : 461;
+    man.y = kind === 'pad' ? 410 : kind === 'jump' ? 450 : 461;
     enterWalk(); man.hurtCd = 0;
-    if (kind !== 'pad') {
+    if (kind !== 'pad' && kind !== 'jump') {
       const t = targets[0]; t.hp = t.hpMax = kind === 'counterpunch' ? 3 : 2;
       t.wind = kind === 'counterpunch' ? WEB_SIM_DT / 2 : 0;
       t.cd = 2; t.face = -1; man.gr = true;
@@ -325,6 +328,40 @@ class Smoke:
         require(launches['boosted_pad']['launch']['vy'] <
                 launches['ordinary_pad']['launch']['vy'], 'Stomp never increased the pad launch')
         report['gameplay']['pads'] = launches
+
+        # Real keyboard events drive the shipped walkStep, not mocked physics.
+        # Reload the same supported floor to compare release and hold fairly.
+        jump_traces = {}
+        for held_ticks, name in ((1, 'tap_hop'), (14, 'held_high')):
+            report['stage'] = 'gameplay_' + name
+            initial = p.evaluate('__inputSmokeGame.prepareGameplay("jump")')
+            settled = self.continuous(12)[0][-1]
+            require(settled['grounded'], 'Jump fixture failed to settle on its floor', settled)
+            baseline_y = settled['y']
+            p.keyboard.down('Space')
+            launched = self.continuous(held_ticks)[0]
+            p.keyboard.up('Space')
+            require(launched[0]['vy'] < 0 and not launched[0]['grounded'],
+                    'Trusted Space key did not begin a normal jump', launched[0])
+            released = self.continuous(18)[0]
+            if held_ticks == 1:
+                require(-180 <= released[0]['vy'] <= -160 and
+                        released[0]['jump_hold'] == 0,
+                        'Early keyup failed to cap rising speed', released[0])
+            self.screenshot('10-gameplay-' + name)
+            completed = self.continuous(20)[0]
+            sample = launched + released + completed
+            apex = min(row['y'] for row in sample)
+            require(apex < baseline_y - 8,
+                    'Character never left the ground after Space', sample[:3])
+            jump_traces[name] = {'initial': initial, 'grounded': settled,
+                                 'first_launch': launched[0], 'first_release': released[0],
+                                 'apex_y': apex, 'height_px': baseline_y - apex,
+                                 'end': completed[-1]}
+        require(jump_traces['held_high']['height_px'] >
+                jump_traces['tap_hop']['height_px'] + 24,
+                'Real held jump did not clear visibly more height', jump_traces)
+        report['gameplay']['jump_height'] = jump_traces
 
     def run(self):
         p, report = self.page, self.report
