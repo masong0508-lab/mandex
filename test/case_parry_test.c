@@ -36,6 +36,9 @@ int main(void){
   CHECK(events(EV_PUNCH)==1&&events(EV_HURT)==0&&events(EV_THUD)==0,
         "parried projectile cannot hurt or shatter again in this frame");
   expect_parry(1);
+  { int flagged=0;for(int i=0;i<w.nev;i++)
+      if(w.ev[i].type==EV_PUNCH)flagged=(w.ev[i].b>0);
+    CHECK(flagged,"parried punch must suppress only its generic POW popup"); }
   CHECK(w.man.hurtCd==0&&w.man.mode==MAN_WALK,"successful parry preserved the walker");
 
   setup();case_at(0,w.man.x-R(3),punch_y());
@@ -66,11 +69,17 @@ int main(void){
   CHECK(!w.cases[0].active&&w.score==150,
         "a descending belly slam parries the case only once across its two hitboxes");
   CHECK(events(EV_SLAM)==1,"belly slam retained its original impact event");
+  { int flagged=0;for(int i=0;i<w.nev;i++)
+      if(w.ev[i].type==EV_SLAM)flagged=(w.ev[i].b>0);
+    CHECK(flagged,"parried slam must suppress overlapping generic text"); }
   expect_parry(1);
 
   setup();walk_punch(&w);
   CHECK(w.score==0&&events(EV_BONK)==0&&events(EV_PUNCH)==1,
         "ordinary punch without a case is unchanged");
+  { int generic=0;for(int i=0;i<w.nev;i++)
+      if(w.ev[i].type==EV_PUNCH)generic=(w.ev[i].b==0);
+    CHECK(generic,"ordinary empty punch retains normal popup priority"); }
 
   /* Timing window: a briefcase can arrive on a later animation frame.
      Start outside the fist and move inside during the projectile step. */
