@@ -165,5 +165,56 @@ check('fight-back-off disables walking throwers',()=>{
   const t=s.target({kind:'thrower',x:400,y:300,cd:0,wind:0});
   s.fight(false);s.ai(t,DT);assert(t.wind===0&&s.cases.length===0);
 });
+// The console MxCase pool is exactly four slots. Browser must cap the
+// corresponding dynamic array without skipping the original windup/cooldown.
+check('four active briefcases block extra browser projectiles',()=>{
+  const s=make();s.man.mode='aim';s.man.x=200;s.man.y=300;
+  const t=s.target({kind:'thrower',x:400,y:300,wind:DT/2,cd:0});
+  for(let i=0;i<4;i++)s.cases.push({x:i,y:40,vx:i+1,vy:-i,l:4});
+  const old=JSON.stringify(s.cases);
+  s.ai(t,DT);
+  assert.strictEqual(s.cases.length,4,'browser exceeded native four-case budget');
+  assert.strictEqual(JSON.stringify(s.cases),old,'full pool destroyed active cases');
+  assert(t.swing>0&&t.cd>0,'failed spawn must still complete windup and cooldown');
+  assert.strictEqual(s.events.filter(e=>e[0]==='sound'&&e[1]==='whoosh').length,0,
+    'a suppressed throw must not play an imaginary projectile sound');
+});
+check('a newly available case slot can be reused',()=>{
+  const s=make();s.man.mode='aim';s.man.x=200;s.man.y=300;
+  const t=s.target({kind:'thrower',x:400,y:300,wind:DT/2,cd:0});
+  for(let i=0;i<3;i++)s.cases.push({x:i,y:i,vx:1,vy:1,l:4});
+  const old=JSON.stringify(s.cases);
+  s.ai(t,DT);
+  assert.strictEqual(s.cases.length,4,'a vacant slot should admit one real throw');
+  assert.strictEqual(JSON.stringify(s.cases.slice(0,3)),old,'existing cases were overwritten');
+  assert(s.cases[3].vx<0&&Number.isFinite(s.cases[3].vy),
+    'the admitted throw needs the original solved trajectory');
+  assert.strictEqual(s.events.filter(e=>e[0]==='sound'&&e[1]==='whoosh').length,1,
+    'a real throw must retain its sound cue');
+});
+check('boss retains two-windup cadence under a saturated case pool',()=>{
+  const s=make();s.man.mode='aim';s.man.x=200;s.man.y=300;
+  const t=s.target({kind:'boss',x:400,y:300,wind:DT/2,b2:0,cd:0});
+  for(let i=0;i<4;i++)s.cases.push({x:i,y:i,vx:1,vy:1,l:4});
+  s.ai(t,DT);
+  assert.strictEqual(s.cases.length,4,'boss exceeded projectile capacity');
+  assert(t.b2===1&&t.wind>0,'boss lost its original second-throw telegraph');
+  s.cases.shift();t.wind=DT/2;
+  s.ai(t,DT);
+  assert.strictEqual(s.cases.length,4,'boss failed to reuse a slot');
+  assert(t.b2===0&&t.cd>=3,'boss must end follow-up with ordinary cooldown');
+});
+check('many throwers cannot accumulate an unlimited projectile storm',()=>{
+  const s=make();s.man.mode='aim';s.man.x=200;s.man.y=300;
+  for(let i=0;i<24;i++){
+    const t=s.target({kind:'thrower',x:400+(i%3)*10,y:300,
+      wind:DT/2,cd:0});
+    s.ai(t,DT);
+  }
+  assert.strictEqual(s.cases.length,4,'24 throwers overflowed the handheld pool');
+  assert.strictEqual(s.events.filter(e=>e[0]==='sound'&&e[1]==='whoosh').length,4,
+    'only actual admitted projectiles should play their launch sound');
+});
+
 console.log('WEB_COMBAT_RECOVERY_'+(failed?'FAIL':'PASS')+' cases='+checks+' failures='+failed);
 if(failed)process.exitCode=1;
