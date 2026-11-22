@@ -1035,6 +1035,14 @@ function walkHit(cx,cy,hw,hh,dmg){let dealt=0;const x0=Math.floor((cx-hw)/V),x1=
   for(const ch of chunks){if(Math.hypot(ch.x-cx,ch.y-cy)>ch.rad+hw+hh)continue;let hit=false;
     for(const a of ch.cells)if(!a.dead&&Math.abs(a.wx-cx)<hw+RC&&Math.abs(a.wy-cy)<hh+RC){hit=true;dealt+=Math.min(a.h,dmg);a.h-=dmg;if(a.h<=0){a.dead=true;chip(a.wx,a.wy,MAT[a.m].c,(rnd()-.5)*200,-rnd()*150)}}
     if(hit)wake(ch)}
+  // Punch and belly slam can catch incoming briefcases before they hit him.
+  // Reverse traversal is safe for in-place splice; no new collision arrays.
+  for(let i=cases.length-1;i>=0;i--){
+    const c=cases[i];
+    if(Math.abs(c.x-cx)>=hw+6||Math.abs(c.y-cy)>=hh+6)continue;
+    cases.splice(i,1);score+=150;dealt+=8;
+    spark(c.x,c.y,7,220);popText(c.x,c.y-20,'PARRY! +150','#ffd23f',20);
+  }
   for(const t of targets)if(t.alive&&Math.abs(t.x-cx)<hw+t.r&&Math.abs(t.y-cy)<hh+t.r)killTarget(t);
   return dealt}
 function walkPunch(){const m=man,cx=m.x+m.face*17,cy=m.y-3,run=Math.abs(m.vx)>100,d=walkHit(cx,cy,13,16,run?24:16);m.pT=.2;m.pCd=.3;
