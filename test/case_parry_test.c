@@ -99,6 +99,46 @@ int main(void){
   CHECK(events(EV_HURT)==1,
         "normal incoming briefcase still hurts an undefended walker");
 
+  /* Campaign reachability: a nearby thrower on a walking floor must
+     telegraph first, then release a real solved arc. */
+  setup();w.nofight=0;w.man.mode=MAN_WALK;w.man.x=RI(40);w.man.y=RI(35);
+  MxTarget *t=&w.targets[0];t->kind=LK_THROWER;t->hp=t->hpmax=1;
+  t->x=RI(55);t->y=RI(35);t->hx=t->x;t->face=-1;t->cd=0;t->wind=0;
+  lord_ai(&w,t,DT);
+  CHECK(t->wind>0&&events(EV_THROW)==0,
+        "walking thrower must visibly wind up before releasing a case");
+  for(int f=0;f<50&&events(EV_THROW)==0;f++)lord_ai(&w,t,DT);
+  CHECK(events(EV_THROW)==1,
+        "nearby thrower must actually attack a walking player");
+  int active=0;for(int i=0;i<MX_MAX_CASES;i++)active+=w.cases[i].active;
+  CHECK(active==1,"walking thrower must use the existing four-case pool");
+  CHECK(t->cd>0,"walking thrower must respect normal attack cooldown");
+
+  setup();w.nofight=0;w.man.mode=MAN_WALK;w.man.x=RI(10);w.man.y=RI(35);
+  t=&w.targets[0];t->kind=LK_THROWER;t->x=RI(55);t->y=RI(35);t->cd=0;
+  lord_ai(&w,t,DT);
+  CHECK(t->wind==0&&events(EV_THROW)==0,
+        "walking throwers must not snipe across the map");
+
+  setup();w.nofight=0;w.man.mode=MAN_WALK;w.man.x=RI(40);w.man.y=RI(10);
+  t=&w.targets[0];t->kind=LK_THROWER;t->x=RI(55);t->y=RI(35);t->cd=0;
+  lord_ai(&w,t,DT);
+  CHECK(t->wind==0,"walking throwers must not target far-separated floors");
+
+  setup();w.nofight=1;w.man.mode=MAN_WALK;w.man.x=RI(40);w.man.y=RI(35);
+  t=&w.targets[0];t->kind=LK_THROWER;t->x=RI(55);t->y=RI(35);t->cd=0;
+  lord_ai(&w,t,DT);
+  CHECK(t->wind==0&&events(EV_THROW)==0,"fight-back-off must remain safe");
+
+  mx_load(&w,37);
+  int walkers=0,throwers=0;
+  for(int i=0;i<w.ntargets;i++){
+    walkers+=w.targets[i].kind==LK_WALKER;
+    throwers+=w.targets[i].kind==LK_THROWER;
+  }
+  CHECK(w.walk&&w.ntargets==8&&walkers==3&&throwers==1,
+        "Rent Strike must teach parrying without losing a landlord");
+
   if(failures){fprintf(stderr,"CASE_PARRY_FAIL %d/%d\n",failures,checks);return 1;}
   printf("CASE_PARRY_PASS checks=%d hit=1 forward_only=1 range=1 multiple=1 slam=1 points=1 vulnerable=1\n",checks);
   return 0;
