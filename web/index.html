@@ -760,23 +760,21 @@ function updateMovingTnt(){
   let live=0;
   for(const ch of chunks){
     if(!ch.hasTnt)continue;
-    if(!ch.tntFused&&ch.tntImpact>=28*V){
+    if(!ch.tntFused&&ch.tntHit&&ch.tntImpact>=28*V){
       const light=ch.tntImpact>=55*V||((level*13+ch.id*7+Math.floor(time*8))&3)===0;
-      for(const a of ch.cells){
-        if(a.dead||a.m!==TNT)continue;
+      const a=ch.tntHit;
+      if(!a.dead&&a.m===TNT){
         if(light)armMovingTnt(ch,a,TNT_FUSE_TICKS);
         else if(!ch.tntWarned){popText(a.wx,a.wy-22,'TNT SURVIVED!','#9debc1',18);ch.tntWarned=true}
-        break;
       }
     }
     let fused=false;
     for(const a of ch.cells){
       if(a.dead||a.m!==TNT||!a.fuse)continue;
       if(--a.fuse===0)movedTntBoom(a);
-      else fused=true;
+      else{fused=true;live++;}
     }
-    ch.tntFused=fused;ch.tntImpact=0;
-    if(fused)live++;
+    ch.tntFused=fused;ch.tntImpact=0;ch.tntHit=null;
   }
   tntLiveFuses=live;
 }
@@ -869,7 +867,7 @@ function newChunk(cells){
   let M=0,cx=0,cy=0,mvx=0,mvy=0;
   for(const a of cells){if(a.px===undefined){a.px=a.x*V+V/2;a.py=a.y*V+V/2;a.vx=a.vy=0}const d=MAT[a.m].d;M+=d;cx+=d*a.px;cy+=d*a.py;mvx+=d*a.vx;mvy+=d*a.vy}
   cx/=M;cy/=M;mvx/=M;mvy/=M;let rad=0,tq=0,ti=0;
-  const ch={id:++chunkId,cells,x:cx,y:cy,vx:clamp(mvx,-WOB_VMAX*V,WOB_VMAX*V),vy:clamp(mvy,-WOB_VMAX*V,WOB_VMAX*V),ang:0,w:0,m:M,I:1,sleep:0,age:0,hitCd:0,rad:0,cs:1,sn:0,cx:0,cy:0,cn:0,tntImpact:0,tntWarned:false};
+  const ch={id:++chunkId,cells,x:cx,y:cy,vx:clamp(mvx,-WOB_VMAX*V,WOB_VMAX*V),vy:clamp(mvy,-WOB_VMAX*V,WOB_VMAX*V),ang:0,w:0,m:M,I:1,sleep:0,age:0,hitCd:0,rad:0,cs:1,sn:0,cx:0,cy:0,cn:0,tntImpact:0,tntHit:null,tntWarned:false};
   for(const a of cells){a.fuse=0;a.lx=a.px-cx;a.ly=a.py-cy;a.ch=ch;a.wx=a.px;a.wy=a.py;a.dead=false;rad=Math.max(rad,Math.hypot(a.lx,a.ly));
     const d=MAT[a.m].d;tq+=d*(a.lx*(a.vy-mvy)-a.ly*(a.vx-mvx));ti+=d*(a.lx*a.lx+a.ly*a.ly)}
   ch.w=ti>64?clamp(tq/ti,-6,6):0;   // the sway becomes a topple
@@ -890,9 +888,9 @@ function resolveStatic(ch,a,nx,ny,pen,ci,cj){
   const rx=a.wx-ch.x,ry=a.wy-ch.y,vpx=ch.vx-ch.w*ry,vpy=ch.vy+ch.w*rx,vn=vpx*nx+vpy*ny;
   if(vn<0){const MP=MAT[a.m],rn=rx*ny-ry*nx,den=1/ch.m+rn*rn/ch.I,e=-vn>(a.m===RUBBER?24:130)?MP.rest:0,j=-(1+e)*vn/den;
     ch.vx+=j*nx/ch.m;ch.vy+=j*ny/ch.m;ch.w+=rn*j/ch.I;
-    if(ch.hasTnt){const surface=inb(ci,cj)?grid[idx(ci,cj)]:0;
+    if(a.m===TNT){const surface=inb(ci,cj)?grid[idx(ci,cj)]:0;
       const hit=-vn*((surface===RUBBER||surface===SAND)?.3:1);
-      ch.tntImpact=Math.max(ch.tntImpact||0,hit)}
+      if(hit>(ch.tntImpact||0)){ch.tntImpact=hit;ch.tntHit=a}}
     const tx=-ny,ty=nx,vt=(ch.vx-ch.w*ry)*tx+(ch.vy+ch.w*rx)*ty,rt=rx*ty-ry*tx,jt=clamp(-vt/(1/ch.m+rt*rt/ch.I),-MP.fric*j,MP.fric*j);
     ch.vx+=jt*tx/ch.m;ch.vy+=jt*ty/ch.m;ch.w+=rt*jt/ch.I;
     if(-vn>(a.m===GLASS?72:170))impactDamage(ch,a,ci,cj,-vn);
@@ -934,8 +932,8 @@ function stepChunks(dt){
           if(vn<0){const rna=rax*ny-ray*nx,rnb=rbx*ny-rby*nx,den=1/ch.m+1/oc.m+rna*rna/ch.I+rnb*rnb/oc.I,jj=-(1.1)*vn/den;
             ch.vx+=jj*nx/ch.m;ch.vy+=jj*ny/ch.m;ch.w+=rna*jj/ch.I;oc.vx-=jj*nx/oc.m;oc.vy-=jj*ny/oc.m;oc.w-=rnb*jj/oc.I;
             if(-vn>160){
-              if(ch.hasTnt)ch.tntImpact=Math.max(ch.tntImpact||0,-vn*((o.m===RUBBER||o.m===SAND)?.3:1));
-              if(oc.hasTnt)oc.tntImpact=Math.max(oc.tntImpact||0,-vn*((a.m===RUBBER||a.m===SAND)?.3:1));
+              if(a.m===TNT){const hit=-vn*((o.m===RUBBER||o.m===SAND)?.3:1);if(hit>(ch.tntImpact||0)){ch.tntImpact=hit;ch.tntHit=a}}
+              if(o.m===TNT){const hit=-vn*((a.m===RUBBER||a.m===SAND)?.3:1);if(hit>(oc.tntImpact||0)){oc.tntImpact=hit;oc.tntHit=o}}
             }
             if(-vn>200){
               const dm=(-vn-180)*.04;
@@ -1745,7 +1743,7 @@ function update(dt){
   if(man.mode==='wait'){waitT+=dt;if(waitT>.7&&(!busy()||waitT>3.5)){zoneAdvance();if(men>0)nextMan();else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14}}}
   processExpl();
   if(needSupport)supportPass();
-  for(const ch of chunks)if(ch.hasTnt)ch.tntImpact=0;
+  for(const ch of chunks)if(ch.hasTnt){ch.tntImpact=0;ch.tntHit=null}
   for(let i=0;i<6;i++)stepChunks(dt/6);
   updateMovingTnt();
   processExpl(); // process detonations caused by late rubble contacts this frame
@@ -5109,6 +5107,7 @@ function drawMobileOptions(){
     if(y+rh<H-72)row('RESET OPTIONS','DEFAULT',()=>{if(performance.now()<armReset){optsReset();armReset=0}else armReset=performance.now()+3000},false);
     if(y+rh<H-68)row('ERASE PROGRESS','CONFIRM',()=>{if(performance.now()<armProg){progReset();armProg=0}else armProg=performance.now()+3000},false);
   }
+  if(!page)txt('TNT CAN SURVIVE FALLS. HARD HITS LIGHT A FUSE.',W/2,H-95,13,'#ffe190','center');
   if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{WEB_UI.page.options=1},{size:18});
   else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{WEB_UI.page.options=0},{size:18});
 }

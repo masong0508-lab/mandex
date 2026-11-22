@@ -32,7 +32,9 @@ to exploit it without causing a guaranteed explosion.
 
 The TNT explosion origin is the **current transformed position of the
 individual cell**, not the chunk's centre of mass nor its original grid
-coordinates. A conservative chunk bounding rejection limits work first;
+coordinates. A collision elsewhere along the same long chunk does not ignite
+remote TNT: the engine records the actual TNT voxel that made contact, and
+the browser HUD counts burning charges rather than only the number of chunks. A conservative chunk bounding rejection limits work first;
 only charges near the blast are considered. No explosion can ignite a
 distant charge solely because a long collapsed wall has its centroid close
 to the blast.

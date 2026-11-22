@@ -34,13 +34,13 @@ let [ch,a]=make();
 check(ch.hasTnt&&!ch.tntFused,'detached TNT starts unarmed');
 for(let k=0;k<90;k++)updateMovingTnt();
 check(!a.fuse&&!a.dead&&!explQ.length,'motion alone never explodes the charge');
-level=1;ch.tntImpact=29*V;updateMovingTnt();
+level=1;ch.tntImpact=29*V;ch.tntHit=a;updateMovingTnt();
 check(!a.fuse&&events.some(e=>e[0]==='text'&&e[3]==='TNT SURVIVED!'),
       'medium hit may show an actual safe result');
-time=.4;ch.tntImpact=29*V;updateMovingTnt();
+time=.4;ch.tntImpact=29*V;ch.tntHit=a;updateMovingTnt();
 check(a.fuse===23&&tntLiveFuses===1,'medium hit may later ignite a short fuse');
 [ch,a]=make(245,248);
-ch.tntImpact=56*V;updateMovingTnt();
+ch.tntImpact=56*V;ch.tntHit=a;updateMovingTnt();
 check(a.fuse===23&&!explQ.length,'hard hit arms without instant detonation');
 for(let k=0;k<23;k++)updateMovingTnt();
 check(a.dead&&explQ.length===1&&explQ[0][0]===30&&explQ[0][1]===31,
@@ -55,6 +55,18 @@ blastMovingTnt(316,240);
 check(!a.fuse,'blast ignores a distant TNT voxel whose chunk centre is near');
 [ch,a]=make();armMovingTnt(ch,a,8);
 check(events.some(e=>e[0]==='text'&&e[3]==='TNT FUSE!'),'fuse has clear in-game feedback');
+
+[ch,a]=make(200,200);const other={...a,wx:340,wy:200,fuse:0};
+ch.cells.push(other);recompute(ch);
+ch.tntHit=other;ch.tntImpact=56*V;updateMovingTnt();
+check(!a.fuse&&other.fuse===23,'in one chunk only the actual struck TNT voxel ignites');
+[ch,a]=make(200,200);
+ch.tntImpact=56*V;ch.tntHit=null;updateMovingTnt();
+check(!a.fuse,'distant steel hit cannot ignite an uncontacted TNT voxel');
+[ch,a]=make(200,200);const next={...a,wx:208,wy:200,fuse:0};
+ch.cells.push(next);recompute(ch);
+armMovingTnt(ch,a,8);armMovingTnt(ch,next,8);updateMovingTnt();
+check(tntLiveFuses===2,'HUD counts actual burning TNT charges, not only chunks');
 const wood={m:1,h:40,dead:false,wx:113,wy:113};
 const piece={x:100,y:100,rad:80,cells:[wood],rest:false};
 chunks=[piece];const outside=walkHit(100,100,10,10,16);
