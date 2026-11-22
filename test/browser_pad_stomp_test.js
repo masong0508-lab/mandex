@@ -43,7 +43,7 @@ const reference=String.raw`function walkStep(dt){const m=man;
 function make(source,initial={}){
   let seed=0x614ec137;
   const e={WHW:7,WHH:19,WALK_T:45,V:8,RC:4,COLS:120,ROWS:60,WW:960,G:900,
-    RUBBER:7,STEEL:6,WOOD:1,KEYS:{},chunks:[],targets:[],MAT:[],time:0,shake:0,
+    RUBBER:7,STEEL:6,WOOD:1,KEYS:{},chunks:[],targets:[],cases:[],MAT:[],time:0,shake:0,
     grid:new Uint8Array(120*60),hp:new Float32Array(120*60),events:[],
     man:{mode:'walk',walked:true,face:1,x:164,y:320-19-.24,vy:64,vx:0,
       gr:false,wt:45,pT:0,pCd:0,padCd:0,turn:0,stomp:false,R:14,...initial.man}};
