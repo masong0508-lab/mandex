@@ -140,5 +140,30 @@ check('unstunned thrower still launches a real solved arc',()=>{
   assert.strictEqual(s.cases.length,1);
   assert(s.cases[0].vx<0&&Number.isFinite(s.cases[0].vy));
 });
+check('walking thrower telegraphs, then attacks at normal cadence',()=>{
+  const s=make();s.man.mode='walk';s.man.x=200;s.man.y=300;
+  const t=s.target({kind:'thrower',x:400,y:300,cd:0,wind:0});
+  s.ai(t,DT);
+  assert(t.wind>0&&s.cases.length===0,'walking thrower skipped its windup');
+  for(let i=0;i<60&&s.cases.length===0;i++)s.ai(t,DT);
+  assert.strictEqual(s.cases.length,1,'walking thrower never fired at nearby walker');
+  assert(t.cd>0,'thrower lost its normal cooldown');
+});
+check('walking thrower cannot snipe across the map',()=>{
+  const s=make();s.man.mode='walk';s.man.x=70;s.man.y=300;
+  const t=s.target({kind:'thrower',x:400,y:300,cd:0,wind:0});
+  s.ai(t,DT);
+  assert(t.wind===0&&s.cases.length===0,'out-of-range walking thrower attacked');
+});
+check('walking thrower cannot shoot across distant floors',()=>{
+  const s=make();s.man.mode='walk';s.man.x=200;s.man.y=100;
+  const t=s.target({kind:'thrower',x:400,y:300,cd:0,wind:0});
+  s.ai(t,DT);assert.strictEqual(t.wind,0);
+});
+check('fight-back-off disables walking throwers',()=>{
+  const s=make();s.man.mode='walk';s.man.x=200;s.man.y=300;
+  const t=s.target({kind:'thrower',x:400,y:300,cd:0,wind:0});
+  s.fight(false);s.ai(t,DT);assert(t.wind===0&&s.cases.length===0);
+});
 console.log('WEB_COMBAT_RECOVERY_'+(failed?'FAIL':'PASS')+' cases='+checks+' failures='+failed);
 if(failed)process.exitCode=1;
