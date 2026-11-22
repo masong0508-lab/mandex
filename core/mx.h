@@ -124,7 +124,9 @@ enum {
   EV_HEAL,     /* a healer patched a landlord up at x,y */
   EV_OOF,      /* a tough landlord took a hit and survived at x,y: a = hp left, m = 1 if a shield was smashed */
   EV_DISTRICT, /* Landlord HQ: the district was cleared and the next one is up (m = its number, 1 or 2); +MX_HQ_BONUS_MEN men and +3000 were added */
-  EV_SURVIVOR  /* rare, injured escape from a collapsed room; m = remaining HP */
+  EV_SURVIVOR, /* rare, injured escape from a collapsed room; m = remaining HP */
+  EV_TNT_FUSE, /* loose TNT armed after a hard impact or nearby blast: x,y precise moving cell */
+  EV_TNT_SAFE  /* loose TNT survived a moderate impact without igniting */
 };
 /* power-ups: one use of each per level */
 enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT, PW_TURBO, PW_QUAKE, PW_COUNT }; /* appended: preserve legacy save IDs */
@@ -133,7 +135,7 @@ typedef struct { uint8_t type, m; real x, y, a, b; } MxEvent;
 
 /* edge = this voxel touches empty space inside its chunk. Interior voxels can't be the first
    point of contact with anything, so the solver skips them (big win on large chunks). */
-typedef struct { real lx, ly, wx, wy, h; uint8_t m, dead, edge; } MxCell;
+typedef struct { real lx, ly, wx, wy, h; uint8_t m, dead, edge, fuse; } MxCell; /* fuse uses existing 24-byte padding */
 
 /* Interior rooms (backdrop only): front-ends may draw wallpaper behind the voxels. */
 typedef struct { uint8_t x, y, w, h, pal; } MxRoom;
@@ -147,6 +149,8 @@ typedef struct {
   int cn;
   uint8_t rest;        /* collapsible buildings: asleep as a solid body (not integrated, still collides) until something wakes it */
   real restT;          /* seconds asleep; re-checked every 2.4 s + a stagger */
+  real tnt_impact;     /* peak measured collision speed this frame, only for chunks with TNT */
+  uint8_t has_tnt, tnt_fused, tnt_warned; /* bounded state; no extra arrays or heap */
   MxCell cells[MX_CHUNK_CELLS];
 } MxChunk;
 
