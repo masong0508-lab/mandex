@@ -8,13 +8,13 @@ Thrower and boss briefcases are no longer purely unavoidable when the player is 
 
 - Destroys that one active briefcase before its next collision update
 - Awards a modest **+150 points**, once per case
-- Produces the existing impact sparks and sounds with a **PARRY! +150** indicator on the browser, DS and 3DS. Dreamcast reuses the existing impact particles and audible BONK cue and shows score via the standard HUD
+- Produces the existing impact sparks and sounds with a **PARRY! +150** indicator on the browser, DS and 3DS. The normal **POW!** or **BELLY SLAM!** label is suppressed only when a case is actually caught, so the two labels never overlap; normal attacks retain their original feedback. Dreamcast reuses the existing impact particles and audible BONK cue and shows score via the standard HUD
 
 Behind-the-back punches, out-of-height and out-of-range cases do not get intercepted. A briefcase still hits an undefended player normally. The punch's existing 0.3-second cooldown and 0.2-second animation remain unchanged, as do the boss's windups and ordinary level objectives.
 
 ## Engineering
 
-The shared C core checks the **four existing MxCase slots** while processing an actual walk hit and, only for the already-active punch pose, within the existing thrown-projectile update. It does not add a new world scan or extend punch cooldown. It deactivates a caught case, issues an existing **EV_BONK** with `m=2` (0/1 retain bat/shield swat semantics), awards the fixed 150-point bonus and reports a small positive hit impact. This adds **no new world state, heap allocations, arrays, framebuffers, sprite sheets or projectile capacity**.
+The shared C core checks the **four existing MxCase slots** while processing an actual walk hit and, only for the already-active punch pose, within the existing thrown-projectile update. It does not add a new world scan or extend punch cooldown. It deactivates a caught case, issues an existing **EV_BONK** with `m=2` (0/1 retain bat/shield swat semantics), awards the fixed 150-point bonus and reports a small positive hit impact. `EV_PUNCH/EV_SLAM.b` identifies an immediate parry for popup priority without adding any persistent state. This adds **no new world state, heap allocations, arrays, framebuffers, sprite sheets or projectile capacity**.
 
 The browser uses an equivalent radius margin of 6 pixels (0.75 world cell), removes cases in reverse index order from its existing array, and uses the already available popup/sparks. Both punch and slam share the walk-hit collision path; its inactive flag prevents duplicate scores when a slam checks two overlapping hitboxes.
 
