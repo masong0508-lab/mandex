@@ -1649,8 +1649,9 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
   /* Close walking encounters make the timed briefcase counter playable
      outside the sling. Range gates keep distant floor-to-floor sniping out
      of the level while preserving the original aim-mode throw behavior. */
-  const int can_throw=(m->mode==MAN_AIM && !(m->stun>0)) ||
-      (m->mode==MAN_WALK && rabs(ddx)<RI(32) && rabs(ddy)<RI(12));
+  const int can_throw=IS_THROW(t->kind) &&
+      ((m->mode==MAN_AIM && !(m->stun>0)) ||
+       (m->mode==MAN_WALK && rabs(ddx)<RI(32) && rabs(ddy)<RI(12)));
   if(fight){
     if(IS_THROW(t->kind)){ if(can_throw) t->cd -= dt; } else t->cd -= dt;
     if(t->wind > 0){
