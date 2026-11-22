@@ -73,7 +73,11 @@ for(const d of fixture.chunks){
 `;
 const finish=String.raw`
 for(let i=0;i<steps;i++)stepChunks(dt);
-return {chunks:chunks.map(c=>({...c,cells:c.cells.map(({ch,...a})=>a)})),events,shake};
+// The old solver predates TNT fuse/impact metadata. Compare physics state,
+ // collision contacts, HP, effects and body transforms; the separate
+ // browser_mobile_tnt_test.js checks those new per-charge fields directly.
+ return {chunks:chunks.map(({tntHit,tntImpact,...c})=>({...c,
+   cells:c.cells.map(({ch,...a})=>a)})),events,shake};
 `;
 const make=source=>new Function('fixture','dt','steps',material+harness+source+finish);
 const run=make(production),old=make(reference);
