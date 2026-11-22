@@ -1048,10 +1048,10 @@ function parryCase(c){
   score+=150;spark(c.x,c.y,7,220);
   popText(c.x,c.y-20,'PARRY! +150','#ffd23f',20);
 }
-function walkPunch(){const m=man,cx=m.x+m.face*17,cy=m.y-3,run=Math.abs(m.vx)>100,d=walkHit(cx,cy,13,16,run?24:16);m.pT=.2;m.pCd=.3;
-  if(d>0){SFX.crunch(Math.min(1,d/90));shake=Math.max(shake,3);spark(cx,cy,5,200);wobKick(Math.floor(cx/V),Math.floor(cy/V),4,m.face*.9,0);popText(cx,cy-24,run?'SHOULDER!':'POW!','#ffd23f',20)}else SFX.whoosh()}
-function walkSlam(){const m=man,cx=m.x,cy=m.y+WHH+4;let d=0;for(const[hw,dm]of[[14,34],[26,18]])d+=walkHit(cx,cy+4,hw,10,dm);
-  m.stomp=false;shake=Math.max(shake,9);ring(cx,cy,70,'#fff');ring(cx,cy,45,'#ffd23f');dust(cx,cy,10,14);SFX.boom&&SFX.crunch(1);wobKick(Math.floor(cx/V),Math.floor(cy/V),6,0,.9);popText(cx,cy-34,'BELLY SLAM!','#ff8a3a',24);return d}
+function walkPunch(){const m=man,cx=m.x+m.face*17,cy=m.y-3,run=Math.abs(m.vx)>100,beforeCases=cases.length,d=walkHit(cx,cy,13,16,run?24:16);m.pT=.2;m.pCd=.3;
+  if(d>0){SFX.crunch(Math.min(1,d/90));shake=Math.max(shake,3);spark(cx,cy,5,200);wobKick(Math.floor(cx/V),Math.floor(cy/V),4,m.face*.9,0);if(cases.length===beforeCases)popText(cx,cy-24,run?'SHOULDER!':'POW!','#ffd23f',20)}else SFX.whoosh()}
+function walkSlam(){const m=man,cx=m.x,cy=m.y+WHH+4,beforeCases=cases.length;let d=0;for(const[hw,dm]of[[14,34],[26,18]])d+=walkHit(cx,cy+4,hw,10,dm);
+  m.stomp=false;shake=Math.max(shake,9);ring(cx,cy,70,'#fff');ring(cx,cy,45,'#ffd23f');dust(cx,cy,10,14);SFX.boom&&SFX.crunch(1);wobKick(Math.floor(cx/V),Math.floor(cy/V),6,0,.9);if(cases.length===beforeCases)popText(cx,cy-34,'BELLY SLAM!','#ff8a3a',24);return d}
 function walkStep(dt){const m=man;
   m.wt-=dt;if(m.wt<=0){popText(m.x,m.y-40,'TIME!','#ff6b6b',26);walkQuit();return}
   if(wBlocked(m.x,m.y)){let f=false;for(let u=2;u<=80&&!f;u+=2)for(const sg of[0,-1,1])if(!wBlocked(m.x+sg*u,m.y-u)){m.x+=sg*u;m.y-=u;f=true;break}}   // rubble fell on him: pop him out
