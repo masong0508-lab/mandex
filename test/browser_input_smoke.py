@@ -66,6 +66,7 @@ HARNESS = r"""
       yaw: face < 0 ? 2 * Math.PI - angle : angle,
       grounded: !!man.gr, wt: man.wt, punch: man.pT || 0,
       invalid, camera: { ...CAM }, world: [COLS, ROWS, WW, WH],
+      actor_screen: toScreen(man.x, man.y),
       canvas: [W, H], portrait: isPortrait(),
       css: [r.x, r.y, r.width, r.height],
       men, shots: lv.shots, alive: aliveTargets(), targets: targets.length,
@@ -145,6 +146,23 @@ def require(condition, message, details=None):
         raise AssertionError(message + (': ' + json.dumps(details) if details is not None else ''))
 
 
+def require_walk_camera(row):
+    if not row['portrait'] or row['mode'] != 'walk':
+        return
+    x, y = row['actor_screen']
+    w, h = row['canvas']
+    camera = row['camera']
+    z = camera['z']
+    require(camera['on'] and .55 <= z <= 1.8, 'Invalid portrait walking zoom', row)
+    require(0 <= camera['x'] <= max(0, row['world'][2] - w / z) + 1e-8,
+            'Walking camera escaped the world bounds', row)
+    require(0 <= x <= w, 'Walking camera lost the actor horizontally', row)
+    # Conservative artwork envelope includes the hair, airborne tilt and
+    # feet. Keep the whole actor between the mission HUD and timer strip.
+    require(y - 40 * z >= 138 - 1e-8 and y + 22 * z <= h - 174 + 1e-8,
+            'Walking actor overlaps the mission HUD or touch controls', row)
+
+
 class Smoke:
     def __init__(self, page, out_dir, report):
         self.page, self.out_dir, self.report = page, out_dir, report
@@ -154,6 +172,7 @@ class Smoke:
         result = self.page.evaluate('__inputSmokeGame.snapshot()')
         self.report['last_state'] = result
         require(not result['invalid'], 'Non-finite character or camera state', result)
+        require_walk_camera(result)
         return result
 
     def step(self, count=1):
@@ -165,6 +184,7 @@ class Smoke:
         for row in frames:
             self.report['last_state'] = row
             require(not row['invalid'], 'Non-finite character or camera state', row)
+            require_walk_camera(row)
             require(abs(row['time'] - before['time'] - 1 / 60) < 1e-9,
                     'Expected exactly one update per input observation', [before, row])
             before = row
@@ -341,6 +361,10 @@ class Smoke:
                     and after['blocks'] == before['blocks'], 'Rotation changed the physics world')
             require(after['portrait'] == (label == 'portrait') and
                     after['camera']['on'] == (label == 'portrait'), 'Wrong orientation/camera mode', after)
+            if label == 'portrait':
+                require_walk_camera(after)
+                require(after['camera']['z'] == 1.8 and after['camera']['hold'] == 0,
+                        'Walking rotation inherited the distant aiming view or hold', after)
             require(after['touches'] == 0 and not after['keys']['virtualLeft'],
                     'Orientation handler left a virtual movement key held', after)
             p.mouse.up()
@@ -353,8 +377,29 @@ class Smoke:
             self.continuous(12)
             require(resumed['x'] > after['x'], 'Keyboard movement did not resume after rotation')
             self.screenshot('06-chapter2-' + label)
-            report['orientations'].append({'orientation': label, 'before': before,
-                'layout_only': after, 'resumed': resumed})
+            observation = {'orientation': label, 'before': before,
+                           'layout_only': after, 'resumed': resumed}
+            if label == 'portrait':
+                report['stage'] = 'portrait_camera_jump_and_land'
+                p.keyboard.down('Space')
+                jumped = self.continuous()[0][-1]
+                p.keyboard.up('Space')
+                require(jumped['vy'] < 0 and not jumped['grounded'],
+                        'Portrait camera check did not begin a real jump', jumped)
+                airborne = self.continuous(17)[0][-1]
+                self.screenshot('07-chapter2-portrait-jump')
+                for frames_to_land in range(1, 121):
+                    landing = self.continuous()[0][-1]
+                    if landing['grounded']:
+                        break
+                require(landing['grounded'], 'Portrait camera jump did not land', landing)
+                require(landing['camera']['z'] == 1.8,
+                        'Portrait camera lost readable walking scale during the jump', landing)
+                observation['camera_jump'] = {'airborne': airborne, 'landing': landing,
+                    'frames_to_land_after_capture': frames_to_land,
+                    'physical_body_canvas_px': 38 * landing['camera']['z'],
+                    'physical_body_css_px': 38 * landing['camera']['z'] * h / after['canvas'][1]}
+            report['orientations'].append(observation)
 
         report['events'] = p.evaluate('__inputSmoke.events')
         report['raf_requests'] = p.evaluate('__inputSmoke.rafRequests')

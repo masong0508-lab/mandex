@@ -22,6 +22,24 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 21 continuation: rubble contact lifetime and portrait walking
+
+- A fragment that shatters during a collision stops contacting immediately
+  in the shared console core and browser. Its final valid impulse and
+  position correction still apply, and normal cleanup retains its existing
+  timing. Shattered fragments also stay out of the next contact hash.
+- Portrait walking moves to a closer view, follows the character through
+  jumps and falls, and keeps the head and feet clear of the mission strip,
+  timer and touch controls. Aiming retains its target overview and a fixed
+  drag scale; ordinary landscape framing stays unchanged.
+- Focused regressions reproduce the former collision failures, compare live
+  debris against the original solver, and exercise the production camera.
+  The real Chromium input gate captures the resulting portrait view.
+  These changes add no production buffers, pools or persistent state.
+
+See [the contact and camera verification notes](docs/RUBBLE_CAMERA_2026-11-21.md)
+for the fixtures, reproduction commands and remaining hardware checks.
+
 ## November 21: continuous turns, debris draw work and boot verification
 
 - Rapid left/right changes now reverse the current walking turn smoothly in

@@ -907,6 +907,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
     ch->cx = ch->cy = 0; ch->cn = 0;
     for(int i = 0; i < ch->count; i++){
       MxCell *a = &ch->cells[i];
+      if(a->dead) continue;
       if(!ch->rest){
         a->wx = ch->x + rmul(ch->cs, a->lx) - rmul(ch->sn, a->ly);
         a->wy = ch->y + rmul(ch->sn, a->lx) + rmul(ch->cs, a->ly);
@@ -932,7 +933,9 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
       if(a->dead || !a->edge) continue;
       w->stat_cells++;
       int gx = rfloor(a->wx), gy = rfloor(a->wy);
-      for(int j = gy - 1; j <= gy + 1; j++) for(int k = gx - 1; k <= gx + 1; k++){
+      /* Cleanup follows all substeps. Keep the fatal contact's response,
+       * but stop this cell's scan as soon as that response shatters it. */
+      for(int j = gy - 1; j <= gy + 1 && !a->dead; j++) for(int k = gx - 1; k <= gx + 1 && !a->dead; k++){
         if(!solid_cell(w, k, j)) continue;
         real qx = rclamp(a->wx, RI(k), RI(k + 1)), qy = rclamp(a->wy, RI(j), RI(j + 1));
         real dx = a->wx - qx, dy = a->wy - qy, d2 = rmul(dx, dx) + rmul(dy, dy);
@@ -953,11 +956,12 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         if(pen > RI(4)) pen = RI(4);
         resolve_static(w, ch, a, nx, ny, pen, k, j);
       }
+      if(a->dead) continue;
       /* chunk vs chunk: circle-circle through the spatial buckets */
       int bx0 = gx + 1, by0 = gy + 1;
-      for(int by = by0; by <= by0 + 2; by++) for(int bx = bx0; bx <= bx0 + 2; bx++){
+      for(int by = by0; by <= by0 + 2 && !a->dead; by++) for(int bx = bx0; bx <= bx0 + 2 && !a->dead; bx++){
         if(bx < 0 || bx > MX_COLS + 3 || by < 0 || by > MX_ROWS + 3) continue;
-        for(int id = w->bhead[by * (MX_COLS + 4) + bx]; id >= 0; id = w->bnext[id]){
+        for(int id = w->bhead[by * (MX_COLS + 4) + bx]; id >= 0 && !a->dead; id = w->bnext[id]){
           int oc = id / MX_CHUNK_CELLS;
           if(oc == c) continue;
           MxChunk *och = &w->chunks[oc];

@@ -817,11 +817,12 @@ function stepChunks(dt){
   if(!chunks.length)return;
   const map=new Map();
   for(const ch of chunks){if(!ch.rest){ch.vy+=G*dt;ch.vx*=.9995;ch.w*=.998;ch.x+=ch.vx*dt;ch.y+=ch.vy*dt;ch.ang+=ch.w*dt;ch.cs=Math.cos(ch.ang);ch.sn=Math.sin(ch.ang)}ch.cx=ch.cy=0;ch.cn=0;
-    for(const a of ch.cells){if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){b=[];map.set(k,b)}b.push(a)}}
+    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){b=[];map.set(k,b)}b.push(a)}}
   for(const ch of chunks){
     for(const a of ch.cells){
+      if(a.dead)continue;
       const gx=Math.floor(a.wx/V),gy=Math.floor(a.wy/V);
-      for(let j=gy-1;j<=(ch.rest?gy-2:gy+1);j++)for(let i=gx-1;i<=gx+1;i++){
+      for(let j=gy-1;j<=(ch.rest?gy-2:gy+1)&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){
         if(!(j>=ROWS||(inb(i,j)&&grid[idx(i,j)])))continue;
         const bx=i*V,by=j*V,qx=clamp(a.wx,bx,bx+V),qy=clamp(a.wy,by,by+V),dx=a.wx-qx,dy=a.wy-qy,d2=dx*dx+dy*dy;
         if(d2>=RC*RC)continue;let nx,ny,pen;
@@ -829,9 +830,11 @@ function stepChunks(dt){
         else{const l=a.wx-bx,r=bx+V-a.wx,t=a.wy-by,b=by+V-a.wy,mn=Math.min(l,r,t,b);
           if(mn===t){nx=0;ny=-1;pen=t+RC}else if(mn===l){nx=-1;ny=0;pen=l+RC}else if(mn===r){nx=1;ny=0;pen=r+RC}else{nx=0;ny=1;pen=b+RC}}
         resolveStatic(ch,a,nx,ny,Math.min(pen,4),i,j)}
-      // chunk vs chunk (circle-circle)
-      for(let j=gy-1;j<=gy+1;j++)for(let i=gx-1;i<=gx+1;i++){const b=map.get((i+4)*1024+(j+4));if(!b)continue;
-        for(const o of b){const oc=o.ch;if(oc.id<=ch.id)continue;const dx=a.wx-o.wx,dy=a.wy-o.wy,d2=dx*dx+dy*dy;if(d2>=V*V||d2<1e-6)continue;
+      // A fatal contact keeps its impulse, then the shattered cell stops
+      // colliding immediately. Cleanup/mass updates still happen once later.
+      if(a.dead)continue;
+      for(let j=gy-1;j<=gy+1&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){const b=map.get((i+4)*1024+(j+4));if(!b)continue;
+        for(const o of b){if(a.dead)break;if(o.dead)continue;const oc=o.ch;if(oc.id<=ch.id)continue;const dx=a.wx-o.wx,dy=a.wy-o.wy,d2=dx*dx+dy*dy;if(d2>=V*V||d2<1e-6)continue;
           const d=Math.sqrt(d2),nx=dx/d,ny=dy/d,pen=V-d,rax=a.wx-ch.x,ray=a.wy-ch.y,rbx=o.wx-oc.x,rby=o.wy-oc.y;
           const vax=ch.vx-ch.w*ray,vay=ch.vy+ch.w*rax,vbx=oc.vx-oc.w*rby,vby=oc.vy+oc.w*rbx,vn=(vax-vbx)*nx+(vay-vby)*ny;
           if(vn<0){const rna=rax*ny-ray*nx,rnb=rbx*ny-rby*nx,den=1/ch.m+1/oc.m+rna*rna/ch.I+rnb*rnb/oc.I,jj=-(1.1)*vn/den;
@@ -3350,20 +3353,40 @@ function layoutTick(){
 }
 function camTick(dt){
   if(!CAM.on){CAM.z=1;CAM.x=0;CAM.y=0;return}
-  // fit the sling and every standing landlord across the screen (a tall phone shows the whole fight at once instead of an empty sky), ground at 80% of the height
+  // Aim frames the sling and its targets. Portrait walking instead shows
+  // the nearby route at a readable scale, with feet above the touch HUD.
+  const m=man,portrait=isPortrait(),walking=portrait&&m.mode==='walk';
   let mx=0;for(const t of targets)if(t.alive&&(!CL.slings||t.zone===slingK))mx=Math.max(mx,t.x);
-  const fitW=Math.max(mx+70,SX+340)-(SX-90),z=CL.slings?Math.min(1.8,H/600):clamp(W/fitW,.55,1.5),vw=W/z,vh=H/z,baseY=WH-vh*.86;CAM.z=z;
+  const fitW=Math.max(mx+70,SX+340)-(SX-90),aimZ=CL.slings?Math.min(1.8,H/600):clamp(W/fitW,.55,1.5),targetZ=walking?1.8:aimZ;
+  let z=targetZ;
+  if(portrait&&!CAM.reset&&!CAM.snap){
+    // A captured pull uses one fixed screen-to-world scale until release.
+    z=dragging&&m.mode==='aim'?CAM.z:CAM.z+(targetZ-CAM.z)*Math.min(1,dt*5);
+    if(!(dragging&&m.mode==='aim')&&Math.abs(z-targetZ)<.0001)z=targetZ;
+    if(z!==CAM.z){
+      const follow=m.mode==='fly'||m.mode==='stuck'||m.mode==='walk'||m.mode==='aim';
+      const ax=follow?m.x:CAM.x+W/(2*CAM.z),ay=follow?m.y:CAM.y+H/(2*CAM.z),ratio=CAM.z/z;
+      CAM.x=ax-(ax-CAM.x)*ratio;CAM.y=ay-(ay-CAM.y)*ratio;
+    }
+  }
+  const vw=W/z,vh=H/z,baseY=walking?GY-(H-180)/z:WH-vh*.86;CAM.z=z;
   let sx=0,n=0;for(const t of targets)if(t.alive){sx+=t.x;n++}
   if(CL.slings){n=0;sx=0;for(const t of targets)if(t.alive&&t.zone===slingK){sx+=t.x;n++}}   // the wide finale: look at the landlords of the sling you stand at
   const cameraMaxX=Math.max(0,WW-vw);
-  const bL=CL.slings?clamp((n?sx/n:640)-vw*.5,0,cameraMaxX):clamp(SX-90,0,cameraMaxX),iL=CL.slings?clamp(SX-vw*.2,0,cameraMaxX):bL,m=man;
+  const bL=CL.slings?clamp((n?sx/n:640)-vw*.5,0,cameraMaxX):clamp(SX-90,0,cameraMaxX),iL=CL.slings?clamp(SX-vw*.2,0,cameraMaxX):bL;
   let tl=bL,ty=baseY,fast=4;
-  if(CAM.hold>0){CAM.hold-=dt}
+  if(walking){CAM.hold=0;tl=clamp(m.x-vw*.38,0,cameraMaxX);ty=Math.min(baseY,m.y-(138+(H-318)*.48)/z);fast=5}
+  else if(CAM.hold>0){CAM.hold-=dt}
   else if(m.mode==='aim'){if(dragging){const k=Math.min(1,Math.hypot(m.x-SX,m.y-SY)/PULL);tl=iL+(bL-iL)*k*k*(3-2*k);fast=8}else tl=iL}
   else if(m.mode==='fly'||m.mode==='stuck'||m.mode==='walk'){tl=clamp(m.x-vw*.38,0,cameraMaxX);ty=Math.min(baseY,m.y-vh*.3);fast=5}
-  if(CAM.reset){CAM.reset=false;CAM.snap=false;CAM.x=bL;CAM.y=baseY;CAM.hold=1.1;return}
-  if(CAM.snap){CAM.snap=false;CAM.x=tl;CAM.y=ty;return}
-  CAM.x+=(tl-CAM.x)*Math.min(1,dt*fast);CAM.y+=(ty-CAM.y)*Math.min(1,dt*3);CAM.x=clamp(CAM.x,0,cameraMaxX)}
+  if(CAM.reset){CAM.reset=false;CAM.snap=false;CAM.x=walking?tl:bL;CAM.y=walking?ty:baseY;CAM.hold=walking?0:1.1}
+  else if(CAM.snap){CAM.snap=false;CAM.x=tl;CAM.y=ty}
+  else{CAM.x+=(tl-CAM.x)*Math.min(1,dt*fast);CAM.y+=(ty-CAM.y)*Math.min(1,dt*3)}
+  CAM.x=clamp(CAM.x,0,cameraMaxX);
+  // Fast falls, rising platforms and a zoom transition cannot put the head
+  // behind the mission HUD or the feet behind the timer/control strip.
+  if(walking)CAM.y=clamp(CAM.y,m.y-(H-174-22*z)/z,m.y-(138+40*z)/z);
+}
 const toWorld=(sx,sy)=>CAM.on?[sx/CAM.z+CAM.x,sy/CAM.z+CAM.y]:[sx,sy];
 const toScreen=(x,y)=>CAM.on?[(x-CAM.x)*CAM.z,(y-CAM.y)*CAM.z]:[x,y];
 let AIM0={sx:0,sy:0,wx:0,wy:0};

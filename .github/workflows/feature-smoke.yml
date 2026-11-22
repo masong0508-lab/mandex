@@ -15,6 +15,9 @@ on:
       - "test/collapse_survivor_web_test.js"
       - "test/rubble_broadphase_test.c"
       - "test/rubble_broadphase_web_test.js"
+      - "test/chunk_contact_lifetime_test.c"
+      - "test/browser_dead_rubble_test.js"
+      - "test/browser_walk_camera_test.js"
       - "test/browser_rubble_draw_test.js"
       - "test/browser_flight_collision_fastpath_test.js"
       - "test/landlord_ai_web_test.js"
@@ -70,6 +73,17 @@ jobs:
           node test/rubble_broadphase_web_test.js
           node test/browser_rubble_draw_test.js
           node test/browser_flight_collision_fastpath_test.js
+      - name: Stop shattered fragments from contacting again within the solver step
+        run: |
+          for mode in float fixed; do
+            flags=""
+            if test "$mode" = fixed; then flags="-DMX_FIXED"; fi
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/chunk_contact_lifetime_test.c -lm -o /tmp/chunk_contact_lifetime_$mode
+            /tmp/chunk_contact_lifetime_$mode
+          done
+          node test/browser_dead_rubble_test.js
+      - name: Keep portrait walking focus bounded through movement and rotation
+        run: node test/browser_walk_camera_test.js
       - name: Verify new rubber BANK SHOT bonus in both core numeric modes
         run: |
           for mode in float fixed; do

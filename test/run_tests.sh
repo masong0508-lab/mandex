@@ -57,6 +57,8 @@ echo "--- Browser refresh-rate-independent fixed-step simulation ---"
 if command -v node >/dev/null 2>&1;then node browser_fixed_step_test.js;fi
 echo "--- Browser walk physics parity, reusable touch controls and character-detail GC ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_memory_test.js;fi
+echo "--- Browser walking camera: portrait focus, zoom bounds and world edges ---"
+if command -v node >/dev/null 2>&1;then node browser_walk_camera_test.js;fi
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
 if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
 echo "--- Browser custom levels: safe 360-column finale transition ---"
@@ -110,6 +112,14 @@ for mode in float fixed; do
   ./rubble_broadphase_$mode
 done
 if command -v node >/dev/null 2>&1;then node rubble_broadphase_web_test.js;fi
+echo "--- shattered rubble stops contacting during the same solver step (float/fixed/browser) ---"
+for mode in float fixed; do
+  defs=""
+  test "$mode" = fixed && defs="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function $defs -I../core chunk_contact_lifetime_test.c -lm -o chunk_contact_lifetime_$mode
+  ./chunk_contact_lifetime_$mode
+done
+if command -v node >/dev/null 2>&1;then node browser_dead_rubble_test.js;fi
 echo "--- BANK SHOT trick bonus: true rubber rebound, direct eviction only, 2s expiry (fixed/float) ---"
 for mode in float fixed; do
   defs=""
