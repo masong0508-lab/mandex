@@ -19,6 +19,10 @@ MIN_LIT_PIXELS = SCREEN_PIXELS // 20
 MIN_CHANGED_PIXELS = 64
 
 
+class UnreadyCapture(ValueError):
+    """Valid image data, but a DS screen is still blank or diagnostic-only."""
+
+
 def read_capture(path):
     data = Path(path).read_bytes()
     pos = 0
@@ -59,27 +63,32 @@ def read_capture(path):
     return pixels
 
 
+def inspect_capture(path):
+    pixels = read_capture(path)
+    screens = []
+    for screen in range(2):
+        start = screen * SCREEN_PIXELS * 3
+        rgb = pixels[start:start + SCREEN_PIXELS * 3]
+        colors = set()
+        lit = 0
+        for i in range(0, len(rgb), 3):
+            color = rgb[i:i + 3]
+            colors.add(color)
+            lit += max(color) > 8
+        if len(colors) < MIN_COLORS or lit < MIN_LIT_PIXELS:
+            raise UnreadyCapture(f"{path}: DS screen {screen + 1} is blank or diagnostic-only "
+                                 f"({len(colors)} colors, {lit} lit pixels)")
+        screens.append({"colors": len(colors), "lit_pixels": lit})
+    return pixels, screens
+
+
 def validate(paths):
     if len(paths) < 2:
         raise ValueError("at least two captures are required to check animation")
     previous = None
     results = []
     for path in paths:
-        pixels = read_capture(path)
-        screens = []
-        for screen in range(2):
-            start = screen * SCREEN_PIXELS * 3
-            rgb = pixels[start:start + SCREEN_PIXELS * 3]
-            colors = set()
-            lit = 0
-            for i in range(0, len(rgb), 3):
-                color = rgb[i:i + 3]
-                colors.add(color)
-                lit += max(color) > 8
-            if len(colors) < MIN_COLORS or lit < MIN_LIT_PIXELS:
-                raise ValueError(f"{path}: DS screen {screen + 1} is blank or diagnostic-only "
-                                 f"({len(colors)} colors, {lit} lit pixels)")
-            screens.append({"colors": len(colors), "lit_pixels": lit})
+        pixels, screens = inspect_capture(path)
         changed = None
         if previous is not None:
             changed = sum(pixels[i:i + 3] != previous[i:i + 3]

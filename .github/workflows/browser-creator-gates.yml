@@ -39,6 +39,10 @@ jobs:
         run: node test/browser_walk_memory_test.js
       - name: Portrait walking focus and bounded camera transitions
         run: node test/browser_walk_camera_test.js
+      - name: Counterpunch interrupts and multi-hit recovery
+        run: node test/browser_combat_recovery_test.js
+      - name: Stomp-pad boost and held-button ascent
+        run: node test/browser_pad_stomp_test.js
       - name: Shot readiness and inventory labels
         run: node test/browser_tool_feedback_test.js
       - name: Character pose turnaround and punch timing
