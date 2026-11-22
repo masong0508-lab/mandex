@@ -118,7 +118,7 @@ enum {
   EV_SLAM,     /* walking belly slam at x,y: a = damage dealt */
   EV_PAD,      /* bounce pad boing at x,y: m = 1 if it was a stomp-boosted one */
   EV_HURT,     /* a landlord hurt him at x,y: m = 1 on foot, 0 in the sling */
-  EV_BONK,     /* a bat landlord swatted a weak shot at x,y */
+  EV_BONK,     /* bat swat at x,y: m=0 bat, m=1 shield; m=2 player parried a thrown case (+150 points) */
   EV_THROW,    /* a landlord threw a briefcase from x,y */
   EV_SWING,    /* a landlord swung at x,y (walker punch / bat practice swing) */
   EV_HEAL,     /* a healer patched a landlord up at x,y */
