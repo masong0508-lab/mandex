@@ -149,7 +149,8 @@ typedef struct {
   int cn;
   uint8_t rest;        /* collapsible buildings: asleep as a solid body (not integrated, still collides) until something wakes it */
   real restT;          /* seconds asleep; re-checked every 2.4 s + a stagger */
-  real tnt_impact;     /* peak measured collision speed this frame, only for chunks with TNT */
+  real tnt_impact;     /* peak exact TNT-voxel collision speed this frame */
+  int16_t tnt_hit;     /* index of the actual struck TNT voxel; -1 when none */
   uint8_t has_tnt, tnt_fused, tnt_warned; /* bounded state; no extra arrays or heap */
   MxCell cells[MX_CHUNK_CELLS];
 } MxChunk;

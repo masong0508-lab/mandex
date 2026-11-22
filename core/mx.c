@@ -764,17 +764,15 @@ static void update_moving_tnt(MxWorld *w){
   for(int c=0;c<MX_MAX_CHUNKS;c++){
     MxChunk *ch=&w->chunks[c];
     if(!ch->active||!ch->has_tnt)continue;
-    if(!ch->tnt_fused && ch->tnt_impact>=RI(28)){
+    if(!ch->tnt_fused && ch->tnt_hit>=0 && ch->tnt_hit<ch->count && ch->tnt_impact>=RI(28)){
       /* Frame/stage/slot hash, not renderer random: stable replays and
          identical DS hardware-vs-software fixed-point decisions. */
       int tick=rfloor(rmul(w->time,RI(8)));
       int light=ch->tnt_impact>=RI(55) || ((w->level*13+c*7+tick)&3)==0;
-      for(int k=0;k<ch->count;k++){
-        MxCell *a=&ch->cells[k];
-        if(a->dead||a->m!=MX_TNT)continue;
+      MxCell *a=&ch->cells[ch->tnt_hit];
+      if(!a->dead&&a->m==MX_TNT){
         if(light)arm_moving_tnt(w,ch,a,TNT_FUSE_TICKS);
         else if(!ch->tnt_warned){ev(w,EV_TNT_SAFE,a->wx,a->wy,0,0,0);ch->tnt_warned=1;}
-        break; /* only one cap per impact; nearby caps chain via blast */
       }
     }
     int still_fused=0;
@@ -786,7 +784,7 @@ static void update_moving_tnt(MxWorld *w){
       else still_fused=1;
     }
     ch->tnt_fused=(uint8_t)still_fused;
-    ch->tnt_impact=0;
+    ch->tnt_impact=0;ch->tnt_hit=-1;
   }
 }
 static void process_expl(MxWorld *w){
@@ -929,6 +927,7 @@ static MX_HOT void support_pass(MxWorld *w){
     ch->w = ti > R(1) ? rclamp(rdiv(tq, ti), -RI(6), RI(6)) : 0;   /* the sway becomes a topple */
     ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rad + R(1); ch->cs = RI(1); ch->sn = 0;
     ch->px = cx; ch->py = cy; ch->pa = 0;
+    ch->tnt_hit=-1;
     recompute(ch);
   }
 }
@@ -962,12 +961,12 @@ static MX_HOT void resolve_static(MxWorld *w, MxChunk *ch, MxCell *a, real nx, r
   if(vn < 0){
     real rn = rmul(rx, ny) - rmul(ry, nx);
     real den = rdiv(RI(1), ch->m) + rdiv(rmul(rn, rn), ch->I);
-    if(ch->has_tnt){
+    if(a->m==MX_TNT){
       real force=-vn;
       if(INB(ci,cj) &&
          (w->grid[IDX(ci,cj)]==MX_RUBBER||w->grid[IDX(ci,cj)]==MX_SAND))
         force=rmul(force,R(0.3));
-      if(force>ch->tnt_impact)ch->tnt_impact=force;
+      if(force>ch->tnt_impact){ch->tnt_impact=force;ch->tnt_hit=(int16_t)(a-ch->cells);}
     }
     const MatProp *mp = &MATS[a->m];
     real e = (-vn > (a->m == MX_RUBBER ? R(3) : R(16.25))) ? mp->rest : 0;
@@ -1089,13 +1088,13 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
               och->vx -= rdiv(rmul(jj, nx), och->m); och->vy -= rdiv(rmul(jj, ny), och->m); och->w -= rdiv(rmul(rnb, jj), och->I);
             }
             if(-vn>R(20)){
-              if(ch->has_tnt){
+              if(a->m==MX_TNT){
                 real force=(o->m==MX_RUBBER||o->m==MX_SAND)?rmul(-vn,R(0.3)):-vn;
-                if(force>ch->tnt_impact)ch->tnt_impact=force;
+                if(force>ch->tnt_impact){ch->tnt_impact=force;ch->tnt_hit=(int16_t)i;}
               }
-              if(och->has_tnt){
+              if(o->m==MX_TNT){
                 real force=(a->m==MX_RUBBER||a->m==MX_SAND)?rmul(-vn,R(0.3)):-vn;
-                if(force>och->tnt_impact)och->tnt_impact=force;
+                if(force>och->tnt_impact){och->tnt_impact=force;och->tnt_hit=(int16_t)(id%MX_CHUNK_CELLS);}
               }
             }
             if(-vn > R(25)){
@@ -2733,7 +2732,7 @@ static void man_pose(MxMan *m, real dt){
 void mx_update(MxWorld *w, real dt){
   MX_PH_MARK(0);
   w->nev = 0; w->crack_ev = 0; w->time += dt;
-  for(int c=0;c<MX_MAX_CHUNKS;c++)if(w->chunks[c].active&&w->chunks[c].has_tnt)w->chunks[c].tnt_impact=0;
+  for(int c=0;c<MX_MAX_CHUNKS;c++)if(w->chunks[c].active&&w->chunks[c].has_tnt){w->chunks[c].tnt_impact=0;w->chunks[c].tnt_hit=-1;}
   if(w->support_cd > 0) w->support_cd--;
   if(w->freeze > 0){ w->freeze--; return; }
   combo_tick(w, dt);            /* wall-clock dt, so bullet-time cannot artificially prolong a chain */

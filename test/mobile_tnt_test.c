@@ -17,7 +17,7 @@ static MxChunk *charge(real x,real y){
   ch->x=x;ch->y=y;ch->rad=RI(1);ch->cs=RI(1);
   MxCell *a=&ch->cells[0];a->wx=x;a->wy=y;a->h=RI(8);
   a->lx=a->ly=0;a->m=MX_TNT;a->edge=1;a->fuse=0;
-  recompute(ch);
+  recompute(ch);ch->tnt_hit=0; /* tests injecting an impact target this TNT voxel */
   return ch;
 }
 static int events(int type){
@@ -91,6 +91,29 @@ int main(void){
   destroy_moving_tnt(&W,&ch->cells[0]);
   destroy_moving_tnt(&W,&ch->cells[0]);
   CHECK(W.nexpl==1&&events(EV_CELL)==1,"direct hits queue one blast and one destruction effect");
+  /* Off-axis impact on a long wall must not arm TNT far from the actual
+     contact. A second fixture proves two TNT cells remain independent. */
+  scene();ch=charge(R(20),R(20));ch->count=2;
+  MxCell *remote=&ch->cells[1];memset(remote,0,sizeof *remote);
+  remote->m=MX_STEEL;remote->h=RI(150);remote->lx=R(20.8);
+  remote->ly=R(0.8);remote->edge=1;
+  ch->rad=RI(25);recompute(ch);ch->tnt_hit=-1;wall(41,20,MX_STEEL);
+  ch->vx=RI(37);step_chunks(&W,0);
+  CHECK(ch->tnt_impact==0 && ch->tnt_hit==-1,
+        "remote steel impact must not count as TNT contact");
+  update_moving_tnt(&W);
+  CHECK(!ch->cells[0].fuse,"hitting distant rubble cannot ignite TNT");
+  scene();ch=charge(R(20),R(20));ch->count=2;
+  remote=&ch->cells[1];memset(remote,0,sizeof *remote);
+  remote->m=MX_TNT;remote->h=RI(8);remote->lx=R(20.8);
+  remote->ly=R(0.8);remote->edge=1;
+  ch->rad=RI(25);recompute(ch);ch->tnt_hit=-1;wall(41,20,MX_STEEL);
+  ch->vx=RI(37);step_chunks(&W,0);
+  CHECK(ch->tnt_hit==1 && ch->tnt_impact>=RI(28),
+        "actual touched TNT cell recorded rather than first cap in chunk");
+  update_moving_tnt(&W);
+  CHECK(!ch->cells[0].fuse && ch->cells[1].fuse,
+        "only directly struck TNT ignites in a two-charge falling chunk");
   if(errors){fprintf(stderr,"MOBILE_TNT_FAIL failures=%d\n",errors);return 1;}
   puts("MOBILE_TNT_PASS safe_move=1 impact=1 fuse=1 chain=1 precise_hitbox=1 fixed_size=24");
   return 0;
