@@ -70,6 +70,27 @@ const empty=make();empty.walkPunch();
 check(empty.e.score===0&&count(empty.e,'spark')===0,
   'ordinary empty punch must not invent a parry');
 
+const animated=make();
+animated.e.man.pT=.15;
+animated.caseAt(356.5,297); // outside 19 px fist; -60 px/s moves inside
+animated.updCases(1/60);
+check(animated.e.cases.length===0&&animated.e.score===150&&animated.e.hurtCount===0,
+  'case entering an ongoing fist lunge should be parried');
+check(popups(animated.e).includes('PARRY! +150'),
+  'late animation-window parry should still show feedback');
+
+const expired=make();
+expired.e.man.pT=0;expired.caseAt(337,297);
+expired.updCases(1/60);
+check(expired.e.hurtCount===1&&expired.e.score===0,
+  'expired fist cannot automatically shield a player from cases');
+
+const rear=make();
+rear.e.man.pT=.15;rear.caseAt(296,297);
+rear.updCases(1/60);
+check(rear.e.cases.length===1&&rear.e.score===0,
+  'animation-window parry must remain forward-only');
+
 const unguarded=make();
 unguarded.caseAt(320,300);
 unguarded.updCases(1/60);
@@ -79,4 +100,4 @@ check(unguarded.e.hurtCount===1&&unguarded.e.score===0&&unguarded.e.cases.length
 const parseStart=html.indexOf('<script>'),parseEnd=html.indexOf('</script>',parseStart);
 new Function(html.slice(parseStart+8,parseEnd));
 console.log('BROWSER_CASE_PARRY_PASS checks='+checks+
-  ' front=1 miss=1 multi=1 slam=1 score_once=1 vulnerable=1 syntax=1');
+  ' front=1 miss=1 multi=1 slam=1 active_window=1 score_once=1 vulnerable=1 syntax=1');
