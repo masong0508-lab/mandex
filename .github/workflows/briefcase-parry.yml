@@ -1,0 +1,49 @@
+name: Briefcase parry gameplay
+on:
+  pull_request:
+    paths:
+      - "core/mx.c"
+      - "core/mx.h"
+      - "web/index.html"
+      - "ds/source/main.c"
+      - "3ds/main.c"
+      - "dreamcast/main.c"
+      - "test/case_parry_test.c"
+      - "test/browser_case_parry_test.js"
+      - "test/browser_pad_stomp_test.js"
+      - ".github/workflows/briefcase-parry.yml"
+  push:
+    branches: [main]
+    paths:
+      - "core/mx.c"
+      - "core/mx.h"
+      - "web/index.html"
+      - "ds/source/main.c"
+      - "3ds/main.c"
+      - "dreamcast/main.c"
+      - "test/case_parry_test.c"
+      - "test/browser_case_parry_test.js"
+      - ".github/workflows/briefcase-parry.yml"
+  workflow_dispatch:
+jobs:
+  parry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shared combat parry, float and DS-style fixed point
+        run: |
+          for mode in float fixed; do
+            flags=""
+            if [ "$mode" = fixed ]; then flags="-DMX_FIXED"; fi
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/case_parry_test.c -lm -o "/tmp/parry_$mode"
+            "/tmp/parry_$mode"
+            gcc -std=gnu99 -O2 -Wno-unused-function $flags -Icore test/combat_recovery_test.c -lm -o "/tmp/combat_$mode"
+            "/tmp/combat_$mode"
+          done
+      - name: Browser production hitboxes and combat nonregressions
+        run: |
+          node test/browser_case_parry_test.js
+          node test/browser_combat_recovery_test.js
+          node test/browser_pad_stomp_test.js
+          node test/browser_walk_jump_forgiveness_test.js

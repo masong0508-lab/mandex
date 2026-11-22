@@ -22,6 +22,19 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 22 combat counterplay: briefcase parries
+
+- While walking, punch an incoming thrown briefcase to smash it before it
+  hits you, earning **150 points**. A well-timed belly slam also works.
+- **Rent Strike** now introduces a single nearby briefcase thrower with a
+  visible warning and existing attack cooldown. His short-range throws let
+  players discover this defensive move naturally without long-distance sniping.
+- Parrying uses the original close-range attack hitbox; ordinary projectiles
+  remain dangerous and missed punches have no defensive effect.
+- Browser, DS, 3DS and Dreamcast use their existing impact particles,
+  sounds, score displays and combat animation slots.
+- [Parry behavior, memory constraints and test gates](docs/BRIEFCASE_PARRY_2026-11-22.md).
+
 ## November 22 walking controls: short hops and ledge grace
 
 - Tap JUMP for a short hop, or hold it to keep the original full-height jump.

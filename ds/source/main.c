@@ -303,12 +303,12 @@ static void on_events(void){
       spawn_ring(e->x, e->y, 6, C_GOO); popup(e->x, e->y - RI(6), "ON FOOT!", C_GOO); sfx_play(SFX_SPLAT, pan);
       break;
     case EV_PUNCH:
-      if(e->a > 0){ for(int k = 0; k < 5; k++) spawn(PT_SPARK, e->x, e->y, rnd(31) - 15, -rnd(15), k & 1 ? C_GOLD : C_WHITE, 12 + rnd(8)); popup(e->x, e->y - RI(3), e->m ? "SHOULDER!" : "POW!", C_GOLD); sfx_play(SFX_SLAP, pan); sfx_play(SFX_CRUNCH, pan); }
+      if(e->a > 0){ for(int k = 0; k < 5; k++) spawn(PT_SPARK, e->x, e->y, rnd(31) - 15, -rnd(15), k & 1 ? C_GOLD : C_WHITE, 12 + rnd(8)); if(e->b<=0)popup(e->x, e->y - RI(3), e->m ? "SHOULDER!" : "POW!", C_GOLD); sfx_play(SFX_SLAP, pan); sfx_play(SFX_CRUNCH, pan); }
       else sfx_play(SFX_WHOOSH, pan);
       break;
     case EV_SLAM:
       for(int k = 0; k < 8; k++) spawn(PT_DUST, e->x + RI(rnd(9) - 4), e->y, rnd(31) - 15, -rnd(6), 0, 22 + rnd(10));
-      spawn_ring(e->x, e->y, 8, C_WHITE); spawn_ring(e->x, e->y, 5, C_GOLD); popup(e->x, e->y - RI(5), "BELLY SLAM!", C_FIRE); sfx_play(SFX_THUD, pan); sfx_play(SFX_CRUNCH, pan);
+      spawn_ring(e->x, e->y, 8, C_WHITE); spawn_ring(e->x, e->y, 5, C_GOLD); if(e->b<=0)popup(e->x, e->y - RI(5), "BELLY SLAM!", C_FIRE); sfx_play(SFX_THUD, pan); sfx_play(SFX_CRUNCH, pan);
       break;
     case EV_PAD:
       for(int k = 0; k < 5; k++) spawn(PT_STAR, e->x, e->y, rnd(17) - 8, -rnd(12) - 2, 0, 24 + rnd(10));
@@ -321,7 +321,7 @@ static void on_events(void){
       break;
     case EV_BONK:                                           /* a bat landlord swatted a weak shot */
       for(int k = 0; k < 8; k++) spawn(PT_SPARK, e->x, e->y - RI(1), rnd(41) - 20, -rnd(20), k & 1 ? C_GOLD : C_WHITE, 14 + rnd(8));
-      spawn_ring(e->x, e->y, 5, C_GOLD); popup(e->x, e->y - RI(6), "BONK!", C_GOLD); sfx_play(SFX_SLAP, pan); sfx_play(SFX_CRUNCH, pan);
+      spawn_ring(e->x, e->y, 5, C_GOLD); popup(e->x, e->y - RI(6), e->m == 2 ? "PARRY! +150" : "BONK!", C_GOLD); sfx_play(SFX_SLAP, pan); sfx_play(SFX_CRUNCH, pan);
       break;
     case EV_OOF:
       for(int k = 0; k < 6; k++) spawn(PT_SPARK, e->x, e->y - RI(1), rnd(41) - 20, -rnd(20), k & 1 ? C_GOLD : C_WHITE, 14 + rnd(8));

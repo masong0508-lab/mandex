@@ -1646,14 +1646,20 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
     t->mv = 0; if(sgn(mx_ - t->x)) t->face = (int8_t)sgn(mx_ - t->x);
     return;
   }
+  /* Close walking encounters make the timed briefcase counter playable
+     outside the sling. Range gates keep distant floor-to-floor sniping out
+     of the level while preserving the original aim-mode throw behavior. */
+  const int can_throw=IS_THROW(t->kind) &&
+      ((m->mode==MAN_AIM && !(m->stun>0)) ||
+       (m->mode==MAN_WALK && rabs(ddx)<RI(32) && rabs(ddy)<RI(12)));
   if(fight){
-    if(IS_THROW(t->kind)){ if(m->mode == MAN_AIM && !(m->stun > 0)) t->cd -= dt; } else t->cd -= dt;
+    if(IS_THROW(t->kind)){ if(can_throw) t->cd -= dt; } else t->cd -= dt;
     if(t->wind > 0){
       t->wind -= dt;
       if(t->wind <= 0){
         if(IS_THROW(t->kind)){
           real vx, vy; int sl = 0;
-          if(m->mode == MAN_AIM && throw_sol(w, t, m->x, m->y, &vx, &vy)){
+          if(can_throw && throw_sol(w, t, m->x, m->y, &vx, &vy)){
             sl = 1;
             for(int k = 0; k < MX_MAX_CASES; k++) if(!w->cases[k].active){
               MxCase *c = &w->cases[k];
@@ -1671,7 +1677,7 @@ static void lord_ai(MxWorld *w, MxTarget *t, real dt){
           if(m->mode == MAN_WALK && rabs(ddx) < R(5.75) && rabs(ddy) < R(5.75)) hurt_man(w, sgn(m->x - t->x) ? sgn(m->x - t->x) : 1);
         }
       }
-    } else if(IS_THROW(t->kind) && m->mode == MAN_AIM && !(m->stun > 0) && t->cd <= 0){
+    } else if(IS_THROW(t->kind) && can_throw && t->cd <= 0){
       real vx, vy;
       if(throw_sol(w, t, m->x, m->y, &vx, &vy)){ t->wind = R(0.6); if(sgn(m->x - t->x)) t->face = (int8_t)sgn(m->x - t->x); }
       else t->cd = R(0.7);
@@ -1723,6 +1729,13 @@ static int bat_block(MxWorld *w, MxTarget *t){
   return 1;
 }
 
+/* Shared parry result for both the immediate fist hitbox and a projectile
+   entering the already visible punch animation. No extra world state. */
+static void parry_case(MxWorld *w, MxCase *c){
+  c->active=0; w->score+=150;
+  ev(w, EV_BONK, c->x, c->y, 2, 0, 0);
+}
+
 static void upd_cases(MxWorld *w, real dt){
   MxMan *m = &w->man;
   for(int k = 0; k < MX_MAX_CASES; k++){
@@ -1731,6 +1744,14 @@ static void upd_cases(MxWorld *w, real dt){
     c->vy += rmul(GRAV, dt); c->x += rmul(c->vx, dt); c->y += rmul(c->vy, dt); c->rot += rmul(c->vx > 0 ? RI(9) : -RI(9), dt); c->l -= dt;
     int dead = c->l <= 0 || c->y > RI(MX_ROWS) - R(0.5) || c->x < -R(2.5) || c->x > RI(MX_COLS) + R(2.5);
     if(!dead && solid_at(w, c->x, c->y)) dead = 1;
+    /* A case arriving during the 0.2 s visible fist lunge can also be
+       countered, not just on the exact button-down frame. */
+    if(!dead && m->mode==MAN_WALK && m->pT>0){
+      real hx=m->x+(m->face>0?R(2.125):-R(2.125)), hy=m->y-R(.375);
+      if(rabs(c->x-hx)<R(2.375) && rabs(c->y-hy)<R(2.75)){
+        parry_case(w,c);continue;
+      }
+    }
     if(!dead && (m->mode == MAN_AIM || m->mode == MAN_WALK)){
       real dx = m->x - c->x, dy = m->y - c->y, lim = m->mode == MAN_WALK ? R(2.75) : m->rad + R(0.75);
       if(rmul(dx, dx) + rmul(dy, dy) < rmul(lim, lim) && hurt_man(w, c->vx < 0 ? -1 : 1)) dead = 1;
@@ -1778,7 +1799,7 @@ void mx_walk_input(MxWorld *w, int ax, int jump, int punch, int stomp){
   m->in_ax = (int8_t)(ax > 0 ? 1 : ax < 0 ? -1 : 0); m->in_jump = (uint8_t)(jump != 0); m->in_punch = (uint8_t)(punch != 0); m->in_stomp = (uint8_t)(stomp != 0);
 }
 /* hit everything in a box (cells, loose rubble, landlords); returns the damage dealt.  Bounce pads shrug off fists. */
-static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg){
+static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg, int *parried){
   real dealt = 0;
   int x0 = rfloor(cx - hw), x1 = rfloor(cx + hw), y0 = rfloor(cy - hh), y1 = rfloor(cy + hh);
   for(int y = y0; y <= y1; y++) for(int x = x0; x <= x1; x++){ if(INB(x, y) && w->grid[IDX(x, y)] == MX_RUBBER) continue; dealt += damage_cell(w, x, y, dmg); }
@@ -1794,6 +1815,17 @@ static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg){
     }
     if(hit) wake_chunk(ch);
   }
+  /* A well-timed punch (or descending belly slam) can knock a thrown
+     briefcase away. Keep this within the existing hitbox and four-slot
+     projectile budget; no extra collision pass or projectile allocations.
+     Inactive cases cannot cause damage, effects, or repeat score. */
+  for(int k=0;k<MX_MAX_CASES;k++){
+    MxCase *c=&w->cases[k];
+    if(!c->active || rabs(c->x-cx)>=hw+R(0.75) ||
+       rabs(c->y-cy)>=hh+R(0.75)) continue;
+    parry_case(w,c); dealt+=RI(8);
+    if(parried)*parried=1;
+  }
   for(int i = 0; i < w->ntargets; i++){
     MxTarget *t = &w->targets[i];
     if(t->alive && rabs(t->x - cx) < hw + R(0.875) && rabs(t->y - cy) < hh + R(0.875)) kill_target(w, t);
@@ -1804,19 +1836,21 @@ static void walk_punch(MxWorld *w){
   MxMan *m = &w->man;
   real cx = m->x + (m->face > 0 ? R(2.125) : -R(2.125)), cy = m->y - R(0.375);
   int run = rabs(m->vx) > R(12.5);
-  real d = walk_hit(w, cx, cy, R(1.625), RI(2), RI(run ? 24 : 16));
+  int parried=0;
+  real d = walk_hit(w, cx, cy, R(1.625), RI(2), RI(run ? 24 : 16), &parried);
   m->pT = R(0.2); m->pCd = R(0.3);
-  ev(w, EV_PUNCH, cx, cy, run, d, 0);
+  ev(w, EV_PUNCH, cx, cy, run, d, RI(parried));
   if(d > 0){ if(w->shake < RI(3)) w->shake = RI(3); wob_kick(w, rfloor(cx), rfloor(cy), 4, m->face > 0 ? R(0.9) : -R(0.9), 0); }
 }
 static void walk_slam(MxWorld *w){
   MxMan *m = &w->man;
   real cx = m->x, cy = m->y + WHH + R(0.5) + R(0.5), d = 0;
-  d += walk_hit(w, cx, cy, R(1.75), R(1.25), RI(34));
-  d += walk_hit(w, cx, cy, R(3.25), R(1.25), RI(18));
+  int parried=0;
+  d += walk_hit(w, cx, cy, R(1.75), R(1.25), RI(34), &parried);
+  d += walk_hit(w, cx, cy, R(3.25), R(1.25), RI(18), &parried);
   m->stomp = 0;
   if(w->shake < RI(9)) w->shake = RI(9);
-  ev(w, EV_SLAM, cx, cy, 0, d, 0);
+  ev(w, EV_SLAM, cx, cy, 0, d, RI(parried));
   wob_kick(w, rfloor(cx), rfloor(cy), 6, 0, R(0.9));
 }
 static void walk_step(MxWorld *w, real dt){
@@ -2350,7 +2384,9 @@ static void build(MxWorld *w, int l){
   case 37: {    /* rent strike: a 3-storey walk-up like Walk-Up Wreckage, but some of the tenants are walkers who fight back */
     static const int PT[3] = {71, 83, 95}, PADS[2][2] = {{100, 0}, {60, 1}};
     static const uint8_t DR[3][3] = {{1,0,1},{0,1,0},{1,0,1}};
-    static const int TG[8][3] = {{89,59,1},{77,59,0},{67,49,0},{77,49,1},{89,49,0},{90,39,0},{80,39,1},{67,39,0}};
+    /* kind: 0 ordinary, 1 close-fighting walker, 2 briefcase thrower.
+       One top-floor thrower teaches a timed parry; the 3 walkers remain. */
+    static const int TG[8][3] = {{89,59,1},{77,59,0},{67,49,0},{77,49,1},{89,49,0},{90,39,2},{80,39,1},{67,39,0}};
     const int g = 59, fh = 10, ft = 2, X = 58, Wd = 48, F = 3;
     w->walk = 1;
     rect_fill(w, X, g, Wd, 1, S);
@@ -2368,7 +2404,8 @@ static void build(MxWorld *w, int l){
       rect_fill(w, c, ys, 4, ft, 0); room(w, c, ys, 4, ft, f + 1);
       rect_fill(w, c, yb - 1, 4, 1, RU); pad(w, c, yb - 1, 4);
     }
-    for(int k = 0; k < 8; k++) tgtk(w, TG[k][0], TG[k][1], TG[k][2] ? LK_WALKER : LK_NONE);
+    for(int k = 0; k < 8; k++) tgtk(w,TG[k][0],TG[k][1],TG[k][2]==2 ? LK_THROWER :
+                                  TG[k][2] ? LK_WALKER : LK_NONE);
     tnt(w, 82, 59); tnt(w, 86, 49); tnt(w, 72, 39); break; }
   case 38:      /* sand standoff: a 2-storey brick house with a glass tank of sand on its wooden roof, two bat landlords at the gate */
     HX(64, GR, 26, 2, 10, 1, 1, B, W_, W_, 0, 0);

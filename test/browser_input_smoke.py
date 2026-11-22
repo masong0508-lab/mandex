@@ -77,7 +77,8 @@ HARNESS = r"""
       css: [r.x, r.y, r.width, r.height],
       men, shots: lv.shots, alive: aliveTargets(), targets: targets.length,
       chunks: chunks.length, blocks: grid.reduce((n, value) => n + !!value, 0),
-      score, dragging, touches: Object.keys(TID).length,
+      score, active_cases: cases.length,
+      dragging, touches: Object.keys(TID).length,
       keys: { left: !!KEYS.ArrowLeft, right: !!KEYS.ArrowRight,
         jump: !!KEYS.Space, punch: !!KEYS.KeyX,
         virtualLeft: !!KEYS.TL, virtualRight: !!KEYS.TR },
@@ -129,27 +130,36 @@ HARNESS = r"""
     // Stable encounter setups isolate recovery and pad landing. Initial
     // actor placement is fixture data; all following attacks and movement
     // use real keyboard events, production update and the actual renderer.
-    muted = true; OPT().muted = true; OPT().fight = kind === 'counterpunch';
+    muted = true; OPT().muted = true;
+    OPT().fight = kind === 'counterpunch' || kind === 'parry';
     OPT().collapse = true; shake = 0; freeze = 0; slow = 0;
     for (const key of Object.keys(KEYS)) KEYS[key] = false;
     load(-1, { name: kind === 'pad' ? 'Stomp boost input check' :
       kind === 'jump' ? 'Jump height input check' :
-      kind === 'ledge' ? 'Ledge input check' : 'Counterpunch input check',
+      kind === 'ledge' ? 'Ledge input check' :
+      kind === 'parry' ? 'Briefcase parry input check' : 'Counterpunch input check',
       men: 3, walk: true, custom: true, build() {
         if (kind === 'pad') rect(38, 59, 5, 1, RUBBER);
         else if(kind === 'jump') rect(15, 59, 80, 1, STEEL);
         else if(kind === 'ledge') rect(15, 59, 20, 1, STEEL);
-        else tgt(26.5, 60, kind === 'counterpunch' ? 'walker' : '');
+        else if (kind !== 'parry') tgt(26.5, 60, kind === 'counterpunch' ? 'walker' : '');
         tgt(110, 60); // A distant objective prevents a fixture victory.
       } });
     man.x = kind === 'pad' ? 324 : kind === 'ledge' ? 264 : 200;
     man.y = kind === 'pad' ? 410 : kind === 'jump' || kind === 'ledge' ? 450 : 461;
     enterWalk(); man.hurtCd = 0;
-    if (kind !== 'pad' && kind !== 'jump' && kind !== 'ledge') {
+    if (kind === 'parry') {
+      man.gr = true;
+      // A real airborne case overlaps the punch's forward hitbox and would
+      // strike the walker this frame if the player failed to counter.
+      cases.push({x:man.x+17,y:man.y-3,vx:-60,vy:0,rot:0,vr:-9,l:4});
+    }
+    if (kind !== 'pad' && kind !== 'jump' && kind !== 'ledge' && kind !== 'parry') {
       const t = targets[0]; t.hp = t.hpMax = kind === 'counterpunch' ? 3 : 2;
       t.wind = kind === 'counterpunch' ? WEB_SIM_DT / 2 : 0;
       t.cd = 2; t.face = -1; man.gr = true;
     }
+    if (kind === 'parry') texts.length = 0; // isolate actual PARRY/OUCH feedback
     banner = 0; layoutTick(); camTick(0); frameDt = 0; draw();
     return snapshot();
   }
@@ -394,6 +404,34 @@ class Smoke:
         report['gameplay']['ledge_grace'] = {
             'edge': departed, 'jump': jumped, 'release': released,
             'no_double_jump': no_double}
+
+        # The same briefcase must be dangerous without a counterpunch and
+        # safely destroyed by a trusted keyboard attack. No scripted hit
+        # or score manipulation is performed after fixture setup.
+        report['stage'] = 'gameplay_case_parry'
+        before = p.evaluate('__inputSmokeGame.prepareGameplay("parry")')
+        require(before['active_cases'] == 1 and before['score'] == 0 and
+                before['hurt_cooldown'] == 0, 'Case fixture did not initialize', before)
+        p.keyboard.down('KeyX')
+        parried = self.continuous()[0][-1]
+        p.keyboard.up('KeyX')
+        require(parried['active_cases'] == 0 and parried['score'] == 150 and
+                parried['hurt_cooldown'] == 0 and parried['punch'] > 0,
+                'Trusted punch failed to parry a real briefcase', parried)
+        self.screenshot('13-gameplay-briefcase-parry')
+        followup = self.continuous(6)[0][-1]
+        require(followup['active_cases'] == 0 and followup['score'] == 150 and
+                followup['hurt_cooldown'] == 0,
+                'Parried briefcase respawned or repeated its impact', followup)
+        p.evaluate('__inputSmokeGame.prepareGameplay("parry")')
+        unguarded = self.continuous()[0][-1]
+        require(unguarded['active_cases'] == 0 and unguarded['score'] == 0 and
+                unguarded['hurt_cooldown'] > 0,
+                'Unparried briefcase must still hurt the walker', unguarded)
+        self.screenshot('14-gameplay-unparried-briefcase')
+        report['gameplay']['case_parry'] = {
+            'before': before, 'parried': parried, 'after_six_ticks': followup,
+            'unprotected': unguarded}
 
     def run(self):
         p, report = self.page, self.report
