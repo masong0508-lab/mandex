@@ -159,6 +159,7 @@ HARNESS = r"""
       t.wind = kind === 'counterpunch' ? WEB_SIM_DT / 2 : 0;
       t.cd = 2; t.face = -1; man.gr = true;
     }
+    if (kind === 'parry') texts.length = 0; // isolate actual PARRY/OUCH feedback
     banner = 0; layoutTick(); camTick(0); frameDt = 0; draw();
     return snapshot();
   }
