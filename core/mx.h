@@ -114,8 +114,8 @@ enum {
   EV_LAND,     /* the man touched the ground at x,y: a = speed (cells/s), m = 1 if it was a hard landing that skips (browser: dust, ring, shake) */
   EV_TUBE,     /* he flew into the mouth of pneumatic tube m at x,y and was posted out of its nozzle at (a,b) */
   EV_WALK,     /* walk levels: he landed on his feet at x,y */
-  EV_PUNCH,    /* walking punch at x,y: a = damage dealt (0 = whiff), m = 1 if it was a running shoulder-barge */
-  EV_SLAM,     /* walking belly slam at x,y: a = damage dealt */
+  EV_PUNCH,    /* walking punch at x,y: a = damage dealt (0 = whiff), m = 1 if running, b > 0 if PARRY popup takes priority */
+  EV_SLAM,     /* walking belly slam at x,y: a = damage dealt, b > 0 if PARRY popup takes priority */
   EV_PAD,      /* bounce pad boing at x,y: m = 1 if it was a stomp-boosted one */
   EV_HURT,     /* a landlord hurt him at x,y: m = 1 on foot, 0 in the sling */
   EV_BONK,     /* bat swat at x,y: m=0 bat, m=1 shield; m=2 player parried a thrown case (+150 points) */
