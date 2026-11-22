@@ -1794,6 +1794,18 @@ static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg){
     }
     if(hit) wake_chunk(ch);
   }
+  /* A well-timed punch (or descending belly slam) can knock a thrown
+     briefcase away. Keep this within the existing hitbox and four-slot
+     projectile budget; no extra collision pass or projectile allocations.
+     Inactive cases cannot cause damage, effects, or repeat score. */
+  for(int k=0;k<MX_MAX_CASES;k++){
+    MxCase *c=&w->cases[k];
+    if(!c->active || rabs(c->x-cx)>=hw+R(0.75) ||
+       rabs(c->y-cy)>=hh+R(0.75)) continue;
+    c->active=0;
+    w->score+=150; dealt+=RI(8);
+    ev(w, EV_BONK, c->x, c->y, 2, 0, 0);
+  }
   for(int i = 0; i < w->ntargets; i++){
     MxTarget *t = &w->targets[i];
     if(t->alive && rabs(t->x - cx) < hw + R(0.875) && rabs(t->y - cy) < hh + R(0.875)) kill_target(w, t);
