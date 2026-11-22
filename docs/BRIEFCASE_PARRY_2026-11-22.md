@@ -2,6 +2,8 @@
 
 ## Player-facing behavior
 
+The campaign's **Rent Strike (level 38 of 60; zero-based 37)** now includes one briefcase thrower among its original eight landlords, while retaining all three walker enemies and two bounce pads. This gives the player a discoverable parry challenge. Throwers can now target a **nearby walking man** only when separated by less than 32 horizontal and 12 vertical world cells; the existing 0.6-second windup and 4.2–5.8-second cooldown apply. Distant floors do not trigger throws. Aim-mode throwing, the fight-back option and all other levels retain their established behavior. The level's in-game tip explains the new action.
+
 Thrower and boss briefcases are no longer purely unavoidable when the player is on foot. A **timely forward punch** can intercept an incoming briefcase in the existing punch hitbox, including when it arrives during the current **0.2-second punch animation**; a **descending belly slam** can also smash one. Every actual interception:
 
 - Destroys that one active briefcase before its next collision update
@@ -20,7 +22,9 @@ The feature is deliberately defensive and skill-based, not automatic deflection.
 
 ## Tests
 
-- `test/case_parry_test.c`, float and fixed: actual public update, punch, multi-case contact, misses, exact bounds, active-animation timing, expired/back-facing fist suppression, slam two-hitbox deduplication, no repeat scoring, non-parry damage, event flag integrity and normal empty punches.
+- `test/case_parry_test.c`, float and fixed: walking throw AI/windup and actual Rent Strike composition, actual public update, punch, multi-case contact, misses, exact bounds, active-animation timing, expired/back-facing fist suppression, slam two-hitbox deduplication, no repeat scoring, non-parry damage, event flag integrity and normal empty punches.
+- `test/browser_combat_recovery_test.js` now checks walking thrower range, vertical gating, real telegraphed release and fight-back-off behavior.
+- `test/ch2_test.c` asserts the unchanged landlord count, existing walker trio and the new thrower in the actual native level.
 - `test/browser_case_parry_test.js`: executes the shipped walking attack functions and projectile update; mirrors the native cases and validates browser parse.
 - `test/browser_input_smoke.py`: actual Chromium keydown/keyup, portrait visual capture of **PARRY! +150** and an identically prepared unguarded briefcase that must still hurt the player.
 - New `.github/workflows/briefcase-parry.yml` runs the focused tests, and `test/run_tests.sh` includes them in the long float/fixed/console host suite.
