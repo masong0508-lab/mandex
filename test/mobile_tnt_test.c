@@ -42,7 +42,7 @@ int main(void){
   ch->tnt_impact=RI(29);update_moving_tnt(&W);
   CHECK(!ch->cells[0].fuse&&!ch->cells[0].dead&&events(EV_TNT_SAFE)==1,
         "a moderate blow may be a safe landing, with truthful feedback");
-  W.time=R(0.4);ch->tnt_impact=RI(29);update_moving_tnt(&W);
+  W.time=R(0.4);ch->tnt_impact=RI(29);ch->tnt_hit=0;update_moving_tnt(&W);
   CHECK(ch->cells[0].fuse==TNT_FUSE_TICKS-1&&events(EV_TNT_FUSE)==1,
         "later moderate impact can ignite a reproducible short fuse");
   scene();ch=charge(R(30.5),R(30.5));

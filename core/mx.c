@@ -1931,7 +1931,8 @@ static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg, i
       /* Exact circle-to-punch-rectangle hitbox; diagonal near-misses
          at the rounded corners do not break TNT or unrelated scenery. */
       real dx=rabs(a->wx-cx)-hw,dy=rabs(a->wy-cy)-hh;
-      if(dx<0)dx=0;if(dy<0)dy=0;
+      if(dx<0)dx=0;
+      if(dy<0)dy=0;
       if(rmul(dx,dx)+rmul(dy,dy)>=rmul(RC,RC))continue;
       hit = 1; dealt += a->h < dmg ? a->h : dmg; a->h -= dmg;
       if(a->h <= 0){if(a->m==MX_TNT)destroy_moving_tnt(w,a);else {a->dead=1;ev(w,EV_CELL,a->wx,a->wy,a->m,0,0);} }
