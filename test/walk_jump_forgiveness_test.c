@@ -81,7 +81,7 @@ int main(void){
         "jump after the actual ledge edge is permitted");
 
   scene(MX_STEEL);
-  tick(0,1,0);tick(0,0,1);
+  tick(0,1,0);w.man.y=RI(20);tick(0,0,1);
   CHECK(w.man.stomp&&w.man.vy>=RI(90)&&w.man.jump_hold==0,
         "stomp overrides the short-hop cut immediately");
 
