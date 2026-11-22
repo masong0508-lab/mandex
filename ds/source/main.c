@@ -321,7 +321,7 @@ static void on_events(void){
       break;
     case EV_BONK:                                           /* a bat landlord swatted a weak shot */
       for(int k = 0; k < 8; k++) spawn(PT_SPARK, e->x, e->y - RI(1), rnd(41) - 20, -rnd(20), k & 1 ? C_GOLD : C_WHITE, 14 + rnd(8));
-      spawn_ring(e->x, e->y, 5, C_GOLD); popup(e->x, e->y - RI(6), "BONK!", C_GOLD); sfx_play(SFX_SLAP, pan); sfx_play(SFX_CRUNCH, pan);
+      spawn_ring(e->x, e->y, 5, C_GOLD); popup(e->x, e->y - RI(6), e->m == 2 ? "PARRY! +150" : "BONK!", C_GOLD); sfx_play(SFX_SLAP, pan); sfx_play(SFX_CRUNCH, pan);
       break;
     case EV_OOF:
       for(int k = 0; k < 6; k++) spawn(PT_SPARK, e->x, e->y - RI(1), rnd(41) - 20, -rnd(20), k & 1 ? C_GOLD : C_WHITE, 14 + rnd(8));
