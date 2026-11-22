@@ -352,6 +352,8 @@ static void on_events(void){
     switch(e->type){
     case EV_CELL: { const uint8_t *c = mx_material_rgb(e->m);
       spawn(x, y, RTOF(e->a) * .3f + (rand() % 9 - 4) * .2f, RTOF(e->b) * .3f - (rand() % 7) * .2f, 30 + rand() % 20, RGB(c[0], c[1], c[2])); } break;
+    case EV_TNT_FUSE: popup(x,y-3,"TNT FUSE!",RGB(255,153,61)); break;
+    case EV_TNT_SAFE: popup(x,y-3,"TNT SAFE",RGB(125,255,150)); break;
     case EV_BOOM: for(int k = 0; k < 24; k++) spawn(x, y, (rand() % 21 - 10) * .35f, (rand() % 21 - 10) * .35f, 30, RGB(255, 200 - rand() % 100, 40)); break;
     case EV_CRACK: for(int k = 0; k < 2; k++) spawn(x, y, (rand() % 9 - 4) * .1f, -(.2f + (rand() % 5) * .1f), 17, RGB(185, 170, 148)); break;
     case EV_THUD: if(e->a > R(0.6)) for(int k = 0; k < 4; k++)

@@ -64,6 +64,7 @@ static int hint_t;                            /* ticks left of the 'pull back' h
 static int bank_toast_t;                      /* rubber rebound trick shot HUD message */
 static int survivor_toast_t;                  /* rare catastrophic collapse escape */
 static int collapse_toast_t;                   /* capped severe aftershock tell */
+static int tnt_toast_t,tnt_toast_fuse;           /* simple TNT guidance, no new image assets */
 static float MAXHP[MX_NMAT];                 /* filled from the core's material table in main() */
 
 static uint32 argb(int r, int g, int b, int a){ return ((uint32)a << 24) | ((uint32)r << 16) | ((uint32)g << 8) | (uint32)b; }
@@ -325,6 +326,9 @@ static void handle_events(void){
     switch(e->type){
     case EV_CELL: { const uint8_t *m = mx_material_rgb(e->m);
       spawn(e->x, e->y, argb(m[0], m[1], m[2], 255), 260); spawn(e->x, e->y, argb(m[0] / 2, m[1] / 2, m[2] / 2, 255), 220); break; }
+    case EV_TNT_FUSE: tnt_toast_t=100;tnt_toast_fuse=1;
+      for(int k=0;k<3;k++)spawn(e->x,e->y,argb(255,170,60,255),220);break;
+    case EV_TNT_SAFE: tnt_toast_t=72;tnt_toast_fuse=0;break;
     case EV_BOOM:   for(int k = 0; k < 30; k++) spawn(e->x, e->y, k & 1 ? argb(255, 160, 40, 255) : argb(255, 220, 90, 255), 600); break;
     case EV_SPLAT:  for(int k = 0; k < 20; k++) spawn(e->x, e->y, argb(125, 255, 90, 255), 380); break;
     case EV_CRACK:  for(int k = 0; k < 3; k++) spawn(e->x, e->y, e->m == MX_GLASS ? argb(235, 250, 255, 255) : argb(200, 190, 170, 255), 120);
@@ -504,6 +508,7 @@ static void idle_fx(int fx, float wx, float wy, int face){
 static void fx_step(int calm, int strain){
   fcount++;
   if(collapse_toast_t>0)collapse_toast_t--;
+  if(tnt_toast_t>0)tnt_toast_t--;
   if(calm){ mi_update(&mi); if(mi.fx) idle_fx(mi.fx, world.man.x, world.man.y, 1); } else mi_reset(&mi);     /* gags run only while he waits, hands off */
   if(world.state == MX_PLAY && world.man.mode == MAN_FLY && fcount % 10 == 0)                                  /* stink trail */
     spawn_k(PK_STINK, world.man.x - (world.man.vx > 0 ? 2 : -2), world.man.y + 1, (frand() - 0.5f) * 30, (frand() - 0.5f) * 20, 0.7f + frand() * 0.4f, argb(135, 220, 75, 255));
@@ -994,6 +999,10 @@ static void draw_all(void){
     quad(18, 74, 174.0f * world.combo_left / 2.5f, 3, Z_HUD + 0.1f, argb(255, 210, 63, 255)); }
   if(bank_toast_t > 0 && world.state == MX_PLAY)
     text("BANK SHOT! +1500", 18, world.combo > 1 ? 99 : 69, 20, argb(255, 126, 176, 255), 0, Z_HUD + 0.1f);
+  if(tnt_toast_t>0 && world.state==MX_PLAY)
+    text(tnt_toast_fuse?"TNT FUSE! TAKE COVER":"TNT SURVIVED THIS FALL",
+         320,134,19,argb(tnt_toast_fuse?255:145,tnt_toast_fuse?169:236,
+                        tnt_toast_fuse?70:185,230),1,Z_HUD+0.2f);
   if(collapse_toast_t>0 && world.state==MX_PLAY)
     text("BUILDING DOWN!",320,104,24,argb(255,210,63,
          collapse_toast_t<24?collapse_toast_t*10:240),1,Z_HUD+0.2f);
@@ -1079,7 +1088,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ bank_toast_t = survivor_toast_t = collapse_toast_t = 0; mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
+static void load_level(int n){ bank_toast_t = survivor_toast_t = collapse_toast_t = tnt_toast_t = 0; mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
 
 static void draw_intro(void){
   intro_draw(ic_top, ic_bot); ic_upload(tx_ic_top, ic_top); ic_upload(tx_ic_bot, ic_bot);

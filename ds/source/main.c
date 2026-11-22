@@ -349,6 +349,13 @@ static void on_events(void){
       for(int k = 0, n = e->m ? 8 : 5; k < n; k++) spawn(PT_DUST, e->x + RI(rnd(5) - 2) / 4, e->y - R(0.5), rnd(15) - 7, -rnd(5) - 1, 0, 22 + rnd(10));
       if(e->m) spawn_ring(e->x, e->y - R(0.5), 4, C_SMOKE);       /* browser: 30 px at 8 px a cell */
       break;
+    case EV_TNT_FUSE:
+      popup(e->x,e->y-RI(2),"TNT FUSE!",C_FIRE);
+      spawn_ring(e->x,e->y,3,C_GOLD);
+      break;
+    case EV_TNT_SAFE:
+      popup(e->x,e->y-RI(2),"TNT SAFE",C_GOO);
+      break;
     case EV_BOOM:
       for(int k = 0; k < 9; k++) spawn(PT_SMOKE, e->x, e->y, rnd(25) - 12, rnd(20) - 14, 0, 26 + rnd(14));
       for(int k = 0; k < 12; k++) spawn(PT_SPARK, e->x, e->y, rnd(41) - 20, rnd(31) - 22, k & 1 ? C_GOLD : C_WHITE, 14 + rnd(12));
