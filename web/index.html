@@ -1024,7 +1024,7 @@ function wBlocked(x,y){
   }
   return false;
 }
-function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.vx=m.vy=0;m.gr=false;m.wt=WALK_T;m.pT=0;m.pCd=0;m.stomp=false;m.R=14;m.pwr=m.pwr;
+function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.vx=m.vy=0;m.gr=false;m.wt=WALK_T;m.pT=0;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.R=14;m.pwr=m.pwr;
   let ok=!wBlocked(m.x,m.y);for(let u=1;u<=110&&!ok;u++){if(!wBlocked(m.x,m.y-u)){m.y-=u;ok=true}}
   for(let r=4;r<=200&&!ok;r+=4)for(let a=0;a<16&&!ok;a++){const an=-Math.PI/2+(a%2?1:-1)*Math.ceil(a/2)*.4,qx=m.x+Math.cos(an)*r,qy=m.y+Math.sin(an)*r;if(!wBlocked(qx,qy)){m.x=qx;m.y=qy;ok=true}}   // nearest free spot, preferring up
   goo(m.x,m.y,22,260);SFX.splat();ring(m.x,m.y,50,'#7dff5a');popText(m.x,m.y-50,'ON YOUR FEET!','#7dff5a',26);shake=Math.max(shake,4)}
@@ -1052,10 +1052,23 @@ function walkStep(dt){const m=man;
   if(m.turn>0)m.turn--;
   m.vx+=(ax*135-m.vx)*Math.min(1,dt*(m.gr?14:5));
   if(m.pCd>0)m.pCd-=dt;if(m.pT>0)m.pT-=dt;if(PU&&m.pCd<=0)walkPunch();
-  if(UP&&m.gr&&!m.stomp){m.vy=-345;m.gr=false;SFX.pop();dust(m.x,m.y+WHH,4,8)}
+  // A last-second ledge jump is valid, but consumes the grace window:
+  // it cannot be used for an airborne double jump.
+  if(m.gr)m.ledgeGrace=.1;
+  if(UP&&(m.gr||m.ledgeGrace>0)&&!m.stomp){
+    m.vy=-345;m.gr=false;m.ledgeGrace=0;m.jumpHold=.16;
+    SFX.pop();dust(m.x,m.y+WHH,4,8);
+  }
+  // Release early for a short hop; keep holding for the original full jump.
+  // Pad bounces do not set jumpHold and therefore are never shortened.
+  if(m.jumpHold>0){
+    if(!UP){m.vy=Math.max(m.vy,-180);m.jumpHold=0}
+    else if(m.vy>=0)m.jumpHold=0;
+    else m.jumpHold=Math.max(0,m.jumpHold-dt);
+  }
   // Holding stomp through a pad landing cannot cancel its upward launch.
   // A ceiling or the existing pad cooldown restores ordinary stomp control.
-  if(DN&&!m.gr&&!m.stomp&&!(m.padCd>0&&m.vy<0)){m.stomp=true;m.vy=Math.max(m.vy,720);SFX.whoosh()}
+  if(DN&&!m.gr&&!m.stomp&&!(m.padCd>0&&m.vy<0)){m.stomp=true;m.jumpHold=0;m.ledgeGrace=0;m.vy=Math.max(m.vy,720);SFX.whoosh()}
   const stompLanding=m.stomp; // walkSlam clears the pose before pad detection
   const dx=m.vx*dt,nx=Math.max(1,Math.ceil(Math.abs(dx)/2));
   for(let i=0;i<nx;i++){const sx=dx/nx;
@@ -1070,9 +1083,12 @@ function walkStep(dt){const m=man;
     else{if(sy>0){if(m.stomp){walkSlam();if(!wBlocked(m.x,m.y+sy)){m.y+=sy;m.vy*=.8;continue}}
         if(m.vy>380){dust(m.x,m.y+WHH,6,10);SFX.thud&&SFX.thud(.5)}m.vy=0}else{m.vy=0;if(Math.abs(dy)>2)SFX.thud&&SFX.thud(.3)}
       break}}
-  m.gr=wBlocked(m.x,m.y+1.5);if(m.gr)m.stomp=false;
+  m.gr=wBlocked(m.x,m.y+1.5);
+  if(m.gr){m.ledgeGrace=.1;m.jumpHold=0}
+  else if(m.ledgeGrace>0)m.ledgeGrace=Math.max(0,m.ledgeGrace-dt);
+  if(m.gr)m.stomp=false;
   if(m.padCd>0)m.padCd-=dt;
-  if(m.gr&&!(m.padCd>0)){const by=Math.floor((m.y+WHH+2)/V);for(const o of[-4,0,4]){const bx=Math.floor((m.x+o)/V);if(inb(bx,by)&&grid[idx(bx,by)]===RUBBER){m.vy=stompLanding?-540:-470;m.gr=false;m.stomp=false;m.padCd=.3;SFX.boing();popText(m.x,m.y-34,stompLanding?'BOOST!':'BOING!','#ff7eb0',26);ring(m.x,m.y+WHH,40,'#ff9ec8');dust(m.x,m.y+WHH,5,8);break}}}
+  if(m.gr&&!(m.padCd>0)){const by=Math.floor((m.y+WHH+2)/V);for(const o of[-4,0,4]){const bx=Math.floor((m.x+o)/V);if(inb(bx,by)&&grid[idx(bx,by)]===RUBBER){m.vy=stompLanding?-540:-470;m.gr=false;m.stomp=false;m.padCd=.3;m.ledgeGrace=0;m.jumpHold=0;SFX.boing();popText(m.x,m.y-34,stompLanding?'BOOST!':'BOING!','#ff7eb0',26);ring(m.x,m.y+WHH,40,'#ff9ec8');dust(m.x,m.y+WHH,5,8);break}}}
   if(m.gr&&Math.abs(m.vx)>60&&((time*9)|0)%2===0&&rnd()<.25)dust(m.x,m.y+WHH,1,6);
   for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<WHH+t.r-4)killTarget(t)}   // bump into a landlord and he is done for
 /* Match the console sprite turnaround: side -> rear -> opposite side.
