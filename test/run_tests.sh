@@ -99,6 +99,14 @@ for mode in float fixed; do
   gcc -std=c99 -O2 -Wall $flags -I../core ../core/mx.c wolf_annex_test.c -lm -o "wolf_annex_$mode"
   "./wolf_annex_$mode"
 done
+echo "--- Moving TNT: padded fuse state, impact/safe outcomes, precise blast hitboxes (float/fixed/browser) ---"
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wall -Wno-unused-function $flags -I../core mobile_tnt_test.c -lm -o "mobile_tnt_$mode"
+  "./mobile_tnt_$mode"
+done
+if command -v node >/dev/null 2>&1;then node browser_mobile_tnt_test.js;fi
 echo "--- read-only shot readiness and actual power stock (float/fixed/browser) ---"
 for mode in float fixed;do
   flags=""
