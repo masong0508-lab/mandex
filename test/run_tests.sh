@@ -92,6 +92,13 @@ echo "--- Browser creator: bounded MX1 imports, Unicode share names and legacy c
 if command -v node >/dev/null 2>&1;then node browser_creator_codec_test.js;fi
 echo "--- Web: touch capture, landscape/portrait two-thumb controls, safe camera pan ---"
 if command -v node >/dev/null 2>&1;then node browser_multitouch_test.js;fi
+echo "--- Chapter 3 street encounters: landmark geometry, defenders and 3-second stability (float/fixed) ---"
+for mode in float fixed; do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=c99 -O2 -Wall $flags -I../core ../core/mx.c wolf_annex_test.c -lm -o "wolf_annex_$mode"
+  "./wolf_annex_$mode"
+done
 echo "--- read-only shot readiness and actual power stock (float/fixed/browser) ---"
 for mode in float fixed;do
   flags=""
@@ -522,4 +529,5 @@ if [ -n "$PARITY" ]; then
   echo "--- level parity with the web game ---"
   gcc -std=c99 -O2 -I../core ../core/mx.c level_dump.c -lm -o level_dump && ./level_dump > /tmp/mx_c_levels.txt
   node ../tools/level_parity.js /tmp/mx_c_levels.txt 0 38
+  node ../tools/level_parity.js /tmp/mx_c_levels.txt 40 59
 fi

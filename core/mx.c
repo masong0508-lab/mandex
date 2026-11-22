@@ -2200,6 +2200,38 @@ static void build_ch3(MxWorld *w, int i){
     tnt(w, H[k].x + 2, MX_ROWS - 1);
   }
   if(w->ntargets < 4) tgtr(w, H[0].x + 3, MX_ROWS - 1 - H[0].fh, LK_WALKER, 2);
+  /* Wolfman street encounters: the formerly empty gap between the first
+     two buildings now houses a small destructible tactical landmark.
+     Layouts cycle through glass, ricochet, sand-drop and fortified designs.
+     The 8-cell footprint always fits the smallest 12-cell gap. No new
+     pools, simulation ticks, assets, or changes to saved level indices. */
+  {
+    int gap = H[1].x - (H[0].x + H[0].w);
+    int ax = H[0].x + H[0].w + (gap - 8) / 2;
+    switch(i % 4){
+    case 0: /* glass tollhouse: pop the ground-floor keg to evict a thrower */
+      house_ex(w, ax, MX_ROWS - 1, 8, 2, 8, 1, 1, MX_GLASS, MX_WOOD, MX_WOOD, 0, 0);
+      tnt(w, ax + 2, 59);
+      tgtr(w, ax + 4, 51, LK_THROWER, 2);
+      break;
+    case 1: /* rubber customs kiosk: rebound from its sides, break its roof */
+      house_ex(w, ax, MX_ROWS - 1, 8, 2, 8, 1, 1, MX_RUBBER, MX_WOOD, MX_WOOD, 0, 0);
+      tnt(w, ax + 2, 51);
+      tgtr(w, ax + 4, 59, tier ? LK_SPRINTER : LK_WALKER, 2);
+      break;
+    case 2: /* sand hopper: TNT pin in the upper floor releases the payload */
+      house_ex(w, ax, MX_ROWS - 1, 8, 2, 8, 1, 1, MX_GLASS, MX_WOOD, MX_WOOD, 0, 0);
+      rect_fill(w, ax + 1, 44, 6, 7, MX_SAND);
+      tnt(w, ax + 3, 51);
+      tgtr(w, ax + 4, 59, LK_WALKER, 2);
+      break;
+    default: /* stone-capped tax bunker: an armored landlord upstairs */
+      house_ex(w, ax, MX_ROWS - 1, 8, 2, 8, 1, 1, MX_BRICK, MX_WOOD, MX_STONE, 0, 0);
+      tnt(w, ax + 2, 59);
+      tgtr(w, ax + 4, 51, tier ? LK_SHIELD : LK_BAT, 2);
+      break;
+    }
+  }
 }
 
 static void build(MxWorld *w, int l){

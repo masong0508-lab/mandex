@@ -22,6 +22,22 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 22: Wolfman street encounters across chapter 3
+
+- All 20 Wolfman levels now feature one of **four** new tactical street
+  landmarks between the main buildings: a glass tollhouse with a thrower,
+  a rubber rebound kiosk with a fast patrol, a TNT-triggered sand hopper,
+  or a fortified tax bunker with an upper-floor defender.
+- The structures use existing materials, TNT, landlords, rooms and
+  destruction physics; there are no extra textures, framebuffers, heap
+  pools or per-frame drawing passes. Landlord counts remain bounded.
+- The browser gives short tactical tips for each design; DS, 3DS and
+  Dreamcast use the identical shared C level geometry and enemy placements.
+  Level indices, saves, achievements and the 60-stage progression remain
+  unchanged. New host checks guard fixed/float geometry and stability;
+  optional browser-vs-core parity now also covers the Wolfman chapter.
+- [World layouts, validation and known hardware limits](docs/WOLFMAN_STREETS_2026-11-22.md).
+
 ## November 22 combat counterplay: briefcase parries
 
 - While walking, punch an incoming thrown briefcase to smash it before it

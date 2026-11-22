@@ -471,20 +471,45 @@ const CH2=LEVELS.length;
  const MATS=[[WOOD,WOOD],[BRICK,WOOD],[STONE,WOOD],[STEEL,BRICK],[GLASS,STONE]],
   NAMES=['Full Moon Rising','Howling Heights','Flea Market','Fang Street','Bad Moon Brick','Wolf Pack Lofts','Moonlit Mortgage','Claw Foreclosure','Growl Gardens','Night Shift',
    'Tail Spin','Lunar Lease','Pelt Place','The Long Howl','Scratch Post Towers','Fur Ball Plaza','Silver Bullet Row','Midnight Eviction','Pack Leader Penthouse','Alpha Landlord'],
-  TIPS={0:'New: landlords have health bars.  Hit them twice!',5:'Riot shields block you from the front.  Hit them fast, or from behind.',10:'Healers patch landlords up.  Take them out first.',15:'Bosses throw two briefcases at once.'};
+  TIPS={0:'New: landlords have health bars.  Hit them twice!',5:'Riot shields block you from the front.  Hit them fast, or from behind.',10:'Healers patch landlords up.  Take them out first.',15:'Bosses throw two briefcases at once.'},
+  ANNEX_TIPS=[
+   'GLASS TOLLHOUSE: smash the keg below the thrower!',
+   'RUBBER KIOSK: bounce off its sides, or come over the roof!',
+   'SAND HOPPER: pop the upper TNT pin to dump the sand!',
+   'TAX BUNKER: break into the upstairs office through the weak floor!'
+  ];
  for(let i=0;i<20;i++){
   const tier=Math.min(3,(i/5)|0),kinds=[['walker','thrower','bat'],['walker','shield','sprinter','thrower'],['shield','sprinter','healer','bat','thrower'],['boss','shield','healer','sprinter','thrower']][tier];
   const m1=MATS[i%5],m2=MATS[(i*2+1)%5],m3=MATS[(i*3+2)%5];
   const H1={x:48+(i%3)*4,w:8+(i%4)*2,floors:2+(i%4),fh:8+(i%3)},H2={x:80+(i%2)*4,w:10+(i%5)*2,floors:2+((i+1)%4),fh:9+(i%2)},H3={x:108,w:8,floors:2+(i%3),fh:8};
   const hs=[[H1,m1],[H2,m2]];if(i>=8)hs.push([H3,m3]);
-  LEVELS.push({name:NAMES[i],men:5+((i/5)|0)+(i>=15?1:0),tip:TIPS[i],build(){
+  LEVELS.push({name:NAMES[i],men:5+((i/5)|0)+(i>=15?1:0),tip:TIPS[i]||ANNEX_TIPS[i%4],build(){
    let k=0;
    for(const[H,mt]of hs){house({x:H.x,w:H.w,floors:H.floors,fh:H.fh,wt:mt[0]===STEEL?2:1,wall:mt[0],floor:mt[1],roof:mt[1]===WOOD?WOOD:STONE,gable:false,paper:['#e8d8c0','#d8e0e8','#e8d8e8'][k%3]});
     for(let f=0;f<H.floors;f++){const row=ROWS-1-f*H.fh,cx=f===0?H.x+H.w-3:H.w>13?H.x+3+((f&1)?H.w-7:0):H.x+(H.w>>1)+((f*3+k)%3-1),kind=(f+k+i)%3===0&&i<5?'':kinds[(f*2+k+i)%kinds.length];
       if(f===H.floors-1&&k===0||f===0||(f+k+i)%2===0)tgt(cx,row,kind,Math.max(2,Math.min(6,(H.w>>1)-3)))}
     tnt(H.x+2,ROWS-1);k++}
    // make sure there are at least 4 landlords
-   if(targets.length<4){const H=hs[0][0];tgt(H.x+3,ROWS-1-H.fh,'walker',2)}}})}
+   if(targets.length<4){const H=hs[0][0];tgt(H.x+3,ROWS-1-H.fh,'walker',2)}
+   // Chapter 3 street encounter: a compact landmark in the existing house gap.
+   // Same footprint, placement, materials, TNT and landlord order as core/mx.c.
+   // Existing rendering, destruction and AI handle these without a new pool.
+   const gap=H2.x-(H1.x+H1.w),ax=H1.x+H1.w+Math.floor((gap-8)/2);
+   switch(i%4){
+   case 0: // glass tollhouse, ground-floor demolition charge
+    house({x:ax,w:8,floors:2,fh:8,wall:GLASS,floor:WOOD,roof:WOOD,paper:'#dcecff'});
+    tnt(ax+2,59);tgt(ax+4,51,'thrower',2);break;
+   case 1: // rubber sidewalls for a deliberate ricochet or roof entry
+    house({x:ax,w:8,floors:2,fh:8,wall:RUBBER,floor:WOOD,roof:WOOD,paper:'#f6d6ec'});
+    tnt(ax+2,51);tgt(ax+4,59,tier?'sprinter':'walker',2);break;
+   case 2: // upper-floor sand reservoir; TNT pin releases it
+    house({x:ax,w:8,floors:2,fh:8,wall:GLASS,floor:WOOD,roof:WOOD,paper:'#e2d6bd'});
+    rect(ax+1,44,6,7,SAND);tnt(ax+3,51);tgt(ax+4,59,'walker',2);break;
+   default: // stone-capped brick tax bunker
+    house({x:ax,w:8,floors:2,fh:8,wall:BRICK,floor:WOOD,roof:STONE,paper:'#e6d4b8'});
+    tnt(ax+2,59);tgt(ax+4,51,tier?'shield':'bat',2);break;
+   }
+  }})}
 })();
 const chEnd=l=>l<CH1?CH1:l<CH2?CH2:LEVELS.length;   // the last level of the chapter that level l belongs to
 // ---- pneumatic tubes ----
