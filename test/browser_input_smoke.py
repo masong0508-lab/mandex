@@ -133,17 +133,19 @@ HARNESS = r"""
     OPT().collapse = true; shake = 0; freeze = 0; slow = 0;
     for (const key of Object.keys(KEYS)) KEYS[key] = false;
     load(-1, { name: kind === 'pad' ? 'Stomp boost input check' :
-      kind === 'jump' ? 'Jump height input check' : 'Counterpunch input check',
+      kind === 'jump' ? 'Jump height input check' :
+      kind === 'ledge' ? 'Ledge input check' : 'Counterpunch input check',
       men: 3, walk: true, custom: true, build() {
         if (kind === 'pad') rect(38, 59, 5, 1, RUBBER);
         else if(kind === 'jump') rect(15, 59, 80, 1, STEEL);
+        else if(kind === 'ledge') rect(15, 59, 20, 1, STEEL);
         else tgt(26.5, 60, kind === 'counterpunch' ? 'walker' : '');
         tgt(110, 60); // A distant objective prevents a fixture victory.
       } });
-    man.x = kind === 'pad' ? 324 : 200;
-    man.y = kind === 'pad' ? 410 : kind === 'jump' ? 450 : 461;
+    man.x = kind === 'pad' ? 324 : kind === 'ledge' ? 264 : 200;
+    man.y = kind === 'pad' ? 410 : kind === 'jump' || kind === 'ledge' ? 450 : 461;
     enterWalk(); man.hurtCd = 0;
-    if (kind !== 'pad' && kind !== 'jump') {
+    if (kind !== 'pad' && kind !== 'jump' && kind !== 'ledge') {
       const t = targets[0]; t.hp = t.hpMax = kind === 'counterpunch' ? 3 : 2;
       t.wind = kind === 'counterpunch' ? WEB_SIM_DT / 2 : 0;
       t.cd = 2; t.face = -1; man.gr = true;
@@ -362,6 +364,36 @@ class Smoke:
                 jump_traces['tap_hop']['height_px'] + 24,
                 'Real held jump did not clear visibly more height', jump_traces)
         report['gameplay']['jump_height'] = jump_traces
+
+        report['stage'] = 'gameplay_real_ledge_jump'
+        p.evaluate('__inputSmokeGame.prepareGameplay("ledge")')
+        settled = self.continuous(12)[0][-1]
+        require(settled['grounded'], 'Ledge test did not settle on its short platform', settled)
+        p.keyboard.down('ArrowRight')
+        departed = None
+        for _ in range(30):
+            row = self.continuous()[0][-1]
+            if not row['grounded']:
+                departed = row
+                break
+        p.keyboard.up('ArrowRight')
+        require(departed is not None and 0 < departed['ledge_grace'] <= .1,
+                'Running off a real ledge failed to arm coyote time', departed)
+        p.keyboard.down('Space')
+        jumped = self.continuous()[0][-1]
+        p.keyboard.up('Space')
+        require(jumped['vy'] < 0 and jumped['ledge_grace'] == 0,
+                'Trusted Space during coyote time did not jump exactly once', jumped)
+        released = self.continuous()[0][-1]
+        p.keyboard.down('Space')
+        no_double = self.continuous()[0][-1]
+        p.keyboard.up('Space')
+        require(no_double['vy'] > released['vy'] and no_double['ledge_grace'] == 0,
+                'Second airborne Space incorrectly restarted the jump', no_double)
+        self.screenshot('12-gameplay-ledge-grace')
+        report['gameplay']['ledge_grace'] = {
+            'edge': departed, 'jump': jumped, 'release': released,
+            'no_double_jump': no_double}
 
     def run(self):
         p, report = self.page, self.report
