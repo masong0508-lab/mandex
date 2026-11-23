@@ -59,7 +59,7 @@ int main(void){
          "second alley fits the main houses without overlap");
       int wall=site==0||site==2?MX_GLASS:site==1?MX_RUBBER:MX_STEEL;
       int roof=site==0||site==3?MX_GLASS:MX_WOOD;
-      ok(CELL(bx,54)==wall && CELL(bx+1,51)==roof,40+i,
+      ok(CELL(bx,56)==wall && CELL(bx+1,51)==roof,40+i,
          "second alley has the correct themed wall and roof");
       int charge_row=site==2?54:57;
       ok(CELL(bx+1,charge_row)==MX_TNT &&
