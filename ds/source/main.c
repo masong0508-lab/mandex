@@ -349,6 +349,13 @@ static void on_events(void){
       for(int k = 0, n = e->m ? 8 : 5; k < n; k++) spawn(PT_DUST, e->x + RI(rnd(5) - 2) / 4, e->y - R(0.5), rnd(15) - 7, -rnd(5) - 1, 0, 22 + rnd(10));
       if(e->m) spawn_ring(e->x, e->y - R(0.5), 4, C_SMOKE);       /* browser: 30 px at 8 px a cell */
       break;
+    case EV_TNT_FUSE:
+      popup(e->x,e->y-RI(2),"TNT FUSE!",C_FIRE);
+      spawn_ring(e->x,e->y,3,C_GOLD);
+      break;
+    case EV_TNT_SAFE:
+      popup(e->x,e->y-RI(2),"TNT SAFE",C_GOO);
+      break;
     case EV_BOOM:
       for(int k = 0; k < 9; k++) spawn(PT_SMOKE, e->x, e->y, rnd(25) - 12, rnd(20) - 14, 0, 26 + rnd(14));
       for(int k = 0; k < 12; k++) spawn(PT_SPARK, e->x, e->y, rnd(41) - 20, rnd(31) - 22, k & 1 ? C_GOLD : C_WHITE, 14 + rnd(12));
@@ -972,6 +979,12 @@ static void draw_chunks(const View *v){
       const int damage=0;
 #endif
       gfx_tile(v,a->m,damage,k&1,sx,sy);
+      /* Mobile TNT's actual hitbox carries the fuse, not its chunk centre.
+         Blink a tiny fuse cap without scanning stationary grid cells. */
+      if(a->m==MX_TNT && a->fuse && ((frame>>(a->fuse<=8?1:2))&1)){
+        gfx_rect(v->buf,sx,sy-2,ppc,1,a->fuse<=8?C_RED:C_GOLD);
+        gfx_px(v->buf,sx+ppc/2,sy-3,C_WHITE);
+      }
     }
   }
 }
@@ -1174,15 +1187,8 @@ static void draw_man(const View *v){
     else if(m->mode == MAN_AIM && dragging) a = rmul(ratan2(MX_ANCHOR_Y - m->y, MX_ANCHOR_X - m->x), R(0.25));
     spr_man_jr(v->buf, x, y, v->ppc, face, pose, frame, &jg, (int)rsin(a), (int)rcos(a));
   }
-  if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){                 /* only the belly swells; the face flushes red near the end */
-    int f = (int)((m->inf * 100) >> 12), p = v->ppc, rx = p * (2 + f * 5 / 40), ry = p * (2 + f * 4 / 40);
-    int bx = x + face * p * f / 60, by = y + p + p * f / 80;
-    gfx_ell(v->buf, bx, by, rx + 1, ry + 1, C_SKIN2); gfx_ell(v->buf, bx, by, rx, ry, C_SKIN);
-    gfx_ell(v->buf, bx - rx / 3, by - ry / 2, rx / 4 + 1, ry / 5 + 1, C_SKIN3);                       /* shine */
-    if(f > 30) for(int k = -1; k <= 1; k++) gfx_line(v->buf, bx + rx / 3, by + k * ry / 3, bx + rx * 4 / 5, by + k * ry / 3, C_SKIN2);   /* stretch marks */
-    gfx_ell(v->buf, bx + face * rx * 3 / 4, by + ry / 8, 1 + f / 40, 1 + f / 40, C_SKIN2);            /* belly button */
-    if(f > 45) gfx_ell(v->buf, x, y - p * 3, p + 1 + f / 50, p, (f > 85 && (frame & 4)) ? C_RED2 : C_RED);   /* blush */
-  }
+  if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY))
+    spr_man_inflation(v->buf,x,y,v->ppc,face,(int)((m->inf*100)>>12),frame);
 }
 
 #ifndef MX_DS_PARTICLE_VIEW_CULL
@@ -1415,6 +1421,16 @@ static void top_hud(u8 *b){
       gfx_text_o(b,px,y,obj.direction<0?"<":">",C_PINK,C_BLACK,1);
     }
   }
+  /* Live TNT alert persists throughout the real moving-fuse lifetime.
+     Counts are cached in the physics pass, so this HUD scans no debris. */
+  if(world.state==MX_PLAY && world.tnt_live>0){
+    int urgent=world.tnt_soonest<=8;
+    gfx_rect(b,160,35,92,11,C_UIBG);
+    gfx_rect(b,160,35,2,11,urgent && (frame&4)?C_RED:C_GOLD);
+    gfx_text_o(b,165,38,"TNT FUSE",urgent?C_RED:C_GOLD,C_BLACK,1);
+    gfx_text_o(b,216,38,gfx_int(world.tnt_live),C_WHITE,C_BLACK,1);
+    if(urgent)gfx_text_o(b,240,38,"!",C_RED,C_BLACK,1);
+  }
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                      /* walk levels: the clock, and what the buttons do */
     int k = gfx_clamp((int)((world.man.wt * 100 / MX_WALK_T) >> 12), 0, 100);
     gfx_rect(b, 4, 36, 82, 7, C_UIBG); gfx_rect(b, 5, 37, 80, 5, C_DARK); gfx_rect(b, 5, 37, k * 80 / 100, 5, k > 30 ? C_GOO : C_RED);
@@ -1442,7 +1458,7 @@ static void banner(u8 *b){
   { static const char *const DN[MX_HQ_DISTRICTS] = { "DISTRICT 1 OF 3", "DISTRICT 2 OF 3", "DISTRICT 3 OF 3" };
     gfx_text_c(b, 128 - slide, 76, world.level == MX_HQ_LEVEL ? DN[world.district % MX_HQ_DISTRICTS] : "LEVEL", C_GOLD, C_BLACK, 1); }
   gfx_text_c(b, 128 + slide, 84, mx_level_name(world.level), C_WHITE, C_BLACK, 2);
-  gfx_text_c(b, 128 - slide, 102, "EVICT EVERY LANDLORD", C_PINK, C_BLACK, 1);
+  gfx_text_c(b, 128 - slide, 102, mx_level_tactic(world.level), C_PINK, C_BLACK, 1);
 }
 
 static void end_panel(u8 *b){

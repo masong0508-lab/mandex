@@ -484,7 +484,69 @@ static int n3_rot_tight_bounds_probe(void){
   return 0;
 }
 #endif
+/* Exercise the actual 3DS inflation rendering, not a constructed
+   screenshot. The portrait/head pixels must stay unchanged, pressure
+   work must stay inside a bounded torso, and the Wolfman must use fur. */
+static int n3_pressure_probe(void){
+  static u8 before[400*240*3],guard[400*240*3+64];
+  top.fb=fb_top[0];top.w=400;top.h=240;
+  apply_outfit(0);
+  int olddrag=dragging;MxMan oldman=world.man;
+  dragging=1;memset(&world.man,0,sizeof world.man);
+  world.man.mode=MAN_AIM;world.man.x=R(25);world.man.y=R(25);
+  world.man.face=1;world.man.inf=0;frame=0;
+  View v={&top,4,60,20,0,0};
+  const int cx=VX(&v,25),cy=VY(&v,25);
+  const u32 bg=RGB(9,29,47);
+  rect(&top,0,0,400,240,bg);draw_man(&v);
+  memcpy(before,top.fb,sizeof before);
+  world.man.inf=R(1);
+  rect(&top,0,0,400,240,bg);draw_man(&v);
+  int diff=0,outside=0,shadow=0,skin=0,highlight=0;
+  for(int x=0;x<400;x++)for(int y=0;y<240;y++){
+    int n=(x*240+239-y)*3;
+    const u8 *p=top.fb+n,*q=before+n;
+    if(p[0]==q[0]&&p[1]==q[1]&&p[2]==q[2])continue;
+    diff++;
+    if(x<cx-28||x>cx+28||y<cy-12||y>cy+34)outside++;
+    u32 c=(u32)p[2]<<16|(u32)p[1]<<8|p[0];
+    shadow+=(c==man_tone[0][2]);
+    skin+=(c==man_tone[0][1]);
+    highlight+=(c==man_tone[0][3]);
+  }
+  if(diff<90||outside||!shadow||!skin||!highlight){
+    fprintf(stderr,"FAIL: 3DS pressure detail diff=%d outside=%d shadow=%d skin=%d light=%d\n",
+            diff,outside,shadow,skin,highlight);
+    return 1;
+  }
+  apply_outfit(12); /* Grey Wolfman fur has a different live palette. */
+  rect(&top,0,0,400,240,bg);draw_man(&v);
+  int fur=0;
+  for(int x=cx-24;x<=cx+24;x++)for(int y=cy-12;y<=cy+34;y++){
+    u32 c=topix(0,x,y);
+    fur+=(c==man_tone[0][1]);
+  }
+  if(!man_fur||!fur){
+    fputs("FAIL: 3DS Wolfman pressure uses old human skin\n",stderr);
+    return 1;
+  }
+  /* Clip the same production oval at all four corners into guard bytes. */
+  memset(guard,0xA5,sizeof guard);
+  top.fb=guard+32;
+  for(int k=0;k<4;k++)
+    oval(&top,(k&1)?399:0,(k&2)?239:0,24,19,RGB(235,186,139));
+  for(int k=0;k<32;k++)if(guard[k]!=0xA5||
+      guard[32+400*240*3+k]!=0xA5){
+    fputs("FAIL: 3DS inflation oval scribbled past the framebuffer\n",stderr);
+    return 1;
+  }
+  top.fb=fb_top[0];dragging=olddrag;world.man=oldman;apply_outfit(0);
+  printf("N3_PRESSURE_PASS changed=%d bounded_head=1 skin_layers=1 wolf_fur=%d clipping=1\n",
+         diff,fur);
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("N3DS_PRESSURE_PROBE"))return n3_pressure_probe();
   if(getenv("N3DS_TILE_CLIP_PROBE"))return n3_tile_clip_probe();
 #ifdef MX_N3DS_ROT_WORK_COUNT
   if(getenv("N3DS_ROT_TIGHT_PROBE"))return n3_rot_tight_bounds_probe();

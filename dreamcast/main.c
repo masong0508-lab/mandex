@@ -64,6 +64,7 @@ static int hint_t;                            /* ticks left of the 'pull back' h
 static int bank_toast_t;                      /* rubber rebound trick shot HUD message */
 static int survivor_toast_t;                  /* rare catastrophic collapse escape */
 static int collapse_toast_t;                   /* capped severe aftershock tell */
+static int tnt_toast_t,tnt_toast_fuse;           /* simple TNT guidance, no new image assets */
 static float MAXHP[MX_NMAT];                 /* filled from the core's material table in main() */
 
 static uint32 argb(int r, int g, int b, int a){ return ((uint32)a << 24) | ((uint32)r << 16) | ((uint32)g << 8) | (uint32)b; }
@@ -208,6 +209,10 @@ static void seg(float x0, float y0, float x1, float y1, float w, float z, uint32
   quad4(X4, Y4, z, c);
 }
 static void puff(float cx, float cy, float r, float z, uint32 c){ atl(cx - r, cy - r, r * 2, r * 2, DCA_PUFF, z, c); }     /* soft round blob */
+/* Aspect-correct existing puff sprite, no new atlas or geometry pool. */
+static void soft_oval(float cx,float cy,float rx,float ry,float z,uint32 c){
+  atl(cx-rx,cy-ry,rx*2,ry*2,DCA_PUFF,z,c);
+}
 
 static float man_zoom = 1.0f;                           /* the end panels draw the man bigger */
 static float shx, shy;                                  /* screen shake */
@@ -281,6 +286,9 @@ static void toast_tick(void){
 }
 /* the man's colours: boxers (red family) and towel (pink family) are re-tinted in the decoded atlas by hue, keeping each texel's brightness */
 static int man_fur;                                                          /* the Wolfman outfit: flying frames get the wolf head */
+/* Four tiny pressure-art colors follow recolor_man, not the original
+   flesh tone when Wolfman fur or another skin variant is selected. */
+static uint32 belly_tone[4];
 static void recolor_man(int o){
   if(!tx_man) return;
   uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); int fur = mx_outfit_skin(o, sk);
@@ -317,6 +325,8 @@ static void recolor_man(int o){
   pvr_txr_load(tmp, tx_man, (uint32)(tot * 2));
   free(tmp);
   man_fur = fur;
+  for(int k=0;k<4;k++)
+    belly_tone[k]=argb(sk[k][0],sk[k][1],sk[k][2],255);
 }
 static void handle_events(void){
   for(int i = 0; i < world.nev; i++){
@@ -325,6 +335,9 @@ static void handle_events(void){
     switch(e->type){
     case EV_CELL: { const uint8_t *m = mx_material_rgb(e->m);
       spawn(e->x, e->y, argb(m[0], m[1], m[2], 255), 260); spawn(e->x, e->y, argb(m[0] / 2, m[1] / 2, m[2] / 2, 255), 220); break; }
+    case EV_TNT_FUSE: tnt_toast_t=100;tnt_toast_fuse=1;
+      for(int k=0;k<3;k++)spawn(e->x,e->y,argb(255,170,60,255),220);break;
+    case EV_TNT_SAFE: tnt_toast_t=72;tnt_toast_fuse=0;break;
     case EV_BOOM:   for(int k = 0; k < 30; k++) spawn(e->x, e->y, k & 1 ? argb(255, 160, 40, 255) : argb(255, 220, 90, 255), 600); break;
     case EV_SPLAT:  for(int k = 0; k < 20; k++) spawn(e->x, e->y, argb(125, 255, 90, 255), 380); break;
     case EV_CRACK:  for(int k = 0; k < 3; k++) spawn(e->x, e->y, e->m == MX_GLASS ? argb(235, 250, 255, 255) : argb(200, 190, 170, 255), 120);
@@ -504,6 +517,7 @@ static void idle_fx(int fx, float wx, float wy, int face){
 static void fx_step(int calm, int strain){
   fcount++;
   if(collapse_toast_t>0)collapse_toast_t--;
+  if(tnt_toast_t>0)tnt_toast_t--;
   if(calm){ mi_update(&mi); if(mi.fx) idle_fx(mi.fx, world.man.x, world.man.y, 1); } else mi_reset(&mi);     /* gags run only while he waits, hands off */
   if(world.state == MX_PLAY && world.man.mode == MAN_FLY && fcount % 10 == 0)                                  /* stink trail */
     spawn_k(PK_STINK, world.man.x - (world.man.vx > 0 ? 2 : -2), world.man.y + 1, (frand() - 0.5f) * 30, (frand() - 0.5f) * 20, 0.7f + frand() * 0.4f, argb(135, 220, 75, 255));
@@ -925,12 +939,30 @@ static void draw_all(void){
       man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
       man_rot = 0;
     }
-    if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){               /* only the belly swells; the face flushes as the pressure builds */
-      float f = m->inf, rx = 11 + f * 28, ry = 10 + f * 24, bx = x + face * f * 10, by = y + 6 + f * 4;
-      puff(bx, by, (rx > ry ? rx : ry) + 2, Z_MAN + 0.3f, argb(205, 135, 100, 255)); puff(bx, by, (rx > ry ? rx : ry), Z_MAN + 0.4f, argb(244, 183, 142, 255));
-      puff(bx - rx * 0.3f, by - ry * 0.45f, rx * 0.22f, Z_MAN + 0.5f, argb(255, 215, 180, 180));
-      puff(bx + face * rx * 0.8f, by + ry * 0.1f, 2 + f * 3, Z_MAN + 0.5f, argb(205, 135, 100, 255));
-      if(f > 0.45f){ float al = (f - 0.45f) * 1.6f; if(al > 0.75f) al = 0.75f; puff(x, y - 16, 9 + f * 3, Z_MAN + 0.45f, argb(235, 40, 50, (int)(255 * al))); }
+    if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){
+      /* Body-local oval with a much tighter max diameter than the old
+         78px circular overpaint. Keep the pose's limbs/face in view and
+         follow its real skin tone, including Wolfman grey fur. */
+      const float f=m->inf;
+      const float rx=14+f*13,ry=11+f*12;
+      const float bx=x+face*f*7,by=y+10+f*3;
+      soft_oval(bx,by,rx+2,ry+2,Z_MAN+.30f,belly_tone[1]);
+      soft_oval(bx,by,rx,ry,Z_MAN+.40f,belly_tone[0]);
+      soft_oval(bx-rx*.34f,by-ry*.43f,rx*.24f,ry*.22f,
+                Z_MAN+.50f,argb(255,235,215,man_fur?100:165));
+      /* Waistline hugs the base of the oval; compact navel and high-
+         pressure creases provide depth without another huge sprite. */
+      seg(bx-rx*.50f,by+ry*.66f,bx,by+ry*.76f,1.7f,
+          Z_MAN+.53f,argb(150,38,51,205));
+      seg(bx,by+ry*.76f,bx+rx*.50f,by+ry*.66f,1.7f,
+          Z_MAN+.53f,argb(150,38,51,205));
+      puff(bx+face*rx*.34f,by+ry*.12f,2.2f,Z_MAN+.55f,belly_tone[1]);
+      if(f>.4f){
+        seg(bx+face*rx*.73f,by-ry*.3f,
+            bx+face*rx*.77f,by-ry*.07f,1.2f,Z_MAN+.57f,belly_tone[1]);
+      }
+      if(f>.75f)
+        puff(bx-rx*.40f,by-ry*.48f,1.8f,Z_MAN+.6f,belly_tone[2]);
     }
   }
   if(m->mode == MAN_AIM)
@@ -992,8 +1024,21 @@ static void draw_all(void){
   if(world.combo > 1 && world.combo_left > 0){
     text(mx_combo_taunt(world.combo), 18, 69, 18, argb(255, 126, 176, 255), 0, Z_HUD + 0.1f);
     quad(18, 74, 174.0f * world.combo_left / 2.5f, 3, Z_HUD + 0.1f, argb(255, 210, 63, 255)); }
+  /* The short first-ignition popup is not the only warning: count any
+     still-burning mobile TNT continuously, without another chunk scan. */
+  if(world.state==MX_PLAY && world.tnt_live){
+    int urgent=world.tnt_soonest<=8;
+    quad(244,75,152,22,Z_HUD,argb(49,28,24,230));
+    quad(244,75,3,22,Z_HUD+0.05f,argb(urgent?255:255,urgent?66:174,65,255));
+    snprintf(buf,sizeof buf,"TNT FUSE x%d%s",world.tnt_live,urgent?" !":"");
+    text(buf,252,91,15,argb(255,urgent?137:213,urgent?115:145,255),0,Z_HUD+0.1f);
+  }
   if(bank_toast_t > 0 && world.state == MX_PLAY)
     text("BANK SHOT! +1500", 18, world.combo > 1 ? 99 : 69, 20, argb(255, 126, 176, 255), 0, Z_HUD + 0.1f);
+  if(tnt_toast_t>0 && world.state==MX_PLAY)
+    text(tnt_toast_fuse?"TNT FUSE! TAKE COVER":"TNT SURVIVED THIS FALL",
+         320,134,19,argb(tnt_toast_fuse?255:145,tnt_toast_fuse?169:236,
+                        tnt_toast_fuse?70:185,230),1,Z_HUD+0.2f);
   if(collapse_toast_t>0 && world.state==MX_PLAY)
     text("BUILDING DOWN!",320,104,24,argb(255,210,63,
          collapse_toast_t<24?collapse_toast_t*10:240),1,Z_HUD+0.2f);
@@ -1045,7 +1090,7 @@ static void draw_all(void){
     int a = (int)(255 * (world.banner > 1 ? 1.0f : world.banner));
     if(world.level == MX_HQ_LEVEL){ char dn[32]; snprintf(dn, sizeof dn, "DISTRICT %d OF %d", world.district + 1, MX_HQ_DISTRICTS); text(dn, 320, 150, 22, argb(255, 126, 176, a), 1, Z_HUD); }
     text(nm, 320, 180, 40, argb(255, 255, 255, a), 1, Z_HUD);
-    text("EVICT EVERY LANDLORD!", 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
+    text(mx_level_tactic(world.level), 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
   }
 
   { float tp = (m->mode == MAN_FLY || m->mode == MAN_STUCK) ? (m->x - MX_ANCHOR_X) * 3.0f : 0; cam_pan += (tp - cam_pan) * 0.06f;
@@ -1079,7 +1124,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ bank_toast_t = survivor_toast_t = collapse_toast_t = 0; mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
+static void load_level(int n){ bank_toast_t = survivor_toast_t = collapse_toast_t = tnt_toast_t = 0; mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
 
 static void draw_intro(void){
   intro_draw(ic_top, ic_bot); ic_upload(tx_ic_top, ic_top); ic_upload(tx_ic_bot, ic_bot);

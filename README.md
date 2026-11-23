@@ -31,6 +31,91 @@ outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
   erase existing cases, and parrying frees a slot for later attacks.
 - [Projectile budget parity and regression evidence](docs/BROWSER_BRIEFCASE_BUDGET_2026-11-22.md).
 
+## November 22: all-chapter level tactics and clearer first-time play
+
+- Every one of the **40 original and chapter-two levels** now has a
+  concise stage-specific objective hint. They tell players whether to
+  attack supports, trigger buried TNT, bank off rubber, release sand, use
+  pneumatic tubes, jump through walk stages, or parry briefcases.
+- The Nintendo DS and Dreamcast already have opening-tip slots; those now
+  show useful instructions instead of repeating "evict every landlord."
+  The Nintendo 3DS shows the same message during the original brief stage
+  introduction. Browser levels without their own authored tutorial receive
+  the same guidance; existing more detailed browser tutorials are preserved.
+- Hints are **static ROM text**, not per-frame allocations or new levels.
+  Objective rules and physics remain identical; no save schema, extra
+  sprite, framebuffer or gameplay timer was added.
+- [Cross-port tactic parity and checks](docs/EARLY_LEVEL_TACTICS_2026-11-22.md).
+
+## November 22: cross-port presentation, persistent TNT danger and pressure artwork
+
+- The shared C physics engine now exposes **live armed moving TNT count** and
+  the most urgent remaining fuse, updated inside the existing physics scan.
+  DS, 3DS and Dreamcast keep a readable warning visible while any loose charge
+  burns, instead of relying on a short popup that can disappear mid-collapse.
+  No second rubble scan is performed by the HUD, and no new heap buffers or
+  game-save fields were added.
+- Nintendo 3DS and Dreamcast now use a compact, lower-torso pressure shape
+  with graduated highlight, creases and an attached waistband rather than
+  a giant flat circular overpaint. The 3DS uses a clipped integer ellipse
+  rasterizer and the already cached costume tones. Dreamcast reuses its
+  existing puff atlas, scaled into an oval, and copies the skin/fur palette
+  only when an outfit is changed.
+- The previous Nintendo DS bounded inflation sprite remains unchanged.
+  No gameplay physics, pressure timing, collision radii or difficulty
+  settings were adjusted on any port.
+- New tests check multi-charge urgency, fuse expiry, silhouette bounds,
+  screen-edge clipping and Wolfman fur recolours. Passing host tests does
+  not establish sustained FPS on original hardware.
+- [Detailed implementation and verification](docs/PRESSURE_AND_TNT_FEEDBACK_2026-11-22.md).
+
+## November 22: late-Wolfman alley expansion and console tactics
+
+- The final **12 Wolfman levels** now include a second small destructible
+  encounter between houses two and three: a glass signal, a cushioned
+  rubber spring gate, a collapsible sandbag post, or a reinforced steel gate.
+  The original first alley encounter is retained.
+- The hazards use the game's existing TNT, rubble, collisions and materials.
+  The DS, 3DS and Dreamcast now give short **level-specific tactics**;
+  the browser has matching stage tips. No new framebuffer, atlas, physics
+  pool, NPC, save schema or stage ID is introduced.
+- Real map constructors are checked across fixed/float C and JavaScript.
+  See [level design and validation](docs/WOLFMAN_NIGHT_ALLEYS_2026-11-22.md).
+
+## November 22: falling TNT, impact hitboxes and fuse guidance
+
+- **Detached TNT can fall safely.** Gentle contacts and rubber/sand cushions
+  do not automatically detonate it. Moderate collisions may arm a short fuse;
+  violent collisions or direct destruction still explode, as do nearby blasts.
+- An armed loose TNT voxel continues falling, rotating and colliding until the
+  fuse expires. The explosion occurs at its **current position**, including
+  after a building collapses or rubble moves across the map. Nearby TNT inside
+  moving debris can ignite too, but only if its actual voxel is within range.
+- Walking punches now use rounded-corner hitboxes for individual falling
+  blocks; browser walking collision uses the contacted voxel rather than the
+  debris chunk's average position. This removes false corner hits and ghost
+  gaps around unusually shaped debris.
+- Browser and console UI report **TNT FUSE** or a charge that **SURVIVED**
+  a risky fall. The browser also shows an active-fuse warning and explains
+  the rules in Options. No new art, framebuffers or save changes.
+- [Explosion behavior, performance boundaries and focused regressions](docs/MOBILE_TNT_IMPACTS_2026-11-22.md).
+
+## November 22: Wolfman street encounters across chapter 3
+
+- All 20 Wolfman levels now feature one of **four** new tactical street
+  landmarks between the main buildings: a glass tollhouse with a thrower,
+  a rubber rebound kiosk with a fast patrol, a TNT-triggered sand hopper,
+  or a fortified tax bunker with an upper-floor defender.
+- The structures use existing materials, TNT, landlords, rooms and
+  destruction physics; there are no extra textures, framebuffers, heap
+  pools or per-frame drawing passes. Landlord counts remain bounded.
+- The browser gives short tactical tips for each design; DS, 3DS and
+  Dreamcast use the identical shared C level geometry and enemy placements.
+  Level indices, saves, achievements and the 60-stage progression remain
+  unchanged. New host checks guard fixed/float geometry and stability;
+  optional browser-vs-core parity now also covers the Wolfman chapter.
+- [World layouts, validation and known hardware limits](docs/WOLFMAN_STREETS_2026-11-22.md).
+
 ## November 22 combat counterplay: briefcase parries
 
 - While walking, punch an incoming thrown briefcase to smash it before it

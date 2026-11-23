@@ -1,0 +1,29 @@
+name: All-chapter gameplay guidance parity
+on:
+  pull_request:
+    paths:
+      - 'core/mx.c'
+      - 'web/index.html'
+      - 'ds/source/main.c'
+      - '3ds/main.c'
+      - 'dreamcast/main.c'
+      - 'test/level_tactic_test.c'
+      - 'test/browser_early_tactics_test.js'
+      - '.github/workflows/level-guidance-gates.yml'
+  workflow_dispatch:
+jobs:
+  stage-hints:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shared fixed/float C level-specific hints
+        run: |
+          for mode in float fixed; do
+            flags=''
+            if test "$mode" = fixed; then flags='-DMX_FIXED'; fi
+            gcc -std=c99 -O2 -Wall -Werror $flags -Icore core/mx.c test/level_tactic_test.c -lm -o "/tmp/levels_$mode"
+            "/tmp/levels_$mode"
+          done
+      - name: Browser hint table matches the shared core and preserves authored tutorials
+        run: node test/browser_early_tactics_test.js
