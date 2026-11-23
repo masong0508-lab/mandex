@@ -8,7 +8,7 @@ Only DS visual presentation changes; the core retains its **3.6-second inflate/p
 The DS rubble renderer now flashes a tiny fuse cap on the active charge's actual transformed voxel coordinates, rather than at the parent rubble centroid. Other ports continue to use their previous indicators.
 
 ## Expanded Wolfman encounters — shared across C and browser
-Rubber kiosks at chapter 3 indices 1, 5, 9, 13 and 17 have an upper **rubber spring shelf** (x=annex+2..5, row 55) and lower rubber landing bed (row 63). Sand hoppers at indices 2, 6, 10, 14 and 18 have a **sand landing bed** (same x, row 63). Materials use the existing impact damping behavior: soft falls are more likely to leave TNT intact, but explosions and violent collisions can still trigger it. They add ten gameplay situations without a new level ID, extra NPC, world storage or simulation cost.
+Rubber kiosks at chapter 3 indices 1, 5, 9, 13 and 17 have an upper **rubber spring shelf** (x=annex+2..5, row 51) and lower rubber landing bed (row 59). Sand hoppers at indices 2, 6, 10, 14 and 18 have a **sand landing bed** (same x, row 59). Materials use the existing impact damping behavior: soft falls are more likely to leave TNT intact, but explosions and violent collisions can still trigger it. They add ten gameplay situations without a new level ID, extra NPC, world storage or simulation cost.
 
 All layout coordinates and descriptions are mirrored in `core/mx.c` and `web/index.html`; `test/wolf_annex_test.c` checks them in fixed/float modes.
 
@@ -17,3 +17,5 @@ All layout coordinates and descriptions are mirrored in `core/mx.c` and `web/ind
 - `test/wolf_annex_test.c`: exact landing bed geometry and 3 seconds of initial world stability for each of the 20 Wolfman levels.
 - `test/mobile_tnt_test.c`: real impact material damping, delayed fuse and precise explosion origin.
 - `Build Nintendo DS` and `Host tests` in CI check compilation and regression behavior. Native hardware FPS and hands-on playability still require a physical-device playtest.
+
+The landing pads are exactly inside the 60-row physics grid: floor 59 and first upper landing 51. CI validates occupied materials at those locations, not just placement calls.

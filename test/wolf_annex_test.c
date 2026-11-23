@@ -36,12 +36,12 @@ int main(void){
       ok(CELL(ax,53)==MX_GLASS && CELL(ax+2,57)==MX_TNT,40+i,"glass booth and ground charge");
     }else if(site==1){
       ok(CELL(ax,53)==MX_RUBBER && CELL(ax+2,49)==MX_TNT,40+i,"rubber rebound and upper charge");
-      ok(CELL(ax+2,55)==MX_RUBBER && CELL(ax+5,63)==MX_RUBBER,40+i,
+      ok(CELL(ax+2,51)==MX_RUBBER && CELL(ax+5,MX_ROWS-1)==MX_RUBBER,40+i,
          "upper and lower rubber shelves cushion moving TNT");
     }else if(site==2){
       ok(CELL(ax,53)==MX_GLASS && CELL(ax+1,45)==MX_SAND &&
          CELL(ax+3,49)==MX_TNT,40+i,"sand hopper and release pin");
-      ok(CELL(ax+2,63)==MX_SAND && CELL(ax+5,63)==MX_SAND,40+i,
+      ok(CELL(ax+2,MX_ROWS-1)==MX_SAND && CELL(ax+5,MX_ROWS-1)==MX_SAND,40+i,
          "soft sand floor forms a second crash zone");
     }else{
       ok(CELL(ax,53)==MX_BRICK && CELL(ax+4,41)==MX_STONE &&

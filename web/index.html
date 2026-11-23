@@ -502,11 +502,11 @@ const CH2=LEVELS.length;
     tnt(ax+2,59);tgt(ax+4,51,'thrower',2);break;
    case 1: // rubber sidewalls for a deliberate ricochet or roof entry
     house({x:ax,w:8,floors:2,fh:8,wall:RUBBER,floor:WOOD,roof:WOOD,paper:'#f6d6ec'});
-    rect(ax+2,55,4,1,RUBBER);rect(ax+2,63,4,1,RUBBER);
+    rect(ax+2,ROWS-1-8,4,1,RUBBER);rect(ax+2,ROWS-1,4,1,RUBBER);
     tnt(ax+2,51);tgt(ax+4,59,tier?'sprinter':'walker',2);break;
    case 2: // upper-floor sand reservoir; TNT pin releases it
     house({x:ax,w:8,floors:2,fh:8,wall:GLASS,floor:WOOD,roof:WOOD,paper:'#e2d6bd'});
-    rect(ax+2,63,4,1,SAND);rect(ax+1,44,6,7,SAND);
+    rect(ax+2,ROWS-1,4,1,SAND);rect(ax+1,44,6,7,SAND);
     tnt(ax+3,51);tgt(ax+4,59,'walker',2);break;
    default: // stone-capped brick tax bunker
     house({x:ax,w:8,floors:2,fh:8,wall:BRICK,floor:WOOD,roof:STONE,paper:'#e6d4b8'});
