@@ -761,6 +761,9 @@ static void blast_moving_tnt(MxWorld *w,real x,real y){
 /* Once per GAME frame, never once per physics substep. Inactive chunks and
    TNT-free chunks are skipped, so normal stages incur no cell scan. */
 static void update_moving_tnt(MxWorld *w){
+  /* Keep the HUD honest at almost zero cost: reuse the same per-charge
+     loop that already decrements every fuse once per frame. */
+  w->tnt_live=0;w->tnt_soonest=0;
   for(int c=0;c<MX_MAX_CHUNKS;c++){
     MxChunk *ch=&w->chunks[c];
     if(!ch->active||!ch->has_tnt)continue;
@@ -781,7 +784,12 @@ static void update_moving_tnt(MxWorld *w){
       if(a->dead||a->m!=MX_TNT||!a->fuse)continue;
       a->fuse--;
       if(!a->fuse)destroy_moving_tnt(w,a);
-      else still_fused=1;
+      else {
+        still_fused=1;
+        w->tnt_live++;
+        if(!w->tnt_soonest||a->fuse<w->tnt_soonest)
+          w->tnt_soonest=a->fuse;
+      }
     }
     ch->tnt_fused=(uint8_t)still_fused;
     ch->tnt_impact=0;ch->tnt_hit=-1;

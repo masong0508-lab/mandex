@@ -323,6 +323,10 @@ typedef struct {
   int16_t bnext[MX_MAX_CHUNKS * MX_CHUNK_CELLS];
   int16_t expl[64][2];
   int nexpl;
+  /* Display-only status cached during the EXISTING moving-TNT scan.
+     Never run another render-time chunk/cell search on small consoles. */
+  int tnt_live;               /* number of separately armed moving TNT voxels */
+  uint8_t tnt_soonest;        /* ticks to earliest blast, zero when none */
 } MxWorld;
 
 /* Anchor of the sling, in cells. */

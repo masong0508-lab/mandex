@@ -49,9 +49,13 @@ int main(void){
   ch->tnt_impact=RI(56);update_moving_tnt(&W);
   CHECK(ch->cells[0].fuse==TNT_FUSE_TICKS-1 && !ch->cells[0].dead && W.nexpl==0,
         "violent contact arms rather than teleporting the explosion to the original grid");
+  CHECK(W.tnt_live==1 && W.tnt_soonest==TNT_FUSE_TICKS-1,
+        "display status counts individual active charges and exact remaining fuse");
   for(int i=0;i<TNT_FUSE_TICKS-1;i++)update_moving_tnt(&W);
   CHECK(ch->cells[0].dead && W.nexpl==1 && W.expl[0][0]==30 && W.expl[0][1]==30,
         "fuse expires at the charge's current location, exactly once");
+  CHECK(W.tnt_live==0 && W.tnt_soonest==0,
+        "persistent warning disappears on exactly the frame the fuse finishes");
   W.ntargets=1;W.targets[0].alive=1;W.targets[0].x=R(33.5);W.targets[0].y=R(29.5);
   process_expl(&W);
   CHECK(events(EV_BOOM)==1 && !W.targets[0].alive,
@@ -114,6 +118,18 @@ int main(void){
   update_moving_tnt(&W);
   CHECK(!ch->cells[0].fuse && ch->cells[1].fuse,
         "only directly struck TNT ignites in a two-charge falling chunk");
+  scene();ch=charge(R(26.5),R(27.5));ch->count=2;
+  remote=&ch->cells[1];memset(remote,0,sizeof *remote);
+  remote->m=MX_TNT;remote->h=RI(8);remote->wx=R(28.5);remote->wy=R(27.5);
+  remote->lx=RI(2);remote->edge=1;recompute(ch);
+  arm_moving_tnt(&W,ch,&ch->cells[0],16);
+  arm_moving_tnt(&W,ch,remote,8);
+  update_moving_tnt(&W);
+  CHECK(W.tnt_live==2 && W.tnt_soonest==7,
+        "two TNT charges in one chunk produce an accurate count and urgent timer");
+  for(int i=0;i<7;i++)update_moving_tnt(&W);
+  CHECK(W.tnt_live==1 && W.tnt_soonest==8,
+        "first detonation leaves the second independently burning charge visible");
   if(errors){fprintf(stderr,"MOBILE_TNT_FAIL failures=%d\n",errors);return 1;}
   puts("MOBILE_TNT_PASS safe_move=1 impact=1 fuse=1 chain=1 precise_hitbox=1 fixed_size=24");
   return 0;

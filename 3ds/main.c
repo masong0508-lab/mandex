@@ -1338,6 +1338,15 @@ static void draw_hud(const View *camera){
   if(world.combo > 1 && world.combo_left > 0){
     rect(&top, 6, 27, 188, 14, RGB(27, 16, 43)); text(&top, 12, 30, mx_combo_taunt(world.combo), 1, RGB(255, 126, 176));
     rect(&top, 6, 41, (int)(188 * RTOF(world.combo_left) / 2.5f), 2, RGB(255, 210, 63)); }
+  /* Read the shared engine's cached moving-charge count (no second
+     physics scan, no extra framebuffer, no sprite atlas). */
+  if(world.state==MX_PLAY && world.tnt_live){
+    int urgent=world.tnt_soonest<=8;
+    rect(&top,246,49,148,19,RGB(50,29,27));
+    rect(&top,246,49,3,19,urgent && (frame&4)?RGB(255,65,55):RGB(255,188,70));
+    snprintf(b,sizeof b,"TNT FUSE x%d%s",world.tnt_live,urgent?" !":"");
+    text(&top,256,55,b,1,urgent?RGB(255,129,94):RGB(255,211,137));
+  }
   /* Project the sole remaining landlord through this eye's camera. Only
      display a cue outside the playable view, never over a visible actor.
      50px top and 30px bottom preserve objective and control strips. */

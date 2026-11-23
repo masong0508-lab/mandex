@@ -997,6 +997,15 @@ static void draw_all(void){
   if(world.combo > 1 && world.combo_left > 0){
     text(mx_combo_taunt(world.combo), 18, 69, 18, argb(255, 126, 176, 255), 0, Z_HUD + 0.1f);
     quad(18, 74, 174.0f * world.combo_left / 2.5f, 3, Z_HUD + 0.1f, argb(255, 210, 63, 255)); }
+  /* The short first-ignition popup is not the only warning: count any
+     still-burning mobile TNT continuously, without another chunk scan. */
+  if(world.state==MX_PLAY && world.tnt_live){
+    int urgent=world.tnt_soonest<=8;
+    quad(244,75,152,22,Z_HUD,argb(49,28,24,230));
+    quad(244,75,3,22,Z_HUD+0.05f,argb(urgent?255:255,urgent?66:174,65,255));
+    snprintf(buf,sizeof buf,"TNT FUSE x%d%s",world.tnt_live,urgent?" !":"");
+    text(buf,252,91,15,argb(255,urgent?137:213,urgent?115:145,255),0,Z_HUD+0.1f);
+  }
   if(bank_toast_t > 0 && world.state == MX_PLAY)
     text("BANK SHOT! +1500", 18, world.combo > 1 ? 99 : 69, 20, argb(255, 126, 176, 255), 0, Z_HUD + 0.1f);
   if(tnt_toast_t>0 && world.state==MX_PLAY)

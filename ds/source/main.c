@@ -1421,6 +1421,16 @@ static void top_hud(u8 *b){
       gfx_text_o(b,px,y,obj.direction<0?"<":">",C_PINK,C_BLACK,1);
     }
   }
+  /* Live TNT alert persists throughout the real moving-fuse lifetime.
+     Counts are cached in the physics pass, so this HUD scans no debris. */
+  if(world.state==MX_PLAY && world.tnt_live>0){
+    int urgent=world.tnt_soonest<=8;
+    gfx_rect(b,160,35,92,11,C_UIBG);
+    gfx_rect(b,160,35,2,11,urgent && (frame&4)?C_RED:C_GOLD);
+    gfx_text_o(b,165,38,"TNT FUSE",urgent?C_RED:C_GOLD,C_BLACK,1);
+    gfx_text_o(b,216,38,gfx_int(world.tnt_live),C_WHITE,C_BLACK,1);
+    if(urgent)gfx_text_o(b,240,38,"!",C_RED,C_BLACK,1);
+  }
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                      /* walk levels: the clock, and what the buttons do */
     int k = gfx_clamp((int)((world.man.wt * 100 / MX_WALK_T) >> 12), 0, 100);
     gfx_rect(b, 4, 36, 82, 7, C_UIBG); gfx_rect(b, 5, 37, 80, 5, C_DARK); gfx_rect(b, 5, 37, k * 80 / 100, 5, k > 30 ? C_GOO : C_RED);
