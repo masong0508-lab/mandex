@@ -101,6 +101,8 @@ for mode in float fixed; do
   gcc -std=c99 -O2 -Wall $flags -I../core ../core/mx.c wolf_annex_test.c -lm -o "wolf_annex_$mode"
   "./wolf_annex_$mode"
 done
+echo "--- Browser late Wolfman alleys: all 12 added structures and truthful tactical tips ---"
+if command -v node >/dev/null 2>&1;then node browser_wolf_alley_test.js;fi
 echo "--- Moving TNT: padded fuse state, impact/safe outcomes, precise blast hitboxes (float/fixed/browser) ---"
 for mode in float fixed;do
   flags=""

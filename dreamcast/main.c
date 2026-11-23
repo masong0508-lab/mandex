@@ -1054,7 +1054,7 @@ static void draw_all(void){
     int a = (int)(255 * (world.banner > 1 ? 1.0f : world.banner));
     if(world.level == MX_HQ_LEVEL){ char dn[32]; snprintf(dn, sizeof dn, "DISTRICT %d OF %d", world.district + 1, MX_HQ_DISTRICTS); text(dn, 320, 150, 22, argb(255, 126, 176, a), 1, Z_HUD); }
     text(nm, 320, 180, 40, argb(255, 255, 255, a), 1, Z_HUD);
-    text("EVICT EVERY LANDLORD!", 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
+    text(mx_level_tactic(world.level), 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
   }
 
   { float tp = (m->mode == MAN_FLY || m->mode == MAN_STUCK) ? (m->x - MX_ANCHOR_X) * 3.0f : 0; cam_pan += (tp - cam_pan) * 0.06f;

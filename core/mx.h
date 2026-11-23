@@ -359,6 +359,7 @@ const char *mx_combo_taunt(int count);  /* compact adult-comedy stingers shared 
 int  mx_targets_alive(const MxWorld *w);
 int  mx_cells_left(const MxWorld *w);
 const char *mx_level_name(int level);
+const char *mx_level_tactic(int level); /* read-only stage guidance */
 void mx_set_wobble_budget(MxWorld *w, int cells);   /* handhelds: cap the lattice work per frame (0 = off); hits then wake fewer cells instead of stalling the frame */
 void mx_set_substeps(MxWorld *w, int n);       /* 2..4: physics steps per frame */
 /* Ballistic preview of the current pull: position after t seconds (for aim dots). */

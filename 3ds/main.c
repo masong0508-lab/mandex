@@ -1362,6 +1362,15 @@ static void draw_hud(const View *camera){
       }
     }
   }
+  /* The new Wolfman tactical card appears only during the original 2.4s
+     level banner. A cheap screen-space rectangle, no extra atlas/heap. */
+  if(app==ST_PLAY && world.level>=MX_CH3_START &&
+     world.banner>0 && world.state==MX_PLAY &&
+     world.man.mode==MAN_AIM && !dragging){
+    rect(&top,45,60,310,27,RGB(19,23,38));
+    rect(&top,45,60,310,2,RGB(255,210,63));
+    textc(&top,200,68,mx_level_tactic(world.level),1,RGB(255,210,63));
+  }
   if(toast_t > 0 && toast_id >= 0){                                          /* achievement popup: drops in, gold frame, star badge, time bar */
     int t = toast_t, off = t < 10 ? (10 - t) * 5 : t > 140 ? (t - 140) * 5 : 0, y = 24 - off, x = 84, w = 232, h = 36;
     int oc = toast_id >= 100; u32 fc = oc ? RGB(125, 255, 90) : RGB(255, 210, 63);

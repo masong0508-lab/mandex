@@ -2295,6 +2295,24 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord"};
 static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
 const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
+/* Compact ROM-only guidance; each hint fits a 256-pixel DS banner. */
+const char *mx_level_tactic(int l){
+  static const char *const annex[4]={
+    "GLASS BOOTH: HIT THE LOWER TNT", "RUBBER SHELF: CUSHION FALLING TNT",
+    "SAND HOPPER: DROP THE SAND", "TAX BUNKER: BREAK THE ROOF"
+  };
+  static const char *const alley[4]={
+    "NIGHT ALLEY: SHATTER THE SIGNAL", "NIGHT ALLEY: BANK OFF THE RUBBER",
+    "NIGHT ALLEY: DUMP THE SANDBAGS", "NIGHT ALLEY: CRACK THE GLASS ROOF"
+  };
+  if(l<MX_CH3_START || l>=MX_NUM_LEVELS)return "EVICT EVERY LANDLORD";
+  int i=l-MX_CH3_START;
+  if(i==0)return "WOLFMAN: LANDLORDS HAVE HEALTH BARS";
+  if(i==5)return "SHIELD GUARDS: HIT FROM BEHIND";
+  if(i==10)return "HEALERS: STOP THEM FIRST";
+  if(i==15)return "BOSSES: WATCH FOR DOUBLE THROWS";
+  return i>=8?alley[i%4]:annex[i%4];
+}
 
 
 /* ---- chapter 3 (the Wolfman): 20 levels built from two or three houses each, exactly as the web game's generator does (same formulas, same order) ---- */
@@ -2360,6 +2378,39 @@ static void build_ch3(MxWorld *w, int i){
       tnt(w, ax + 2, 59);
       tgtr(w, ax + 4, 51, tier ? LK_SHIELD : LK_BAT, 2);
       break;
+    }
+  }
+  /* The last 12 Wolfman stages gain a second four-cell booth in the
+     gap between houses two and three (minimum gap six cells).
+     No additional enemies, runtime arrays, or frame passes. */
+  if(nh==3){
+    int gap=H[2].x-(H[1].x+H[1].w);
+    if(gap>=6){
+      int bx=H[1].x+H[1].w+(gap-4)/2;
+      switch(i%4){
+      case 0: /* glass signal booth with an interior TNT keg */
+        house_ex(w,bx,MX_ROWS-1,4,1,7,1,1,MX_GLASS,MX_WOOD,MX_GLASS,0,0);
+        rect_fill(w,bx+1,48,2,2,MX_GLASS);
+        tnt(w,bx+1,59);
+        break;
+      case 1: /* rubber spring gate with a safe TNT crash mat */
+        house_ex(w,bx,MX_ROWS-1,4,1,7,1,1,MX_RUBBER,MX_WOOD,MX_WOOD,0,0);
+        rect_fill(w,bx+1,59,2,1,MX_RUBBER);
+        rect_fill(w,bx+1,49,2,1,MX_RUBBER);
+        tnt(w,bx+1,59);
+        break;
+      case 2: /* sandbag spill station: real soft falling material */
+        house_ex(w,bx,MX_ROWS-1,4,1,7,1,1,MX_GLASS,MX_WOOD,MX_WOOD,0,0);
+        rect_fill(w,bx+1,56,2,3,MX_SAND);
+        rect_fill(w,bx+1,48,2,2,MX_SAND);
+        tnt(w,bx+1,56);
+        break;
+      default: /* steel gate, glass weak roof */
+        house_ex(w,bx,MX_ROWS-1,4,1,7,1,1,MX_STEEL,MX_WOOD,MX_GLASS,0,0);
+        rect_fill(w,bx+1,48,2,2,MX_STEEL);
+        tnt(w,bx+1,59);
+        break;
+      }
     }
   }
 }

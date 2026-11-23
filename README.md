@@ -22,6 +22,19 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 22: late-Wolfman alley expansion and console tactics
+
+- The final **12 Wolfman levels** now include a second small destructible
+  encounter between houses two and three: a glass signal, a cushioned
+  rubber spring gate, a collapsible sandbag post, or a reinforced steel gate.
+  The original first alley encounter is retained.
+- The hazards use the game's existing TNT, rubble, collisions and materials.
+  The DS, 3DS and Dreamcast now give short **level-specific tactics**;
+  the browser has matching stage tips. No new framebuffer, atlas, physics
+  pool, NPC, save schema or stage ID is introduced.
+- Real map constructors are checked across fixed/float C and JavaScript.
+  See [level design and validation](docs/WOLFMAN_NIGHT_ALLEYS_2026-11-22.md).
+
 ## November 22: falling TNT, impact hitboxes and fuse guidance
 
 - **Detached TNT can fall safely.** Gentle contacts and rubber/sand cushions

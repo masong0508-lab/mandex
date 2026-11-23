@@ -1448,7 +1448,7 @@ static void banner(u8 *b){
   { static const char *const DN[MX_HQ_DISTRICTS] = { "DISTRICT 1 OF 3", "DISTRICT 2 OF 3", "DISTRICT 3 OF 3" };
     gfx_text_c(b, 128 - slide, 76, world.level == MX_HQ_LEVEL ? DN[world.district % MX_HQ_DISTRICTS] : "LEVEL", C_GOLD, C_BLACK, 1); }
   gfx_text_c(b, 128 + slide, 84, mx_level_name(world.level), C_WHITE, C_BLACK, 2);
-  gfx_text_c(b, 128 - slide, 102, "EVICT EVERY LANDLORD", C_PINK, C_BLACK, 1);
+  gfx_text_c(b, 128 - slide, 102, mx_level_tactic(world.level), C_PINK, C_BLACK, 1);
 }
 
 static void end_panel(u8 *b){

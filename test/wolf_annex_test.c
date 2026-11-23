@@ -2,6 +2,7 @@
    street. Test actual loaded worlds in fixed (DS) and float (3DS/DC) modes.
    Web parity: PARITY=1 sh test/run_tests.sh (requires Playwright). */
 #include <stdio.h>
+#include <string.h>
 #include "mx.h"
 static MxWorld W;
 static int failed;
@@ -48,6 +49,38 @@ int main(void){
       ok(CELL(ax,53)==MX_BRICK && CELL(ax+4,41)==MX_STONE &&
          CELL(ax+2,57)==MX_TNT,40+i,"armored roof and accessible charge");
     }
+    /* In the final 12 maps, a second four-cell landmark appears in the
+       second alley. Inspect actual loaded cells and keep room/NPC pools
+       beneath their fixed maximums. */
+    if(i>=8){
+      int x2=80+(i%2)*4,w2=10+(i%5)*2;
+      int gap2=108-(x2+w2), bx=x2+w2+(gap2-4)/2;
+      ok(gap2>=6 && bx>=x2+w2+1 && bx+4<=107,40+i,
+         "second alley fits the main houses without overlap");
+      int wall=site==0||site==2?MX_GLASS:site==1?MX_RUBBER:MX_STEEL;
+      int roof=site==0||site==3?MX_GLASS:MX_WOOD;
+      ok(CELL(bx,54)==wall && CELL(bx+1,51)==roof,40+i,
+         "second alley has the correct themed wall and roof");
+      int charge_row=site==2?54:57;
+      ok(CELL(bx+1,charge_row)==MX_TNT &&
+         CELL(bx+2,charge_row+1)==MX_TNT,40+i,
+         "detonatable alley charge is two by two and inside the booth");
+      if(site==0)
+        ok(CELL(bx+1,48)==MX_GLASS && CELL(bx+2,49)==MX_GLASS,
+           40+i,"glass signal remains visible above its roof");
+      if(site==1)
+        ok(CELL(bx+1,59)==MX_RUBBER && CELL(bx+2,49)==MX_RUBBER,
+           40+i,"spring gate has soft landing floor and rubber cap");
+      if(site==2)
+        ok(CELL(bx+1,56)==MX_SAND && CELL(bx+2,58)==MX_SAND &&
+           CELL(bx+1,48)==MX_SAND,40+i,
+           "sandbag spill includes real lower and upper sand blocks");
+      if(site==3)
+        ok(CELL(bx+1,48)==MX_STEEL && CELL(bx+2,49)==MX_STEEL,
+           40+i,"steel signal anchored above the breakable roof");
+    }
+    ok(strlen(mx_level_tactic(40+i))<=52,40+i,
+       "console mission tactic fits the small handheld level banner");
     int cells=mx_cells_left(&W);
     for(int f=0;f<180;f++)mx_update(&W,R(1.0/60.0));
     int chunks=0;

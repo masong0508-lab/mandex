@@ -478,13 +478,19 @@ const CH2=LEVELS.length;
    'RUBBER KIOSK: spring shelves can cushion falling TNT!',
    'SAND HOPPER: dump sand; the soft floor can cushion loose TNT!',
    'TAX BUNKER: break into the upstairs office through the weak floor!'
+  ],
+  ALLEY_TIPS=[
+   'NIGHT ALLEY: shatter the glass signal and its TNT!',
+   'NIGHT ALLEY: bank off the rubber; TNT may survive!',
+   'NIGHT ALLEY: break the sandbags loose from above!',
+   'NIGHT ALLEY: crack the glass roof of the steel gate!'
   ];
  for(let i=0;i<20;i++){
   const tier=Math.min(3,(i/5)|0),kinds=[['walker','thrower','bat'],['walker','shield','sprinter','thrower'],['shield','sprinter','healer','bat','thrower'],['boss','shield','healer','sprinter','thrower']][tier];
   const m1=MATS[i%5],m2=MATS[(i*2+1)%5],m3=MATS[(i*3+2)%5];
   const H1={x:48+(i%3)*4,w:8+(i%4)*2,floors:2+(i%4),fh:8+(i%3)},H2={x:80+(i%2)*4,w:10+(i%5)*2,floors:2+((i+1)%4),fh:9+(i%2)},H3={x:108,w:8,floors:2+(i%3),fh:8};
   const hs=[[H1,m1],[H2,m2]];if(i>=8)hs.push([H3,m3]);
-  LEVELS.push({name:NAMES[i],men:5+((i/5)|0)+(i>=15?1:0),tip:TIPS[i]||ANNEX_TIPS[i%4],build(){
+  LEVELS.push({name:NAMES[i],men:5+((i/5)|0)+(i>=15?1:0),tip:TIPS[i]||(i>=8?ALLEY_TIPS[i%4]:ANNEX_TIPS[i%4]),build(){
    let k=0;
    for(const[H,mt]of hs){house({x:H.x,w:H.w,floors:H.floors,fh:H.fh,wt:mt[0]===STEEL?2:1,wall:mt[0],floor:mt[1],roof:mt[1]===WOOD?WOOD:STONE,gable:false,paper:['#e8d8c0','#d8e0e8','#e8d8e8'][k%3]});
     for(let f=0;f<H.floors;f++){const row=ROWS-1-f*H.fh,cx=f===0?H.x+H.w-3:H.w>13?H.x+3+((f&1)?H.w-7:0):H.x+(H.w>>1)+((f*3+k)%3-1),kind=(f+k+i)%3===0&&i<5?'':kinds[(f*2+k+i)%kinds.length];
@@ -511,6 +517,28 @@ const CH2=LEVELS.length;
    default: // stone-capped brick tax bunker
     house({x:ax,w:8,floors:2,fh:8,wall:BRICK,floor:WOOD,roof:STONE,paper:'#e6d4b8'});
     tnt(ax+2,59);tgt(ax+4,51,tier?'shield':'bat',2);break;
+   }
+   // The second four-cell landmark sits in the remaining gap between
+   // houses 2 and 3 in the final twelve Wolfman levels. Exact C parity.
+   if(i>=8){
+    const g2=H3.x-(H2.x+H2.w);
+    if(g2>=6){
+     const bx=H2.x+H2.w+Math.floor((g2-4)/2);
+     switch(i%4){
+     case 0:
+      house({x:bx,w:4,floors:1,fh:7,wall:GLASS,floor:WOOD,roof:GLASS,paper:'#daeafb'});
+      rect(bx+1,48,2,2,GLASS);tnt(bx+1,59);break;
+     case 1:
+      house({x:bx,w:4,floors:1,fh:7,wall:RUBBER,floor:WOOD,roof:WOOD,paper:'#f6d6ec'});
+      rect(bx+1,59,2,1,RUBBER);rect(bx+1,49,2,1,RUBBER);tnt(bx+1,59);break;
+     case 2:
+      house({x:bx,w:4,floors:1,fh:7,wall:GLASS,floor:WOOD,roof:WOOD,paper:'#e7dfbc'});
+      rect(bx+1,56,2,3,SAND);rect(bx+1,48,2,2,SAND);tnt(bx+1,56);break;
+     default:
+      house({x:bx,w:4,floors:1,fh:7,wall:STEEL,floor:WOOD,roof:GLASS,paper:'#abbdd3'});
+      rect(bx+1,48,2,2,STEEL);tnt(bx+1,59);break;
+     }
+    }
    }
   }})}
 })();
