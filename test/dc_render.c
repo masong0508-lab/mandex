@@ -391,7 +391,7 @@ static int dc_pressure_probe(void){
   soft_oval(320,240,27,23,Z_MAN+.4f,skin);
   int ink=0,minx=640,maxx=-1,miny=480,maxy=-1;
   for(int y=0;y<480;y++)for(int x=0;x<640;x++){
-    const u8 *p=(const u8 *)&fb[(y*640+x)*3];
+    const unsigned char *p=&fb[(y*640+x)*3];
     if(!(p[0]|p[1]|p[2]))continue;
     ink++;if(x<minx)minx=x;if(x>maxx)maxx=x;
     if(y<miny)miny=y;if(y>maxy)maxy=y;
@@ -410,7 +410,7 @@ static int dc_pressure_probe(void){
   soft_oval(320,240,27,23,Z_MAN+.4f,belly_tone[0]);
   int grey=0;
   for(int y=220;y<=260;y++)for(int x=298;x<=342;x++){
-    const u8 *p=&fb[(y*640+x)*3];
+    const unsigned char *p=&fb[(y*640+x)*3];
     if((int)p[0]+(int)p[1]+(int)p[2]>30 &&
        abs((int)p[0]-(int)p[1])<18 &&
        abs((int)p[1]-(int)p[2])<34)grey++;

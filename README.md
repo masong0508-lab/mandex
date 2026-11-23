@@ -22,6 +22,28 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 22: cross-port presentation, persistent TNT danger and pressure artwork
+
+- The shared C physics engine now exposes **live armed moving TNT count** and
+  the most urgent remaining fuse, updated inside the existing physics scan.
+  DS, 3DS and Dreamcast keep a readable warning visible while any loose charge
+  burns, instead of relying on a short popup that can disappear mid-collapse.
+  No second rubble scan is performed by the HUD, and no new heap buffers or
+  game-save fields were added.
+- Nintendo 3DS and Dreamcast now use a compact, lower-torso pressure shape
+  with graduated highlight, creases and an attached waistband rather than
+  a giant flat circular overpaint. The 3DS uses a clipped integer ellipse
+  rasterizer and the already cached costume tones. Dreamcast reuses its
+  existing puff atlas, scaled into an oval, and copies the skin/fur palette
+  only when an outfit is changed.
+- The previous Nintendo DS bounded inflation sprite remains unchanged.
+  No gameplay physics, pressure timing, collision radii or difficulty
+  settings were adjusted on any port.
+- New tests check multi-charge urgency, fuse expiry, silhouette bounds,
+  screen-edge clipping and Wolfman fur recolours. Passing host tests does
+  not establish sustained FPS on original hardware.
+- [Detailed implementation and verification](docs/PRESSURE_AND_TNT_FEEDBACK_2026-11-22.md).
+
 ## November 22: late-Wolfman alley expansion and console tactics
 
 - The final **12 Wolfman levels** now include a second small destructible
