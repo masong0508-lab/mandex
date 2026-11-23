@@ -94,7 +94,7 @@ for(const initial of [-1,1])for(const grounded of [false,true]){
   for(let i=0;i<12;i++)tickContinuous(m,initial);
   assert.strictEqual(m.turn,0,'holding current facing does not start a turn');
 }
-assert(html.includes('m.turn=0;m.vx=m.vy=0'),'new walk does not inherit an old turn');
+assert(html.includes('m.turn=0;m.gait=0;m.vx=m.vy=0'),'new walk clears its old turn and stride phase');
 const start=html.indexOf('<script>'),stop=html.indexOf('</script>',start);
 assert(start>=0&&stop>start,'single-file browser game script exists');
 new Function(html.slice(start+8,stop));
