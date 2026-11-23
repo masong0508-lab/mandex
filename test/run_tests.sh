@@ -76,6 +76,8 @@ echo "--- Browser walk physics parity, reusable touch controls and character-det
 if command -v node >/dev/null 2>&1;then node browser_walk_memory_test.js;fi
 echo "--- Browser: cached structural-support buffers, 120/360 world widths ---"
 if command -v node >/dev/null 2>&1;then node browser_support_cache_test.js;fi
+echo "--- Browser: bounded collision hashing, repeated contacts and no stale rubble refs ---"
+if command -v node >/dev/null 2>&1;then node browser_collision_hash_test.js;fi
 echo "--- Browser walking camera: portrait focus, zoom bounds and world edges ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_camera_test.js;fi
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
