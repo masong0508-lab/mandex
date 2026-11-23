@@ -592,12 +592,20 @@ for(let i=0;i<EARLY_TACTICS.length;i++)
   if(!LEVELS[i].tip)LEVELS[i].tip=EARLY_TACTICS[i];
 const chEnd=l=>l<CH1?CH1:l<CH2?CH2:LEVELS.length;   // the last level of the chapter that level l belongs to
 // ---- pneumatic tubes ----
+// Keep the orientation stable when the sling or tube fires left.
+// Mirror the facing sprite, but pitch against abs(horizontal velocity),
+// exactly as the shared console man_pose / mx_flight_face_update.
+function flightFaceFor(vx,previous){
+  return vx>12?1:vx< -12?-1:previous<0?-1:1;
+}
+function flightPitch(vx,vy){return Math.atan2(vy,Math.abs(vx))*.6}
 function tubeStep(m,dt){
   if(m.tubeT>0)m.tubeT-=dt;
   if(m.tubeCd>0){m.tubeCd-=dt;return}
   for(const tb of tubes){if(Math.hypot(m.x-tb.ax,m.y-tb.ay)>tb.r)continue;
     ring(tb.ax,tb.ay,50,tb.col);SFX.whoosh();popText(tb.ax,tb.ay-34,'FWOOMP!',tb.col,24);
-    m.x=tb.bx;m.y=tb.by;m.vx=Math.cos(tb.ang)*tb.sp;m.vy=Math.sin(tb.ang)*tb.sp;m.ang=tb.ang;
+    m.x=tb.bx;m.y=tb.by;m.vx=Math.cos(tb.ang)*tb.sp;m.vy=Math.sin(tb.ang)*tb.sp;
+    m.face=flightFaceFor(m.vx,m.face);m.ang=0; // blend into the new tube direction without a one-frame flip
     m.tubeT=.55;m.tubeCd=.35;ring(tb.bx,tb.by,50,tb.col);SFX.pop();shake=Math.max(shake,3);break}}
 function drawPads(){for(const p of pads){const cx=p.x+p.w/2,bob=Math.sin(time*5)*3;ctx.save();ctx.strokeStyle='#fff';ctx.lineWidth=3;for(let k=0;k<3;k++){ctx.globalAlpha=.9-k*.25;const y=p.y-16-k*14-bob;ctx.beginPath();ctx.moveTo(cx-10,y+6);ctx.lineTo(cx,y-6);ctx.lineTo(cx+10,y+6);ctx.stroke()}ctx.restore()}}
 function drawTubes(){
@@ -660,7 +668,7 @@ function zoneAdvance(){
   goSling(slingK+1);popText(SX,SY-56,'DISTRICT CLEARED!  +'+bonus+' MEN','#7dff5a',24);banner=2.2}
 function nextMan(){
   bankLeft=0;
-  if(men>0)man={mode:'aim',x:SX,y:SY,vx:0,vy:0,ang:0,spin:0,t:0,a:1,R:14,dive:false,gt:0,hitCd:0,gooT:0,pop:1,stT:0,swT:0,G:gagNew(2.5,4,3),jg:jigNew(),inf:0,seated:false,pwr:null,vlv:false,airT:0,beaned:false,bel:0,burped:false,burpT:0,chug:null};
+  if(men>0)man={mode:'aim',x:SX,y:SY,vx:0,vy:0,ang:0,spin:0,face:1,t:0,a:1,R:14,dive:false,gt:0,hitCd:0,gooT:0,pop:1,stT:0,swT:0,G:gagNew(2.5,4,3),jg:jigNew(),inf:0,seated:false,pwr:null,vlv:false,airT:0,beaned:false,bel:0,burped:false,burpT:0,chug:null};
   else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};
 }
 const aliveTargets=()=>targets.reduce((n,t)=>n+(t.alive?1:0),0);
@@ -1432,7 +1440,8 @@ function launch(){const[dx,dy]=pullVec();if(Math.hypot(dx,dy)<14){man.x=SX;man.y
     if(man.jg){man.jg.bvx+=Math.sign(man.vx)*24;man.jg.bvy-=11;man.jg.sq=1;man.jg.st=0;}
     ring(man.x,man.y,35,'#ffcd61');popText(man.x,man.y-35,'TURBO TUSH!','#ffd23f',20);
   }
-  pdTouch();man.gt=0;men--;onShot();hint=0;SFX.launch();SFX.wooo();man.ang=Math.atan2(man.vy,man.vx)*.6}
+  pdTouch();man.gt=0;men--;onShot();hint=0;SFX.launch();SFX.wooo();
+  man.face=flightFaceFor(man.vx,man.face);man.ang=flightPitch(man.vx,man.vy)}
 // ---- BURPBURSTER: two big sodas on a stand, chugged in the sling's shadow; then a burp shockwave (tap) or a small delayed burst (no tap)
 const STX=88,CHUG_Y=GY-30,BEL_MAX=.3,BEL_SET=.27;
 // ONE stomach for both tools: air from the valve (m.inf, also slows the launch) + soda (m.bel, cosmetic).  stom(m) is how full he is overall.
@@ -1848,7 +1857,8 @@ function update(dt){
     else if(state==='play'){Q.ox=man.x;Q.oy=man.y;Q.sc=.5*(1+man.pop*.5);Q.jg=man.jg;gagTick(Q,dt,true)}}
   if(man.mode==='fly'){
     for(let i=0;i<8&&man.mode==='fly';i++)manStep(dt/8);
-    if(man.mode==='fly'){const m=man;m.ang+=(m.dive?0:(Math.atan2(m.vy,m.vx)*.6-m.ang)*.15);if(m.dive)m.spin+=dt*14;
+    if(man.mode==='fly'){const m=man;m.face=flightFaceFor(m.vx,m.face);
+      m.ang+=(m.dive?0:(flightPitch(m.vx,m.vy)-m.ang)*.15);if(m.dive)m.spin+=dt*14;
       m.gooT+=dt;if(m.gooT>.04){m.gooT=0;if(parts.length<1200)parts.push({k:3,x:m.x-m.vx*.01,y:m.y-m.vy*.01,vx:-m.vx*.05+(rnd()-.5)*40,vy:(rnd()-.5)*40,l:.7,l0:.7,s:2+rnd()*2})}
       m.stT+=dt;if(m.stT>.2){m.stT=0;const c=Math.cos(m.ang),sn=Math.sin(m.ang);   // stink trail
         P({k:6,x:m.x+(-30*c-8*sn),y:m.y+(-30*sn+8*c),vx:-m.vx*.04+(rnd()-.5)*20,vy:-12-rnd()*16,l:.9+rnd()*.4,l0:1.3,s:5+rnd()*3,c:'#a6d63c'})}
@@ -3515,8 +3525,12 @@ function renderMan(){
     else if(stom(m)>.02){INF=bgrow(stom(m));drawFront('up',stom(m)>.5||dragging?'scream':'cool',time);INF=0}   // burpburster: belly full of soda   // seated on the valve: front view, belly swelling
     else if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else if(dragging)drawFront('up','scream',time);else{const bz=Math.sin(time*2.6);drawSpin(0,Object.assign({},SPIN_POSE.T_IDLE,{t:time,belly:[1+.012*bz,1-.01*bz]}))}
     JIG=null}
-  else if(m.dive){ctx.rotate(m.spin);ctx.scale(.62,.62);JIG=jigOpts(j,.62,.62,m.spin);drawBall(time,'scream');JIG=null}
-  else{ctx.rotate(m.ang);ctx.scale(.64,.64);JIG=jigOpts(j,.64,.64,m.ang);ragOpts(JIG,m);INF=bgrow(stom(m));drawSide(time,'scream');INF=0;JIG=null}
+  else if(m.dive){const face=m.face<0?-1:1,a=m.spin*face;
+    ctx.rotate(a);ctx.scale(.62*face,.62);
+    JIG=jigOpts(j,.62*face,.62,a);drawBall(time,'scream');JIG=null}
+  else{const face=m.face<0?-1:1,a=m.ang*face;
+    ctx.rotate(a);ctx.scale(.64*face,.64);
+    JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=bgrow(stom(m));drawSide(time,'scream');INF=0;JIG=null}
   ctx.restore()}
 const LORD_NEW=true;
 /* Offline-style caching: a single 56x56 halo replaces a radial gradient
