@@ -118,6 +118,24 @@ int main(void){
   update_moving_tnt(&W);
   CHECK(!ch->cells[0].fuse && ch->cells[1].fuse,
         "only directly struck TNT ignites in a two-charge falling chunk");
+  /* A fuse already burning on one charge must not make another charge
+     collision-proof. Nor may an armed voxel falsely say it survived. */
+  scene();ch=charge(R(26.5),R(27.5));ch->count=2;
+  remote=&ch->cells[1];memset(remote,0,sizeof *remote);
+  remote->m=MX_TNT;remote->h=RI(8);
+  remote->wx=R(28.5);remote->wy=R(27.5);
+  remote->lx=RI(2);remote->edge=1;recompute(ch);
+  arm_moving_tnt(&W,ch,&ch->cells[0],16);
+  ch->tnt_hit=1;ch->tnt_impact=RI(56);
+  update_moving_tnt(&W);
+  CHECK(ch->cells[0].fuse==15 && remote->fuse==23 && W.tnt_live==2,
+        "second charge arms on impact while the first charge's fuse burns");
+  scene();ch=charge(R(30.5),R(30.5));W.level=1;
+  arm_moving_tnt(&W,ch,&ch->cells[0],16);
+  ch->tnt_hit=0;ch->tnt_impact=RI(29);
+  update_moving_tnt(&W);
+  CHECK(ch->cells[0].fuse==15 && events(EV_TNT_SAFE)==0,
+        "another collision cannot label an already armed charge as safe");
   scene();ch=charge(R(26.5),R(27.5));ch->count=2;
   remote=&ch->cells[1];memset(remote,0,sizeof *remote);
   remote->m=MX_TNT;remote->h=RI(8);remote->wx=R(28.5);remote->wy=R(27.5);

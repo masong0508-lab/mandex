@@ -767,13 +767,16 @@ static void update_moving_tnt(MxWorld *w){
   for(int c=0;c<MX_MAX_CHUNKS;c++){
     MxChunk *ch=&w->chunks[c];
     if(!ch->active||!ch->has_tnt)continue;
-    if(!ch->tnt_fused && ch->tnt_hit>=0 && ch->tnt_hit<ch->count && ch->tnt_impact>=RI(28)){
-      /* Frame/stage/slot hash, not renderer random: stable replays and
-         identical DS hardware-vs-software fixed-point decisions. */
-      int tick=rfloor(rmul(w->time,RI(8)));
-      int light=ch->tnt_impact>=RI(55) || ((w->level*13+c*7+tick)&3)==0;
+    if(ch->tnt_hit>=0 && ch->tnt_hit<ch->count && ch->tnt_impact>=RI(28)){
+      /* A burning charge does not protect a DIFFERENT TNT voxel in the same
+         rubble body. Assess the impacted cell, not the chunk-wide fuse bit.
+         An already armed voxel cannot misleadingly report a safe landing. */
       MxCell *a=&ch->cells[ch->tnt_hit];
-      if(!a->dead&&a->m==MX_TNT){
+      if(!a->dead&&a->m==MX_TNT&&!a->fuse){
+        /* Frame/stage/slot hash, not renderer random: stable replays and
+           identical DS hardware-vs-software fixed-point decisions. */
+        int tick=rfloor(rmul(w->time,RI(8)));
+        int light=ch->tnt_impact>=RI(55) || ((w->level*13+c*7+tick)&3)==0;
         if(light)arm_moving_tnt(w,ch,a,TNT_FUSE_TICKS);
         else if(!ch->tnt_warned){ev(w,EV_TNT_SAFE,a->wx,a->wy,0,0,0);ch->tnt_warned=1;}
       }

@@ -838,10 +838,12 @@ function updateMovingTnt(){
   let live=0;
   for(const ch of chunks){
     if(!ch.hasTnt)continue;
-    if(!ch.tntFused&&ch.tntHit&&ch.tntImpact>=28*V){
-      const light=ch.tntImpact>=55*V||((level*13+ch.id*7+Math.floor(time*8))&3)===0;
+    if(ch.tntHit&&ch.tntImpact>=28*V){
+      // A separate TNT voxel can ignite even if another in this rubble chunk
+      // already has a fuse. Do not call an already armed charge "safe".
       const a=ch.tntHit;
-      if(!a.dead&&a.m===TNT){
+      if(!a.dead&&a.m===TNT&&!a.fuse){
+        const light=ch.tntImpact>=55*V||((level*13+ch.id*7+Math.floor(time*8))&3)===0;
         if(light)armMovingTnt(ch,a,TNT_FUSE_TICKS);
         else if(!ch.tntWarned){popText(a.wx,a.wy-22,'TNT SURVIVED!','#9debc1',18);ch.tntWarned=true}
       }

@@ -61,6 +61,20 @@ ch.cells.push(other);recompute(ch);
 ch.tntHit=other;ch.tntImpact=56*V;updateMovingTnt();
 check(!a.fuse&&other.fuse===23,'in one chunk only the actual struck TNT voxel ignites');
 [ch,a]=make(200,200);
+const later={...a,wx:208,wy:200,fuse:0};
+ch.cells.push(later);recompute(ch);
+armMovingTnt(ch,a,16);
+ch.tntHit=later;ch.tntImpact=56*V;updateMovingTnt();
+check(a.fuse===15&&later.fuse===23&&tntLiveFuses===2,
+      'a second TNT voxel ignites on impact even if the first fuse already burns');
+[ch,a]=make(200,200);
+armMovingTnt(ch,a,16);
+ch.tntHit=a;ch.tntImpact=29*V;
+const safeBefore=events.filter(e=>e[0]==='text'&&e[3]==='TNT SURVIVED!').length;
+updateMovingTnt();
+check(a.fuse===15&&events.filter(e=>e[0]==='text'&&e[3]==='TNT SURVIVED!').length===safeBefore,
+      'an already armed voxel never displays a misleading safe landing');
+[ch,a]=make(200,200);
 ch.tntImpact=56*V;ch.tntHit=null;updateMovingTnt();
 check(!a.fuse,'distant steel hit cannot ignite an uncontacted TNT voxel');
 [ch,a]=make(200,200);const next={...a,wx:208,wy:200,fuse:0};
