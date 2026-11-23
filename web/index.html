@@ -996,11 +996,18 @@ function impactDamage(ch,a,ci,cj,vn){
     else{a.dead=true;const c=MAT[a.m].c;for(let k=0;k<3;k++)chip(a.wx,a.wy,c,(rnd()-.5)*200,-rnd()*150);dust(a.wx,a.wy,1,7)}
   }
   if(vn>250)lordShock(a.wx,a.wy,8*V,.45);SFX.thud(vn*ch.m/3000);shake=Math.max(shake,Math.min(6,vn*ch.m/5000));if(rnd()<.3)dust(a.wx,a.wy+4,1,8)}
+// Reuse the debris broadphase without unbounded retained buckets.
+// Clear all references after contact resolution to avoid holding dead rubble.
+const CHUNK_HASH=new Map(),CHUNK_BUCKET_POOL=[];
+const CHUNK_BUCKET_CACHE_MAX=2048;
 function stepChunks(dt){
   if(!chunks.length)return;
-  const map=new Map();
+  const map=CHUNK_HASH;map.clear();let bucketCount=0;
   for(const ch of chunks){if(!ch.rest){ch.vy+=G*dt;ch.vx*=.9995;ch.w*=.998;ch.x+=ch.vx*dt;ch.y+=ch.vy*dt;ch.ang+=ch.w*dt;ch.cs=Math.cos(ch.ang);ch.sn=Math.sin(ch.ang)}ch.cx=ch.cy=0;ch.cn=0;
-    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){b=[];map.set(k,b)}b.push(a)}}
+    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
+      b=bucketCount<CHUNK_BUCKET_CACHE_MAX?(CHUNK_BUCKET_POOL[bucketCount]||(CHUNK_BUCKET_POOL[bucketCount]=[])):[];
+      bucketCount++;map.set(k,b)
+    }b.push(a)}}
   for(const ch of chunks){
     for(const a of ch.cells){
       if(a.dead)continue;
@@ -1037,6 +1044,8 @@ function stepChunks(dt){
           const tm=ch.m+oc.m;ch.cx+=nx*pen*.5*oc.m/tm;ch.cy+=ny*pen*.5*oc.m/tm;ch.cn++;oc.cx-=nx*pen*.5*ch.m/tm;oc.cy-=ny*pen*.5*ch.m/tm;oc.cn++}}
     }}
   for(const ch of chunks){if(ch.cn>0&&!ch.rest){ch.x+=ch.cx/ch.cn*.9;ch.y+=ch.cy/ch.cn*.9}ch.age+=dt}
+  for(let i=0,n=Math.min(bucketCount,CHUNK_BUCKET_CACHE_MAX);i<n;i++)CHUNK_BUCKET_POOL[i].length=0;
+  map.clear();
 }
 function cleanChunks(dt){
   for(let k=chunks.length-1;k>=0;k--){const ch=chunks[k];let lost=false;
