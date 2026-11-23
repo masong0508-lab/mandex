@@ -22,6 +22,22 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 22: all-chapter level tactics and clearer first-time play
+
+- Every one of the **40 original and chapter-two levels** now has a
+  concise stage-specific objective hint. They tell players whether to
+  attack supports, trigger buried TNT, bank off rubber, release sand, use
+  pneumatic tubes, jump through walk stages, or parry briefcases.
+- The Nintendo DS and Dreamcast already have opening-tip slots; those now
+  show useful instructions instead of repeating "evict every landlord."
+  The Nintendo 3DS shows the same message during the original brief stage
+  introduction. Browser levels without their own authored tutorial receive
+  the same guidance; existing more detailed browser tutorials are preserved.
+- Hints are **static ROM text**, not per-frame allocations or new levels.
+  Objective rules and physics remain identical; no save schema, extra
+  sprite, framebuffer or gameplay timer was added.
+- [Cross-port tactic parity and checks](docs/EARLY_LEVEL_TACTICS_2026-11-22.md).
+
 ## November 22: cross-port presentation, persistent TNT danger and pressure artwork
 
 - The shared C physics engine now exposes **live armed moving TNT count** and

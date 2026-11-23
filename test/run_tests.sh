@@ -94,6 +94,14 @@ echo "--- Browser creator: bounded MX1 imports, Unicode share names and legacy c
 if command -v node >/dev/null 2>&1;then node browser_creator_codec_test.js;fi
 echo "--- Web: touch capture, landscape/portrait two-thumb controls, safe camera pan ---"
 if command -v node >/dev/null 2>&1;then node browser_multitouch_test.js;fi
+echo "--- Stage guidance: all 60 console levels and 40 browser early-stage tactics ---"
+for mode in float fixed;do
+  flags=''
+  if test "$mode" = fixed;then flags="-DMX_FIXED";fi
+  gcc -std=c99 -O2 -Wall $flags -I../core ../core/mx.c level_tactic_test.c -lm -o "level_tactic_$mode"
+  "./level_tactic_$mode"
+done
+if command -v node >/dev/null 2>&1;then node browser_early_tactics_test.js;fi
 echo "--- Chapter 3 street encounters: landmark geometry, defenders and 3-second stability (float/fixed) ---"
 for mode in float fixed; do
   flags=""
