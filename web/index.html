@@ -1345,7 +1345,7 @@ function walkStrideStep(m){
 }
 // The character is drawn once per frame. Reuse one scratch pose instead of
 // generating an Object.assign clone every time the walking sprite is drawn.
-const WALK_SPIN_POSE={th:Math.PI/2,dir:1,hip:0,psi:0,t:0};
+const WALK_SPIN_POSE={th:Math.PI/2,dir:1,ld:12,hip:0,psi:0,t:0};
 function drawWalkMan(m){
   const turning=m.turn>0,sc=.36,step=walkStrideStep(m),hip=2.4*step;
   if(m.gr){
