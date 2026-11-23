@@ -915,14 +915,22 @@ static MX_HOT void support_pass(MxWorld *w){
     }
     if(!ch) continue;                   /* no slot: retry when a sleeper settles */
     if(oversized) w->need_support = 1;  /* unsupported remainder falls next pass */
+    /* The existing visited byte already marks the whole disconnected
+       region as 1. Temporarily mark the selected <=512 cells as 2 so the
+       cut can be recognized without a new bitmap or all-edge slowdown. */
+    if(oversized) for(int k = 0; k < n; k++){
+      MxCell *c = &ch->cells[k];
+      w->vis[IDX(rfloor(c->lx),rfloor(c->ly))] = 2;
+    }
     /* mark boundary voxels while the component is still in the grid */
     for(int k = 0; k < n; k++){
       MxCell *c = &ch->cells[k];
-      /* Every newly cut face of an oversized piece must be collidable. */
-      int gx = rfloor(c->lx), gy = rfloor(c->ly), e = oversized ? 1 : 0;
+      int gx = rfloor(c->lx), gy = rfloor(c->ly), e = 0;
       for(int d = 0; d < 4 && !e; d++){
         int nx = gx + DX[d], ny = gy + DY[d];
-        if(!INB(nx, ny) || !w->grid[IDX(nx, ny)] || w->hb[IDX(nx, ny)] != 255) e = 1;
+        if(!INB(nx, ny) || !w->grid[IDX(nx, ny)] ||
+           w->hb[IDX(nx, ny)] != 255 ||
+           (oversized && w->vis[IDX(nx, ny)] != 2)) e = 1;
       }
 #ifdef MX_NO_EDGE
       e = 1;
