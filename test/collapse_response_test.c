@@ -38,10 +38,22 @@ int main(void){
   CHECK(active()==1&&W.chunks[0].count==512,
         "first oversized slab remained hovering instead of falling");
   CHECK(W.need_support,"large collapse did not request a continuation pass");
-  int n=0,edges=0;
+  int n=0,edges=0,cut=0;
   for(int i=0;i<MX_COLS*MX_ROWS;i++)n+=W.grid[i]!=0;
-  for(int i=0;i<W.chunks[0].count;i++)edges+=W.chunks[0].cells[i].edge!=0;
-  CHECK(n==88&&edges==512,"split surface lost cells or has invisible contact faces");
+  static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
+  for(int i=0;i<W.chunks[0].count;i++){
+    const MxCell *a=&W.chunks[0].cells[i];
+    edges+=a->edge!=0;
+    int x=rfloor(a->wx),y=rfloor(a->wy);
+    for(int d=0;d<4;d++){
+      int nx=x+dx[d],ny=y+dy[d];
+      if(INB(nx,ny)&&W.grid[IDX(nx,ny)]){
+        cut++;CHECK(a->edge,"new cut face is missing from collision detection");
+      }
+    }
+  }
+  CHECK(n==88&&cut>0&&edges>0&&edges<512,
+        "split face lost cells or made every interior voxel collidable");
   for(int k=0;k<8&&W.need_support;k++)support_pass(&W);
   CHECK(fallen()==600&&active()>=2&&!W.need_support,
         "large disconnected structure did not fully detach within bounded passes");
