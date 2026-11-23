@@ -1239,7 +1239,7 @@ function wBlocked(x,y){
   }
   return false;
 }
-function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.vx=m.vy=0;m.gr=false;m.wt=WALK_T;m.pT=0;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.R=14;m.pwr=m.pwr;
+function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.gait=0;m.vx=m.vy=0;m.gr=false;m.wt=WALK_T;m.pT=0;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.R=14;m.pwr=m.pwr;
   let ok=!wBlocked(m.x,m.y);for(let u=1;u<=110&&!ok;u++){if(!wBlocked(m.x,m.y-u)){m.y-=u;ok=true}}
   for(let r=4;r<=200&&!ok;r+=4)for(let a=0;a<16&&!ok;a++){const an=-Math.PI/2+(a%2?1:-1)*Math.ceil(a/2)*.4,qx=m.x+Math.cos(an)*r,qy=m.y+Math.sin(an)*r;if(!wBlocked(qx,qy)){m.x=qx;m.y=qy;ok=true}}   // nearest free spot, preferring up
   goo(m.x,m.y,22,260);SFX.splat();ring(m.x,m.y,50,'#7dff5a');popText(m.x,m.y-50,'ON YOUR FEET!','#7dff5a',26);shake=Math.max(shake,4)}
@@ -1271,6 +1271,9 @@ function walkSlam(){const m=man,cx=m.x,cy=m.y+WHH+4,beforeCases=cases.length;let
 function walkStep(dt){const m=man;
   m.wt-=dt;if(m.wt<=0){popText(m.x,m.y-40,'TIME!','#ff6b6b',26);walkQuit();return}
   if(wBlocked(m.x,m.y)){let f=false;for(let u=2;u<=80&&!f;u+=2)for(const sg of[0,-1,1])if(!wBlocked(m.x+sg*u,m.y-u)){m.x+=sg*u;m.y-=u;f=true;break}}   // rubble fell on him: pop him out
+  // Record the real start AFTER rubble recovery; moving the player out of
+  // intersecting debris is not a walking stride.
+  const strideStartX=m.x;
   const L=KEYS.KeyA||KEYS.ArrowLeft||KEYS.TL,R=KEYS.KeyD||KEYS.ArrowRight||KEYS.TR,UP=KEYS.KeyW||KEYS.ArrowUp||KEYS.Space||KEYS.TJ,DN=KEYS.KeyS||KEYS.ArrowDown||KEYS.TS,PU=KEYS.KeyX||KEYS.KeyZ||KEYS.KeyJ||KEYS.KeyK||KEYS.Enter||KEYS.TP;
   const ax=(R?1:0)-(L?1:0);
   // Countersteering retraces the current rear turn instead of snapping to
@@ -1311,6 +1314,9 @@ function walkStep(dt){const m=man;
         if(m.vy>380){dust(m.x,m.y+WHH,6,10);SFX.thud&&SFX.thud(.5)}m.vy=0}else{m.vy=0;if(Math.abs(dy)>2)SFX.thud&&SFX.thud(.3)}
       break}}
   m.gr=wBlocked(m.x,m.y+1.5);
+  // Same four-cell, contact-correct gait as DS / 3DS / Dreamcast. Walking
+  // animation never advances from time alone or from a blocked input.
+  if(m.gr)m.gait=((m.gait||0)+Math.abs(m.x-strideStartX))%(4*V);
   if(m.gr){m.ledgeGrace=.1;m.jumpHold=0}
   else if(m.ledgeGrace>0)m.ledgeGrace=Math.max(0,m.ledgeGrace-dt);
   if(m.gr)m.stomp=false;
@@ -1331,29 +1337,33 @@ function walkPunchLunge(punchTime,turnTicks){
   const t=Math.max(0,Math.min(.2,punchTime||0));
   return 3*V*Math.min(t,.2-t);
 }
+// Match the native 4-cell gait while avoiding sudden acceleration snaps.
+// Speed affects animation amplitude, never footstep timing.
+function walkStrideStep(m){
+  if(!m.gr||m.turn>0)return 0;
+  return Math.sin((m.gait||0)*Math.PI/(2*V))*Math.min(1,Math.abs(m.vx)/100);
+}
+// The character is drawn once per frame. Reuse one scratch pose instead of
+// generating an Object.assign clone every time the walking sprite is drawn.
+const WALK_SPIN_POSE={th:Math.PI/2,dir:1,hip:0,psi:0,t:0};
 function drawWalkMan(m){
-  const turning=m.turn>0,mv=!turning&&m.gr&&Math.abs(m.vx)>25,sc=.36;
-  // Couple the gait to distance travelled: feet no longer keep cycling when
-  // the simulation slows down, and reversing direction reverses the stride.
-  const phase=mv?m.x/15:0,step=Math.sin(phase),hip=mv?2.4*step:0;
+  const turning=m.turn>0,sc=.36,step=walkStrideStep(m),hip=2.4*step;
   if(m.gr){
     ctx.save();ctx.fillStyle='rgba(19,28,20,.26)';
-    ctx.beginPath();ctx.ellipse(m.x,m.y+WHH+1,12-(mv?Math.abs(step)*1.1:0),2.5,0,0,6.2832);ctx.fill();ctx.restore();
+    ctx.beginPath();ctx.ellipse(m.x,m.y+WHH+1,12-Math.abs(step)*1.1,2.5,0,0,6.2832);ctx.fill();ctx.restore();
   }
   ctx.save();ctx.translate(m.x,m.y+WHH-3);
-  if(mv)ctx.translate(0,-Math.max(0,step)*1.35);
+  if(step>0)ctx.translate(0,-step*1.35);
   const visualFace=turning?walkTurnFace(m.face,m.turn):m.face;
-  // Translate only the artwork. The planted contact ellipse above still
-  // follows the real floor position instead of sliding with the punch.
+  // Punch lunge translates art only; the floor contact stays grounded.
   const punchLunge=walkPunchLunge(m.pT,m.turn);
   if(punchLunge)ctx.translate(visualFace<0?-punchLunge:punchLunge,0);
   ctx.scale(visualFace<0?-sc:sc,sc);ctx.translate(0,-50);
   if(!m.gr)ctx.rotate(m.stomp?0:m.vy<0?-.08:.08);
-  // A side silhouette stays side-on; walking bends the pelvis rather than
-  // repeatedly turning the entire torso toward and away from the camera.
-  const th=turning?walkTurnAngle(m.turn):Math.PI/2+(mv?.055*step:0);
-  JIG=null;drawSpin(th,Object.assign({},SPIN_POSE.SPIN_6,
-    {th,dir:1,hip,psi:mv?-3.7*step:0,t:time}));
+  const th=turning?walkTurnAngle(m.turn):Math.PI/2+.055*step;
+  WALK_SPIN_POSE.th=th;WALK_SPIN_POSE.hip=hip;
+  WALK_SPIN_POSE.psi=-3.7*step;WALK_SPIN_POSE.t=time;
+  JIG=null;drawSpin(th,WALK_SPIN_POSE);
   if(m.pT>0){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=7;
     ctx.beginPath();ctx.arc(30,0,38,-.9,.9);ctx.stroke()}
   ctx.restore();
