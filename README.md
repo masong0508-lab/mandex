@@ -22,6 +22,10 @@ See [November 20 cross-port development waves](docs/IMPROVEMENT_WAVES_2026-11-20
 for the current performance-sensitive improvements and the major features still
 outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
+## November 23: corrected walking animation and frame allocations
+
+The browser now advances its foot cycle from actual grounded travel, matching the four-cell console stride instead of absolute world coordinates. Turns and jumps no longer create false steps, and the 3D walking pose reuses a single scratch object. [Animation parity and tests](docs/WALK_GAIT_ANIMATION_CORRECTIONS_2026-11-23.md).
+
 ## November 22 browser combat budget: no projectile storms
 
 - The browser now caps simultaneously flying briefcases at **four**, matching

@@ -1,0 +1,32 @@
+name: Walking animation and collision-locked gait
+on:
+  pull_request:
+    paths:
+      - 'web/index.html'
+      - 'core/mx.c'
+      - 'core/mx.h'
+      - 'test/browser_walk_gait_test.js'
+      - 'test/browser_turn_pose_test.js'
+      - 'test/walk_turn_interrupt_test.c'
+      - '.github/workflows/walk-animation-gates.yml'
+  workflow_dispatch:
+jobs:
+  gait-and-pose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Browser contact-locked stride and uninterrupted turnaround
+        run: |
+          node test/browser_walk_gait_test.js
+          node test/browser_turn_pose_test.js
+          node test/browser_walk_memory_test.js
+      - name: Console shared-core walking profiles in float and DS fixed point
+        run: |
+          set -eu
+          for mode in float fixed; do
+            flags=''
+            if test "$mode" = fixed; then flags='-DMX_FIXED'; fi
+            gcc -std=gnu99 -O2 -Wall $flags -Icore core/mx.c test/walk_turn_interrupt_test.c -lm -o "/tmp/mandex_turn_$mode"
+            "/tmp/mandex_turn_$mode"
+          done
