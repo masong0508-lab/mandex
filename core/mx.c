@@ -2340,11 +2340,17 @@ static void build_ch3(MxWorld *w, int i){
       break;
     case 1: /* rubber customs kiosk: rebound from its sides, break its roof */
       house_ex(w, ax, MX_ROWS - 1, 8, 2, 8, 1, 1, MX_RUBBER, MX_WOOD, MX_WOOD, 0, 0);
+      /* Two purpose-made crash cushions for loose moving TNT; the shared
+         physics already dampens TNT collisions against rubber. */
+      rect_fill(w, ax + 2, 55, 4, 1, MX_RUBBER);
+      rect_fill(w, ax + 2, 63, 4, 1, MX_RUBBER);
       tnt(w, ax + 2, 51);
       tgtr(w, ax + 4, 59, tier ? LK_SPRINTER : LK_WALKER, 2);
       break;
     case 2: /* sand hopper: TNT pin in the upper floor releases the payload */
       house_ex(w, ax, MX_ROWS - 1, 8, 2, 8, 1, 1, MX_GLASS, MX_WOOD, MX_WOOD, 0, 0);
+      /* Sand-filled lower sill can stop a charge without igniting it. */
+      rect_fill(w, ax + 2, 63, 4, 1, MX_SAND);
       rect_fill(w, ax + 1, 44, 6, 7, MX_SAND);
       tnt(w, ax + 3, 51);
       tgtr(w, ax + 4, 59, LK_WALKER, 2);

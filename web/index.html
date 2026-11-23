@@ -475,8 +475,8 @@ const CH2=LEVELS.length;
   TIPS={0:'New: landlords have health bars.  Hit them twice!',5:'Riot shields block you from the front.  Hit them fast, or from behind.',10:'Healers patch landlords up.  Take them out first.',15:'Bosses throw two briefcases at once.'},
   ANNEX_TIPS=[
    'GLASS TOLLHOUSE: smash the keg below the thrower!',
-   'RUBBER KIOSK: bounce off its sides, or come over the roof!',
-   'SAND HOPPER: pop the upper TNT pin to dump the sand!',
+   'RUBBER KIOSK: spring shelves can cushion falling TNT!',
+   'SAND HOPPER: dump sand; the soft floor can cushion loose TNT!',
    'TAX BUNKER: break into the upstairs office through the weak floor!'
   ];
  for(let i=0;i<20;i++){
@@ -502,10 +502,12 @@ const CH2=LEVELS.length;
     tnt(ax+2,59);tgt(ax+4,51,'thrower',2);break;
    case 1: // rubber sidewalls for a deliberate ricochet or roof entry
     house({x:ax,w:8,floors:2,fh:8,wall:RUBBER,floor:WOOD,roof:WOOD,paper:'#f6d6ec'});
+    rect(ax+2,55,4,1,RUBBER);rect(ax+2,63,4,1,RUBBER);
     tnt(ax+2,51);tgt(ax+4,59,tier?'sprinter':'walker',2);break;
    case 2: // upper-floor sand reservoir; TNT pin releases it
     house({x:ax,w:8,floors:2,fh:8,wall:GLASS,floor:WOOD,roof:WOOD,paper:'#e2d6bd'});
-    rect(ax+1,44,6,7,SAND);tnt(ax+3,51);tgt(ax+4,59,'walker',2);break;
+    rect(ax+2,63,4,1,SAND);rect(ax+1,44,6,7,SAND);
+    tnt(ax+3,51);tgt(ax+4,59,'walker',2);break;
    default: // stone-capped brick tax bunker
     house({x:ax,w:8,floors:2,fh:8,wall:BRICK,floor:WOOD,roof:STONE,paper:'#e6d4b8'});
     tnt(ax+2,59);tgt(ax+4,51,tier?'shield':'bat',2);break;
