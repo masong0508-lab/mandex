@@ -83,6 +83,8 @@ void spr_man_j(u8 *b, int x, int y, int ppc, int face, int pose, int ph, const M
 /* the same, turned about his centre by sn / cs = sin / cos of the angle in 1/4096 (clockwise on screen); jiggle and squash still apply */
 void spr_man_jr(u8 *b, int x, int y, int ppc, int face, int pose, int ph, const ManJig *jg, int sn, int cs);
 void spr_man_bust(u8 *b, int x, int y, int ppc);   /* x = centre, y = top */
+/* pressure 0..100: high-detail, body-local ballooning that preserves the head and live outfit */
+void spr_man_inflation(u8 *b, int x, int y, int ppc, int face, int pressure, int tick);
 void spr_landlord(u8 *b, int x, int y, int ppc, int ph, int scared);
 void spr_hpbar(u8 *b, int x, int y, int ppc, int hp, int hpmax);
 void spr_landlord_k(u8 *b, int x, int y, int ppc, int ph, int scared, int kind, int face, int st);   /* chapter 2: kind 0 plain 1 walker 2 thrower 3 bat; st bits 1 dazed 2 wind-up 4 swing 8 stroll 16 run 32 riot shield; kinds 4 shield 5 sprinter 6 boss 7 healer (chapter 3) */

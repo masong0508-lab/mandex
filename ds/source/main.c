@@ -979,6 +979,12 @@ static void draw_chunks(const View *v){
       const int damage=0;
 #endif
       gfx_tile(v,a->m,damage,k&1,sx,sy);
+      /* Mobile TNT's actual hitbox carries the fuse, not its chunk centre.
+         Blink a tiny fuse cap without scanning stationary grid cells. */
+      if(a->m==MX_TNT && a->fuse && ((frame>>(a->fuse<=8?1:2))&1)){
+        gfx_rect(v->buf,sx,sy-2,ppc,1,a->fuse<=8?C_RED:C_GOLD);
+        gfx_px(v->buf,sx+ppc/2,sy-3,C_WHITE);
+      }
     }
   }
 }
@@ -1181,15 +1187,8 @@ static void draw_man(const View *v){
     else if(m->mode == MAN_AIM && dragging) a = rmul(ratan2(MX_ANCHOR_Y - m->y, MX_ANCHOR_X - m->x), R(0.25));
     spr_man_jr(v->buf, x, y, v->ppc, face, pose, frame, &jg, (int)rsin(a), (int)rcos(a));
   }
-  if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){                 /* only the belly swells; the face flushes red near the end */
-    int f = (int)((m->inf * 100) >> 12), p = v->ppc, rx = p * (2 + f * 5 / 40), ry = p * (2 + f * 4 / 40);
-    int bx = x + face * p * f / 60, by = y + p + p * f / 80;
-    gfx_ell(v->buf, bx, by, rx + 1, ry + 1, C_SKIN2); gfx_ell(v->buf, bx, by, rx, ry, C_SKIN);
-    gfx_ell(v->buf, bx - rx / 3, by - ry / 2, rx / 4 + 1, ry / 5 + 1, C_SKIN3);                       /* shine */
-    if(f > 30) for(int k = -1; k <= 1; k++) gfx_line(v->buf, bx + rx / 3, by + k * ry / 3, bx + rx * 4 / 5, by + k * ry / 3, C_SKIN2);   /* stretch marks */
-    gfx_ell(v->buf, bx + face * rx * 3 / 4, by + ry / 8, 1 + f / 40, 1 + f / 40, C_SKIN2);            /* belly button */
-    if(f > 45) gfx_ell(v->buf, x, y - p * 3, p + 1 + f / 50, p, (f > 85 && (frame & 4)) ? C_RED2 : C_RED);   /* blush */
-  }
+  if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY))
+    spr_man_inflation(v->buf,x,y,v->ppc,face,(int)((m->inf*100)>>12),frame);
 }
 
 #ifndef MX_DS_PARTICLE_VIEW_CULL

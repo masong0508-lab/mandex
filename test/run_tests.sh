@@ -15,6 +15,8 @@ python3 sprite_turn_anchor_test.py
 python3 head_turnaround_test.py
 echo "--- Dreamcast: all 71 Wolfman profiles use independent HD UV rectangles ---"
 python3 dreamcast_wolf_atlas_test.py
+echo "--- DS inflation native-resolution detail, silhouette and clipping ---"
+gcc -std=gnu99 -O2 -Wall -DMX_FIXED -Istubs -I../core -I../art ds_inflation_detail_test.c -lm -o ds_inflation_detail_test && ./ds_inflation_detail_test
 echo "--- DS emulator smoke validator: reject frozen, blank and incomplete boot captures ---"
 python3 ds_smoke_test.py
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c host_test.c -lm -o test_float
