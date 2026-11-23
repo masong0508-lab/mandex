@@ -143,6 +143,8 @@ echo "--- Browser side -> rear -> side pose coherence at 60Hz ---"
 if command -v node >/dev/null 2>&1;then node browser_turn_pose_test.js;fi
 echo "--- Browser walking gait: actual contacts, 4-cell stride, and reusable pose ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_gait_test.js;fi
+echo "--- Browser left/right flight, dive and pneumatic tube animation parity ---"
+if command -v node >/dev/null 2>&1;then node browser_flight_pose_test.js;fi
 echo "--- Browser cutscene JavaScript syntax and required rear-gag effects ---"
 if command -v node >/dev/null 2>&1; then
   node -e 'const fs=require("fs");const h=fs.readFileSync("../web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<a)throw Error("game script missing");const s=h.slice(a+8,b);new Function(s);for(const sym of ["function cgRearPanel","function cgHotTake","function cgMoonlitKiss"])if(!s.includes(sym))throw Error(sym+" missing");console.log("ok: browser script parses and cutscene effects are present")'

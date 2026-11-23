@@ -24,7 +24,7 @@ outstanding.  Passing CI/host tests does not imply 30 FPS on original hardware.
 
 ## November 23: corrected walking animation and frame allocations
 
-The browser now advances its foot cycle from actual grounded travel, matching the four-cell console stride instead of absolute world coordinates. Turns and jumps no longer create false steps, and the 3D walking pose reuses a single scratch object. [Animation parity and tests](docs/WALK_GAIT_ANIMATION_CORRECTIONS_2026-11-23.md).
+The browser now advances its foot cycle from actual grounded travel, matching the four-cell console stride instead of absolute world coordinates. Turns and jumps no longer create false steps, and the 3D walking pose reuses a single scratch object. Left-facing flights, dives and tube exits now use the same mirrored pitch and orientation rules as the console ports. [Animation parity and tests](docs/WALK_GAIT_ANIMATION_CORRECTIONS_2026-11-23.md).
 
 ## November 22 browser combat budget: no projectile storms
 

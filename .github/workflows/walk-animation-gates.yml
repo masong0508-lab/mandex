@@ -6,6 +6,7 @@ on:
       - 'core/mx.c'
       - 'core/mx.h'
       - 'test/browser_walk_gait_test.js'
+      - 'test/browser_flight_pose_test.js'
       - 'test/browser_turn_pose_test.js'
       - 'test/walk_turn_interrupt_test.c'
       - '.github/workflows/walk-animation-gates.yml'
@@ -19,6 +20,7 @@ jobs:
       - name: Browser contact-locked stride and uninterrupted turnaround
         run: |
           node test/browser_walk_gait_test.js
+          node test/browser_flight_pose_test.js
           node test/browser_turn_pose_test.js
           node test/browser_walk_memory_test.js
       - name: Console shared-core walking profiles in float and DS fixed point

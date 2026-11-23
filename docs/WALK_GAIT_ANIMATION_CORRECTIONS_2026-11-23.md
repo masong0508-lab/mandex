@@ -33,3 +33,21 @@ browser turnaround and both native numeric modes.
 
 This is an animation correctness and GC-allocation fix. No measured browser
 FPS gain or hardware playthrough is claimed.
+
+## Flight and tube animation parity
+
+- The browser now mirrors the actual side and tumble silhouettes when flying
+  left, matching the shared DS/3DS/Dreamcast `MxMan.face` behavior.
+- The flight pitch uses `atan2(vy, abs(vx))`: left and right shots with
+  equal trajectories have equal forward-relative pitch, without a sudden
+  180-degree rotation on launch.
+- A 12-pixel/s facing deadzone preserves the previous left/right side near
+  a horizontal stall, avoiding a flickering pose in midair.
+- Tube transport resets the incoming pitch and chooses the outgoing facing
+  from the nozzle direction before easing toward its new trajectory.
+- The browser dive spin mirrors with the drawn side, keeping the rotation
+  consistent with the three console frontends.
+
+`test/browser_flight_pose_test.js` exercises launch, tube and actual drawing
+code for both directions, including rotation and scale signs. None of these
+cosmetic changes affect collision velocity, damage, levels or saves.
