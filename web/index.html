@@ -924,16 +924,23 @@ function targetOffset(t){if(!wobOn)return[0,0];const gx=Math.floor(t.x/V);let gy
   for(let k=0;k<3;k++,gy++){if(!inb(gx,gy))break;const i=idx(gx,gy);if(grid[i])return[ox[i]*V,oy[i]*V]}return[0,0]}
 
 // ---------- structural integrity: overhang-limited support -> rigid chunks ----------
+// Reuse traversal scratch across collapses. The visited bitmap is resized
+// only when a custom level changes grid dimensions (120 / 360 columns).
+const SUPPORT_QUEUE=[],SUPPORT_STACK=[];
+let supportVis=new Uint8Array(0);
 function supportPass(){
-  needSupport=false;hb.fill(255);const q=[];
+  needSupport=false;hb.fill(255);
+  const q=SUPPORT_QUEUE;q.length=0;
   for(let x=0;x<COLS;x++){const i=idx(x,ROWS-1);if(grid[i]){hb[i]=0;q.push(i)}}
   for(let qi=0;qi<q.length;qi++){const i=q[qi],x=i%COLS,y=(i/COLS)|0,h=hb[i];
     for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(!inb(nx,ny)||((brk[i]>>d)&1))continue;const j=idx(nx,ny),m=grid[j];if(!m)continue;
       const nh=DY[d]===-1?0:h+1;if(nh<hb[j]&&nh<=MAT[m].lim+(anch[j]?8:0)){hb[j]=nh;q.push(j)}}}
-  const vis=new Uint8Array(COLS*ROWS);
+  if(supportVis.length!==grid.length)supportVis=new Uint8Array(grid.length);
+  else supportVis.fill(0);
+  const vis=supportVis;
   for(let i=0;i<grid.length;i++){
     if(!grid[i]||grid[i]===SAND||hb[i]!==255||vis[i])continue;
-    const comp=[],st=[i];vis[i]=1;
+    const comp=[],st=SUPPORT_STACK;st.length=0;st.push(i);vis[i]=1;
     while(st.length){const a=st.pop(),x=a%COLS,y=(a/COLS)|0;
       comp.push({x,y,m:grid[a],h:hp[a],px:(x+.5+ox[a])*V,py:(y+.5+oy[a])*V,vx:ovx[a]*V,vy:ovy[a]*V});   // leaves from where the wobble has it, with its velocity
       for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(!inb(nx,ny))continue;const j=idx(nx,ny);if(grid[j]&&grid[j]!==SAND&&hb[j]===255&&!vis[j]&&!((brk[a]>>d)&1)){vis[j]=1;st.push(j)}}}

@@ -74,6 +74,8 @@ echo "--- Browser refresh-rate-independent fixed-step simulation ---"
 if command -v node >/dev/null 2>&1;then node browser_fixed_step_test.js;fi
 echo "--- Browser walk physics parity, reusable touch controls and character-detail GC ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_memory_test.js;fi
+echo "--- Browser: cached structural-support buffers, 120/360 world widths ---"
+if command -v node >/dev/null 2>&1;then node browser_support_cache_test.js;fi
 echo "--- Browser walking camera: portrait focus, zoom bounds and world edges ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_camera_test.js;fi
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
