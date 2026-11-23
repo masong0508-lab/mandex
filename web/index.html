@@ -848,13 +848,17 @@ function updateMovingTnt(){
         else if(!ch.tntWarned){popText(a.wx,a.wy-22,'TNT SURVIVED!','#9debc1',18);ch.tntWarned=true}
       }
     }
-    let fused=false;
+    let fused=false,anyTnt=false;
     for(const a of ch.cells){
-      if(a.dead||a.m!==TNT||!a.fuse)continue;
-      if(--a.fuse===0)movedTntBoom(a);
-      else{fused=true;live++;}
+      if(a.dead||a.m!==TNT)continue;
+      if(a.fuse){
+        if(--a.fuse===0)movedTntBoom(a);
+        else{fused=true;live++;}
+      }
+      if(!a.dead)anyTnt=true;
     }
-    ch.tntFused=fused;ch.tntImpact=0;ch.tntHit=null;
+    // Retire rubble bodies from TNT scans when their last charge dies.
+    ch.hasTnt=anyTnt;ch.tntFused=fused;ch.tntImpact=0;ch.tntHit=null;
   }
   tntLiveFuses=live;
 }

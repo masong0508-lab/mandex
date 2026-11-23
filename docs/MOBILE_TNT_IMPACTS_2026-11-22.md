@@ -60,6 +60,9 @@ The per-cell fuse uses one byte of previously unused struct padding:
 `sizeof(MxCell)` stays 24 bytes in host float and fixed point. The
 console chunk adds a few bytes for cached TNT presence and peak impact.
 Only chunks holding TNT are scanned once per gameplay update for fuses.
+The same scan clears a chunk's TNT-presence flag after its last charge dies,
+avoiding repeated scans through spent rubble on future frames. It adds no new
+per-frame traversal.
 There are no new particle pools, level data files, framebuffers or heap
 allocations, and no save-version or chapter-index changes.
 

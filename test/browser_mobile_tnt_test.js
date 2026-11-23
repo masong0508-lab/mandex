@@ -45,6 +45,7 @@ check(a.fuse===23&&!explQ.length,'hard hit arms without instant detonation');
 for(let k=0;k<23;k++)updateMovingTnt();
 check(a.dead&&explQ.length===1&&explQ[0][0]===30&&explQ[0][1]===31,
       'fuse explodes at moved voxel position after 24 ticks');
+check(!ch.hasTnt,'spent rubble body is retired from subsequent per-frame TNT scans');
 movedTntBoom(a);
 check(explQ.length===1,'spent TNT cannot trigger twice');
 [ch,a]=make(600,240);ch.rad=400;a.wx=316;a.wy=240;

@@ -56,6 +56,8 @@ int main(void){
         "fuse expires at the charge's current location, exactly once");
   CHECK(W.tnt_live==0 && W.tnt_soonest==0,
         "persistent warning disappears on exactly the frame the fuse finishes");
+  CHECK(!ch->has_tnt,
+        "spent TNT body stops requiring cell scans once the last charge detonates");
   W.ntargets=1;W.targets[0].alive=1;W.targets[0].x=R(33.5);W.targets[0].y=R(29.5);
   process_expl(&W);
   CHECK(events(EV_BOOM)==1 && !W.targets[0].alive,

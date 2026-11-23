@@ -781,19 +781,25 @@ static void update_moving_tnt(MxWorld *w){
         else if(!ch->tnt_warned){ev(w,EV_TNT_SAFE,a->wx,a->wy,0,0,0);ch->tnt_warned=1;}
       }
     }
-    int still_fused=0;
+    int still_fused=0,any_tnt=0;
     for(int k=0;k<ch->count;k++){
       MxCell *a=&ch->cells[k];
-      if(a->dead||a->m!=MX_TNT||!a->fuse)continue;
-      a->fuse--;
-      if(!a->fuse)destroy_moving_tnt(w,a);
-      else {
-        still_fused=1;
-        w->tnt_live++;
-        if(!w->tnt_soonest||a->fuse<w->tnt_soonest)
-          w->tnt_soonest=a->fuse;
+      if(a->dead||a->m!=MX_TNT)continue;
+      if(a->fuse){
+        a->fuse--;
+        if(!a->fuse)destroy_moving_tnt(w,a);
+        else {
+          still_fused=1;
+          w->tnt_live++;
+          if(!w->tnt_soonest||a->fuse<w->tnt_soonest)
+            w->tnt_soonest=a->fuse;
+        }
       }
+      if(!a->dead)any_tnt=1;
     }
+    /* Retire a rubble chunk's TNT flag when its last charge dies:
+       no further per-frame cell scans for exhausted bodies. */
+    ch->has_tnt=(uint8_t)any_tnt;
     ch->tnt_fused=(uint8_t)still_fused;
     ch->tnt_impact=0;ch->tnt_hit=-1;
   }
