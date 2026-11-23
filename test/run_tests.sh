@@ -377,7 +377,7 @@ cmp ds_chunk_view_0.txt ds_chunk_view_1.txt
 cat ds_chunk_view_1.txt
 echo "--- Dreamcast front-end drawing on the host (software rasteriser instead of the PVR): jiggle, gags, win/lose ---"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o dc_$f.o; done   # the shared cutscene code, built exactly as dreamcast/Makefile does
-gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c dc_render.c -lm -o dc_render && DC_OUTFIT_RECOLOR_PROBE=1 ./dc_render && DC_MENU_FLOW_TEST=1 ./dc_render && ./dc_render
+gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c dc_render.c -lm -o dc_render && DC_OUTFIT_RECOLOR_PROBE=1 ./dc_render && DC_PRESSURE_PROBE=1 ./dc_render && DC_MENU_FLOW_TEST=1 ./dc_render && ./dc_render
 echo "--- Dreamcast untouched-wall damage fastpath vs exact division reference ---"
 gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -DMX_DC_FAST_PRISTINE_DAMAGE=0 \
   -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source \
@@ -421,6 +421,7 @@ for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED 
 gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_render
 N3DS_RUBBLE_DAMAGE_PROBE=1 ./n3ds_render
 N3DS_TILE_CLIP_PROBE=1 ./n3ds_render
+N3DS_PRESSURE_PROBE=1 ./n3ds_render
 echo "--- 3DS silhouette, outfit colors and antialiased rotated edges ---"
 for config in base lit smooth; do
   case "$config" in

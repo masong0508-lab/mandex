@@ -381,6 +381,45 @@ static int dc_particle_view_probe(void){
   return 0;
 }
 #endif
+/* Real ARGB4444 PVR atlas/rasterizer pressure check, including
+   monochrome fur recolour and a conservative body-size envelope. */
+static int dc_pressure_probe(void){
+  if(!tx_atl||!tx_man){puts("FAIL: Dreamcast pressure atlas missing");return 1;}
+  recolor_man(0);
+  const uint32 skin=belly_tone[0];
+  memset(fb,0,sizeof fb);cur_hdr=0;nq=0;
+  soft_oval(320,240,27,23,Z_MAN+.4f,skin);
+  int ink=0,minx=640,maxx=-1,miny=480,maxy=-1;
+  for(int y=0;y<480;y++)for(int x=0;x<640;x++){
+    const u8 *p=(const u8 *)&fb[(y*640+x)*3];
+    if(!(p[0]|p[1]|p[2]))continue;
+    ink++;if(x<minx)minx=x;if(x>maxx)maxx=x;
+    if(y<miny)miny=y;if(y>maxy)maxy=y;
+  }
+  if(ink<150||maxx-minx>56||maxy-miny>48){
+    fprintf(stderr,"FAIL: Dreamcast pressure oval bounds ink=%d w=%d h=%d\n",
+            ink,maxx-minx+1,maxy-miny+1);
+    return 1;
+  }
+  recolor_man(12);
+  if(!man_fur || belly_tone[0]==skin){
+    fputs("FAIL: Dreamcast pressure is not recoloured for Wolfman\n",stderr);
+    return 1;
+  }
+  memset(fb,0,sizeof fb);cur_hdr=0;nq=0;
+  soft_oval(320,240,27,23,Z_MAN+.4f,belly_tone[0]);
+  int grey=0;
+  for(int y=220;y<=260;y++)for(int x=298;x<=342;x++){
+    const u8 *p=&fb[(y*640+x)*3];
+    if((int)p[0]+(int)p[1]+(int)p[2]>30 &&
+       abs((int)p[0]-(int)p[1])<18 &&
+       abs((int)p[1]-(int)p[2])<34)grey++;
+  }
+  if(grey<80){fprintf(stderr,"FAIL: Dreamcast grey fur detail count=%d\n",grey);return 1;}
+  printf("DC_PRESSURE_PASS ink=%d span=%dx%d wolf_gray=%d\n",
+         ink,maxx-minx+1,maxy-miny+1,grey);
+  return 0;
+}
 int main(void){
   if(getenv("DC_DAMAGE_FASTPATH_PROBE"))return dc_damage_fastpath_probe();
   if(getenv("DC_FASTPATH_PROBE"))return dc_fastpath_probe();
@@ -390,6 +429,7 @@ int main(void){
   if(getenv("DC_PARTICLE_VIEW_PROBE"))return dc_particle_view_probe();
 #endif
   if(getenv("DC_OUTFIT_RECOLOR_PROBE"))return dc_outfit_memory_probe();
+  if(getenv("DC_PRESSURE_PROBE"))return dc_pressure_probe();
   sound_init(); if(!snd_ok){ puts("FAIL: dc sound did not initialise"); return 1; }
   if(getenv("DC_MENU_FLOW_TEST"))return dc_menu_flow_test();
   for(int k = 0; k < MX_NMAT; k++) MAXHP[k] = k ? (float)mx_material_hp(k) : 1.0f;

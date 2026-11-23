@@ -305,7 +305,8 @@ static void oval(Scr *s,int cx,int cy,int rx,int ry,u32 c){
     const int X=cx+dx;
     if((unsigned)X>=(unsigned)s->w)continue;
     int lo=cy-h,hi=cy+h;
-    if(lo<0)lo=0;if(hi>=s->h)hi=s->h-1;
+    if(lo<0)lo=0;
+    if(hi>=s->h)hi=s->h-1;
     if(lo>hi)continue;
     u8 *d=s->fb+(X*s->h+(s->h-1-lo))*3;
     for(int y=lo;y<=hi;y++,d-=3){d[0]=blue;d[1]=green;d[2]=red;}
