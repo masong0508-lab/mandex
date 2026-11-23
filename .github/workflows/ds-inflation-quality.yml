@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: DS detail, pressure progression and pixel bounds
         run: |
-          gcc -std=gnu99 -O2 -Wall -Werror -DMX_FIXED -Itest/stubs -Icore -Iart test/ds_inflation_detail_test.c -lm -o /tmp/ds_art
+          gcc -std=gnu99 -O2 -Wall -Werror -DMX_FIXED -Itest/stubs -Icore -Iart test/ds_inflation_detail_test.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_art
           /tmp/ds_art
       - name: Wolfman safe impact sites in fixed and float physics
         run: |
