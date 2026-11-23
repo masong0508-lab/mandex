@@ -19,8 +19,10 @@ November 23, 2026
 
 ## Physics and performance safeguards
 
-Detached partial chunks expose all contact edges at split boundaries so
-they are collidable. Ordinary components keep sparse edge marking.
+Detached partial chunks mark both their true exterior faces and their new
+cut faces using the existing support-visited scratch bytes (1=unselected,
+2=selected). This avoids marking every interior voxel as collidable, while
+ordinary components keep their original sparse edge marking.
 No extra C voxel buffers, heap allocations, framebuffers, save formats,
 sprites or particle pools were added. The browser builds on the previously
 implemented reusable support traversal and collision hash. Splitting a
