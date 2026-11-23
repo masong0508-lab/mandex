@@ -889,6 +889,12 @@ function crackFx(x,y,m,d){const px=(x+.5+(d===0?.5:0))*V,py=(y+.5+(d===2?.5:0))*
   dust(px,py,1,6);
   if(m===GLASS)for(let k=0;k<4;k++)chip(px,py,'#ffffff',(rnd()-.5)*160,-rnd()*120);
   else for(let k=0;k<2;k++)chip(px,py,shade(MAT[m].c,-20),(rnd()-.5)*90,-rnd()*70)}
+function jointBreakLimit(i,j,m,mj){
+  let lim=Math.min(MAT[m].ymax,MAT[mj].ymax);
+  if(hp[i]*4<=MAT[m].hp||hp[j]*4<=MAT[mj].hp)return lim*.70;
+  if(hp[i]*2<=MAT[m].hp||hp[j]*2<=MAT[mj].hp)return lim*.85;
+  return lim;
+}
 function wobStep(dt){
   for(let m=1;m<MAT.length;m++)FD[m]=Math.max(0,1-MAT[m].damp*dt);
   const NB=[0,0,0,0];
@@ -908,7 +914,7 @@ function wobStep(dt){
     const sv=Math.abs(ovx[i])+Math.abs(ovy[i]),so=Math.abs(ox[i])+Math.abs(oy[i]);if(sv>maxv)maxv=sv;if(so>maxo)maxo=so}
   for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS;x++){const i=y*COLS+x,m=grid[i];if(!m)continue;
     for(let d=0;d<3;d+=2){const j=d===0?(x+1<COLS?i+1:-1):i+COLS;if(j<0||((brk[i]>>d)&1))continue;const mj=grid[j];if(!mj)continue;
-      const s=Math.abs(ox[j]-ox[i])+Math.abs(oy[j]-oy[i]),lim=Math.min(MAT[m].ymax,MAT[mj].ymax);
+      const s=Math.abs(ox[j]-ox[i])+Math.abs(oy[j]-oy[i]),lim=jointBreakLimit(i,j,m,mj);
       if(s>lim){brk[i]|=1<<d;brk[j]|=1<<(d^1);needSupport=true;if(crackEv<4){crackEv++;crackFx(x,y,m,d)}}}}
   if(maxv<.6&&maxo<.03){if(++wobQuiet>20){ox.fill(0);oy.fill(0);ovx.fill(0);ovy.fill(0);wobOn=false;wobQuiet=0}}else wobQuiet=0}
 // sand: no cohesion - falls straight down and slides off slopes steeper than 45 degrees
@@ -940,12 +946,16 @@ function supportPass(){
   const vis=supportVis;
   for(let i=0;i<grid.length;i++){
     if(!grid[i]||grid[i]===SAND||hb[i]!==255||vis[i])continue;
-    const comp=[],st=SUPPORT_STACK;st.length=0;st.push(i);vis[i]=1;
+    const comp=[],st=SUPPORT_STACK;let oversized=false;st.length=0;st.push(i);vis[i]=1;
     while(st.length){const a=st.pop(),x=a%COLS,y=(a/COLS)|0;
-      comp.push({x,y,m:grid[a],h:hp[a],px:(x+.5+ox[a])*V,py:(y+.5+oy[a])*V,vx:ovx[a]*V,vy:ovy[a]*V});   // leaves from where the wobble has it, with its velocity
+      // Limit one falling slab to 512 voxels, as in the shared C engine.
+      // Keep the remainder in the world until the next support pass.
+      if(comp.length<512)comp.push({x,y,m:grid[a],h:hp[a],px:(x+.5+ox[a])*V,py:(y+.5+oy[a])*V,vx:ovx[a]*V,vy:ovy[a]*V});
+      else oversized=true;
       for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(!inb(nx,ny))continue;const j=idx(nx,ny);if(grid[j]&&grid[j]!==SAND&&hb[j]===255&&!vis[j]&&!((brk[a]>>d)&1)){vis[j]=1;st.push(j)}}}
     for(const c of comp){const k=idx(c.x,c.y);grid[k]=0;hp[k]=0;anch[k]=0;paperHit(c.x,c.y);wobZero(k);clearLinks(k)}
     paperDirty=true;newChunk(comp);
+    if(oversized)needSupport=true; // detach remaining unsupported cells next pass
   }
 }
 function recompute(ch){
@@ -1041,7 +1051,8 @@ function stepChunks(dt){
               if(o.h<=0){if(o.m===TNT)movedTntBoom(o);else o.dead=true}
               SFX.thud(.2)
             }}
-          const tm=ch.m+oc.m;ch.cx+=nx*pen*.5*oc.m/tm;ch.cy+=ny*pen*.5*oc.m/tm;ch.cn++;oc.cx-=nx*pen*.5*ch.m/tm;oc.cy-=ny*pen*.5*ch.m/tm;oc.cn++}}
+          const tm=ch.m+oc.m;ch.cx+=nx*pen*.5*oc.m/tm;ch.cy+=ny*pen*.5*oc.m/tm;ch.cn++;oc.cx-=nx*pen*.5*ch.m/tm;oc.cy-=ny*pen*.5*ch.m/tm;oc.cn++;
+          if(vn < -5*V){if(ch.rest)wake(ch);if(oc.rest)wake(oc)}}}
     }}
   for(const ch of chunks){if(ch.cn>0&&!ch.rest){ch.x+=ch.cx/ch.cn*.9;ch.y+=ch.cy/ch.cn*.9}ch.age+=dt}
   for(let i=0,n=Math.min(bucketCount,CHUNK_BUCKET_CACHE_MAX);i<n;i++)CHUNK_BUCKET_POOL[i].length=0;

@@ -61,6 +61,8 @@ const chip=(...a)=>events.push(['chip',...a]),dust=(...a)=>events.push(['dust',.
 const damageCell=(...a)=>events.push(['damage',...a]);
 const wobKick=(...a)=>events.push(['wobble',...a]);
 const lordShock=(...a)=>events.push(['shock',...a]);
+// The actual browser physics now wakes a sleeping piece after a hard hit.
+const wake=ch=>{ch.rest=false;ch.sleep=0;ch.restT=0;ch.age=Math.max(ch.age,.2)};
 const SFX={thud(...a){events.push(['thud',...a])}};
 for(const [x,y,m]of fixture.walls||[])grid[idx(x,y)]=m;
 for(const d of fixture.chunks){
@@ -141,8 +143,10 @@ assert.strictEqual(six.chunks[0].cn,0);
 assert.strictEqual(six.events.length,0);
 assert.strictEqual(six.chunks[0].cells.length,1,'solver must leave cleanup timing intact');
 
-// Seeded live-cell worlds compare complete bodies, HP, transforms, impulses,
-// position correction, effect order and RNG-driven dust against the old code.
+// Seeded all-moving live-cell worlds compare complete bodies, HP, transforms,
+// impulses, position correction and RNG-driven dust against the old code.
+// Intentional changes to resting-body response have their own regression in
+// browser_collapse_response_test.js.
 let seed=0x78ca32ee;
 const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
 let liveCases=0;
@@ -152,7 +156,7 @@ for(let i=0;i<600;i++){
   const cells=Array.from({length:3},(_,k)=>({m:1+(i+j+k)%8,h:1e9,lx:(k-1)*8,ly:(k%2)*8}));
   chunks.push({id:j+1,x:160+rnd()*48,y:450+rnd()*30,vx:(rnd()-.5)*180,vy:(rnd()-.5)*180,
    w:(rnd()-.5)*3,ang:(rnd()-.5)*3,m:2+rnd()*5,I:200+rnd()*300,
-   rest:j===3&&i%4===0,cells});
+   rest:false,cells});
  }
  const fixture={chunks,walls:[[22,58,3],[24,57,2],[25,59,1]]};
  assert.deepStrictEqual(run(fixture,1/360,6),old(fixture,1/360,6),'live contact behavior changed in case '+i);

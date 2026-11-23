@@ -640,6 +640,16 @@ static MX_HOT void wobble_step(MxWorld *w, real dt
     w->oy[i] = rclamp(w->oy[i] + rmul(w->ovy[i], dt), -WOB_OMAX, WOB_OMAX);
   }
 }
+/* Weak joints now respond to accumulated HP damage, not merely the
+   final fatal voxel hit. Fully healthy structures keep their old tuning. */
+static real joint_break_limit(const MxWorld *w,int i,int j,int m,int mj){
+  real lim=MATS[m].ymax<MATS[mj].ymax?MATS[m].ymax:MATS[mj].ymax;
+  if(w->hp[i]*4<=RI(MATS[m].hp)||w->hp[j]*4<=RI(MATS[mj].hp))
+    return rmul(lim,R(0.70));
+  if(w->hp[i]*2<=RI(MATS[m].hp)||w->hp[j]*2<=RI(MATS[mj].hp))
+    return rmul(lim,R(0.85));
+  return lim;
+}
 /* once per frame: snap joints that stretched past their break strain, and detect when everything has stopped */
 #ifndef MX_WOB_JOINT_MASK
 #define MX_WOB_JOINT_MASK 1
@@ -661,7 +671,7 @@ static void wobble_check(MxWorld *w){
 #define MX_CHECK_FORWARD(D, J) do { \
       const int j = (J), mj = w->grid[j]; \
       real s = rabs(w->ox[j] - w->ox[i]) + rabs(w->oy[j] - w->oy[i]); \
-      real lim = MATS[m].ymax < MATS[mj].ymax ? MATS[m].ymax : MATS[mj].ymax; \
+      real lim = joint_break_limit(w,i,j,m,mj); \
       if(s > lim){ \
         w->brk[i] |= (uint8_t)(1 << (D)); w->brk[j] |= (uint8_t)(1 << ((D) ^ 1)); \
         dz_touch(w, i); dz_touch(w, j); \
@@ -684,7 +694,7 @@ static void wobble_check(MxWorld *w){
       int mj = w->grid[j];
       if(!mj) continue;
       real s = rabs(w->ox[j] - w->ox[i]) + rabs(w->oy[j] - w->oy[i]);
-      real lim = MATS[m].ymax < MATS[mj].ymax ? MATS[m].ymax : MATS[mj].ymax;
+      real lim = joint_break_limit(w,i,j,m,mj);
       if(s > lim){
         w->brk[i] |= (uint8_t)(1 << d); w->brk[j] |= (uint8_t)(1 << (d ^ 1));
         dz_touch(w, i); dz_touch(w, j);
@@ -884,15 +894,17 @@ static MX_HOT void support_pass(MxWorld *w){
     if(!w->grid[i] || w->grid[i] == MX_SAND || w->hb[i] != 255 || w->vis[i]) continue;
     MxChunk *ch = chunk_slot(w);
     if(!ch) w->retry_cd = 20;            /* no free body right now: stay standing, but look again in a third of a second (a slab must not hang in the air for good) */
-    int sp = 0, n = 0, overflow = ch ? 0 : 1;
+    int sp = 0, n = 0, oversized = 0;
     w->stack[sp++] = (uint16_t)i; w->vis[i] = 1;
     while(sp){
       int a = w->stack[--sp], x = a % MX_COLS, y = a / MX_COLS;
-      if(!overflow){
+      /* Detach the first contiguous 512 voxels; let the rest fall on
+         later support passes instead of leaving a giant wall hanging. */
+      if(ch){
         if(n < MX_CHUNK_CELLS){
           MxCell *c = &ch->cells[n++];
           c->lx = RI(x); c->ly = RI(y); c->m = w->grid[a]; c->h = w->hp[a]; c->dead = 0;
-        } else overflow = 1;
+        } else oversized = 1;
       }
       for(int d = 0; d < 4; d++){
         int nx = x + DX[d], ny = y + DY[d];
@@ -901,14 +913,24 @@ static MX_HOT void support_pass(MxWorld *w){
         if(w->grid[j] && w->grid[j] != MX_SAND && w->hb[j] == 255 && !w->vis[j] && !((w->brk[a] >> d) & 1)){ w->vis[j] = 1; w->stack[sp++] = (uint16_t)j; }
       }
     }
-    if(overflow) continue;               /* too big or no free body: leave it standing */
+    if(!ch) continue;                   /* no slot: retry when a sleeper settles */
+    if(oversized) w->need_support = 1;  /* unsupported remainder falls next pass */
+    /* The existing visited byte already marks the whole disconnected
+       region as 1. Temporarily mark the selected <=512 cells as 2 so the
+       cut can be recognized without a new bitmap or all-edge slowdown. */
+    if(oversized) for(int k = 0; k < n; k++){
+      MxCell *c = &ch->cells[k];
+      w->vis[IDX(rfloor(c->lx),rfloor(c->ly))] = 2;
+    }
     /* mark boundary voxels while the component is still in the grid */
     for(int k = 0; k < n; k++){
       MxCell *c = &ch->cells[k];
       int gx = rfloor(c->lx), gy = rfloor(c->ly), e = 0;
       for(int d = 0; d < 4 && !e; d++){
         int nx = gx + DX[d], ny = gy + DY[d];
-        if(!INB(nx, ny) || !w->grid[IDX(nx, ny)] || w->hb[IDX(nx, ny)] != 255) e = 1;
+        if(!INB(nx, ny) || !w->grid[IDX(nx, ny)] ||
+           w->hb[IDX(nx, ny)] != 255 ||
+           (oversized && w->vis[IDX(nx, ny)] != 2)) e = 1;
       }
 #ifdef MX_NO_EDGE
       e = 1;
@@ -1129,6 +1151,8 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
             ch->cx += rmul(nx, fa); ch->cy += rmul(ny, fa); ch->cn++;
             och->cx -= rmul(nx, fb); och->cy -= rmul(ny, fb); och->cn++;
           }
+          /* Hard contact wakes the sleeper next step; soft pile taps don't. */
+          if(och->rest && vn < -R(5)) wake_chunk(och);
         }
       }
     }

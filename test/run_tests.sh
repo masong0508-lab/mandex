@@ -115,6 +115,14 @@ for mode in float fixed; do
 done
 echo "--- Browser late Wolfman alleys: all 12 added structures and truthful tactical tips ---"
 if command -v node >/dev/null 2>&1;then node browser_wolf_alley_test.js;fi
+echo "--- Responsive collapse: 512-cell split, damaged joints, impact waking (float/fixed/browser) ---"
+for mode in float fixed;do
+  flags=''
+  if test "$mode" = fixed;then flags='-DMX_FIXED';fi
+  gcc -std=gnu99 -O2 -Wall -Wno-unused-function $flags -I../core collapse_response_test.c -lm -o "collapse_response_$mode"
+  "./collapse_response_$mode"
+done
+if command -v node >/dev/null 2>&1;then node browser_collapse_response_test.js;fi
 echo "--- Moving TNT: padded fuse state, impact/safe outcomes, precise blast hitboxes (float/fixed/browser) ---"
 for mode in float fixed;do
   flags=""

@@ -1,0 +1,26 @@
+name: Responsive structural collapse physics
+on:
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'web/index.html'
+      - 'test/collapse_response_test.c'
+      - 'test/browser_collapse_response_test.js'
+      - '.github/workflows/responsive-collapse.yml'
+  workflow_dispatch:
+jobs:
+  collapse-response:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shared core float and DS fixed point physics
+        run: |
+          for mode in float fixed; do
+            flags=''
+            if test "$mode" = fixed; then flags='-DMX_FIXED'; fi
+            gcc -std=gnu99 -O2 -Wall -Wno-unused-function $flags -Icore test/collapse_response_test.c -lm -o "/tmp/mandex_collapse_$mode"
+            "/tmp/mandex_collapse_$mode"
+          done
+      - name: Browser actual-source structural dynamics and script syntax
+        run: node test/browser_collapse_response_test.js
