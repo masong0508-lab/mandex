@@ -209,6 +209,10 @@ static void seg(float x0, float y0, float x1, float y1, float w, float z, uint32
   quad4(X4, Y4, z, c);
 }
 static void puff(float cx, float cy, float r, float z, uint32 c){ atl(cx - r, cy - r, r * 2, r * 2, DCA_PUFF, z, c); }     /* soft round blob */
+/* Aspect-correct existing puff sprite, no new atlas or geometry pool. */
+static void soft_oval(float cx,float cy,float rx,float ry,float z,uint32 c){
+  atl(cx-rx,cy-ry,rx*2,ry*2,DCA_PUFF,z,c);
+}
 
 static float man_zoom = 1.0f;                           /* the end panels draw the man bigger */
 static float shx, shy;                                  /* screen shake */
@@ -282,6 +286,9 @@ static void toast_tick(void){
 }
 /* the man's colours: boxers (red family) and towel (pink family) are re-tinted in the decoded atlas by hue, keeping each texel's brightness */
 static int man_fur;                                                          /* the Wolfman outfit: flying frames get the wolf head */
+/* Four tiny pressure-art colors follow recolor_man, not the original
+   flesh tone when Wolfman fur or another skin variant is selected. */
+static uint32 belly_tone[4];
 static void recolor_man(int o){
   if(!tx_man) return;
   uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); int fur = mx_outfit_skin(o, sk);
@@ -318,6 +325,8 @@ static void recolor_man(int o){
   pvr_txr_load(tmp, tx_man, (uint32)(tot * 2));
   free(tmp);
   man_fur = fur;
+  for(int k=0;k<4;k++)
+    belly_tone[k]=argb(sk[k][0],sk[k][1],sk[k][2],255);
 }
 static void handle_events(void){
   for(int i = 0; i < world.nev; i++){
@@ -930,12 +939,30 @@ static void draw_all(void){
       man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
       man_rot = 0;
     }
-    if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){               /* only the belly swells; the face flushes as the pressure builds */
-      float f = m->inf, rx = 11 + f * 28, ry = 10 + f * 24, bx = x + face * f * 10, by = y + 6 + f * 4;
-      puff(bx, by, (rx > ry ? rx : ry) + 2, Z_MAN + 0.3f, argb(205, 135, 100, 255)); puff(bx, by, (rx > ry ? rx : ry), Z_MAN + 0.4f, argb(244, 183, 142, 255));
-      puff(bx - rx * 0.3f, by - ry * 0.45f, rx * 0.22f, Z_MAN + 0.5f, argb(255, 215, 180, 180));
-      puff(bx + face * rx * 0.8f, by + ry * 0.1f, 2 + f * 3, Z_MAN + 0.5f, argb(205, 135, 100, 255));
-      if(f > 0.45f){ float al = (f - 0.45f) * 1.6f; if(al > 0.75f) al = 0.75f; puff(x, y - 16, 9 + f * 3, Z_MAN + 0.45f, argb(235, 40, 50, (int)(255 * al))); }
+    if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){
+      /* Body-local oval with a much tighter max diameter than the old
+         78px circular overpaint. Keep the pose's limbs/face in view and
+         follow its real skin tone, including Wolfman grey fur. */
+      const float f=m->inf;
+      const float rx=14+f*13,ry=11+f*12;
+      const float bx=x+face*f*7,by=y+10+f*3;
+      soft_oval(bx,by,rx+2,ry+2,Z_MAN+.30f,belly_tone[1]);
+      soft_oval(bx,by,rx,ry,Z_MAN+.40f,belly_tone[0]);
+      soft_oval(bx-rx*.34f,by-ry*.43f,rx*.24f,ry*.22f,
+                Z_MAN+.50f,argb(255,235,215,man_fur?100:165));
+      /* Waistline hugs the base of the oval; compact navel and high-
+         pressure creases provide depth without another huge sprite. */
+      seg(bx-rx*.50f,by+ry*.66f,bx,by+ry*.76f,1.7f,
+          Z_MAN+.53f,argb(150,38,51,205));
+      seg(bx,by+ry*.76f,bx+rx*.50f,by+ry*.66f,1.7f,
+          Z_MAN+.53f,argb(150,38,51,205));
+      puff(bx+face*rx*.34f,by+ry*.12f,2.2f,Z_MAN+.55f,belly_tone[1]);
+      if(f>.4f){
+        seg(bx+face*rx*.73f,by-ry*.3f,
+            bx+face*rx*.77f,by-ry*.07f,1.2f,Z_MAN+.57f,belly_tone[1]);
+      }
+      if(f>.75f)
+        puff(bx-rx*.40f,by-ry*.48f,1.8f,Z_MAN+.6f,belly_tone[2]);
     }
   }
   if(m->mode == MAN_AIM)
