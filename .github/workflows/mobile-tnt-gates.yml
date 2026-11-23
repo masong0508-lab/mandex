@@ -1,0 +1,53 @@
+name: TNT impact and hitbox gates
+
+on:
+  pull_request:
+    paths:
+      - "core/mx.c"
+      - "core/mx.h"
+      - "web/index.html"
+      - "test/mobile_tnt_test.c"
+      - "test/browser_mobile_tnt_test.js"
+      - ".github/workflows/mobile-tnt-gates.yml"
+  push:
+    branches: [main]
+    paths:
+      - "core/mx.c"
+      - "core/mx.h"
+      - "web/index.html"
+      - "test/mobile_tnt_test.c"
+      - "test/browser_mobile_tnt_test.js"
+      - ".github/workflows/mobile-tnt-gates.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile-tnt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Floating and fixed-point TNT physics and collision hitboxes
+        run: |
+          set -eu
+          for mode in float fixed; do
+            flags=""
+            test "$mode" = fixed && flags="-DMX_FIXED"
+            gcc -std=gnu99 -O2 -Wall -Wno-unused-function $flags -Icore test/mobile_tnt_test.c -lm -o "/tmp/mobile_tnt_$mode"
+            "/tmp/mobile_tnt_$mode"
+          done
+      - name: Browser moving TNT and rounded punch hitboxes
+        run: node test/browser_mobile_tnt_test.js
+      - name: Browser game JavaScript parses
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          game=Path('web/index.html').read_text()
+          a=game.rfind('<script>');b=game.rfind('</script>')
+          assert a>=0 and b>a
+          Path('/tmp/mobile_tnt_game.js').write_text(game[a+8:b])
+          PY
+          node --check /tmp/mobile_tnt_game.js

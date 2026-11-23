@@ -1,0 +1,31 @@
+name: DS inflation detail and TNT impact pockets
+on:
+  pull_request:
+    paths:
+      - 'ds/**'
+      - 'core/**'
+      - 'web/index.html'
+      - 'test/ds_inflation_detail_test.c'
+      - 'test/wolf_annex_test.c'
+      - '.github/workflows/ds-inflation-quality.yml'
+  workflow_dispatch:
+jobs:
+  ds-art:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: DS detail, pressure progression and pixel bounds
+        run: |
+          gcc -std=gnu99 -O2 -Wall -Werror -DMX_FIXED -Itest/stubs -Icore -Iart test/ds_inflation_detail_test.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_art
+          /tmp/ds_art
+      - name: Wolfman safe impact sites in fixed and float physics
+        run: |
+          for mode in float fixed; do
+            flags=''
+            if test "$mode" = fixed; then flags='-DMX_FIXED'; fi
+            gcc -std=c99 -O2 -Wall $flags -Icore core/mx.c test/wolf_annex_test.c -lm -o "/tmp/wolf_annex_$mode"
+            "/tmp/wolf_annex_$mode"
+          done
+      - name: Browser script parses
+        run: |
+          node -e 'const h=require("fs").readFileSync("web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<=a)throw Error("browser script missing");new Function(h.slice(a+8,b));'

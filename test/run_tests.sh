@@ -15,6 +15,8 @@ python3 sprite_turn_anchor_test.py
 python3 head_turnaround_test.py
 echo "--- Dreamcast: all 71 Wolfman profiles use independent HD UV rectangles ---"
 python3 dreamcast_wolf_atlas_test.py
+echo "--- DS inflation native-resolution detail, silhouette and clipping ---"
+gcc -std=gnu99 -O2 -Wall -DMX_FIXED -Istubs -I../core -I../art ds_inflation_detail_test.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o ds_inflation_detail_test && ./ds_inflation_detail_test
 echo "--- DS emulator smoke validator: reject frozen, blank and incomplete boot captures ---"
 python3 ds_smoke_test.py
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c host_test.c -lm -o test_float
@@ -92,6 +94,14 @@ echo "--- Browser creator: bounded MX1 imports, Unicode share names and legacy c
 if command -v node >/dev/null 2>&1;then node browser_creator_codec_test.js;fi
 echo "--- Web: touch capture, landscape/portrait two-thumb controls, safe camera pan ---"
 if command -v node >/dev/null 2>&1;then node browser_multitouch_test.js;fi
+echo "--- Stage guidance: all 60 console levels and 40 browser early-stage tactics ---"
+for mode in float fixed;do
+  flags=''
+  if test "$mode" = fixed;then flags="-DMX_FIXED";fi
+  gcc -std=c99 -O2 -Wall $flags -I../core ../core/mx.c level_tactic_test.c -lm -o "level_tactic_$mode"
+  "./level_tactic_$mode"
+done
+if command -v node >/dev/null 2>&1;then node browser_early_tactics_test.js;fi
 echo "--- Chapter 3 street encounters: landmark geometry, defenders and 3-second stability (float/fixed) ---"
 for mode in float fixed; do
   flags=""
@@ -99,6 +109,16 @@ for mode in float fixed; do
   gcc -std=c99 -O2 -Wall $flags -I../core ../core/mx.c wolf_annex_test.c -lm -o "wolf_annex_$mode"
   "./wolf_annex_$mode"
 done
+echo "--- Browser late Wolfman alleys: all 12 added structures and truthful tactical tips ---"
+if command -v node >/dev/null 2>&1;then node browser_wolf_alley_test.js;fi
+echo "--- Moving TNT: padded fuse state, impact/safe outcomes, precise blast hitboxes (float/fixed/browser) ---"
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wall -Wno-unused-function $flags -I../core mobile_tnt_test.c -lm -o "mobile_tnt_$mode"
+  "./mobile_tnt_$mode"
+done
+if command -v node >/dev/null 2>&1;then node browser_mobile_tnt_test.js;fi
 echo "--- read-only shot readiness and actual power stock (float/fixed/browser) ---"
 for mode in float fixed;do
   flags=""
@@ -365,7 +385,7 @@ cmp ds_chunk_view_0.txt ds_chunk_view_1.txt
 cat ds_chunk_view_1.txt
 echo "--- Dreamcast front-end drawing on the host (software rasteriser instead of the PVR): jiggle, gags, win/lose ---"
 for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source -c ../ds/source/$f.c -o dc_$f.o; done   # the shared cutscene code, built exactly as dreamcast/Makefile does
-gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c dc_render.c -lm -o dc_render && DC_OUTFIT_RECOLOR_PROBE=1 ./dc_render && DC_MENU_FLOW_TEST=1 ./dc_render && ./dc_render
+gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source dc_gfx.o dc_intro.o ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c dc_render.c -lm -o dc_render && DC_OUTFIT_RECOLOR_PROBE=1 ./dc_render && DC_PRESSURE_PROBE=1 ./dc_render && DC_MENU_FLOW_TEST=1 ./dc_render && ./dc_render
 echo "--- Dreamcast untouched-wall damage fastpath vs exact division reference ---"
 gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation -DMX_DC_FAST_PRISTINE_DAMAGE=0 \
   -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source \
@@ -409,6 +429,7 @@ for f in gfx intro; do gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED 
 gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_render.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_render
 N3DS_RUBBLE_DAMAGE_PROBE=1 ./n3ds_render
 N3DS_TILE_CLIP_PROBE=1 ./n3ds_render
+N3DS_PRESSURE_PROBE=1 ./n3ds_render
 echo "--- 3DS silhouette, outfit colors and antialiased rotated edges ---"
 for config in base lit smooth; do
   case "$config" in

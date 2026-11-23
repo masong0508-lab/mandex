@@ -1,0 +1,31 @@
+name: Wolfman night alley gates
+on:
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'ds/**'
+      - '3ds/**'
+      - 'dreamcast/**'
+      - 'web/index.html'
+      - 'test/wolf_annex_test.c'
+      - 'test/browser_wolf_alley_test.js'
+      - '.github/workflows/wolfman-night-alley-gates.yml'
+  workflow_dispatch:
+jobs:
+  alley:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fixed and float street cells and stability
+        run: |
+          for mode in float fixed; do
+            flags=''
+            if test "$mode" = fixed; then flags='-DMX_FIXED'; fi
+            gcc -std=c99 -O2 -Wall -Werror $flags -Icore core/mx.c test/wolf_annex_test.c -lm -o "/tmp/wolf_alley_$mode"
+            "/tmp/wolf_alley_$mode"
+          done
+      - name: Browser actual Wolfman generator
+        run: node test/browser_wolf_alley_test.js
+      - name: Browser gameplay script parses
+        run: |
+          node -e 'const h=require("fs").readFileSync("web/index.html","utf8");const a=h.indexOf("<script>"),b=h.indexOf("</script>",a);if(a<0||b<=a)throw Error("missing game script");new Function(h.slice(a+8,b));'

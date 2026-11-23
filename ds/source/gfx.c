@@ -873,6 +873,54 @@ void spr_man_jr(u8 *b, int x, int y, int ppc, int f, int pose, int ph, const Man
   else blit_frame(b, MFR(fr), x, y, ppc, f, 0, jg);
 }
 
+
+/* Detailed body-local pressure volume for the DS. This replaces the old
+   flat 112px-wide swelling circle at ppc=4. The original frame's face,
+   limbs, coat and cloth remain visible. The contour peaks at 56px wide
+   (plus its one-pixel rim), with pixel-wise growth, not 4px jumps.
+   Man/Wolfman tones come from the existing live sprite palette: no
+   image allocation, frame buffer or floating-point per frame. */
+void spr_man_inflation(u8 *b,int x,int y,int ppc,int face,int pressure,int tick){
+  if(ppc<1 || pressure<=0)return;
+  if(pressure>100)pressure=100;
+  const int rx=3*ppc+(4*ppc*pressure+50)/100;
+  const int ry=3*ppc+(3*ppc*pressure+50)/100;
+  const int cx=x+face*((3*ppc*pressure+100)/200);
+  const int cy=y+2*ppc+(ppc*pressure+50)/100;
+  if(cx+rx+2<0 || cx-rx-2>=256 || cy+ry+2<0 || cy-ry-2>=192)return;
+  const u8 shade=C_MAN0+2,skin=C_MAN0+1,light=C_MAN0+3,rim=C_MAN_RIM0+1;
+  /* Small outlined silhouette, warm side shadow and a clear highlight. */
+  gfx_ell(b,cx,cy,rx+1,ry+1,rim);
+  gfx_ell(b,cx,cy,rx,ry,shade);
+  gfx_ell(b,cx-face,cy-1,rx-2,ry-2,skin);
+  gfx_ell(b,cx-face*rx/3,cy-ry/3,rx/4,ry/5,light);
+  if(ppc>=3){
+    /* Boxers follow the rounded underside instead of being erased. */
+    int hem=cy+ry*2/3;
+    gfx_line(b,cx-rx/2,hem-2,cx,hem+1,C_RED2);
+    gfx_line(b,cx,hem+1,cx+rx/2,hem-2,C_RED2);
+    gfx_line(b,cx-face*(rx*2/3),cy-ry/3,
+               cx-face*(rx*3/4),cy+ry/5,C_MAN0+4);
+    if(pressure>=35){
+      gfx_line(b,cx+face*rx*2/3,cy-ry/3,cx+face*rx*3/4,cy-ry/6,shade);
+      gfx_line(b,cx+face*rx*3/4,cy+ry/6,cx+face*rx*2/3,cy+ry/3,shade);
+    }
+    int nx=cx+face*rx/3,ny=cy+ry/7;
+    gfx_rect(b,nx,ny,ppc>=4?2:1,2,shade);
+    gfx_px(b,nx-face,ny-1,light);
+    if(gfx_man_fur){ /* texture marks in the recoloured wolf fur */
+      gfx_px(b,cx-rx/3,cy+ry/4,light);
+      gfx_px(b,cx+rx/4,cy-ry/5,light);
+      gfx_px(b,cx+rx/2,cy+ry/3,shade);
+    }
+    /* One-pixel high-pressure glint; no added enlargement or jitter. */
+    if(pressure>=75 && (tick&8))
+      gfx_rect(b,cx-face*rx/2,cy-ry/2,1,ppc>=4?3:2,light);
+  }else{
+    gfx_px(b,cx+face*rx/3,cy,shade);
+  }
+}
+
 void spr_man_bust(u8 *b, int x, int y, int ppc){         /* head + shoulders only, for the HUD strip */
   blit_frame(b, &MS_FRAMES[MSF_IDLE_B], x, y, ppc, 1, 20, 0);
 }

@@ -38,6 +38,7 @@ const WOOD=1,BRICK=2,STONE=3,GLASS=4,TNT=5,STEEL=6,RUBBER=7,SAND=8;
 let grid,hp,anch,hb=new Uint8Array(COLS*ROWS),dmg=new Uint8Array(COLS*ROWS);
 let ox,oy,ovx,ovy,brk,wobOn=false,wobQuiet=0,sandOn=false,sandT=0,crackEv=0;   // wobble lattice (cells, cells/s)
 let chunks=[],parts=[],texts=[],targets=[],interiors=[],explQ=[],man,men=0,cases=[];
+let tntLiveFuses=0; // available to the HUD without a second per-frame world scan
 let tubes=[];   // pneumatic tubes of the current level (chapter 2): see tubeStep / drawTubes
 let pads=[];    // bounce pads of the current level (walk levels): pink rubber strips that boing the man up a shaft, see padCheck / drawPads
 let level=0,state='title',shake=0,freeze=0,slow=0,needSupport=false,dragging=false;
@@ -474,16 +475,22 @@ const CH2=LEVELS.length;
   TIPS={0:'New: landlords have health bars.  Hit them twice!',5:'Riot shields block you from the front.  Hit them fast, or from behind.',10:'Healers patch landlords up.  Take them out first.',15:'Bosses throw two briefcases at once.'},
   ANNEX_TIPS=[
    'GLASS TOLLHOUSE: smash the keg below the thrower!',
-   'RUBBER KIOSK: bounce off its sides, or come over the roof!',
-   'SAND HOPPER: pop the upper TNT pin to dump the sand!',
+   'RUBBER KIOSK: spring shelves can cushion falling TNT!',
+   'SAND HOPPER: dump sand; the soft floor can cushion loose TNT!',
    'TAX BUNKER: break into the upstairs office through the weak floor!'
+  ],
+  ALLEY_TIPS=[
+   'NIGHT ALLEY: shatter the glass signal and its TNT!',
+   'NIGHT ALLEY: bank off the rubber; TNT may survive!',
+   'NIGHT ALLEY: break the sandbags loose from above!',
+   'NIGHT ALLEY: crack the glass roof of the steel gate!'
   ];
  for(let i=0;i<20;i++){
   const tier=Math.min(3,(i/5)|0),kinds=[['walker','thrower','bat'],['walker','shield','sprinter','thrower'],['shield','sprinter','healer','bat','thrower'],['boss','shield','healer','sprinter','thrower']][tier];
   const m1=MATS[i%5],m2=MATS[(i*2+1)%5],m3=MATS[(i*3+2)%5];
   const H1={x:48+(i%3)*4,w:8+(i%4)*2,floors:2+(i%4),fh:8+(i%3)},H2={x:80+(i%2)*4,w:10+(i%5)*2,floors:2+((i+1)%4),fh:9+(i%2)},H3={x:108,w:8,floors:2+(i%3),fh:8};
   const hs=[[H1,m1],[H2,m2]];if(i>=8)hs.push([H3,m3]);
-  LEVELS.push({name:NAMES[i],men:5+((i/5)|0)+(i>=15?1:0),tip:TIPS[i]||ANNEX_TIPS[i%4],build(){
+  LEVELS.push({name:NAMES[i],men:5+((i/5)|0)+(i>=15?1:0),tip:TIPS[i]||(i>=8?ALLEY_TIPS[i%4]:ANNEX_TIPS[i%4]),build(){
    let k=0;
    for(const[H,mt]of hs){house({x:H.x,w:H.w,floors:H.floors,fh:H.fh,wt:mt[0]===STEEL?2:1,wall:mt[0],floor:mt[1],roof:mt[1]===WOOD?WOOD:STONE,gable:false,paper:['#e8d8c0','#d8e0e8','#e8d8e8'][k%3]});
     for(let f=0;f<H.floors;f++){const row=ROWS-1-f*H.fh,cx=f===0?H.x+H.w-3:H.w>13?H.x+3+((f&1)?H.w-7:0):H.x+(H.w>>1)+((f*3+k)%3-1),kind=(f+k+i)%3===0&&i<5?'':kinds[(f*2+k+i)%kinds.length];
@@ -501,16 +508,88 @@ const CH2=LEVELS.length;
     tnt(ax+2,59);tgt(ax+4,51,'thrower',2);break;
    case 1: // rubber sidewalls for a deliberate ricochet or roof entry
     house({x:ax,w:8,floors:2,fh:8,wall:RUBBER,floor:WOOD,roof:WOOD,paper:'#f6d6ec'});
+    rect(ax+2,ROWS-1-8,4,1,RUBBER);rect(ax+2,ROWS-1,4,1,RUBBER);
     tnt(ax+2,51);tgt(ax+4,59,tier?'sprinter':'walker',2);break;
    case 2: // upper-floor sand reservoir; TNT pin releases it
     house({x:ax,w:8,floors:2,fh:8,wall:GLASS,floor:WOOD,roof:WOOD,paper:'#e2d6bd'});
-    rect(ax+1,44,6,7,SAND);tnt(ax+3,51);tgt(ax+4,59,'walker',2);break;
+    rect(ax+2,ROWS-1,4,1,SAND);rect(ax+1,44,6,7,SAND);
+    tnt(ax+3,51);tgt(ax+4,59,'walker',2);break;
    default: // stone-capped brick tax bunker
     house({x:ax,w:8,floors:2,fh:8,wall:BRICK,floor:WOOD,roof:STONE,paper:'#e6d4b8'});
     tnt(ax+2,59);tgt(ax+4,51,tier?'shield':'bat',2);break;
    }
+   // The second four-cell landmark sits in the remaining gap between
+   // houses 2 and 3 in the final twelve Wolfman levels. Exact C parity.
+   if(i>=8){
+    const g2=H3.x-(H2.x+H2.w);
+    if(g2>=6){
+     const bx=H2.x+H2.w+Math.floor((g2-4)/2);
+     switch(i%4){
+     case 0:
+      house({x:bx,w:4,floors:1,fh:7,wall:GLASS,floor:WOOD,roof:GLASS,paper:'#daeafb'});
+      rect(bx+1,48,2,2,GLASS);tnt(bx+1,59);break;
+     case 1:
+      house({x:bx,w:4,floors:1,fh:7,wall:RUBBER,floor:WOOD,roof:WOOD,paper:'#f6d6ec'});
+      rect(bx+1,59,2,1,RUBBER);rect(bx+1,49,2,1,RUBBER);tnt(bx+1,59);break;
+     case 2:
+      house({x:bx,w:4,floors:1,fh:7,wall:GLASS,floor:WOOD,roof:WOOD,paper:'#e7dfbc'});
+      rect(bx+1,56,2,3,SAND);rect(bx+1,48,2,2,SAND);tnt(bx+1,56);break;
+     default:
+      house({x:bx,w:4,floors:1,fh:7,wall:STEEL,floor:WOOD,roof:GLASS,paper:'#abbdd3'});
+      rect(bx+1,48,2,2,STEEL);tnt(bx+1,59);break;
+     }
+    }
+   }
   }})}
 })();
+/* Forty practical chapter 1/2 tactics, mirrored verbatim from the console
+   core's ROM-only table. Fill only absent tips: authored tutorials for
+   walking, parrying, pipes and the finale keep their own fuller copy.
+   This runs once on boot, not inside gameplay or the render loop. */
+const EARLY_TACTICS=[
+ "HIT THE SHED FIRST - EVICT EVERY LANDLORD",
+ "BREAK THE TALL TOWER'S WEAK FLOORS",
+ "STONE FLOORS ARE TOUGH - USE TNT",
+ "CRACK THE CASTLE'S STONE SUPPORTS",
+ "STEEL WALLS ARE TOUGH - AIM AT BRICK",
+ "RUBBER BOUNCES YOU - HIT THE ROOF",
+ "DIG THE SAND TO DROP BOTH HOUSES",
+ "GLASS SHATTERS - AIM FOR THE BASE",
+ "TOPPLE THE STEEL STACK FROM ITS CAP",
+ "BREAK THE BRIDGE TO SPLIT THE TOWERS",
+ "START SMALL - DOMINO THE WOOD TOWERS",
+ "BANK OFF RUBBER; SAND SHIFTS BELOW",
+ "TNT IS BURIED IN THE PYRAMID'S BASE",
+ "SKYSCRAPER: TARGET WOOD OR TNT",
+ "BRIDGE DECK: CUT THE SUPPORT PIERS",
+ "FORT KNOXED: FIND A WEAK ENTRY",
+ "JENGA JOE: REMOVE A SUPPORT PILLAR",
+ "KNOCK THE KEEP INTO THE SAND MOAT",
+ "GLASS CANNON: SHATTER THE BASE",
+ "MANDEX MANOR: TWO BRIDGES TO DROP",
+ "USE AIR TUBES TO ENTER THE VAULT",
+ "HIT THE WOODEN PLUG - RELEASE SAND",
+ "LAND AND WALK - JUMP ON PINK PADS",
+ "LOB HIGH OVER THE STEEL CURTAIN",
+ "THREAD THE GAPS IN THE STEEL WALL",
+ "PATROLLING LANDLORDS: LEAD YOUR SHOT",
+ "BAT GUARDS SWAT SLOW SHOTS - HIT HARD",
+ "BREAK THE BEANPOLE'S LOWER FLOORS",
+ "TNT TOWERS CAN START CHAIN REACTIONS",
+ "BANK A SHOT OFF RUBBER FOR A BONUS",
+ "HIT THE STEPS FROM BELOW AND ABOVE",
+ "SAND SUPPORTS THE VILLA - DIG IT OUT",
+ "STEEL VAULT: BREAK THE WOODEN LID",
+ "BRIDGE FLOORS DROP WHEN PIERS BREAK",
+ "GLASS TOWERS SHATTER WITH CHAIN HITS",
+ "BREAK THE COLUMN UNDER THE PENTHOUSE",
+ "USE TUBES OR THREAD THE MAIL SLOTS",
+ "PUNCH A THROWN CASE TO PARRY +150",
+ "BREAK THE SAND TANK ABOVE THE FIGHT",
+ "THREE DISTRICTS - CLEAR EVERY LANDLORD"
+];
+for(let i=0;i<EARLY_TACTICS.length;i++)
+  if(!LEVELS[i].tip)LEVELS[i].tip=EARLY_TACTICS[i];
 const chEnd=l=>l<CH1?CH1:l<CH2?CH2:LEVELS.length;   // the last level of the chapter that level l belongs to
 // ---- pneumatic tubes ----
 function tubeStep(m,dt){
@@ -556,7 +635,7 @@ function load(l,custom){
      a previously saved AIR choice cannot obstruct the very next shot. */
   OPT().tool='none';
   pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;bankLeft=0;banner=2.4;waitT=0;
-  tubes=[];pads=[];CL.build();paper.fill(0);interiors.forEach((r,n)=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(inb(x,y))paper[idx(x,y)]=n+1});unclipTargets();
+  tntLiveFuses=0;tubes=[];pads=[];CL.build();paper.fill(0);interiors.forEach((r,n)=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(inb(x,y))paper[idx(x,y)]=n+1});unclipTargets();
   zonePaid=[];if(CL.slings){const zb=CL.zones||[];for(const t of targets){t.zone=0;for(let k=0;k<zb.length;k++)if(t.x>=zb[k]*V)t.zone=k+1}setSling(0)}else{SX=128;SY=GY-118;VX=36;VY=SY+58;slingK=0}
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
   paperFrameInit=interiors.map(roomFrameSupport);paperFrameOrig=paperFrameInit.slice();
@@ -726,9 +805,66 @@ function lordShock(x,y,reach,seconds){
     }
   }
 }
+// ---------- MOBILE TNT: movement and gentle landings are not explosions.
+// A real hard collision arms a visible fuse. Nearby blasts use the world
+// coordinates of each charge, never the parent chunk's average position.
+const TNT_FUSE_TICKS=24;
+function movedTntBoom(a){
+  if(a.dead)return;
+  a.dead=true;a.fuse=0;
+  const x=Math.floor(a.wx/V),y=Math.floor(a.wy/V);
+  if(x>=-7&&x<COLS+7&&y>=-7&&y<ROWS+7)explQ.push([x,y]);
+  chip(a.wx,a.wy,'#ffb84a',0,-110);
+}
+function armMovingTnt(ch,a,ticks){
+  if(a.dead||a.m!==TNT)return;
+  if(!a.fuse){
+    if(!ch.tntFused){popText(a.wx,a.wy-26,'TNT FUSE!','#ff9a3c',21);ring(a.wx,a.wy,25,'#ffbd52')}
+    a.fuse=ticks;ch.tntFused=true;
+  }else if(a.fuse>ticks)a.fuse=ticks;
+}
+function blastMovingTnt(px,py){
+  const reach=7.5*V,r2=reach*reach;
+  for(const ch of chunks){
+    if(!ch.hasTnt||Math.abs(ch.x-px)>ch.rad+reach||Math.abs(ch.y-py)>ch.rad+reach)continue;
+    for(const a of ch.cells){
+      if(a.dead||a.m!==TNT)continue;
+      const dx=a.wx-px,dy=a.wy-py;
+      if(Math.abs(dx)<reach&&Math.abs(dy)<reach&&dx*dx+dy*dy<r2)armMovingTnt(ch,a,8);
+    }
+  }
+}
+function updateMovingTnt(){
+  let live=0;
+  for(const ch of chunks){
+    if(!ch.hasTnt)continue;
+    if(ch.tntHit&&ch.tntImpact>=28*V){
+      // A separate TNT voxel can ignite even if another in this rubble chunk
+      // already has a fuse. Do not call an already armed charge "safe".
+      const a=ch.tntHit;
+      if(!a.dead&&a.m===TNT&&!a.fuse){
+        const light=ch.tntImpact>=55*V||((level*13+ch.id*7+Math.floor(time*8))&3)===0;
+        if(light)armMovingTnt(ch,a,TNT_FUSE_TICKS);
+        else if(!ch.tntWarned){popText(a.wx,a.wy-22,'TNT SURVIVED!','#9debc1',18);ch.tntWarned=true}
+      }
+    }
+    let fused=false,anyTnt=false;
+    for(const a of ch.cells){
+      if(a.dead||a.m!==TNT)continue;
+      if(a.fuse){
+        if(--a.fuse===0)movedTntBoom(a);
+        else{fused=true;live++;}
+      }
+      if(!a.dead)anyTnt=true;
+    }
+    // Retire rubble bodies from TNT scans when their last charge dies.
+    ch.hasTnt=anyTnt;ch.tntFused=fused;ch.tntImpact=0;ch.tntHit=null;
+  }
+  tntLiveFuses=live;
+}
 function processExpl(){let n=0;
   while(explQ.length&&n++<80){const[x,y]=explQ.shift(),px=x*V+V/2,py=y*V+V/2;onBoom();
-    blast(x,y,7,95);wobBlast(x,y,14,26);shockwave(px,py,7*V,5200);lordShock(px,py,14*V,.8);shake=Math.max(shake,9);slow=Math.max(slow,.35);freeze=Math.max(freeze,3);flash=.35;SFX.boom();
+    blast(x,y,7,95);blastMovingTnt(px,py);wobBlast(x,y,14,26);shockwave(px,py,7*V,5200);lordShock(px,py,14*V,.8);shake=Math.max(shake,9);slow=Math.max(slow,.35);freeze=Math.max(freeze,3);flash=.35;SFX.boom();
     ring(px,py,90,'#ffcf6b');
     for(let k=0;k<30;k++)P({k:2,x:px,y:py,vx:(rnd()-.5)*620,vy:-rnd()*520,l:.5+rnd()*.5,l0:1});
     for(let k=0;k<8;k++)P({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}}
@@ -805,13 +941,18 @@ function supportPass(){
     paperDirty=true;newChunk(comp);
   }
 }
-function recompute(ch){let M=0,I=0;for(const a of ch.cells){const d=MAT[a.m].d;M+=d;I+=d*(a.lx*a.lx+a.ly*a.ly+V*V/6)}ch.m=Math.max(.2,M);ch.I=Math.max(1,I)}
+function recompute(ch){
+  let M=0,I=0;ch.hasTnt=false;ch.tntFused=false;
+  for(const a of ch.cells){if(a.m===TNT&&!a.dead){ch.hasTnt=true;if(a.fuse>0)ch.tntFused=true}
+    const d=MAT[a.m].d;M+=d;I+=d*(a.lx*a.lx+a.ly*a.ly+V*V/6)}
+  ch.m=Math.max(.2,M);ch.I=Math.max(1,I)
+}
 function newChunk(cells){
   let M=0,cx=0,cy=0,mvx=0,mvy=0;
   for(const a of cells){if(a.px===undefined){a.px=a.x*V+V/2;a.py=a.y*V+V/2;a.vx=a.vy=0}const d=MAT[a.m].d;M+=d;cx+=d*a.px;cy+=d*a.py;mvx+=d*a.vx;mvy+=d*a.vy}
   cx/=M;cy/=M;mvx/=M;mvy/=M;let rad=0,tq=0,ti=0;
-  const ch={id:++chunkId,cells,x:cx,y:cy,vx:clamp(mvx,-WOB_VMAX*V,WOB_VMAX*V),vy:clamp(mvy,-WOB_VMAX*V,WOB_VMAX*V),ang:0,w:0,m:M,I:1,sleep:0,age:0,hitCd:0,rad:0,cs:1,sn:0,cx:0,cy:0,cn:0};
-  for(const a of cells){a.lx=a.px-cx;a.ly=a.py-cy;a.ch=ch;a.wx=a.px;a.wy=a.py;a.dead=false;rad=Math.max(rad,Math.hypot(a.lx,a.ly));
+  const ch={id:++chunkId,cells,x:cx,y:cy,vx:clamp(mvx,-WOB_VMAX*V,WOB_VMAX*V),vy:clamp(mvy,-WOB_VMAX*V,WOB_VMAX*V),ang:0,w:0,m:M,I:1,sleep:0,age:0,hitCd:0,rad:0,cs:1,sn:0,cx:0,cy:0,cn:0,tntImpact:0,tntHit:null,tntWarned:false};
+  for(const a of cells){a.fuse=0;a.lx=a.px-cx;a.ly=a.py-cy;a.ch=ch;a.wx=a.px;a.wy=a.py;a.dead=false;rad=Math.max(rad,Math.hypot(a.lx,a.ly));
     const d=MAT[a.m].d;tq+=d*(a.lx*(a.vy-mvy)-a.ly*(a.vx-mvx));ti+=d*(a.lx*a.lx+a.ly*a.ly)}
   ch.w=ti>64?clamp(tq/ti,-6,6):0;   // the sway becomes a topple
   ch.rad=rad+V;recompute(ch);chunks.push(ch);return ch}
@@ -819,7 +960,9 @@ const OFFS=[[0,0],[0,-1],[-1,0],[1,0],[0,-2],[-1,-1],[1,-1],[-2,0],[2,0]];
 function settleRaw(ch,keep){
   let ang=keep?0:ch.ang;const q=Math.round(ang/(Math.PI/2))*(Math.PI/2);if(Math.abs(ang-q)<.4)ang=q;
   const cs=Math.cos(ang),sn=Math.sin(ang);
-  for(const a of ch.cells){if(a.dead)continue;const wx=ch.x+cs*a.lx-sn*a.ly,wy=ch.y+sn*a.lx+cs*a.ly,gx=Math.floor(wx/V),gy=Math.floor(wy/V);let ok=false;
+  for(const a of ch.cells){if(a.dead)continue;
+    if(a.m===TNT&&a.fuse){movedTntBoom(a);continue}
+    const wx=ch.x+cs*a.lx-sn*a.ly,wy=ch.y+sn*a.lx+cs*a.ly,gx=Math.floor(wx/V),gy=Math.floor(wy/V);let ok=false;
     for(const[ox,oy]of OFFS){const X=gx+ox,Y=gy+oy;if(inb(X,Y)&&!grid[idx(X,Y)]){const i=idx(X,Y);grid[i]=a.m;hp[i]=a.h;anch[i]=1;wobZero(i);clearLinks(i);if(a.m===SAND)sandOn=true;ok=true;break}}
     if(!ok)dust(wx,wy,1,6)}
   needSupport=true}
@@ -829,14 +972,22 @@ function resolveStatic(ch,a,nx,ny,pen,ci,cj){
   const rx=a.wx-ch.x,ry=a.wy-ch.y,vpx=ch.vx-ch.w*ry,vpy=ch.vy+ch.w*rx,vn=vpx*nx+vpy*ny;
   if(vn<0){const MP=MAT[a.m],rn=rx*ny-ry*nx,den=1/ch.m+rn*rn/ch.I,e=-vn>(a.m===RUBBER?24:130)?MP.rest:0,j=-(1+e)*vn/den;
     ch.vx+=j*nx/ch.m;ch.vy+=j*ny/ch.m;ch.w+=rn*j/ch.I;
+    if(a.m===TNT){const surface=inb(ci,cj)?grid[idx(ci,cj)]:0;
+      const hit=-vn*((surface===RUBBER||surface===SAND)?.3:1);
+      if(hit>(ch.tntImpact||0)){ch.tntImpact=hit;ch.tntHit=a}}
     const tx=-ny,ty=nx,vt=(ch.vx-ch.w*ry)*tx+(ch.vy+ch.w*rx)*ty,rt=rx*ty-ry*tx,jt=clamp(-vt/(1/ch.m+rt*rt/ch.I),-MP.fric*j,MP.fric*j);
     ch.vx+=jt*tx/ch.m;ch.vy+=jt*ty/ch.m;ch.w+=rt*jt/ch.I;
     if(-vn>(a.m===GLASS?72:170))impactDamage(ch,a,ci,cj,-vn);
     if(-vn>56){const kf=clamp(ch.m/200,.03,.4);wobKick(ci,cj,2,nx*vn/V*kf,ny*vn/V*kf)}}   // the thing that got hit wobbles
   ch.cx+=nx*pen;ch.cy+=ny*pen;ch.cn++}
 function impactDamage(ch,a,ci,cj,vn){
-  const dmg=(vn-(a.m===GLASS?57:160))*.07;if(inb(ci,cj)&&grid[idx(ci,cj)])damageCell(ci,cj,dmg*.9);a.h-=dmg*.6*MAT[a.m].brit;
-  if(a.h<=0){a.dead=true;const c=MAT[a.m].c;for(let k=0;k<3;k++)chip(a.wx,a.wy,c,(rnd()-.5)*200,-rnd()*150);dust(a.wx,a.wy,1,7)}
+  const dmg=(vn-(a.m===GLASS?57:160))*.07,surface=inb(ci,cj)?grid[idx(ci,cj)]:0;
+  if(surface)damageCell(ci,cj,dmg*.9);
+  a.h-=dmg*.6*MAT[a.m].brit*((a.m===TNT&&(surface===RUBBER||surface===SAND))?.22:1);
+  if(a.h<=0){
+    if(a.m===TNT)movedTntBoom(a);
+    else{a.dead=true;const c=MAT[a.m].c;for(let k=0;k<3;k++)chip(a.wx,a.wy,c,(rnd()-.5)*200,-rnd()*150);dust(a.wx,a.wy,1,7)}
+  }
   if(vn>250)lordShock(a.wx,a.wy,8*V,.45);SFX.thud(vn*ch.m/3000);shake=Math.max(shake,Math.min(6,vn*ch.m/5000));if(rnd()<.3)dust(a.wx,a.wy+4,1,8)}
 function stepChunks(dt){
   if(!chunks.length)return;
@@ -864,7 +1015,18 @@ function stepChunks(dt){
           const vax=ch.vx-ch.w*ray,vay=ch.vy+ch.w*rax,vbx=oc.vx-oc.w*rby,vby=oc.vy+oc.w*rbx,vn=(vax-vbx)*nx+(vay-vby)*ny;
           if(vn<0){const rna=rax*ny-ray*nx,rnb=rbx*ny-rby*nx,den=1/ch.m+1/oc.m+rna*rna/ch.I+rnb*rnb/oc.I,jj=-(1.1)*vn/den;
             ch.vx+=jj*nx/ch.m;ch.vy+=jj*ny/ch.m;ch.w+=rna*jj/ch.I;oc.vx-=jj*nx/oc.m;oc.vy-=jj*ny/oc.m;oc.w-=rnb*jj/oc.I;
-            if(-vn>200){a.h-=(-vn-180)*.04;o.h-=(-vn-180)*.04;if(a.h<=0)a.dead=true;if(o.h<=0)o.dead=true;SFX.thud(.2)}}
+            if(-vn>160){
+              if(a.m===TNT){const hit=-vn*((o.m===RUBBER||o.m===SAND)?.3:1);if(hit>(ch.tntImpact||0)){ch.tntImpact=hit;ch.tntHit=a}}
+              if(o.m===TNT){const hit=-vn*((a.m===RUBBER||a.m===SAND)?.3:1);if(hit>(oc.tntImpact||0)){oc.tntImpact=hit;oc.tntHit=o}}
+            }
+            if(-vn>200){
+              const dm=(-vn-180)*.04;
+              a.h-=dm*((a.m===TNT&&(o.m===RUBBER||o.m===SAND))?.22:1);
+              o.h-=dm*((o.m===TNT&&(a.m===RUBBER||a.m===SAND))?.22:1);
+              if(a.h<=0){if(a.m===TNT)movedTntBoom(a);else a.dead=true}
+              if(o.h<=0){if(o.m===TNT)movedTntBoom(o);else o.dead=true}
+              SFX.thud(.2)
+            }}
           const tm=ch.m+oc.m;ch.cx+=nx*pen*.5*oc.m/tm;ch.cy+=ny*pen*.5*oc.m/tm;ch.cn++;oc.cx-=nx*pen*.5*ch.m/tm;oc.cy-=ny*pen*.5*ch.m/tm;oc.cn++}}
     }}
   for(const ch of chunks){if(ch.cn>0&&!ch.rest){ch.x+=ch.cx/ch.cn*.9;ch.y+=ch.cy/ch.cn*.9}ch.age+=dt}
@@ -874,6 +1036,7 @@ function cleanChunks(dt){
     for(const a of ch.cells)if(a.dead){lost=true;score+=5}
     if(lost){ch.cells=ch.cells.filter(a=>!a.dead);if(!ch.cells.length){chunks.splice(k,1);continue}recompute(ch)}
     if(ch.hitCd>0)ch.hitCd-=dt;
+    if(ch.tntFused){ch.sleep=0;continue} // the fuse cannot vanish when rubble welds
     if(ch.x<-250||ch.x>WW+250||ch.y>WH+300){chunks.splice(k,1);continue}
     const sp=Math.hypot(ch.vx,ch.vy)+Math.abs(ch.w)*18;
     if(ch.rest){
@@ -989,7 +1152,7 @@ function manPlow(){
       const dx=a.wx-m.x,dy=a.wy-m.y;
       if(Math.abs(dx)>=cellReach||Math.abs(dy)>=cellReach||
          Math.hypot(dx,dy)>=cellReach)continue;touched=true;hit=true;ax+=a.wx;ay+=a.wy;n++;const cost=a.h*K;
-      if(E>=cost){E-=cost;a.dead=true;const c=MAT[a.m].c;for(let k=0;k<2;k++)chip(a.wx,a.wy,c,m.vx*.25+(rnd()-.5)*200,m.vy*.25-rnd()*150)}else{a.h-=E/K;E=0}}
+      if(E>=cost){E-=cost;if(a.m===TNT)movedTntBoom(a);else{a.dead=true;const c=MAT[a.m].c;for(let k=0;k<2;k++)chip(a.wx,a.wy,c,m.vx*.25+(rnd()-.5)*200,m.vy*.25-rnd()*150)}}else{a.h-=E/K;E=0}}
     if(hit&&ch.hitCd<=0){ch.hitCd=.12;applyImpulse(ch,ax/n,ay/n,m.vx*mass*.9,m.vy*mass*.9)}}
   /* Man-target proximity is checked for every flight substep. Squared
      distance avoids a square root for each landlord without sacrificing
@@ -1042,7 +1205,7 @@ function wBlocked(x,y){
       else if(j===3)qy=y+WHH*.5;
       else if(j===4)qy=y+WHH-.01;
           if(Math.abs(a.wy-qy)>=RC)continue;
-          if(Math.hypot(ch.x-qx,ch.y-qy)<=radius)return true;
+          return true; /* the actual rubble voxel hit, not a distant chunk-centre proxy */
         }
       }
     }
@@ -1058,7 +1221,8 @@ function walkQuit(){const m=man;if(m.mode!=='walk')return;goo(m.x,m.y,20,240);SF
 function walkHit(cx,cy,hw,hh,dmg){let dealt=0;const x0=Math.floor((cx-hw)/V),x1=Math.floor((cx+hw)/V),y0=Math.floor((cy-hh)/V),y1=Math.floor((cy+hh)/V);
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(inb(x,y)&&grid[idx(x,y)]===RUBBER)continue;dealt+=damageCell(x,y,dmg)}   // bounce pads shrug off fists
   for(const ch of chunks){if(Math.hypot(ch.x-cx,ch.y-cy)>ch.rad+hw+hh)continue;let hit=false;
-    for(const a of ch.cells)if(!a.dead&&Math.abs(a.wx-cx)<hw+RC&&Math.abs(a.wy-cy)<hh+RC){hit=true;dealt+=Math.min(a.h,dmg);a.h-=dmg;if(a.h<=0){a.dead=true;chip(a.wx,a.wy,MAT[a.m].c,(rnd()-.5)*200,-rnd()*150)}}
+    for(const a of ch.cells)if(!a.dead&&Math.abs(a.wx-cx)<hw+RC&&Math.abs(a.wy-cy)<hh+RC&&
+      Math.max(0,Math.abs(a.wx-cx)-hw)**2+Math.max(0,Math.abs(a.wy-cy)-hh)**2<RC*RC){hit=true;dealt+=Math.min(a.h,dmg);a.h-=dmg;if(a.h<=0){if(a.m===TNT)movedTntBoom(a);else{a.dead=true;chip(a.wx,a.wy,MAT[a.m].c,(rnd()-.5)*200,-rnd()*150)}}}
     if(hit)wake(ch)}
   // Punch and belly slam can catch incoming briefcases before they hit him.
   // Reverse traversal is safe for in-place splice; no new collision arrays.
@@ -1663,7 +1827,10 @@ function update(dt){
   if(man.mode==='wait'){waitT+=dt;if(waitT>.7&&(!busy()||waitT>3.5)){zoneAdvance();if(men>0)nextMan();else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14}}}
   processExpl();
   if(needSupport)supportPass();
+  for(const ch of chunks)if(ch.hasTnt){ch.tntImpact=0;ch.tntHit=null}
   for(let i=0;i<6;i++)stepChunks(dt/6);
+  updateMovingTnt();
+  processExpl(); // process detonations caused by late rubble contacts this frame
   cleanChunks(dt);
   if(wobOn){const n=Math.max(1,Math.min(8,Math.ceil(dt*180-.05)));for(let i=0;i<n;i++)wobStep(dt/n)}
   sandT++;if(sandOn&&sandT%3===0)sandStep();
@@ -3629,6 +3796,14 @@ function drawHUD(){
   {const nm=`${CL.custom?'CUSTOM':'LV '+(level+1)}  ${CL.name.toUpperCase()}`;let sz=18;{while(sz>11){ctx.font=`bold ${sz}px "Trebuchet MS",Impact,sans-serif`;if(ctx.measureText(nm).width<=(P?285:250))break;sz--}}txt(nm,12,24,sz,'#ffd23f','left')}
   const objective=objectiveSnapshot(),lb=objective.remaining;
   txt(`LANDLORDS ${lb}/${objective.total}`,P?12:Math.max(430,300+men*Math.min(20,230/Math.max(1,men))+24),P?54:24,18,lb?'#ff8a8a':'#7dff5a','left');
+  if(state==='play'&&tntLiveFuses>0){
+    // Compact status below the mission strip, and below combo on portrait.
+    // No hot-path HUD scan or new input hit target is introduced.
+    const y=P?(combo>1?139:107):73;
+    ctx.fillStyle='rgba(55,26,19,.88)';ctx.fillRect(8,y-18,208,26);
+    ctx.fillStyle='#ff9b45';ctx.fillRect(8,y-18,3,26);
+    txt('TNT FUSE x'+tntLiveFuses+'  -  TAKE COVER!',17,y,13,'#ffe4a1','left');
+  }
   if(state==='play'){
     // Never mistake the wreckage meter for the win condition. In portrait
     // and landscape the objective lives below the header, not over controls.
@@ -3677,7 +3852,7 @@ function drawHUD(){
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
-  if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict every landlord!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
+  if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
   if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
   if(state==='play')btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
   if(state==='win'||state==='lose')drawEnd()}
@@ -5016,6 +5191,7 @@ function drawMobileOptions(){
     if(y+rh<H-72)row('RESET OPTIONS','DEFAULT',()=>{if(performance.now()<armReset){optsReset();armReset=0}else armReset=performance.now()+3000},false);
     if(y+rh<H-68)row('ERASE PROGRESS','CONFIRM',()=>{if(performance.now()<armProg){progReset();armProg=0}else armProg=performance.now()+3000},false);
   }
+  if(!page)txt('TNT CAN SURVIVE FALLS. HARD HITS LIGHT A FUSE.',W/2,H-95,13,'#ffe190','center');
   if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{WEB_UI.page.options=1},{size:18});
   else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{WEB_UI.page.options=0},{size:18});
 }
@@ -5159,7 +5335,7 @@ function drawOptions(){
   // ---- left: gameplay ----
   head(lx,y,'GAMEPLAY');y+=26;
   row(lx,y,'COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',()=>{o.collapse=!o.collapse;pdTouch();pdSave();SFX.pop()},null,!!o.collapse);y+=rh+2;
-  txt(o.collapse?'Fallen rubble keeps slumping and toppling until the level ends.':'Rubble settles in place and locks solid.',lx+cw/2,y+12,13,'#cfd','center');y+=gap+14;
+  txt(o.collapse?'Rubble can topple. TNT: soft falls safe; hard hits may light a fuse.':'Rubble settles and locks. TNT can survive a soft landing.',lx+cw/2,y+12,13,'#cfd','center');y+=gap+14;
   row(lx,y,'START TOOL',toolName(),()=>{toolCycle();pdTouch();pdSave();SFX.pop()},'#ffd23f',true);y+=rh+gap;
   row(lx,y,'AIM GUIDE (DOTS)',GUIDES[o.guide==null?2:o.guide],()=>{o.guide=((o.guide==null?2:o.guide)+1)%3;pdTouch();pdSave();SFX.pop()},'#9fd8ff',(o.guide==null?2:o.guide)>0);y+=rh+gap;
   row(lx,y,'BURP CHARGE',o.burpCharge?'ON':'OFF',()=>{o.burpCharge=!o.burpCharge;pdTouch();pdSave();SFX.pop()},null,!!o.burpCharge);y+=rh+gap;

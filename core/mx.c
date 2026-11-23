@@ -291,6 +291,23 @@ static real kill(MxWorld *w, int x, int y, real bvx, real bvy){
   if(m == MX_TNT && w->nexpl < 64){ w->expl[w->nexpl][0] = (int16_t)x; w->expl[w->nexpl][1] = (int16_t)y; w->nexpl++; }
   return h;
 }
+/* A detached voxel retains its physical location. Grid-based TNT already
+   enqueues a blast in kill(); falling TNT must use its CURRENT world position.
+   A dead mobile voxel is retired once and may never be detonated again. */
+static void queue_moving_tnt(MxWorld *w, real x, real y){
+  if(w->nexpl >= 64) return;
+  int cx=rfloor(x),cy=rfloor(y);
+  if(cx < -7 || cx >= MX_COLS+7 || cy < -7 || cy >= MX_ROWS+7)return;
+  w->expl[w->nexpl][0]=(int16_t)cx;
+  w->expl[w->nexpl][1]=(int16_t)cy;
+  w->nexpl++;
+}
+static void destroy_moving_tnt(MxWorld *w, MxCell *a){
+  if(a->dead)return;
+  a->dead=1;a->fuse=0;
+  ev(w,EV_CELL,a->wx,a->wy,MX_TNT,0,0);
+  queue_moving_tnt(w,a->wx,a->wy);
+}
 static real damage_cell(MxWorld *w, int x, int y, real d){
   if(!INB(x, y)) return 0;
   int i = IDX(x, y);
@@ -710,6 +727,83 @@ static void sand_step(MxWorld *w){
   if(moved) w->need_support = 1;
 }
 
+/* TNT knocked loose by collapsing walls remains live. Motion alone never
+   lights it. Medium collisions have a deterministic 1-in-4 chance; soft
+   rubber/sand cushions attenuate the hit. A violent hit always lights it.
+   A fuse is a byte already present in each cell's C alignment padding. */
+#define TNT_FUSE_TICKS 24
+static void arm_moving_tnt(MxWorld *w,MxChunk *ch,MxCell *a,int ticks){
+  if(a->dead || a->m!=MX_TNT)return;
+  if(!a->fuse){
+    if(!ch->tnt_fused)ev(w,EV_TNT_FUSE,a->wx,a->wy,0,0,0);
+    a->fuse=(uint8_t)ticks;
+    ch->tnt_fused=1;
+  }else if(a->fuse>ticks)a->fuse=(uint8_t)ticks;
+}
+/* Exact TNT voxel hitboxes, NOT approximate body-centre hitboxes. A blast
+   next to one end of a long fallen wall can light TNT there even when the
+   chunk's centre is far away. Distant TNT in the same large chunk stays safe. */
+static void blast_moving_tnt(MxWorld *w,real x,real y){
+  const real reach=R(7.5),reach2=rmul(reach,reach);
+  for(int c=0;c<MX_MAX_CHUNKS;c++){
+    MxChunk *ch=&w->chunks[c];
+    if(!ch->active||!ch->has_tnt)continue;
+    if(rabs(ch->x-x)>ch->rad+reach||rabs(ch->y-y)>ch->rad+reach)continue;
+    for(int k=0;k<ch->count;k++){
+      MxCell *a=&ch->cells[k];
+      if(a->dead||a->m!=MX_TNT)continue;
+      real dx=a->wx-x,dy=a->wy-y;
+      if(rabs(dx)>=reach||rabs(dy)>=reach)continue;
+      if(rmul(dx,dx)+rmul(dy,dy)<reach2)arm_moving_tnt(w,ch,a,8);
+    }
+  }
+}
+/* Once per GAME frame, never once per physics substep. Inactive chunks and
+   TNT-free chunks are skipped, so normal stages incur no cell scan. */
+static void update_moving_tnt(MxWorld *w){
+  /* Keep the HUD honest at almost zero cost: reuse the same per-charge
+     loop that already decrements every fuse once per frame. */
+  w->tnt_live=0;w->tnt_soonest=0;
+  for(int c=0;c<MX_MAX_CHUNKS;c++){
+    MxChunk *ch=&w->chunks[c];
+    if(!ch->active||!ch->has_tnt)continue;
+    if(ch->tnt_hit>=0 && ch->tnt_hit<ch->count && ch->tnt_impact>=RI(28)){
+      /* A burning charge does not protect a DIFFERENT TNT voxel in the same
+         rubble body. Assess the impacted cell, not the chunk-wide fuse bit.
+         An already armed voxel cannot misleadingly report a safe landing. */
+      MxCell *a=&ch->cells[ch->tnt_hit];
+      if(!a->dead&&a->m==MX_TNT&&!a->fuse){
+        /* Frame/stage/slot hash, not renderer random: stable replays and
+           identical DS hardware-vs-software fixed-point decisions. */
+        int tick=rfloor(rmul(w->time,RI(8)));
+        int light=ch->tnt_impact>=RI(55) || ((w->level*13+c*7+tick)&3)==0;
+        if(light)arm_moving_tnt(w,ch,a,TNT_FUSE_TICKS);
+        else if(!ch->tnt_warned){ev(w,EV_TNT_SAFE,a->wx,a->wy,0,0,0);ch->tnt_warned=1;}
+      }
+    }
+    int still_fused=0,any_tnt=0;
+    for(int k=0;k<ch->count;k++){
+      MxCell *a=&ch->cells[k];
+      if(a->dead||a->m!=MX_TNT)continue;
+      if(a->fuse){
+        a->fuse--;
+        if(!a->fuse)destroy_moving_tnt(w,a);
+        else {
+          still_fused=1;
+          w->tnt_live++;
+          if(!w->tnt_soonest||a->fuse<w->tnt_soonest)
+            w->tnt_soonest=a->fuse;
+        }
+      }
+      if(!a->dead)any_tnt=1;
+    }
+    /* Retire a rubble chunk's TNT flag when its last charge dies:
+       no further per-frame cell scans for exhausted bodies. */
+    ch->has_tnt=(uint8_t)any_tnt;
+    ch->tnt_fused=(uint8_t)still_fused;
+    ch->tnt_impact=0;ch->tnt_hit=-1;
+  }
+}
 static void process_expl(MxWorld *w){
   int n = 0;
   while(w->nexpl > 0 && n++ < 80){
@@ -718,6 +812,7 @@ static void process_expl(MxWorld *w){
     w->nexpl--;
     real px = RI(x) + R(0.5), py = RI(y) + R(0.5);
     blast(w, x, y, 7, R(95));
+    blast_moving_tnt(w,px,py);
     shockwave(w, px, py, RI(7), R(650));
     wob_blast(w, x, y, 14, R(26));
     w->shake = R(9); w->slow = R(0.35); w->freeze = 3; w->flash = R(0.35);
@@ -728,8 +823,10 @@ static void process_expl(MxWorld *w){
 /* ---- structural integrity: overhang-limited support, unsupported -> rigid chunk ---- */
 static void recompute(MxChunk *ch){
   real M = 0, I = 0;
+  ch->has_tnt=ch->tnt_fused=0;
   for(int i = 0; i < ch->count; i++){
     MxCell *a = &ch->cells[i];
+    if(a->m==MX_TNT&&!a->dead){ch->has_tnt=1;if(a->fuse)ch->tnt_fused=1;}
     real d = MATS[a->m].d;
     M += d;
     I += rmul(d, rmul(a->lx, a->lx) + rmul(a->ly, a->ly) + R(0.17));
@@ -823,6 +920,7 @@ static MX_HOT void support_pass(MxWorld *w){
     for(int k = 0; k < n; k++){
       MxCell *c = &ch->cells[k];
       int gi = IDX(rfloor(c->lx), rfloor(c->ly));
+      c->fuse=0; /* detaching TNT is safe; it does not ignite on movement */
       c->lx += w->ox[gi]; c->ly += w->oy[gi];            /* leave from where the wobble has it right now ... */
       c->wx = w->ovx[gi]; c->wy = w->ovy[gi];            /* ... remembering its velocity (temporarily in wx/wy) */
       real d = MATS[c->m].d, px = c->lx + R(0.5), py = c->ly + R(0.5);
@@ -846,6 +944,7 @@ static MX_HOT void support_pass(MxWorld *w){
     ch->w = ti > R(1) ? rclamp(rdiv(tq, ti), -RI(6), RI(6)) : 0;   /* the sway becomes a topple */
     ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rad + R(1); ch->cs = RI(1); ch->sn = 0;
     ch->px = cx; ch->py = cy; ch->pa = 0;
+    ch->tnt_hit=-1;
     recompute(ch);
   }
 }
@@ -854,8 +953,17 @@ static MX_HOT void support_pass(MxWorld *w){
 static void impact_damage(MxWorld *w, MxChunk *ch, MxCell *a, int ci, int cj, real vn){
   real dmg = rmul(vn, R(0.56)) - (a->m == MX_GLASS ? R(4) : R(11.2));
   if(INB(ci, cj) && w->grid[IDX(ci, cj)]) damage_cell(w, ci, cj, rmul(dmg, R(0.9)));
-  a->h -= rmul(rmul(dmg, R(0.6)), MATS[a->m].brit);
-  if(a->h <= 0){ a->dead = 1; ev(w, EV_CELL, a->wx, a->wy, a->m, 0, 0); }
+  real fracture=rmul(rmul(dmg,R(0.6)),MATS[a->m].brit);
+  /* Rubber and sand can absorb a falling charge's blow; extremely violent
+     hits still break it. All non-TNT material damage is unchanged. */
+  if(a->m==MX_TNT && INB(ci,cj) &&
+     (w->grid[IDX(ci,cj)]==MX_RUBBER||w->grid[IDX(ci,cj)]==MX_SAND))
+    fracture=rmul(fracture,R(0.22));
+  a->h-=fracture;
+  if(a->h<=0){
+    if(a->m==MX_TNT)destroy_moving_tnt(w,a);
+    else {a->dead=1;ev(w,EV_CELL,a->wx,a->wy,a->m,0,0);}
+  }
   real s = rdiv(rmul(vn, ch->m), RI(375));
   ev(w, EV_THUD, a->wx, a->wy, 0, s > RI(1) ? RI(1) : s, 0);
   real sh = rdiv(rmul(vn, ch->m), RI(625));
@@ -870,6 +978,13 @@ static MX_HOT void resolve_static(MxWorld *w, MxChunk *ch, MxCell *a, real nx, r
   if(vn < 0){
     real rn = rmul(rx, ny) - rmul(ry, nx);
     real den = rdiv(RI(1), ch->m) + rdiv(rmul(rn, rn), ch->I);
+    if(a->m==MX_TNT){
+      real force=-vn;
+      if(INB(ci,cj) &&
+         (w->grid[IDX(ci,cj)]==MX_RUBBER||w->grid[IDX(ci,cj)]==MX_SAND))
+        force=rmul(force,R(0.3));
+      if(force>ch->tnt_impact){ch->tnt_impact=force;ch->tnt_hit=(int16_t)(a-ch->cells);}
+    }
     const MatProp *mp = &MATS[a->m];
     real e = (-vn > (a->m == MX_RUBBER ? R(3) : R(16.25))) ? mp->rest : 0;
     real j = rdiv(rmul(-vn, RI(1) + e), den);
@@ -989,11 +1104,22 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
               ch->vx += rdiv(rmul(jj, nx), ch->m); ch->vy += rdiv(rmul(jj, ny), ch->m); ch->w += rdiv(rmul(rna, jj), ch->I);
               och->vx -= rdiv(rmul(jj, nx), och->m); och->vy -= rdiv(rmul(jj, ny), och->m); och->w -= rdiv(rmul(rnb, jj), och->I);
             }
+            if(-vn>R(20)){
+              if(a->m==MX_TNT){
+                real force=(o->m==MX_RUBBER||o->m==MX_SAND)?rmul(-vn,R(0.3)):-vn;
+                if(force>ch->tnt_impact){ch->tnt_impact=force;ch->tnt_hit=(int16_t)i;}
+              }
+              if(o->m==MX_TNT){
+                real force=(a->m==MX_RUBBER||a->m==MX_SAND)?rmul(-vn,R(0.3)):-vn;
+                if(force>och->tnt_impact){och->tnt_impact=force;och->tnt_hit=(int16_t)(id%MX_CHUNK_CELLS);}
+              }
+            }
             if(-vn > R(25)){
-              real dm = rmul(-vn - R(22.5), R(0.04));
-              a->h -= dm; o->h -= dm;
-              if(a->h <= 0) a->dead = 1;
-              if(o->h <= 0) o->dead = 1;
+              real dm=rmul(-vn-R(22.5),R(0.04));
+              a->h-=rmul(dm,(a->m==MX_TNT && (o->m==MX_RUBBER||o->m==MX_SAND))?R(0.22):RI(1));
+              o->h-=rmul(dm,(o->m==MX_TNT && (a->m==MX_RUBBER||a->m==MX_SAND))?R(0.22):RI(1));
+              if(a->h<=0){if(a->m==MX_TNT)destroy_moving_tnt(w,a);else a->dead=1;}
+              if(o->h<=0){if(o->m==MX_TNT)destroy_moving_tnt(w,o);else o->dead=1;}
             }
           }
           real tm = ch->m + och->m;
@@ -1028,6 +1154,7 @@ static void settle(MxWorld *w, MxChunk *ch, int keep_upright){
   for(int i = 0; i < ch->count; i++){
     MxCell *a = &ch->cells[i];
     if(a->dead) continue;
+    if(a->m==MX_TNT && a->fuse){destroy_moving_tnt(w,a);continue;}
     real wx = ch->x + rmul(cs, a->lx) - rmul(sn, a->ly), wy = ch->y + rmul(sn, a->lx) + rmul(cs, a->ly);
     int gx = rfloor(wx), gy = rfloor(wy), ok = 0;
     for(int o = 0; o < 9 && !ok; o++){
@@ -1058,6 +1185,7 @@ static void clean_chunks(MxWorld *w, real dt){
       recompute(ch);
     }
     if(ch->hitCd > 0) ch->hitCd -= dt;
+    if(ch->tnt_fused){ch->sleep=0;continue;} /* fuse must finish before welding */
     if(ch->x < RI(-30) || ch->x > RI(150) || ch->y > RI(90)){ ch->active = 0; continue; }
     if(ch->rest){                                       /* collapsible buildings: a sleeper stays solid until something wakes it */
       real spr = rabs(ch->vx) + rabs(ch->vy) + rmul(rabs(ch->w), R(2.25));
@@ -1299,10 +1427,17 @@ static MX_HOT void man_plow(MxWorld *w){
       MxCell *a = &ch->cells[i];
       if(a->dead) continue;
       real ddx = a->wx - m->x, ddy = a->wy - m->y;
+#ifdef MX_FIXED
+      if(rabs(ddx)>=RI(256)||rabs(ddy)>=RI(256))continue; /* never square wrapped far rubble */
+#endif
+      if(rabs(ddx)>=MAN_R+RC||rabs(ddy)>=MAN_R+RC)continue;
       if(rmul(ddx, ddx) + rmul(ddy, ddy) >= lim) continue;
       touched = 1; hit = 1; ax += a->wx; ay += a->wy; cnt++;
       real cost = rmul(a->h, KCOST);
-      if(E >= cost){ E -= cost; a->dead = 1; ev(w, EV_CELL, a->wx, a->wy, a->m, rmul(m->vx, R(0.25)), rmul(m->vy, R(0.25))); }
+      if(E >= cost){ E -= cost;
+        if(a->m==MX_TNT)destroy_moving_tnt(w,a);
+        else {a->dead=1;ev(w,EV_CELL,a->wx,a->wy,a->m,rmul(m->vx,R(0.25)),rmul(m->vy,R(0.25)));}
+      }
       else { a->h -= rdiv(E, KCOST); E = 0; }
     }
     if(hit && ch->hitCd <= 0){
@@ -1810,8 +1945,14 @@ static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg, i
     for(int k = 0; k < ch->count; k++){
       MxCell *a = &ch->cells[k];
       if(a->dead || rabs(a->wx - cx) >= hw + RC || rabs(a->wy - cy) >= hh + RC) continue;
+      /* Exact circle-to-punch-rectangle hitbox; diagonal near-misses
+         at the rounded corners do not break TNT or unrelated scenery. */
+      real dx=rabs(a->wx-cx)-hw,dy=rabs(a->wy-cy)-hh;
+      if(dx<0)dx=0;
+      if(dy<0)dy=0;
+      if(rmul(dx,dx)+rmul(dy,dy)>=rmul(RC,RC))continue;
       hit = 1; dealt += a->h < dmg ? a->h : dmg; a->h -= dmg;
-      if(a->h <= 0){ a->dead = 1; ev(w, EV_CELL, a->wx, a->wy, a->m, 0, 0); }
+      if(a->h <= 0){if(a->m==MX_TNT)destroy_moving_tnt(w,a);else {a->dead=1;ev(w,EV_CELL,a->wx,a->wy,a->m,0,0);} }
     }
     if(hit) wake_chunk(ch);
   }
@@ -2171,6 +2312,67 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord"};
 static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
 const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
+/* Compact ROM-only guidance; each hint fits a 256-pixel DS banner. */
+const char *mx_level_tactic(int l){
+  static const char *const early[MX_CH3_START]={
+    "HIT THE SHED FIRST - EVICT EVERY LANDLORD",
+    "BREAK THE TALL TOWER'S WEAK FLOORS",
+    "STONE FLOORS ARE TOUGH - USE TNT",
+    "CRACK THE CASTLE'S STONE SUPPORTS",
+    "STEEL WALLS ARE TOUGH - AIM AT BRICK",
+    "RUBBER BOUNCES YOU - HIT THE ROOF",
+    "DIG THE SAND TO DROP BOTH HOUSES",
+    "GLASS SHATTERS - AIM FOR THE BASE",
+    "TOPPLE THE STEEL STACK FROM ITS CAP",
+    "BREAK THE BRIDGE TO SPLIT THE TOWERS",
+    "START SMALL - DOMINO THE WOOD TOWERS",
+    "BANK OFF RUBBER; SAND SHIFTS BELOW",
+    "TNT IS BURIED IN THE PYRAMID'S BASE",
+    "SKYSCRAPER: TARGET WOOD OR TNT",
+    "BRIDGE DECK: CUT THE SUPPORT PIERS",
+    "FORT KNOXED: FIND A WEAK ENTRY",
+    "JENGA JOE: REMOVE A SUPPORT PILLAR",
+    "KNOCK THE KEEP INTO THE SAND MOAT",
+    "GLASS CANNON: SHATTER THE BASE",
+    "MANDEX MANOR: TWO BRIDGES TO DROP",
+    "USE AIR TUBES TO ENTER THE VAULT",
+    "HIT THE WOODEN PLUG - RELEASE SAND",
+    "LAND AND WALK - JUMP ON PINK PADS",
+    "LOB HIGH OVER THE STEEL CURTAIN",
+    "THREAD THE GAPS IN THE STEEL WALL",
+    "PATROLLING LANDLORDS: LEAD YOUR SHOT",
+    "BAT GUARDS SWAT SLOW SHOTS - HIT HARD",
+    "BREAK THE BEANPOLE'S LOWER FLOORS",
+    "TNT TOWERS CAN START CHAIN REACTIONS",
+    "BANK A SHOT OFF RUBBER FOR A BONUS",
+    "HIT THE STEPS FROM BELOW AND ABOVE",
+    "SAND SUPPORTS THE VILLA - DIG IT OUT",
+    "STEEL VAULT: BREAK THE WOODEN LID",
+    "BRIDGE FLOORS DROP WHEN PIERS BREAK",
+    "GLASS TOWERS SHATTER WITH CHAIN HITS",
+    "BREAK THE COLUMN UNDER THE PENTHOUSE",
+    "USE TUBES OR THREAD THE MAIL SLOTS",
+    "PUNCH A THROWN CASE TO PARRY +150",
+    "BREAK THE SAND TANK ABOVE THE FIGHT",
+    "THREE DISTRICTS - CLEAR EVERY LANDLORD"
+  };
+  static const char *const annex[4]={
+    "GLASS BOOTH: HIT THE LOWER TNT", "RUBBER SHELF: CUSHION FALLING TNT",
+    "SAND HOPPER: DROP THE SAND", "TAX BUNKER: BREAK THE ROOF"
+  };
+  static const char *const alley[4]={
+    "NIGHT ALLEY: SHATTER THE SIGNAL", "NIGHT ALLEY: BANK OFF THE RUBBER",
+    "NIGHT ALLEY: DUMP THE SANDBAGS", "NIGHT ALLEY: CRACK THE GLASS ROOF"
+  };
+  if(l<0 || l>=MX_NUM_LEVELS)return "EVICT EVERY LANDLORD";
+  if(l<MX_CH3_START)return early[l];
+  int i=l-MX_CH3_START;
+  if(i==0)return "WOLFMAN: LANDLORDS HAVE HEALTH BARS";
+  if(i==5)return "SHIELD GUARDS: HIT FROM BEHIND";
+  if(i==10)return "HEALERS: STOP THEM FIRST";
+  if(i==15)return "BOSSES: WATCH FOR DOUBLE THROWS";
+  return i>=8?alley[i%4]:annex[i%4];
+}
 
 
 /* ---- chapter 3 (the Wolfman): 20 levels built from two or three houses each, exactly as the web game's generator does (same formulas, same order) ---- */
@@ -2216,11 +2418,17 @@ static void build_ch3(MxWorld *w, int i){
       break;
     case 1: /* rubber customs kiosk: rebound from its sides, break its roof */
       house_ex(w, ax, MX_ROWS - 1, 8, 2, 8, 1, 1, MX_RUBBER, MX_WOOD, MX_WOOD, 0, 0);
+      /* Two purpose-made crash cushions for loose moving TNT; the shared
+         physics already dampens TNT collisions against rubber. */
+      rect_fill(w, ax + 2, 51, 4, 1, MX_RUBBER);
+      rect_fill(w, ax + 2, MX_ROWS - 1, 4, 1, MX_RUBBER);
       tnt(w, ax + 2, 51);
       tgtr(w, ax + 4, 59, tier ? LK_SPRINTER : LK_WALKER, 2);
       break;
     case 2: /* sand hopper: TNT pin in the upper floor releases the payload */
       house_ex(w, ax, MX_ROWS - 1, 8, 2, 8, 1, 1, MX_GLASS, MX_WOOD, MX_WOOD, 0, 0);
+      /* Sand-filled lower sill can stop a charge without igniting it. */
+      rect_fill(w, ax + 2, MX_ROWS - 1, 4, 1, MX_SAND);
       rect_fill(w, ax + 1, 44, 6, 7, MX_SAND);
       tnt(w, ax + 3, 51);
       tgtr(w, ax + 4, 59, LK_WALKER, 2);
@@ -2230,6 +2438,39 @@ static void build_ch3(MxWorld *w, int i){
       tnt(w, ax + 2, 59);
       tgtr(w, ax + 4, 51, tier ? LK_SHIELD : LK_BAT, 2);
       break;
+    }
+  }
+  /* The last 12 Wolfman stages gain a second four-cell booth in the
+     gap between houses two and three (minimum gap six cells).
+     No additional enemies, runtime arrays, or frame passes. */
+  if(nh==3){
+    int gap=H[2].x-(H[1].x+H[1].w);
+    if(gap>=6){
+      int bx=H[1].x+H[1].w+(gap-4)/2;
+      switch(i%4){
+      case 0: /* glass signal booth with an interior TNT keg */
+        house_ex(w,bx,MX_ROWS-1,4,1,7,1,1,MX_GLASS,MX_WOOD,MX_GLASS,0,0);
+        rect_fill(w,bx+1,48,2,2,MX_GLASS);
+        tnt(w,bx+1,59);
+        break;
+      case 1: /* rubber spring gate with a safe TNT crash mat */
+        house_ex(w,bx,MX_ROWS-1,4,1,7,1,1,MX_RUBBER,MX_WOOD,MX_WOOD,0,0);
+        rect_fill(w,bx+1,59,2,1,MX_RUBBER);
+        rect_fill(w,bx+1,49,2,1,MX_RUBBER);
+        tnt(w,bx+1,59);
+        break;
+      case 2: /* sandbag spill station: real soft falling material */
+        house_ex(w,bx,MX_ROWS-1,4,1,7,1,1,MX_GLASS,MX_WOOD,MX_WOOD,0,0);
+        rect_fill(w,bx+1,56,2,3,MX_SAND);
+        rect_fill(w,bx+1,48,2,2,MX_SAND);
+        tnt(w,bx+1,56);
+        break;
+      default: /* steel gate, glass weak roof */
+        house_ex(w,bx,MX_ROWS-1,4,1,7,1,1,MX_STEEL,MX_WOOD,MX_GLASS,0,0);
+        rect_fill(w,bx+1,48,2,2,MX_STEEL);
+        tnt(w,bx+1,59);
+        break;
+      }
     }
   }
 }
@@ -2609,6 +2850,7 @@ static void man_pose(MxMan *m, real dt){
 void mx_update(MxWorld *w, real dt){
   MX_PH_MARK(0);
   w->nev = 0; w->crack_ev = 0; w->time += dt;
+  for(int c=0;c<MX_MAX_CHUNKS;c++)if(w->chunks[c].active&&w->chunks[c].has_tnt){w->chunks[c].tnt_impact=0;w->chunks[c].tnt_hit=-1;}
   if(w->support_cd > 0) w->support_cd--;
   if(w->freeze > 0){ w->freeze--; return; }
   combo_tick(w, dt);            /* wall-clock dt, so bullet-time cannot artificially prolong a chain */
@@ -2684,6 +2926,8 @@ void mx_update(MxWorld *w, real dt){
 #endif
     step_chunks(w, sdt);
   }
+  update_moving_tnt(w);
+  process_expl(w); /* collisions can light TNT AFTER the initial explosion pass */
   clean_chunks(w, dt);
   MX_PH_MARK(3);
   if(w->wob_on){

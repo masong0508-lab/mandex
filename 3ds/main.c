@@ -287,6 +287,31 @@ static void disc(Scr *s, int cx, int cy, int r, u32 c){
   }
 #endif
 }
+/* A small native BGR8 oval. Midpoint-style integer scan conversion avoids
+   sqrtf and per-pixel division on the older 3DS CPU; clipped vertical
+   spans follow the framebuffer's column-major memory layout. */
+static void oval(Scr *s,int cx,int cy,int rx,int ry,u32 c){
+  if(rx<1||ry<1||cx+rx<0||cx-rx>=s->w||cy+ry<0||cy-ry>=s->h)return;
+  const int a=rx*rx,b=ry*ry,limit=a*b;
+  const u8 blue=(u8)c,green=(u8)(c>>8),red=(u8)(c>>16);
+  int h=0;
+  for(int dx=-rx;dx<=rx;dx++){
+    const int xx=dx*dx*b;
+    if(dx<=0){
+      while(h<ry&&xx+(h+1)*(h+1)*a<=limit)h++;
+    }else{
+      while(h>0&&xx+h*h*a>limit)h--;
+    }
+    const int X=cx+dx;
+    if((unsigned)X>=(unsigned)s->w)continue;
+    int lo=cy-h,hi=cy+h;
+    if(lo<0)lo=0;
+    if(hi>=s->h)hi=s->h-1;
+    if(lo>hi)continue;
+    u8 *d=s->fb+(X*s->h+(s->h-1-lo))*3;
+    for(int y=lo;y<=hi;y++,d-=3){d[0]=blue;d[1]=green;d[2]=red;}
+  }
+}
 static void line(Scr *s, int x0, int y0, int x1, int y1, u32 c){
   int dx = abs(x1 - x0), dy = -abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, e = dx + dy;
   for(;;){ px(s, x0, y0, c); if(x0 == x1 && y0 == y1) break; int e2 = 2 * e; if(e2 >= dy){ e += dy; x0 += sx; } if(e2 <= dx){ e += dx; y0 += sy; } }
@@ -352,6 +377,8 @@ static void on_events(void){
     switch(e->type){
     case EV_CELL: { const uint8_t *c = mx_material_rgb(e->m);
       spawn(x, y, RTOF(e->a) * .3f + (rand() % 9 - 4) * .2f, RTOF(e->b) * .3f - (rand() % 7) * .2f, 30 + rand() % 20, RGB(c[0], c[1], c[2])); } break;
+    case EV_TNT_FUSE: popup(x,y-3,"TNT FUSE!",RGB(255,153,61)); break;
+    case EV_TNT_SAFE: popup(x,y-3,"TNT SAFE",RGB(125,255,150)); break;
     case EV_BOOM: for(int k = 0; k < 24; k++) spawn(x, y, (rand() % 21 - 10) * .35f, (rand() % 21 - 10) * .35f, 30, RGB(255, 200 - rand() % 100, 40)); break;
     case EV_CRACK: for(int k = 0; k < 2; k++) spawn(x, y, (rand() % 9 - 4) * .1f, -(.2f + (rand() % 5) * .1f), 17, RGB(185, 170, 148)); break;
     case EV_THUD: if(e->a > R(0.6)) for(int k = 0; k < 4; k++)
@@ -1128,10 +1155,39 @@ static void draw_man(const View *v){
   { float a = 0;
     if(m->mode == MAN_FLY) a = (m->dive ? RTOF(m->spin) : RTOF(m->ang)) * face; else if(m->mode == MAN_STUCK) a = RTOF(mx_man_wobble(m)) * 0.17f;
     if(a > 0.03f || a < -0.03f) blit_frame_rot(v->s, fr, x, y, p, face, a); else blit_frame(v->s, fr, x, y, p, face); }
-  if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){             /* only the belly swells */
-    float f = RTOF(m->inf); int r = (int)(p * (2 + f * 3.2f)), bx = x + face * (int)(p * f * 1.5f);
-    disc(v->s, bx, y + p / 2, r + 1, RGB(205, 135, 100)); disc(v->s, bx, y + p / 2, r, RGB(244, 183, 142));
-    disc(v->s, bx - r / 3, y + p / 2 - r / 3, r / 5 + 1, RGB(255, 215, 180));
+  if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){
+    /* Small, lower-torso-only pressure volume (never a face-sized circle).
+       Reuse the exact selected outfit/Wolfman skin in the existing 3-tone
+       sprite palette, with contour/crease detail at native resolution. */
+    const float f=RTOF(m->inf);
+    const int rx=(int)(p*(2.7f+2.0f*f)+0.5f);
+    const int ry=(int)(p*(2.5f+1.9f*f)+0.5f);
+    const int bx=x+face*(int)(p*1.3f*f+0.5f);
+    const int by=y+2*p+(int)(p*.7f*f+0.5f);
+    if(!man_tone_ready)apply_outfit(0);
+    oval(v->s,bx,by,rx+1,ry+1,man_tone[2][1]);
+    oval(v->s,bx,by,rx,ry,man_tone[0][2]);
+    oval(v->s,bx-face,by-1,rx>2?rx-2:rx,ry>2?ry-2:ry,man_tone[0][1]);
+    oval(v->s,bx-face*rx/3,by-ry/3,rx/4+1,ry/5+1,man_tone[0][3]);
+    if(p>=3){
+      /* A little boxer seam, navel, and lateral tension strokes make the
+         inflation legible without increasing its silhouette size. */
+      const int hem=by+ry*2/3;
+      line(v->s,bx-rx/2,hem-2,bx,hem+1,man_tone[0][6]);
+      line(v->s,bx,hem+1,bx+rx/2,hem-2,man_tone[0][6]);
+      rect(v->s,bx+face*rx/3,by+ry/7,2,2,man_tone[0][2]);
+      px(v->s,bx+face*rx/3-face,by+ry/7-1,man_tone[0][3]);
+      if(f>.35f){
+        line(v->s,bx+face*rx*2/3,by-ry/3,
+             bx+face*rx*3/4,by-ry/7,man_tone[0][2]);
+        line(v->s,bx+face*rx*3/4,by+ry/6,
+             bx+face*rx*2/3,by+ry/3,man_tone[0][2]);
+      }
+      if(man_fur){
+        px(v->s,bx-rx/3,by+ry/4,man_tone[0][3]);
+        px(v->s,bx+rx/4,by-ry/5,man_tone[0][3]);
+      }
+    }
   }
 }
 /* chapter 2 pneumatic tubes: a balloon-held brass mouth to fly into, and the nozzle stub on the wall it posts you into */
@@ -1336,6 +1392,15 @@ static void draw_hud(const View *camera){
   if(world.combo > 1 && world.combo_left > 0){
     rect(&top, 6, 27, 188, 14, RGB(27, 16, 43)); text(&top, 12, 30, mx_combo_taunt(world.combo), 1, RGB(255, 126, 176));
     rect(&top, 6, 41, (int)(188 * RTOF(world.combo_left) / 2.5f), 2, RGB(255, 210, 63)); }
+  /* Read the shared engine's cached moving-charge count (no second
+     physics scan, no extra framebuffer, no sprite atlas). */
+  if(world.state==MX_PLAY && world.tnt_live){
+    int urgent=world.tnt_soonest<=8;
+    rect(&top,246,49,148,19,RGB(50,29,27));
+    rect(&top,246,49,3,19,urgent && (frame&4)?RGB(255,65,55):RGB(255,188,70));
+    snprintf(b,sizeof b,"TNT FUSE x%d%s",world.tnt_live,urgent?" !":"");
+    text(&top,256,55,b,1,urgent?RGB(255,129,94):RGB(255,211,137));
+  }
   /* Project the sole remaining landlord through this eye's camera. Only
      display a cue outside the playable view, never over a visible actor.
      50px top and 30px bottom preserve objective and control strips. */
@@ -1359,6 +1424,14 @@ static void draw_hud(const View *camera){
         textc(&top,cx,edge.y-4,word,1,RGB(255,126,176));
       }
     }
+  }
+  /* The new Wolfman tactical card appears only during the original 2.4s
+     level banner. A cheap screen-space rectangle, no extra atlas/heap. */
+  if(app==ST_PLAY && world.banner>0 && world.state==MX_PLAY &&
+     world.man.mode==MAN_AIM && !dragging){
+    rect(&top,45,60,310,27,RGB(19,23,38));
+    rect(&top,45,60,310,2,RGB(255,210,63));
+    textc(&top,200,68,mx_level_tactic(world.level),1,RGB(255,210,63));
   }
   if(toast_t > 0 && toast_id >= 0){                                          /* achievement popup: drops in, gold frame, star badge, time bar */
     int t = toast_t, off = t < 10 ? (10 - t) * 5 : t > 140 ? (t - 140) * 5 : 0, y = 24 - off, x = 84, w = 232, h = 36;

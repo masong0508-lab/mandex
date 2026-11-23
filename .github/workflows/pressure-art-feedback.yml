@@ -1,0 +1,41 @@
+name: Console pressure art and live TNT HUD quality
+on:
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'ds/**'
+      - '3ds/**'
+      - 'dreamcast/**'
+      - 'test/mobile_tnt_test.c'
+      - 'test/n3ds_render.c'
+      - 'test/dc_render.c'
+      - '.github/workflows/pressure-art-feedback.yml'
+  workflow_dispatch:
+jobs:
+  pressure-and-fuses:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Per-charge fuse and warning integrity (float, DS fixed)
+        run: |
+          for mode in float fixed; do
+            flags=''
+            if test "$mode" = fixed; then flags='-DMX_FIXED'; fi
+            gcc -std=gnu99 -O2 -Wall -Wno-unused-function $flags -Icore test/mobile_tnt_test.c -lm -o "/tmp/tnt_threat_$mode"
+            "/tmp/tnt_threat_$mode"
+          done
+      - name: Build test-only shared cutscene objects for 3DS and Dreamcast
+        run: |
+          for f in gfx intro; do
+            gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -D__3DS__               -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source -c "ds/source/$f.c" -o "/tmp/n3d_$f.o"
+            gcc -std=gnu99 -O1 -Wall -Wno-unused-function -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init               -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source -c "ds/source/$f.c" -o "/tmp/dc_$f.o"
+          done
+      - name: Original 3DS gameplay sprite with bounded inflation and Wolfman fur
+        run: |
+          gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__             -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source             test/n3ds_render.c /tmp/n3d_gfx.o /tmp/n3d_intro.o             core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c -lm -o /tmp/n3d_pressure
+          N3DS_PRESSURE_PROBE=1 /tmp/n3d_pressure
+      - name: Original Dreamcast puff texture with compact oval and live fur tint
+        run: |
+          gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation             -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source             /tmp/dc_gfx.o /tmp/dc_intro.o core/mx.c core/mx_meta.c             core/cloth.c core/mx_snd.c test/dc_render.c -lm -o /tmp/dc_pressure
+          DC_PRESSURE_PROBE=1 /tmp/dc_pressure
