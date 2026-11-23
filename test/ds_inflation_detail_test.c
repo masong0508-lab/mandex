@@ -12,8 +12,11 @@ static unsigned draw(int ppc,int pressure,int face,int x,int y,int phase,int *w,
   int minx=256,maxx=-1,miny=192,maxy=-1;unsigned n=0;int badcol=0;
   for(int yy=0;yy<192;yy++)for(int xx=0;xx<256;xx++){
     u8 c=screen[32+yy*256+xx];if(!c)continue;
-    n++;if(xx<minx)minx=xx;if(xx>maxx)maxx=xx;
-    if(yy<miny)miny=yy;if(yy>maxy)maxy=yy;
+    n++;
+    if(xx<minx)minx=xx;
+    if(xx>maxx)maxx=xx;
+    if(yy<miny)miny=yy;
+    if(yy>maxy)maxy=yy;
     if(c!=C_RED2 && (c<C_MAN0 || c>=C_MAN_RIM0+C_MAN_RIM_COUNT))badcol++;
   }
   for(int i=0;i<32;i++)if(screen[i]!=0xa5 || screen[32+256*192+i]!=0xa5)fails++;
