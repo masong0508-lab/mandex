@@ -31,7 +31,8 @@ int main(void){
       ok(rfloor(t->x)==ax+4 && t->kind==kind && t->alive,40+i,
          "annex defender matches the scene and progression");
     }
-    ok(CELL(ax+4,59)==MX_WOOD,40+i,"ground floor has a destructible foundation");
+    ok(CELL(ax+4,MX_ROWS-1)==(site==1?MX_RUBBER:site==2?MX_SAND:MX_WOOD),40+i,
+       "ground floor correctly uses wood or a soft impact bed");
     if(site==0){
       ok(CELL(ax,53)==MX_GLASS && CELL(ax+2,57)==MX_TNT,40+i,"glass booth and ground charge");
     }else if(site==1){
