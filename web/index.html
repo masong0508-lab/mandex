@@ -3639,7 +3639,8 @@ const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0};
    landscapes retain the original 960x540 artwork and screen geometry. */
 const WEB_UI={portrait:false,viewportW:0,viewportH:0,
   page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0,editorScale:1,
-  editorHeight:480,gesture:null,aimId:null,sodaId:null,endWalkUntil:0};
+  editorHeight:480,gesture:null,aimId:null,sodaId:null,endWalkUntil:0,
+  inspect:false,inspectId:null,inspectX:0,inspectY:0,inspectSling:-1};
 const isPortrait=()=>WEB_UI.portrait;
 const mobilePage=(kind,n,size)=>Math.max(0,Math.min(Math.max(0,Math.ceil(n/size)-1),WEB_UI.page[kind]||0));
 function layoutTick(){
@@ -3664,7 +3665,7 @@ function layoutTick(){
   if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed||bufferChanged){
     WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
     // A CSS-only resize invalidates the captured pointer mapping too.
-    if(!changed&&!bufferChanged&&(dragging||sodaHold))releaseAllWalkTouches();
+    if(!changed&&!bufferChanged&&(dragging||sodaHold||WEB_UI.inspect))releaseAllWalkTouches();
     const rect=document.body.getBoundingClientRect(),
       css=window.getComputedStyle?window.getComputedStyle(document.body):null,
       insetW=css?(parseFloat(css.paddingLeft)||0)+(parseFloat(css.paddingRight)||0):0,
@@ -3679,7 +3680,13 @@ function layoutTick(){
     !!(CL&&CL.cols>120&&(state==='play'||state==='win'||state==='lose'));
 }
 function camTick(dt){
-  if(!CAM.on){CAM.z=1;CAM.x=0;CAM.y=0;return}
+  if(!CAM.on){if(WEB_UI.inspect)endPortraitInspect(false);CAM.z=1;CAM.x=0;CAM.y=0;return}
+  // A deliberate inspection is separate from aiming and camera follow.
+  // Simulation keeps running; a new shot, district or HUD state exits it.
+  if(WEB_UI.inspect){
+    if(portraitInspectAllowed()&&WEB_UI.inspectSling===slingK){clampPortraitInspect();return}
+    endPortraitInspect(false);
+  }
   // Aim frames the sling and its targets. Portrait walking instead shows
   // the nearby route at a readable scale, with feet above the touch HUD.
   const m=man,portrait=isPortrait(),walking=portrait&&m.mode==='walk';
@@ -3722,6 +3729,53 @@ function camTick(dt){
     CAM.x=clamp(clamp(CAM.x,m.x-(W-32)/z,m.x-32/z),0,cameraMaxX);
     if(!walking)CAM.y=clamp(CAM.y,m.y-(H-112)/z,m.y-168/z);
   }
+}
+// Manual inspection uses only view state. No changes to the sling, shot
+// inventory, game time, character position or world collision coordinates.
+function portraitInspectAllowed(){
+  return isPortrait()&&CAM.on&&state==='play'&&man&&man.mode==='aim'&&
+    !dragging&&!sodaHold&&!man.chug&&!man.seated&&!man.vlv&&!(man.stun>0);
+}
+function clampPortraitInspect(){
+  const z=CAM.z=clamp(CAM.z,.55,1.8);
+  CAM.x=clamp(CAM.x,0,Math.max(0,WW-W/z));
+  // Keep the full building height reachable BETWEEN mission and action HUD.
+  const top=152,bottom=H-112,lo=-top/z,hi=WH-bottom/z;
+  CAM.y=hi>=lo?clamp(CAM.y,lo,hi):(lo+hi)*.5;
+}
+function centrePortraitInspect(){
+  if(!WEB_UI.inspect)return;
+  let tx=0,ty=0,n=0;
+  for(const t of targets)if(t.alive&&(!CL.slings||t.zone===slingK)){
+    tx+=t.x;ty+=t.y;n++;
+  }
+  CAM.x=(n?tx/n:SX+180)-W/(2*CAM.z);
+  CAM.y=(n?ty/n:GY*.5)-(152+H-112)/(2*CAM.z);
+  clampPortraitInspect();
+}
+function startPortraitInspect(){
+  if(!portraitInspectAllowed()||WEB_UI.inspect)return false;
+  WEB_UI.inspect=true;WEB_UI.inspectId=null;WEB_UI.inspectSling=slingK;
+  CAM.hold=0;CAM.reset=CAM.snap=false;CAM.z=Math.max(CAM.z,1.1);
+  centrePortraitInspect();hits=[];return true;
+}
+function endPortraitInspect(restore=true){
+  if(!WEB_UI.inspect)return;
+  WEB_UI.inspect=false;WEB_UI.inspectId=null;WEB_UI.inspectSling=-1;
+  CAM.hold=0;CAM.reset=CAM.snap=true;hits=[];
+  if(restore&&portraitInspectAllowed())camTick(0);
+}
+function zoomPortraitInspect(factor){
+  if(!WEB_UI.inspect||!portraitInspectAllowed()||WEB_UI.inspectId!==null)return;
+  const old=CAM.z,z=clamp(old*factor,.55,1.8);
+  const cx=W*.5,cy=(152+H-112)*.5;
+  CAM.x+=cx/old-cx/z;CAM.y+=cy/old-cy/z;CAM.z=z;
+  clampPortraitInspect();
+}
+function panPortraitInspect(id,x,y){
+  if(!WEB_UI.inspect||WEB_UI.inspectId!==id||!portraitInspectAllowed())return;
+  CAM.x-=(x-WEB_UI.inspectX)/CAM.z;CAM.y-=(y-WEB_UI.inspectY)/CAM.z;
+  WEB_UI.inspectX=x;WEB_UI.inspectY=y;clampPortraitInspect();
 }
 const toWorld=(sx,sy)=>CAM.on?[sx/CAM.z+CAM.x,sy/CAM.z+CAM.y]:[sx,sy];
 const toScreen=(x,y)=>CAM.on?[(x-CAM.x)*CAM.z,(y-CAM.y)*CAM.z]:[x,y];
@@ -3869,7 +3923,7 @@ function drawObjectiveEdge(){
   const sy=CAM.on?(t.y+off[1]-CAM.y)*CAM.z:t.y+off[1];
   const top=W<700?138:76;
   const safeTop=W<700&&combo>1&&tntLiveFuses>0?152:top;
-  const bottom=W<700?(man.mode==='walk'?174:112):56;
+  const bottom=W<700?(man.mode==='walk'?174:man.mode==='aim'&&!WEB_UI.inspect?160:112):56;
   const edge=objectiveScreenEdge(sx,sy,W,H,safeTop,bottom);
   if(!edge.dir)return;
   const label=edge.dir===1?'< LAST':edge.dir===2?'LAST >':
@@ -3897,6 +3951,14 @@ function drawPortraitWalkEnd(){
     if(WEB_UI.endWalkUntil>time){releaseAllWalkTouches();walkQuit()}
     else WEB_UI.endWalkUntil=time+2.5;
   },{size:12,on:ready,col:'#ffab83'});
+}
+function drawPortraitInspectBar(){
+  // Manual camera controls replace, rather than overlap, the aim toolbar.
+  txt('INSPECT • DRAG TO PAN • '+Math.round(CAM.z*100)+'%',W/2,H-91,16,'#ffe190','center');
+  btn(12,H-76,150,60,'BACK TO AIM',()=>endPortraitInspect(),{size:16,on:true});
+  btn(172,H-76,80,60,'−',()=>zoomPortraitInspect(1/1.25),{size:26,disabled:CAM.z<=.55});
+  btn(262,H-76,80,60,'+',()=>zoomPortraitInspect(1.25),{size:26,disabled:CAM.z>=1.8});
+  btn(352,H-76,176,60,'FIND TARGETS',centrePortraitInspect,{size:16});
 }
 function drawHUD(){
   drawWalkHUD();
@@ -3939,9 +4001,10 @@ function drawHUD(){
   const mstp=Math.min(P?16:20,(P?190:230)/Math.max(1,men));   // a long row of men squeezes together (the wide finale can have 17)
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
-  if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
+  if(hint>0&&state==='play'&&man.mode==='aim'&&!WEB_UI.inspect){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
   if(state!=='play'||man.mode!=='walk')WEB_UI.endWalkUntil=0;
-  if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
+  if(state==='play'&&P&&WEB_UI.inspect)drawPortraitInspectBar();
+  else if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
     if(P&&man.mode==='walk')drawPortraitWalkEnd();
     if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
       btn(W-212,H-(P?76:44),96,P?60:32,'< SLING',()=>goSling(slingK-1),{size:P?16:13,disabled:slingK<=0});btn(W-108,H-(P?76:44),96,P?60:32,'SLING >',()=>goSling(slingK+1),{size:P?16:13,disabled:slingK>=CL.slings.length-1});void ny}
@@ -3950,11 +4013,19 @@ function drawHUD(){
     if(man.mode==='aim'){
       const ready=shotReadiness(man);
       if(ready){
-        const cy=H-(P?112:83);
+        const cy=H-(P?130:83);
         ctx.fillStyle='rgba(15,18,30,.82)';
-        ctx.fillRect(Math.max(5,W/2-144),cy-17,Math.min(W-10,288),23);
-        txt(ready,W/2,cy,13,man.stun>0?'#ff7474':
+        ctx.fillRect(P?12:Math.max(5,W/2-144),cy-17,P?342:Math.min(W-10,288),P?60:23);
+        txt(ready,P?183:W/2,cy,13,man.stun>0?'#ff7474':
            ready==='RELEASE TO LAUNCH'?'#7dff5a':'#ffe190','center');
+        if(P){
+          const power=dragging&&!man.seated?clamp(Math.hypot(man.x-SX,man.y-SY)/PULL,0,1):0;
+          txt('PULL '+Math.round(power*100)+'%',26,H-106,12,'#fff','left');
+          ctx.fillStyle='rgba(255,255,255,.2)';ctx.fillRect(115,H-116,224,10);
+          ctx.fillStyle=power>.85?'#ffd23f':'#7dff5a';ctx.fillRect(115,H-116,224*power,10);
+          btn(364,H-147,164,60,'INSPECT',startPortraitInspect,
+            {size:16,disabled:!portraitInspectAllowed()});
+        }
       }
     }
     if(man.mode!=='walk'&&!(P&&man.mode==='fly'))btn(12,H-(P?76:44),236,P?60:32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:P?16:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
@@ -3962,7 +4033,9 @@ function drawHUD(){
       const action=man.pwr==='beans'&&!man.beaned?'FART JET':man.pwr==='burp'&&!man.burped?'BURP BLAST':!man.dive?'BELLY FLOP':'DIVING...';
       btn(12,H-76,W-24,60,action,dive,{size:20,on:action!=='DIVING...',disabled:action==='DIVING...'});
     }
-    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-(P?88:54),P?12:15,'#ffd23f','center')}}
+    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];
+      if(!P)txt(tip,W/2,H-54,15,'#ffd23f','center');
+      else if(man.mode==='aim')txt(pw.sel==='burp'?'BURP: tap in flight or burst on impact':tip,183,H-91,11,'#ffd23f','center')}}
   if(!P&&man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(!P&&man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
   else if(!P&&man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
@@ -4037,7 +4110,7 @@ function cancelSodaPointer(id){
 cv.addEventListener('pointerdown',e=>{
   audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
   // Another finger cannot steal a captured pull or chug.
-  if(state==='play'&&(dragging||sodaHold))return;
+  if(state==='play'&&(dragging||sodaHold||WEB_UI.inspectId!=null))return;
   if(state==='cutscene'){cutClick(x,y);return}
   if(state==='title'){goMenu();return}
   if(isPortrait()&&['menu','select','ach','outfit','options'].includes(state)){
@@ -4062,6 +4135,15 @@ cv.addEventListener('pointerdown',e=>{
     return;
   }
   if(hitTest(x,y))return;
+  if(state==='play'&&WEB_UI.inspect){
+    if(!portraitInspectAllowed()){endPortraitInspect();return}
+    // Only the actual world area pans. Do not begin a pan on HUD ink.
+    if(y>=152&&y<H-112){
+      WEB_UI.inspectId=e.pointerId;WEB_UI.inspectX=x;WEB_UI.inspectY=y;
+      try{cv.setPointerCapture(e.pointerId)}catch(_){}
+    }
+    return;
+  }
   if(state==='play'&&man.mode==='walk'){
     if(walkTouch(x,y,e.pointerId))try{cv.setPointerCapture(e.pointerId)}catch(_){}
     return;
@@ -4082,6 +4164,7 @@ cv.addEventListener('pointerdown',e=>{
   }
   else dive()});
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
+  if(WEB_UI.inspect){panPortraitInspect(e.pointerId,mx,my);return}
   if(state==='play'&&man.mode==='walk'&&moveWalkTouch(mx,my,e.pointerId))return;
   if(state==='edit'){
     if(!eStrokeOwner(e.pointerId))return;
@@ -4110,6 +4193,7 @@ cv.addEventListener('pointerup',e=>{
     return;
   }
   if(WEB_UI.gesture)return; // foreign menu release
+  if(WEB_UI.inspect){if(WEB_UI.inspectId===e.pointerId)WEB_UI.inspectId=null;return}
   if(state==='edit'){eEndStroke(e.pointerId,false);return}
   if(state==='options'&&sliderDrag){sliderDrag=false;pdSave();SFX.boing()}
   cancelSodaPointer(e.pointerId);
@@ -4124,6 +4208,7 @@ addEventListener('keyup',e=>{KEYS[e.code]=false});
 function releaseAllWalkTouches(){
   for(const id in TID){if(TID[id])KEYS[TID[id]]=false;delete TID[id]}
   WEB_UI.gesture=null;WEB_UI.endWalkUntil=0;
+  endPortraitInspect(false);
   cancelAimPointer(WEB_UI.aimId);cancelSodaPointer(WEB_UI.sodaId);
   dragging=false;sodaHold=false;sliderDrag=false;
 }
@@ -4136,12 +4221,14 @@ for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
     if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
     if(state==='edit')eEndStroke(e.pointerId,true);
     if(state==='play'){cancelAimPointer(e.pointerId);cancelSodaPointer(e.pointerId)}
+    if(WEB_UI.inspectId===e.pointerId)WEB_UI.inspectId=null;
   }
 });
 cv.addEventListener('lostpointercapture',e=>{
   releaseWalkTouch(e.pointerId);
   if(state==='edit')eEndStroke(e.pointerId,true);
   if(state==='play'){cancelAimPointer(e.pointerId);cancelSodaPointer(e.pointerId)}
+  if(WEB_UI.inspectId===e.pointerId)WEB_UI.inspectId=null;
   if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
 });
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
