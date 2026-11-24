@@ -49,6 +49,35 @@ int main(void){
   CK(mx_walk_punch_lunge(&m)==0, "rear turn cannot slide while punching");
   m.turn_ticks=0;m.mode=MAN_FLY;
   CK(mx_walk_punch_lunge(&m)==0, "airborne animation does not inherit grounded lunge");
+  /* The effect follows the live attack face (not the delayed visual face)
+     and its actual rectangle. Preserve an indication for the full parry
+     interval, with no extra samples or state after it expires. */
+  {
+    MxMan a;memset(&a,0,sizeof a);a.mode=MAN_WALK;
+    const double times[]={.2,.15,.11,.07,.04,.005,0,-.001};
+    const int stages[]={3,3,2,2,1,1,0,0};
+    for(int face=-1;face<=1;face+=2)for(int turn=0;turn<=12;turn++){
+      a.face=(int8_t)face;a.turn_ticks=(uint8_t)turn;
+      for(int i=0;i<8;i++){
+        a.pT=R(times[i]);
+        CK(mx_walk_punch_fx_stage(&a)==stages[i],"attack sweep stages follow existing punch timer");
+        if(!stages[i])continue;
+        const MxMan before=a;
+        for(int k=-stages[i];k<=stages[i];k++){
+          real dx,dy;mx_walk_punch_fx_point(&a,k,&dx,&dy);
+          CK(near(dx,face*(2.125+1.625*(1.0-k*k/9.0))),"visible sweep follows gameplay facing and hitbox reach");
+          CK(near(dy,-.375+2.0*k/3.0),"sweep lies inside punch vertical bounds");
+          CK(rabs(dx)>=MX_WALK_PUNCH_X&&rabs(dx)<=MX_WALK_PUNCH_X+MX_WALK_PUNCH_HW,"sweep does not overstate horizontal range");
+          CK(dy>=MX_WALK_PUNCH_Y-MX_WALK_PUNCH_HH&&dy<=MX_WALK_PUNCH_Y+MX_WALK_PUNCH_HH,"sweep does not overstate vertical range");
+        }
+        CK(memcmp(&a,&before,sizeof a)==0,"rendering helpers do not mutate gameplay state");
+      }
+    }
+    a.mode=MAN_FLY;a.pT=R(.2);
+    CK(mx_walk_punch_fx_stage(&a)==0,"flight cannot inherit a walking attack effect");
+    a.mode=MAN_AIM;
+    CK(mx_walk_punch_fx_stage(&a)==0,"aim cannot inherit a walking attack effect");
+  }
   m.mode=MAN_WALK;m.pT=0;
   m.vx=0;CK(mx_walk_foot_lift(&m)==0,"stationary foot lift disappears");
   m.vx=RI(9);m.gr=0;CK(mx_walk_foot_lift(&m)==0,"airborne lift stays anchored");
@@ -62,6 +91,6 @@ int main(void){
   for(unsigned i=0;i<sizeof counts/sizeof counts[0];i++)
     CK(mx_crumble_tier(RI(counts[i]))==tiers[i],"collapse severity is bounded and deterministic");
   if(failures)return 1;
-  puts("VISUAL_FEEDBACK_PASS continuous_grounded_steps=1 flight_face_hysteresis=1 collapse_tiers=4");
+  puts("VISUAL_FEEDBACK_PASS continuous_grounded_steps=1 flight_face_hysteresis=1 collapse_tiers=4 punch_fx_bounds=1");
   return 0;
 }

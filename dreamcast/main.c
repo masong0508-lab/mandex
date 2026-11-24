@@ -928,7 +928,12 @@ static void draw_all(void){
         float lunge = RTOF(mx_walk_punch_lunge(m)) * PXC;
         draw_frame(wf, x + fc*lunge, foot - (f[3] - f[5]) * DCM_SCALE * man_zoom, fc, Z_MAN, NULL);
         man_zoom = zm;
-        if(m->pT > 0) for(int k = -3; k <= 3; k++) puff(x + fc * (24 - k * k * 1.4f) + fc * 18, y + k * 3.4f, 1.8f, Z_MAN + 0.3f, WHITE);
+        int punch_stage=mx_walk_punch_fx_stage(m);
+        if(punch_stage)for(int k=-punch_stage;k<=punch_stage;k++){
+          real dx,dy;mx_walk_punch_fx_point(m,k,&dx,&dy);
+          puff(X(m->x+dx),Y(m->y+dy),punch_stage==3?1.8f:1.3f,
+               Z_MAN+0.3f,argb(255,255,255,punch_stage==3?255:punch_stage==2?185:112));
+        }
       }
     } else {
       /* The walking figure was already painted above. Previously this

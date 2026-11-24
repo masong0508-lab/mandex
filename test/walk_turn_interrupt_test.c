@@ -49,6 +49,10 @@ static void step(int input,int punch,int *yaw,int *facing){
   for(int i=0;i<w.nev;i++)if(w.ev[i].type==EV_PUNCH){
     real expected=old_x+(*facing<0?-R(2.125):R(2.125));
     CHECK(rabs(w.ev[i].x-expected)<R(.001),"punch uses immediate input facing, not delayed visual facing");
+    real dx,dy;mx_walk_punch_fx_point(&w.man,0,&dx,&dy);
+    CHECK(mx_walk_punch_fx_stage(&w.man)==3,"actual punch starts the full visible sweep");
+    CHECK(rabs(old_x+dx-w.ev[i].x-(*facing<0?-MX_WALK_PUNCH_HW:MX_WALK_PUNCH_HW))<R(.001),
+          "rendered punch tip agrees with the actual attack event during a turn");
   }
   samples++;
 }
