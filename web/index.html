@@ -3638,7 +3638,7 @@ function layoutTick(){
   }
   if(changed)WEB_UI.portrait=por;
   if(bufferChanged){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
-  if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed){
+  if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed||bufferChanged){
     WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
     // A CSS-only resize invalidates the captured pointer mapping too.
     if(!changed&&!bufferChanged&&(dragging||sodaHold))releaseAllWalkTouches();
@@ -3646,8 +3646,8 @@ function layoutTick(){
       css=window.getComputedStyle?window.getComputedStyle(document.body):null,
       insetW=css?(parseFloat(css.paddingLeft)||0)+(parseFloat(css.paddingRight)||0):0,
       insetH=css?(parseFloat(css.paddingTop)||0)+(parseFloat(css.paddingBottom)||0):0,
-      availW=Math.max(1,(rect.width||vw)-insetW),
-      availH=Math.max(1,(rect.height||vh)-insetH),
+      availW=Math.max(1,Math.min(rect.width||vw,vw)-insetW),
+      availH=Math.max(1,Math.min(rect.height||vh,vh)-insetH),
       scale=Math.max(.01,Math.min(availW/w,availH/h));
     cv.style.width=Math.floor(w*scale)+'px';cv.style.height=Math.floor(h*scale)+'px';
   }
