@@ -27,6 +27,12 @@ const h=new Function('cv','window','document',`
   let W=960,H=540,COLS=120,state='menu',dragging=true,sliderDrag=true,
       E={drag:{pen:true}},KEYS={TL:true},TID={7:'TL'},hits=[1],_vig=null,
       CL={cols:120};
+  let sodaHold=false;
+  function releaseAllWalkTouches(){
+    for(const id in TID){if(TID[id])KEYS[TID[id]]=false;delete TID[id]}
+    dragging=false;sliderDrag=false;sodaHold=false;
+    WEB_UI.gesture=null;
+  }
   function setWorld(cols){COLS=cols}
   ${layout}
   return {

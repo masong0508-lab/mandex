@@ -35,6 +35,8 @@ jobs:
         run: node test/browser_orientation_test.js
       - name: Captured multitouch and camera safety
         run: node test/browser_multitouch_test.js
+      - name: Portrait play ownership, camera and mobile action controls
+        run: node test/browser_portrait_play_test.js
       - name: Shared walk controls and collision memory
         run: node test/browser_walk_memory_test.js
       - name: Portrait walking focus and bounded camera transitions

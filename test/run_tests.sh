@@ -98,6 +98,8 @@ echo "--- Browser creator: bounded MX1 imports, Unicode share names and legacy c
 if command -v node >/dev/null 2>&1;then node browser_creator_codec_test.js;fi
 echo "--- Web: touch capture, landscape/portrait two-thumb controls, safe camera pan ---"
 if command -v node >/dev/null 2>&1;then node browser_multitouch_test.js;fi
+echo "--- Portrait: captured pull, viewport safety, neutral thumb, camera and touch actions ---"
+if command -v node >/dev/null 2>&1;then node browser_portrait_play_test.js;fi
 echo "--- Stage guidance: all 60 console levels and 40 browser early-stage tactics ---"
 for mode in float fixed;do
   flags=''
