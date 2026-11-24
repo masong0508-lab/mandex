@@ -667,6 +667,9 @@ function zoneAdvance(){
   zonePaid[slingK]=1;const bonus=CL.zoneMen||4;men+=bonus;score+=3000;flash=Math.max(flash,.5);SFX.wooo&&SFX.wooo();
   goSling(slingK+1);popText(SX,SY-56,'DISTRICT CLEARED!  +'+bonus+' MEN','#7dff5a',24);banner=2.2}
 function nextMan(){
+  // A previous shot can expire or pop while its finger is still held.
+  // Never let that pointer carry over to the replacement player.
+  releaseAllWalkTouches();
   bankLeft=0;
   if(men>0)man={mode:'aim',x:SX,y:SY,vx:0,vy:0,ang:0,spin:0,face:1,t:0,a:1,R:14,dive:false,gt:0,hitCd:0,gooT:0,pop:1,stT:0,swT:0,G:gagNew(2.5,4,3),jg:jigNew(),inf:0,seated:false,pwr:null,vlv:false,airT:0,beaned:false,bel:0,burped:false,burpT:0,chug:null};
   else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};
@@ -3986,7 +3989,7 @@ function drawTitle(){
 //  INPUT / LOOP
 // =====================================================================
 function pt(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
-function retry(){load(level,CL&&CL.custom?CL:undefined)}
+function retry(){releaseAllWalkTouches();load(level,CL&&CL.custom?CL:undefined)}
 function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else if(level+1===CH1)startCutEnd(1);else if(level+1===CH2)startCutEnd(2);else{state='ending';endScroll=0;hits=[]}}
 let endScroll=0;
 const CREDITS=['MANDEX','THE LANDLORD SMASHER','','Every landlord has been evicted.','The neighbourhood is free.','Rent is cancelled.','','STARRING','The Man  -  as himself','His Towel  -  as the cape','The Belly  -  stunts and special effects','','LANDLORDS HARMED','all of them','','Thank you for playing!'];
