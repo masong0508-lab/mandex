@@ -1140,7 +1140,12 @@ static void draw_man(const View *v){
     }
     int lunge = (int)lroundf(RTOF(mx_walk_punch_lunge(m)) * p);
     blit_frame(v->s, wf, x + fc*lunge, fy - fdiv4((f->h - f->ay) * q), q, fc);
-    if(m->pT > 0){ for(int k = -3; k <= 3; k++) px(v->s, x + fc * (p * 5 - k * k * p * 5 / 18) + fc * p * 4, y + k * p * 3 / 4, RGB(255, 255, 255)); }
+    int punch_stage=mx_walk_punch_fx_stage(m);
+    if(punch_stage)for(int k=-punch_stage;k<=punch_stage;k++){
+      real dx,dy;mx_walk_punch_fx_point(m,k,&dx,&dy);
+      px(v->s,VX(v,RTOF(m->x+dx)),VY(v,RTOF(m->y+dy)),
+         punch_stage==3?RGB(255,255,255):punch_stage==2?RGB(214,218,227):RGB(151,163,181));
+    }
     return;
   }
   if(m->mode == MAN_FLY){ face = m->face < 0 ? -1 : 1; fr = m->dive ? MSF_DIVE : (((frame >> 2) & 1) ? MSF_FLY_A : MSF_FLY_B); }

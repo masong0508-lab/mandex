@@ -67,6 +67,7 @@ if command -v node >/dev/null 2>&1;then
   node browser_pad_stomp_test.js
   node browser_walk_jump_forgiveness_test.js
   node browser_case_parry_test.js
+  node browser_punch_fx_test.js
 fi
 echo "--- real-time frame meter: rendered FPS vs simulation steps/s ---"
 gcc -std=gnu99 -O2 -I../core fps_meter_test.c -o fps_meter_test && ./fps_meter_test

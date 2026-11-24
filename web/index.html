@@ -1354,6 +1354,26 @@ function walkStrideStep(m){
 // The character is drawn once per frame. Reuse one scratch pose instead of
 // generating an Object.assign clone every time the walking sprite is drawn.
 const WALK_SPIN_POSE={th:Math.PI/2,dir:1,ld:12,hip:0,psi:0,t:0};
+// The effect is sampled in world coordinates, not the turning sprite's
+// mirrored/scaled local frame. Match walkPunch's exact 17/13/16px box;
+// project the same 7 -> 5 -> 3 point sweep used on all three consoles.
+function walkPunchFxStage(m){
+  if(m.mode!=='walk'||!(m.pT>0))return 0;
+  return m.pT>.13?3:m.pT>.065?2:1;
+}
+function drawWalkPunchFx(m){
+  const stage=walkPunchFxStage(m);
+  if(!stage)return;
+  const facing=m.face>0?1:-1;
+  ctx.save();ctx.globalAlpha*=stage/3;
+  ctx.strokeStyle='#fff';ctx.lineWidth=stage===3?2:1.5;
+  ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();
+  for(let k=-stage;k<=stage;k++){
+    const x=m.x+facing*(17+13*(1-k*k/9)),y=m.y-3+16*k/3;
+    if(k===-stage)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.stroke();ctx.restore();
+}
 function drawWalkMan(m){
   const turning=m.turn>0,sc=.36,step=walkStrideStep(m),hip=2.4*step;
   if(m.gr){
@@ -1372,9 +1392,9 @@ function drawWalkMan(m){
   WALK_SPIN_POSE.th=th;WALK_SPIN_POSE.hip=hip;
   WALK_SPIN_POSE.psi=-3.7*step;WALK_SPIN_POSE.t=time;
   JIG=null;drawSpin(th,WALK_SPIN_POSE);
-  if(m.pT>0){ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=7;
-    ctx.beginPath();ctx.arc(30,0,38,-.9,.9);ctx.stroke()}
   ctx.restore();
+  // Keep the attack cue on the live hitbox even during a rear-facing turn.
+  drawWalkPunchFx(m);
 }
 /* Two fingers on the same virtual key must not cancel one another. */
 function releaseWalkTouch(id){

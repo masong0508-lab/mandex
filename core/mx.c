@@ -1906,8 +1906,8 @@ static void upd_cases(MxWorld *w, real dt){
     /* A case arriving during the 0.2 s visible fist lunge can also be
        countered, not just on the exact button-down frame. */
     if(!dead && m->mode==MAN_WALK && m->pT>0){
-      real hx=m->x+(m->face>0?R(2.125):-R(2.125)), hy=m->y-R(.375);
-      if(rabs(c->x-hx)<R(2.375) && rabs(c->y-hy)<R(2.75)){
+      real hx=m->x+(m->face>0?MX_WALK_PUNCH_X:-MX_WALK_PUNCH_X), hy=m->y+MX_WALK_PUNCH_Y;
+      if(rabs(c->x-hx)<MX_WALK_PUNCH_HW+R(0.75) && rabs(c->y-hy)<MX_WALK_PUNCH_HH+R(0.75)){
         parry_case(w,c);continue;
       }
     }
@@ -1999,10 +1999,10 @@ static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg, i
 }
 static void walk_punch(MxWorld *w){
   MxMan *m = &w->man;
-  real cx = m->x + (m->face > 0 ? R(2.125) : -R(2.125)), cy = m->y - R(0.375);
+  real cx = m->x + (m->face > 0 ? MX_WALK_PUNCH_X : -MX_WALK_PUNCH_X), cy = m->y + MX_WALK_PUNCH_Y;
   int run = rabs(m->vx) > R(12.5);
   int parried=0;
-  real d = walk_hit(w, cx, cy, R(1.625), RI(2), RI(run ? 24 : 16), &parried);
+  real d = walk_hit(w, cx, cy, MX_WALK_PUNCH_HW, MX_WALK_PUNCH_HH, RI(run ? 24 : 16), &parried);
   m->pT = R(0.2); m->pCd = R(0.3);
   ev(w, EV_PUNCH, cx, cy, run, d, RI(parried));
   if(d > 0){ if(w->shake < RI(3)) w->shake = RI(3); wob_kick(w, rfloor(cx), rfloor(cy), 4, m->face > 0 ? R(0.9) : -R(0.9), 0); }

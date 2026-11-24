@@ -8,7 +8,12 @@ on:
       - 'test/browser_walk_gait_test.js'
       - 'test/browser_flight_pose_test.js'
       - 'test/browser_turn_pose_test.js'
+      - 'test/browser_punch_fx_test.js'
+      - 'test/visual_feedback_test.c'
       - 'test/walk_turn_interrupt_test.c'
+      - 'ds/source/main.c'
+      - '3ds/main.c'
+      - 'dreamcast/main.c'
       - '.github/workflows/walk-animation-gates.yml'
   workflow_dispatch:
 jobs:
@@ -23,6 +28,7 @@ jobs:
           node test/browser_flight_pose_test.js
           node test/browser_turn_pose_test.js
           node test/browser_walk_memory_test.js
+          node test/browser_punch_fx_test.js
       - name: Console shared-core walking profiles in float and DS fixed point
         run: |
           set -eu
@@ -31,4 +37,6 @@ jobs:
             if test "$mode" = fixed; then flags='-DMX_FIXED'; fi
             gcc -std=gnu99 -O2 -Wall $flags -Icore core/mx.c test/walk_turn_interrupt_test.c -lm -o "/tmp/mandex_turn_$mode"
             "/tmp/mandex_turn_$mode"
+            gcc -std=gnu99 -O2 -Wall $flags -Icore core/mx.c test/visual_feedback_test.c -lm -o "/tmp/mandex_feedback_$mode"
+            "/tmp/mandex_feedback_$mode"
           done
