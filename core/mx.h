@@ -246,6 +246,28 @@ static inline real mx_walk_punch_lunge(const MxMan *m){
   if(t > R(0.1)) t = R(0.2) - t;
   return rmul(t, RI(3));
 }
+/* Shared walking punch rectangle, in world cells. Keep the visible sweep
+   tied to these exact gameplay dimensions rather than the delayed sprite
+   facing or the scale of the selected character atlas. */
+#define MX_WALK_PUNCH_X R(2.125)
+#define MX_WALK_PUNCH_Y R(-0.375)
+#define MX_WALK_PUNCH_HW R(1.625)
+#define MX_WALK_PUNCH_HH RI(2)
+/* Draw at most seven samples. Keep a readable cue for the entire live
+   parry window, shrinking/fading it as the existing punch timer expires.
+   These helpers neither store animation state nor change collision rules. */
+static inline int mx_walk_punch_fx_stage(const MxMan *m){
+  if(m->mode!=MAN_WALK || m->pT<=0) return 0;
+  return m->pT>R(0.13)?3:m->pT>R(0.065)?2:1;
+}
+static inline void mx_walk_punch_fx_point(const MxMan *m,int k,real *dx,real *dy){
+  /* k=-3..3, with exact end points in both numeric modes. */
+  const int n=k*k;
+  const real arc=n>=9?0:MX_WALK_PUNCH_HW-n*R(1.625/9.0);
+  const real x=MX_WALK_PUNCH_X+arc;
+  *dx=m->face>0?x:-x;
+  *dy=MX_WALK_PUNCH_Y+(k==-3?-MX_WALK_PUNCH_HH:k==3?MX_WALK_PUNCH_HH:k*R(2.0/3.0));
+}
 /* Avoid single-frame left/right sprite flips when flying near zero horizontal
    speed. The existing face byte is cosmetic until the player walks. */
 static inline void mx_flight_face_update(MxMan *m){

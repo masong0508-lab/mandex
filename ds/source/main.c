@@ -1168,7 +1168,14 @@ static void draw_man(const View *v){
     /* Lunge the artwork, not the collision body or floor contact shadow. */
     int lunge = (int)((rmul(mx_walk_punch_lunge(m),RI(v->ppc)) + R(0.5)) >> 12);
     spr_man_walk(v->buf, x + face*lunge, fy, p < 1 ? 1 : p, face, fr, 0);
-    if(m->pT > 0){ int r = v->ppc * 5, ax = x + face * v->ppc * 4; for(int k = -3; k <= 3; k++) gfx_px(v->buf, ax + face * (r - k * k * r / 18), y + k * v->ppc * 3 / 4, C_WHITE); }   /* punch swoosh */
+    /* Attack-facing, not the slowly turning body-facing: draw within the
+       real punch rectangle and shorten the sweep as the attack recovers. */
+    int punch_stage=mx_walk_punch_fx_stage(m);
+    if(punch_stage)for(int k=-punch_stage;k<=punch_stage;k++){
+      real dx,dy;mx_walk_punch_fx_point(m,k,&dx,&dy);
+      gfx_px(v->buf,vx(v,m->x+dx),vy(v,m->y+dy),
+             punch_stage==1?C_GRAY:C_WHITE);
+    }
     return;
   }
   int pose = POSE_IDLE, face = 1;
