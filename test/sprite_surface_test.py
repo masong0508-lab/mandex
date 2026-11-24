@@ -39,10 +39,15 @@ for name in ('IDLE_A','IDLE_B','FLEX_A','DRAG','STUCK_A'):
     w,h,ax,ay,p=arrays[name]
     torso=[v for y in range(ay+2,min(h,ay+21)) for v in p[y*w:(y+1)*w]]
     assert 3 in torso and 4 in torso,(name,'lost face-safe body shading')
-assert "const phase=mv?m.x/15:0" in web
+# The browser now follows the handheld's collision-resolved gait instead of
+# tying footsteps to the absolute map X coordinate (which slid at walls).
+assert "function walkStrideStep(m){" in web
+assert "Math.sin((m.gait||0)*Math.PI/(2*V))" in web
+assert "if(m.gr)m.gait=((m.gait||0)+Math.abs(m.x-strideStartX))%(4*V)" in web
+assert "m.x/15" not in web
 # Reversals now blend through walkTurnAngle()/walkTurnFace() rather than
 # snapping directly back to the old side-on walking transform.
-assert "const th=turning?walkTurnAngle(m.turn):Math.PI/2+(mv?.055*step:0)" in web
+assert "const th=turning?walkTurnAngle(m.turn):Math.PI/2+.055*step;" in web
 assert "const visualFace=turning?walkTurnFace(m.face,m.turn):m.face;" in web
 assert "lit?'rgba(255,224,164,.52)'" in web
 assert "x.fillStyle='rgba(215,248,166,.20)'" in web
