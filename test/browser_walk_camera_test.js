@@ -9,7 +9,7 @@ const production=html.slice(start,end);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function scene(portrait=true,height=1169,wide=false){
   return {W:portrait?540:960,H:portrait?height:540,WW:wide?2880:960,WH:540,GY:480,
-    portrait,clamp,isPortrait(){return this.portrait},
+    portrait,clamp,isPortrait(){return this.portrait},WEB_UI:{inspect:false},
     CAM:{on:portrait||wide,z:1,x:0,y:0,reset:true,snap:false,hold:0},
     CL:wide?{slings:[[128,362],[1088,362],[2048,362]]}:{},
     slingK:wide?1:0,SX:wide?1088:128,SY:362,PULL:92,dragging:false,
