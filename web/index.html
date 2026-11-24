@@ -3865,6 +3865,16 @@ function shotReadiness(m){
   const dx=m.x-SX,dy=m.y-SY;
   return dx*dx+dy*dy>=3*V*V?'RELEASE TO LAUNCH':'DRAG BACK TO AIM';
 }
+// A mobile-only exit from a walking attempt, guarded against accidental
+// contact with the adjacent movement/action buttons.
+function drawPortraitWalkEnd(){
+  const ready=WEB_UI.endWalkUntil>time;
+  btn(190,H-106,76,80,ready?'CONFIRM':'END RUN',()=>{
+    if(state!=='play'||man.mode!=='walk')return;
+    if(WEB_UI.endWalkUntil>time){releaseAllWalkTouches();walkQuit()}
+    else WEB_UI.endWalkUntil=time+2.5;
+  },{size:12,on:ready,col:'#ffab83'});
+}
 function drawHUD(){
   drawWalkHUD();
   const P=W<700;ctx.fillStyle='rgba(15,18,30,.72)';ctx.fillRect(0,0,W,P?62:34);ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(0,0,W,2);
@@ -3907,26 +3917,32 @@ function drawHUD(){
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
+  if(state!=='play'||man.mode!=='walk')WEB_UI.endWalkUntil=0;
   if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
+    if(P&&man.mode==='walk')drawPortraitWalkEnd();
     if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
-      btn(W-212,H-44,96,32,'< SLING',()=>goSling(slingK-1),{size:13,disabled:slingK<=0});btn(W-108,H-44,96,32,'SLING >',()=>goSling(slingK+1),{size:13,disabled:slingK>=CL.slings.length-1});void ny}
+      btn(W-212,H-(P?76:44),96,P?60:32,'< SLING',()=>goSling(slingK-1),{size:P?16:13,disabled:slingK<=0});btn(W-108,H-(P?76:44),96,P?60:32,'SLING >',()=>goSling(slingK+1),{size:P?16:13,disabled:slingK>=CL.slings.length-1});void ny}
     // Separate immediate shot readiness from tool inventory. The
     // selection badge already shows charges and consumes none until launch.
     if(man.mode==='aim'){
       const ready=shotReadiness(man);
       if(ready){
-        const cy=H-83;
+        const cy=H-(P?112:83);
         ctx.fillStyle='rgba(15,18,30,.82)';
         ctx.fillRect(Math.max(5,W/2-144),cy-17,Math.min(W-10,288),23);
         txt(ready,W/2,cy,13,man.stun>0?'#ff7474':
            ready==='RELEASE TO LAUNCH'?'#7dff5a':'#ffe190','center');
       }
     }
-    if(man.mode!=='walk')btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
-    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
-  if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
-  if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
-  else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
+    if(man.mode!=='walk'&&!(P&&man.mode==='fly'))btn(12,H-(P?76:44),236,P?60:32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:P?16:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
+    if(P&&man.mode==='fly'){
+      const action=man.pwr==='beans'&&!man.beaned?'FART JET':man.pwr==='burp'&&!man.burped?'BURP BLAST':!man.dive?'BELLY FLOP':'DIVING...';
+      btn(12,H-76,W-24,60,action,dive,{size:20,on:action!=='DIVING...',disabled:action==='DIVING...'});
+    }
+    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-(P?88:54),P?12:15,'#ffd23f','center')}}
+  if(!P&&man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
+  if(!P&&man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
+  else if(!P&&man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
   if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
   if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
   if(state==='play')btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
