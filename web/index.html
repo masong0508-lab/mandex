@@ -667,6 +667,9 @@ function zoneAdvance(){
   zonePaid[slingK]=1;const bonus=CL.zoneMen||4;men+=bonus;score+=3000;flash=Math.max(flash,.5);SFX.wooo&&SFX.wooo();
   goSling(slingK+1);popText(SX,SY-56,'DISTRICT CLEARED!  +'+bonus+' MEN','#7dff5a',24);banner=2.2}
 function nextMan(){
+  // A previous shot can expire or pop while its finger is still held.
+  // Never let that pointer carry over to the replacement player.
+  releaseAllWalkTouches();
   bankLeft=0;
   if(men>0)man={mode:'aim',x:SX,y:SY,vx:0,vy:0,ang:0,spin:0,face:1,t:0,a:1,R:14,dive:false,gt:0,hitCd:0,gooT:0,pop:1,stT:0,swT:0,G:gagNew(2.5,4,3),jg:jigNew(),inf:0,seated:false,pwr:null,vlv:false,airT:0,beaned:false,bel:0,burped:false,burpT:0,chug:null};
   else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};
@@ -1398,8 +1401,8 @@ function drawWalkMan(m){
 }
 /* Two fingers on the same virtual key must not cancel one another. */
 function releaseWalkTouch(id){
-  const key=TID[id];if(!key)return;
-  delete TID[id];KEYS[key]=false;
+  const key=TID[id];delete TID[id];if(!key)return;
+  KEYS[key]=false;
   for(const p in TID)if(TID[p]===key){KEYS[key]=true;break}
 }
 function walkTouch(x,y,id){
@@ -1408,6 +1411,13 @@ function walkTouch(x,y,id){
     KEYS[b.k]=true;TID[id]=b.k;return true;
   }
   return false;
+}
+// A captured thumb may slide into a gap and back onto a control.
+// Empty string means the pointer is still owned but no key is held.
+function moveWalkTouch(x,y,id){
+  if(!Object.prototype.hasOwnProperty.call(TID,id))return false;
+  if(!walkTouch(x,y,id)){releaseWalkTouch(id);TID[id]='';}
+  return true;
 }
 /* The touch HUD is drawn every frame. Reuse the five hit-test objects,
  * updating only their positions when canvas dimensions change. */
@@ -3629,7 +3639,7 @@ const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0};
    landscapes retain the original 960x540 artwork and screen geometry. */
 const WEB_UI={portrait:false,viewportW:0,viewportH:0,
   page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0,editorScale:1,
-  editorHeight:480,gesture:null};
+  editorHeight:480,gesture:null,aimId:null,sodaId:null,endWalkUntil:0};
 const isPortrait=()=>WEB_UI.portrait;
 const mobilePage=(kind,n,size)=>Math.max(0,Math.min(Math.max(0,Math.ceil(n/size)-1),WEB_UI.page[kind]||0));
 function layoutTick(){
@@ -3642,24 +3652,25 @@ function layoutTick(){
         stableH=Math.max(1,window.innerHeight||vh),
         por=stableH>stableW*1.08;
   const w=por?540:960,h=por?Math.max(720,Math.min(1240,Math.round(w*stableH/stableW))):540;
-  const changed=por!==WEB_UI.portrait;
-  if(changed){
-    WEB_UI.portrait=por;WEB_UI.gesture=null;
-    if(typeof dragging!=='undefined')dragging=false;
-    if(typeof sliderDrag!=='undefined')sliderDrag=false;
+  const changed=por!==WEB_UI.portrait,bufferChanged=w!==W||h!==H;
+  // Never release a shot into a changed canvas coordinate space.
+  if(changed||bufferChanged){
+    releaseAllWalkTouches();
     if(typeof E!=='undefined'&&E){E.drag=null;E.pointer=null;}
-    for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
     CAM.reset=true;CAM.snap=true;hits=[];
   }
-  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
-  if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed){
+  if(changed)WEB_UI.portrait=por;
+  if(bufferChanged){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
+  if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed||bufferChanged){
     WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
+    // A CSS-only resize invalidates the captured pointer mapping too.
+    if(!changed&&!bufferChanged&&(dragging||sodaHold))releaseAllWalkTouches();
     const rect=document.body.getBoundingClientRect(),
       css=window.getComputedStyle?window.getComputedStyle(document.body):null,
       insetW=css?(parseFloat(css.paddingLeft)||0)+(parseFloat(css.paddingRight)||0):0,
       insetH=css?(parseFloat(css.paddingTop)||0)+(parseFloat(css.paddingBottom)||0):0,
-      availW=Math.max(1,(rect.width||vw)-insetW),
-      availH=Math.max(1,(rect.height||vh)-insetH),
+      availW=Math.max(1,Math.min(rect.width||vw,vw)-insetW),
+      availH=Math.max(1,Math.min(rect.height||vh,vh)-insetH),
       scale=Math.max(.01,Math.min(availW/w,availH/h));
     cv.style.width=Math.floor(w*scale)+'px';cv.style.height=Math.floor(h*scale)+'px';
   }
@@ -3691,21 +3702,30 @@ function camTick(dt){
   const cameraMaxX=Math.max(0,WW-vw);
   const bL=CL.slings?clamp((n?sx/n:640)-vw*.5,0,cameraMaxX):clamp(SX-90,0,cameraMaxX),iL=CL.slings?clamp(SX-vw*.2,0,cameraMaxX):bL;
   let tl=bL,ty=baseY,fast=4;
-  if(walking){CAM.hold=0;tl=clamp(m.x-vw*.38,0,cameraMaxX);ty=Math.min(baseY,m.y-(138+(H-318)*.48)/z);fast=5}
+  if(walking){CAM.hold=0;tl=clamp(m.x-vw*(m.vx<-25?.62:.38),0,cameraMaxX);ty=Math.min(baseY,m.y-(138+(H-318)*.48)/z);fast=5}
   else if(CAM.hold>0){CAM.hold-=dt}
   else if(m.mode==='aim'){if(dragging){const k=Math.min(1,Math.hypot(m.x-SX,m.y-SY)/PULL);tl=iL+(bL-iL)*k*k*(3-2*k);fast=8}else tl=iL}
   else if(m.mode==='fly'||m.mode==='stuck'||m.mode==='walk'){tl=clamp(m.x-vw*.38,0,cameraMaxX);ty=Math.min(baseY,m.y-vh*.3);fast=5}
-  if(CAM.reset){CAM.reset=false;CAM.snap=false;CAM.x=walking?tl:bL;CAM.y=walking?ty:baseY;CAM.hold=walking?0:1.1}
+  if(CAM.reset){CAM.reset=false;CAM.snap=false;
+    const aimNow=portrait&&m.mode==='aim';
+    CAM.x=walking?tl:aimNow?iL:bL;CAM.y=walking?ty:baseY;
+    CAM.hold=walking||aimNow?0:1.1;}
   else if(CAM.snap){CAM.snap=false;CAM.x=tl;CAM.y=ty}
   else{CAM.x+=(tl-CAM.x)*Math.min(1,dt*fast);CAM.y+=(ty-CAM.y)*Math.min(1,dt*3)}
   CAM.x=clamp(CAM.x,0,cameraMaxX);
   // Fast falls, rising platforms and a zoom transition cannot put the head
   // behind the mission HUD or the feet behind the timer/control strip.
   if(walking)CAM.y=clamp(CAM.y,m.y-(H-174-22*z)/z,m.y-(138+40*z)/z);
+  // A fast shot or a rubble escape can outrun normal camera easing.
+  // Keep the actor in the usable view while retaining hard world bounds.
+  if(portrait&&(walking||m.mode==='fly'||m.mode==='stuck')){
+    CAM.x=clamp(clamp(CAM.x,m.x-(W-32)/z,m.x-32/z),0,cameraMaxX);
+    if(!walking)CAM.y=clamp(CAM.y,m.y-(H-112)/z,m.y-168/z);
+  }
 }
 const toWorld=(sx,sy)=>CAM.on?[sx/CAM.z+CAM.x,sy/CAM.z+CAM.y]:[sx,sy];
 const toScreen=(x,y)=>CAM.on?[(x-CAM.x)*CAM.z,(y-CAM.y)*CAM.z]:[x,y];
-let AIM0={sx:0,sy:0,wx:0,wy:0};
+let AIM0={sx:0,sy:0,wx:0,wy:0,z:1,seated:false};
 
 // the last pass over the picture: a warm key light from the sun's corner, cooler shadows, a soft vignette and a hint of bloom, so the flat flash-game colours sit together
 let _vig=null;
@@ -3848,7 +3868,9 @@ function drawObjectiveEdge(){
   const sx=CAM.on?(t.x+off[0]-CAM.x)*CAM.z:t.x+off[0];
   const sy=CAM.on?(t.y+off[1]-CAM.y)*CAM.z:t.y+off[1];
   const top=W<700?138:76;
-  const edge=objectiveScreenEdge(sx,sy,W,H,top,56);
+  const safeTop=W<700&&combo>1&&tntLiveFuses>0?152:top;
+  const bottom=W<700?(man.mode==='walk'?174:112):56;
+  const edge=objectiveScreenEdge(sx,sy,W,H,safeTop,bottom);
   if(!edge.dir)return;
   const label=edge.dir===1?'< LAST':edge.dir===2?'LAST >':
     edge.dir===3?'LAST UP':'LAST DOWN';
@@ -3865,6 +3887,16 @@ function shotReadiness(m){
   if(m.seated||m.vlv)return 'AIR FILLING - DRAG OFF';
   const dx=m.x-SX,dy=m.y-SY;
   return dx*dx+dy*dy>=3*V*V?'RELEASE TO LAUNCH':'DRAG BACK TO AIM';
+}
+// A mobile-only exit from a walking attempt, guarded against accidental
+// contact with the adjacent movement/action buttons.
+function drawPortraitWalkEnd(){
+  const ready=WEB_UI.endWalkUntil>time;
+  btn(190,H-106,76,80,ready?'CONFIRM':'END RUN',()=>{
+    if(state!=='play'||man.mode!=='walk')return;
+    if(WEB_UI.endWalkUntil>time){releaseAllWalkTouches();walkQuit()}
+    else WEB_UI.endWalkUntil=time+2.5;
+  },{size:12,on:ready,col:'#ffab83'});
 }
 function drawHUD(){
   drawWalkHUD();
@@ -3908,26 +3940,32 @@ function drawHUD(){
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
+  if(state!=='play'||man.mode!=='walk')WEB_UI.endWalkUntil=0;
   if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
+    if(P&&man.mode==='walk')drawPortraitWalkEnd();
     if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
-      btn(W-212,H-44,96,32,'< SLING',()=>goSling(slingK-1),{size:13,disabled:slingK<=0});btn(W-108,H-44,96,32,'SLING >',()=>goSling(slingK+1),{size:13,disabled:slingK>=CL.slings.length-1});void ny}
+      btn(W-212,H-(P?76:44),96,P?60:32,'< SLING',()=>goSling(slingK-1),{size:P?16:13,disabled:slingK<=0});btn(W-108,H-(P?76:44),96,P?60:32,'SLING >',()=>goSling(slingK+1),{size:P?16:13,disabled:slingK>=CL.slings.length-1});void ny}
     // Separate immediate shot readiness from tool inventory. The
     // selection badge already shows charges and consumes none until launch.
     if(man.mode==='aim'){
       const ready=shotReadiness(man);
       if(ready){
-        const cy=H-83;
+        const cy=H-(P?112:83);
         ctx.fillStyle='rgba(15,18,30,.82)';
         ctx.fillRect(Math.max(5,W/2-144),cy-17,Math.min(W-10,288),23);
         txt(ready,W/2,cy,13,man.stun>0?'#ff7474':
            ready==='RELEASE TO LAUNCH'?'#7dff5a':'#ffe190','center');
       }
     }
-    if(man.mode!=='walk')btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
-    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
-  if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
-  if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
-  else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
+    if(man.mode!=='walk'&&!(P&&man.mode==='fly'))btn(12,H-(P?76:44),236,P?60:32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:P?16:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
+    if(P&&man.mode==='fly'){
+      const action=man.pwr==='beans'&&!man.beaned?'FART JET':man.pwr==='burp'&&!man.burped?'BURP BLAST':!man.dive?'BELLY FLOP':'DIVING...';
+      btn(12,H-76,W-24,60,action,dive,{size:20,on:action!=='DIVING...',disabled:action==='DIVING...'});
+    }
+    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-(P?88:54),P?12:15,'#ffd23f','center')}}
+  if(!P&&man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
+  if(!P&&man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
+  else if(!P&&man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
   if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
   if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
   if(state==='play')btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
@@ -3971,7 +4009,7 @@ function drawTitle(){
 //  INPUT / LOOP
 // =====================================================================
 function pt(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
-function retry(){load(level,CL&&CL.custom?CL:undefined)}
+function retry(){releaseAllWalkTouches();load(level,CL&&CL.custom?CL:undefined)}
 function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else if(level+1===CH1)startCutEnd(1);else if(level+1===CH2)startCutEnd(2);else{state='ending';endScroll=0;hits=[]}}
 let endScroll=0;
 const CREDITS=['MANDEX','THE LANDLORD SMASHER','','Every landlord has been evicted.','The neighbourhood is free.','Rent is cancelled.','','STARRING','The Man  -  as himself','His Towel  -  as the cape','The Belly  -  stunts and special effects','','LANDLORDS HARMED','all of them','','Thank you for playing!'];
@@ -3981,14 +4019,31 @@ function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);end
   JIG={bo:[sw*4,Math.cos(ph)*1.5],ro:[sw*5,0],bs:[1,1]};drawManFrame(seg===0?(sw>0?'DANCE_A':'DANCE_B'):seg===1?(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C'):(Math.sin(time*3)>.4?'BK_B':sw>0?'POSE_A':'POSE_B'));JIG=null;ctx.restore();
   if(rnd()<.25)P({k:rnd()<.5?12:13,x:rnd()*W,y:H+10,vx:(rnd()-.5)*30,vy:-60-rnd()*60,l:3,l0:3,s:5+rnd()*5,ph:rnd()*6});if(rnd()<.3)P({k:13,x:rnd()*W,y:rnd()*H,vx:0,vy:0,l:.7,l0:1,s:5+rnd()*6,ph:0});
   drawParts();btn(W-150,H-56,130,40,'MENU',goMenu,{size:16,on:true})}
-function backFromPlay(){if(testing){openEditor(true);return}goSelect()}
+function backFromPlay(){releaseAllWalkTouches();if(testing){openEditor(true);return}goSelect()}
+// Cancellation is never a launch. Return to the original valve seat if
+// the player began the pull seated, otherwise to the resting sling.
+function cancelAimPointer(id){
+  if(id!==WEB_UI.aimId)return;
+  WEB_UI.aimId=null;
+  if(dragging&&state==='play'&&man&&man.mode==='aim'){
+    man.seated=!!AIM0.seated;man.vlv=!!AIM0.seated;
+    man.x=man.seated?VX:SX;man.y=man.seated?VY:SY;
+  }
+  dragging=false;
+}
+function cancelSodaPointer(id){
+  if(id===WEB_UI.sodaId){WEB_UI.sodaId=null;sodaHold=false}
+}
 cv.addEventListener('pointerdown',e=>{
   audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
+  // Another finger cannot steal a captured pull or chug.
+  if(state==='play'&&(dragging||sodaHold))return;
   if(state==='cutscene'){cutClick(x,y);return}
   if(state==='title'){goMenu();return}
   if(isPortrait()&&['menu','select','ach','outfit','options'].includes(state)){
     /* Defer activation until release: a swipe must change pages without
        accidentally opening a level or erasing a custom project. */
+    if(WEB_UI.gesture)return;
     WEB_UI.gesture={id:e.pointerId,x,y,screen:state};
     try{cv.setPointerCapture(e.pointerId)}catch(_){}
     return;
@@ -4014,14 +4069,20 @@ cv.addEventListener('pointerdown',e=>{
   if(state==='win'){nextAfterWin();return}
   if(state==='lose'){retry();return}
   const[wx,wy]=toWorld(x,y);
-  if(man.mode==='aim'&&toolOn('burp')&&!man.chug&&!man.seated&&pw.left.burp>0&&Math.abs(wx-STX)<48&&wy>GY-62){sodaHold=true;startChug();if(!man.chug)sodaHold=false;try{cv.setPointerCapture(e.pointerId)}catch(_){}return}   // tap the soda stand: he hops over and chugs
+  if(man.mode==='aim'&&toolOn('burp')&&!man.chug&&!man.seated&&pw.left.burp>0&&Math.abs(wx-STX)<48&&wy>GY-62){sodaHold=true;startChug();if(!man.chug)sodaHold=false;else WEB_UI.sodaId=e.pointerId;try{cv.setPointerCapture(e.pointerId)}catch(_){}return}   // tap the soda stand: he hops over and chugs
   if(man.mode==='aim'&&!man.chug&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(wx-VX,wy-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}   // tap the valve: he sits and fills; drag him off to fire
-  if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
+  const pickup=isPortrait()?Math.hypot(x-(man.x-CAM.x)*CAM.z,y-(man.y-CAM.y)*CAM.z)<64:
+    Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70);
+  if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&pickup){
+    // Save the character's position, not the initial off-centre finger,
+    // and capture one zoom scale until the owner lifts or cancels.
+    AIM0.sx=x;AIM0.sy=y;AIM0.wx=man.x;AIM0.wy=man.y;
+    AIM0.z=CAM.on?CAM.z:1;AIM0.seated=!!man.seated;
+    WEB_UI.aimId=e.pointerId;dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  }
   else dive()});
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
-  if(state==='play'&&man.mode==='walk'&&TID[e.pointerId]){
-    walkTouch(mx,my,e.pointerId);return;
-  }
+  if(state==='play'&&man.mode==='walk'&&moveWalkTouch(mx,my,e.pointerId))return;
   if(state==='edit'){
     if(!eStrokeOwner(e.pointerId))return;
     if(!isPortrait())eMove(mx,my);
@@ -4032,7 +4093,7 @@ cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
     }
     return;
   }
-  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
+  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||state!=='play'||man.mode!=='aim'||WEB_UI.aimId!==e.pointerId)return;gagReset(man.G);const[sx,sy]=pt(e),zz=AIM0.z,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
   if(vOn&&dv<VPULL){const k=.9*(VPULL-dv)/(VPULL-VGRAB);man.x+=(VX-man.x)*k;man.y+=(VY-man.y)*k}});   // nearing the valve the sling stretches on back toward it (power stays a full pull), then he drops onto it
 cv.addEventListener('pointerup',e=>{
   if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId){
@@ -4048,16 +4109,22 @@ cv.addEventListener('pointerup',e=>{
     }else if(g.screen===state)hitTest(p[0],p[1]);
     return;
   }
-  sodaHold=false;if(sliderDrag){sliderDrag=false;pdSave();SFX.boing()}
+  if(WEB_UI.gesture)return; // foreign menu release
   if(state==='edit'){eEndStroke(e.pointerId,false);return}
-  if(dragging){dragging=false;if(man.mode==='aim'){
-    if(man.vlv){man.seated=true;return}man.seated=false;launch()
-  }}
+  if(state==='options'&&sliderDrag){sliderDrag=false;pdSave();SFX.boing()}
+  cancelSodaPointer(e.pointerId);
+  if(WEB_UI.aimId===e.pointerId){
+    WEB_UI.aimId=null;
+    if(dragging){dragging=false;if(state==='play'&&man.mode==='aim'){
+      if(man.vlv){man.seated=true;return}man.seated=false;launch()
+    }}
+  }
 });   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keyup',e=>{KEYS[e.code]=false});
 function releaseAllWalkTouches(){
-  for(const id in TID){KEYS[TID[id]]=false;delete TID[id]}
-  WEB_UI.gesture=null;
+  for(const id in TID){if(TID[id])KEYS[TID[id]]=false;delete TID[id]}
+  WEB_UI.gesture=null;WEB_UI.endWalkUntil=0;
+  cancelAimPointer(WEB_UI.aimId);cancelSodaPointer(WEB_UI.sodaId);
   dragging=false;sodaHold=false;sliderDrag=false;
 }
 addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false;releaseAllWalkTouches()});
@@ -4068,12 +4135,14 @@ for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
   if(ev==='pointercancel'){
     if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
     if(state==='edit')eEndStroke(e.pointerId,true);
-    if(dragging){dragging=false;man.seated=false}
+    if(state==='play'){cancelAimPointer(e.pointerId);cancelSodaPointer(e.pointerId)}
   }
 });
 cv.addEventListener('lostpointercapture',e=>{
   releaseWalkTouch(e.pointerId);
   if(state==='edit')eEndStroke(e.pointerId,true);
+  if(state==='play'){cancelAimPointer(e.pointerId);cancelSodaPointer(e.pointerId)}
+  if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
 });
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
