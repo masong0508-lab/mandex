@@ -322,9 +322,15 @@ static real damage_cell(MxWorld *w, int x, int y, real d){
 }
 static real blast(MxWorld *w, int cx, int cy, int r, real power){
   real spent = 0, rr = RI(r);
-  for(int j = -r; j <= r; j++) for(int i = -r; i <= r; i++){
+  /* Out-of-world and empty background-free cells contribute zero.
+     Keep row-major hit/event order unchanged. */
+  const int x0 = -cx > -r ? -cx : -r, x1 = MX_COLS-1-cx < r ? MX_COLS-1-cx : r;
+  const int y0 = -cy > -r ? -cy : -r, y1 = MX_ROWS-1-cy < r ? MX_ROWS-1-cy : r;
+  for(int j = y0; j <= y1; j++) for(int i = x0; i <= x1; i++){
     int d2 = i * i + j * j;
     if(d2 > r * r) continue;
+    int k = IDX(cx+i,cy+j);
+    if(!w->grid[k] && !w->paper[k]) continue;
     real d = rsqrt(RI(d2));
     real p = rmul(power, RI(1) - rdiv(d, rr));
     if(d2 == 0) p += rmul(power, R(0.25));

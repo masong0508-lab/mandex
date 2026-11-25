@@ -793,7 +793,12 @@ function damageCell(x,y,d){if(!inb(x,y))return 0;const i=idx(x,y);
   if(!grid[i]){if(paper[i]&&d>=4)paperHit(x,y);return 0}
   if(hp[i]<=d)return kill(x,y,0,0);hp[i]-=d;return d}
 function blast(cx,cy,r,power){let spent=0;const R=Math.ceil(r);
-  for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){const d=Math.hypot(i,j);if(d>r)continue;spent+=damageCell(cx+i,cy+j,power*(1-d/r)+(d<1?power*.25:0))}return spent}
+  const x0=Math.max(-R,-cx),x1=Math.min(R,COLS-1-cx),y0=Math.max(-R,-cy),y1=Math.min(R,ROWS-1-cy);
+  for(let j=y0;j<=y1;j++)for(let i=x0;i<=x1;i++){
+    const k=idx(cx+i,cy+j);if(!grid[k]&&!paper[k])continue;
+    const d=Math.hypot(i,j);if(d>r)continue;
+    spent+=damageCell(cx+i,cy+j,power*(1-d/r)+(d<1?power*.25:0))
+  }return spent}
 function applyImpulse(ch,px,py,jx,jy){ch.vx+=jx/ch.m;ch.vy+=jy/ch.m;ch.w+=((px-ch.x)*jy-(py-ch.y)*jx)/ch.I;ch.sleep=0}
 function shockwave(px,py,rpx,power){
   for(const ch of chunks){const dx=ch.x-px,dy=ch.y-py,d=Math.hypot(dx,dy)||1;if(d>rpx*1.9)continue;const f=(1-d/(rpx*1.9))*power;
@@ -1112,7 +1117,8 @@ function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long 
   if(!OPT().noBurst&&stom(m)>=1)explodeMan()}
 // ---- gameplay toolbar: valve and six tools are opt-in. Three reserved slots remain for future updates.
 const TOOLS=[{id:'valve',name:'AIR VALVE'},{id:'burp',name:'BURPBURSTER'},{id:'beans',name:'BEANS'},{id:'towel',name:'TOWEL'},{id:'splat',name:'SPLAT'},{id:'turbo',name:'TURBO'},{id:'quake',name:'QUAKE'}].concat(Array.from({length:3},(_,i)=>({id:'slot'+(i+7),name:'',reserved:true})));
-const toolList=()=>TOOLS.filter(t=>!t.reserved);          // what the player can actually pick
+const ACTIVE_TOOLS=TOOLS.filter(t=>!t.reserved);
+const toolList=()=>ACTIVE_TOOLS;          // what the player can actually pick
 const toolOn=id=>(OPT().tool||'none')===id;                // the air valve exists only after explicit selection
 function toolCycle(){const ids=['none'].concat(toolList().map(t=>t.id)),o=OPT(),i=ids.indexOf(o.tool||'none');o.tool=ids[(i+1)%ids.length]}
 const PWTOOLS=['beans','towel','splat','turbo','quake'];
@@ -3869,7 +3875,7 @@ function shotReadiness(m){
 function drawHUD(){
   drawWalkHUD();
   const P=W<700;ctx.fillStyle='rgba(15,18,30,.72)';ctx.fillRect(0,0,W,P?62:34);ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(0,0,W,2);
-  {const nm=`${CL.custom?'CUSTOM':'LV '+(level+1)}  ${CL.name.toUpperCase()}`;let sz=18;{while(sz>11){ctx.font=`bold ${sz}px "Trebuchet MS",Impact,sans-serif`;if(ctx.measureText(nm).width<=(P?285:250))break;sz--}}txt(nm,12,24,sz,'#ffd23f','left')}
+  {const nm=`${Number.isInteger(CL.contract)?'CONTRACT':CL.custom?'CUSTOM':'LV '+(level+1)}  ${CL.name.toUpperCase()}`;let sz=18;{while(sz>11){ctx.font=`bold ${sz}px "Trebuchet MS",Impact,sans-serif`;if(ctx.measureText(nm).width<=(P?285:250))break;sz--}}txt(nm,12,24,sz,'#ffd23f','left')}
   const objective=objectiveSnapshot(),lb=objective.remaining;
   txt(`LANDLORDS ${lb}/${objective.total}`,P?12:Math.max(430,300+men*Math.min(20,230/Math.max(1,men))+24),P?54:24,18,lb?'#ff8a8a':'#7dff5a','left');
   if(state==='play'&&tntLiveFuses>0){
@@ -4104,7 +4110,7 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.
 // =====================================================================
 const SAVE_KEY='mandex.save.v1';
 const ST0=()=>({kills:0,cells:0,booms:0,shots:0,flops:0,wins:0,oneShots:0,created:0,customWins:0,exported:0,maxChain:0,bestScore:0,inflated:0,pops:0,pw_beans:0,pw_towel:0,pw_splat:0,pw_burp:0,pw_turbo:0,pw_quake:0});
-let PD={stars:{},best:{},ach:{},outfit:'classic',own:{},custom:[],st:ST0(),unlockAll:false,opt:{collapse:false,tool:'none'}};
+let PD={stars:{},best:{},contracts:{},ach:{},outfit:'classic',own:{},custom:[],st:ST0(),unlockAll:false,opt:{collapse:false,tool:'none'}};
 function pdLoad(){try{const s=localStorage.getItem(SAVE_KEY);if(s){const o=JSON.parse(s);PD=Object.assign(PD,o);PD.st=Object.assign(ST0(),o.st||{})}}catch(e){}}
 let pdDirty=false;
 function pdSave(){
@@ -5179,6 +5185,7 @@ function drawMobileMenu(){
   txt(totalStars()+' ★ EARNED',W/2,H-28,18,'#ffd23f','center');
 }
 function mobileSelectItems(){
+  if(selTab===4)return CONTRACT_ITEMS;
   if(selTab===0)return LEVELS.slice(0,CH1).map((q,i)=>({label:(i+1)+'. '+q.name,stars:PD.stars[i]||0,locked:!storyUnlocked(i),fn:()=>startStory(i)}));
   if(selTab===2)return LEVELS.slice(CH1,CH2).map((q,i)=>({label:(CH1+i+1)+'. '+q.name,stars:PD.stars[CH1+i]||0,locked:!ch2Unlocked(CH1+i),fn:()=>startStory(CH1+i)}));
   if(selTab===3)return LEVELS.slice(CH2).map((q,i)=>({label:(CH2+i+1)+'. '+q.name,stars:PD.stars[CH2+i]||0,locked:!ch3Unlocked(CH2+i),fn:()=>startStory(CH2+i)}));
@@ -5188,9 +5195,9 @@ function mobileSelectItems(){
   return items;
 }
 function drawMobileSelect(){
-  mobileHeader('SELECT LEVEL',selTab===1?'YOUR CUSTOM LEVELS':'CHOOSE A DISTRICT',goMenu);
-  const labels=['STORY','MY LEVELS','CHAPTER 2','CHAPTER 3'],tabs=[0,1,2,3];
-  for(let i=0;i<4;i++)mobileTab(12+(i%2)*264,101,252,labels[i],
+  mobileHeader('SELECT LEVEL',selTab===4?'DEMOLITION CONTRACTS':selTab===1?'YOUR CUSTOM LEVELS':'CHOOSE A DISTRICT',goMenu);
+  const labels=['STORY','MY LEVELS','CONTRACTS','CHAPTER 2','CHAPTER 3'],tabs=[0,1,4,2,3];
+  for(let i=0;i<labels.length;i++)mobileTab(12+(i%3)*176,101+Math.floor(i/3)*48,164,labels[i],
     ()=>{selTab=tabs[i];WEB_UI.page.select=0},selTab===tabs[i]);
   const items=mobileSelectItems(),top=208,rh=94,rowGap=8,cols=2,
     visibleRows=Math.max(2,Math.floor((H-top-94)/(rh+rowGap))),size=visibleRows*cols,
@@ -5401,7 +5408,7 @@ let sliderDrag=false,sliX=0,sliW=1,armReset=0,armProg=0;
 function setVolFromX(x){const o=OPT();o.vol=clamp(Math.round((x-sliX)/sliW*20)/20,0,1);applyVol();pdTouch()}
 const GUIDES=['OFF','SHORT','FULL'],SHAKES=[['OFF',0],['LOW',.5],['FULL',1]];
 function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX'])delete o[k];o.tool='none';muted=false;webEcoFX=false;applyVol();pdTouch();pdSave()}
-function progReset(){PD.stars={};PD.best={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
+function progReset(){PD.stars={};PD.best={};PD.contracts={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
 function drawOptions(){
   ctx.fillStyle='rgba(10,14,30,.62)';ctx.fillRect(0,0,W,H);
   txt('OPTIONS',W/2,56,40,'#ffd23f','center','#7a1a1a');btn(16,14,90,36,'< MENU',goMenu,{size:16});
@@ -5448,10 +5455,10 @@ function drawSelect(){
   ctx.fillStyle='rgba(10,14,30,.55)';ctx.fillRect(0,0,W,H);
   txt('SELECT LEVEL',W/2,52,40,'#ffd23f','center','#7a1a1a');
   btn(16,14,90,36,'< MENU',goMenu,{size:16});
-  btn(W/2-336,66,160,34,'STORY',()=>{selTab=0},{on:selTab===0,size:16});
-  btn(W/2-166,66,160,34,'CHAPTER 2 (WIP)',()=>{selTab=2},{on:selTab===2,size:14,col:'#ffb03a'});
-  btn(W/2+4,66,160,34,'CHAPTER 3 (WIP)',()=>{selTab=3},{on:selTab===3,size:14,col:'#9aa4d8'});
-  btn(W/2+174,66,160,34,'MY LEVELS',()=>{selTab=1},{on:selTab===1,size:16});
+  const tabs=[['STORY',0],['CHAPTER 2',2],['CHAPTER 3',3],['CONTRACTS',4],['MY LEVELS',1]];
+  tabs.forEach(([name,id],i)=>btn(W/2-430+i*174,66,164,34,name,
+    ()=>{selTab=id;WEB_UI.page.select=0},{on:selTab===id,size:15}));
+  if(selTab===4){drawContractSelect();return}
   if(selTab===3){
     const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n3=LEVELS.length-CH2,th=60;
     txt('CHAPTER 3  -  THE WOLFMAN',W/2,134,24,'#9aa4d8','center','#10132a');
@@ -5504,6 +5511,75 @@ function drawOutfits(){
     let c1=o.thong?o.tg:o.br,c2=o.tow;if(o.rainbow){c1=`hsl(${(time*60)%360},85%,52%)`;c2=`hsl(${(time*60+180)%360},85%,70%)`}
     ctx.globalAlpha=own?1:.35;ctx.fillStyle=c1;rrect(x+10,y+9,46,46,8);ctx.fill();ctx.fillStyle=c2;rrect(x+36,y+29,26,26,6);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;rrect(x+10,y+9,46,46,8);ctx.stroke();ctx.globalAlpha=1;
     txt(o.n,x+74,y+26,17,own?'#fff':'#889','left');txt(own?(sel?'WEARING':'tap to wear'):'locked: '+o.h,x+74,y+48,12,own?'#cfd':'#aab','left');ctx.restore()})}
+
+// ---------- demolition contracts ----------
+// Demolition contracts: separate from campaign and creator saves.
+// Twelve authored districts, four tactical layouts each. Build only the selected map.
+const CONTRACT_FAMILIES=[
+  {n:'Rowhouse Alley',tip:'Break the near house first',paper:'#e7cba4',h:[[43,22,2,9,2,1,1],[78,28,2,9,1,1,2]]},
+  {n:'Brick Stacks',tip:'Cut the middle floor supports',paper:'#d7b9a3',h:[[61,38,4,10,2,1,3]]},
+  {n:'Market Hall',tip:'Use the long wooden roof',paper:'#e5c4a8',h:[[44,28,1,13,1,1,1],[78,30,1,12,2,1,1]]},
+  {n:'Twin Towers',tip:'Break one tower at a time',paper:'#c7d2da',h:[[43,25,4,9,2,1,2],[82,28,3,11,2,2,3]]},
+  {n:'Freight Warehouse',tip:'Aim along the lower floor',paper:'#dccfac',h:[[49,58,2,13,1,1,2]]},
+  {n:'Glass Apartments',tip:'Shatter the glass bays',paper:'#b8dce1',h:[[56,43,3,11,4,1,2]]},
+  {n:'Rail Depot',tip:'Avoid the steel roof',paper:'#c9cacc',h:[[44,26,2,10,2,1,6],[79,31,1,13,1,2,6]]},
+  {n:'Garden Court',tip:'Lob across the open courtyard',paper:'#c7dfaf',h:[[39,22,2,9,1,1,1],[91,22,2,10,2,1,1]]},
+  {n:'Sandworks',tip:'Break the sand banks',paper:'#eed6ac',h:[[45,23,2,10,2,1,2],[84,27,2,11,1,1,1]],sand:[71,10,5]},
+  {n:'High Rise',tip:'Hit the low floors first',paper:'#c3d4e4',h:[[71,34,5,9,2,1,3]]},
+  {n:'Terrace Steps',tip:'Work upwards from the small house',paper:'#e4cbb8',h:[[39,20,1,9,1,1,1],[64,24,2,10,2,1,2],[94,21,3,10,2,1,2]]},
+  {n:'Industrial Yard',tip:'Separate the two structures',paper:'#d1c9c1',h:[[39,24,3,10,2,1,3],[70,44,2,12,2,1,6]]}
+];
+const CONTRACT_MODES=[
+  {n:'Open',men:8,tip:''},
+  {n:'Bank',men:5,tip:'Use the rubber bank; five shots'},
+  {n:'Chain',men:6,tip:'Trigger the red support charges'},
+  {n:'Guard',men:9,tip:'Break the shell; guards fight back'}
+];
+const CONTRACTS=CONTRACT_FAMILIES.flatMap((f,fi)=>CONTRACT_MODES.map((m,mi)=>({
+  id:fi*CONTRACT_MODES.length+mi,name:f.n+' / '+m.n,family:fi,mode:mi
+})));
+function buildContract(id){
+  const q=CONTRACTS[id];if(!q)throw Error('Unknown demolition contract');
+  const f=CONTRACT_FAMILIES[q.family],m=CONTRACT_MODES[q.mode];
+  return {cols:120,custom:true,contract:id,name:q.name,men:m.men,tip:m.tip||f.tip,build(){
+    if(f.sand)mound(...f.sand);
+    if(q.mode===1)rect(30,56,5,4,RUBBER);
+    f.h.forEach((spec,k)=>{
+      const [x,w,floors,fh,wall,floor,roof]=spec;
+      const wt=q.mode===3?2:1,ft=2;
+      house({x,w,floors,fh,wt,ft,wall:q.mode===3&&wall!==GLASS?STONE:wall,
+             floor,roof,gable:false,paper:f.paper});
+      if(q.mode===2){rect(x,57,2,2,TNT);rect(x+w-2,57,2,2,TNT)}
+      if(q.mode===3){rect(x,55,wt,4,STEEL);rect(x+w-wt,55,wt,4,STEEL)}
+      const upper=floors-1;
+      tgt(x+5,59,q.mode===3?'walker':'');
+      tgt(x+w-6,59-upper*fh,q.mode===3?'shield':'');
+      if(q.mode===2&&floors>=3)tgt(x+5,59-fh);
+      if(q.mode===3&&floors>=3)tgt(x+5,59-(upper-1)*fh,'thrower');
+    });
+  }};
+}
+function contractStars(id){
+  const map=PD.contracts,v=map&&map[id];
+  return Number.isInteger(v)&&v>=1&&v<=3?v:0;
+}
+function startContract(id){
+  const q=buildContract(id);testing=false;selTab=4;load(-1,q);
+}
+const CONTRACT_ITEMS=CONTRACTS.map(q=>({label:q.name,get stars(){return contractStars(q.id)},fn:()=>startContract(q.id)}));
+function drawContractSelect(){
+  const size=12,cols=4,tw=206,th=82,gap=10,x0=(W-(cols*tw+(cols-1)*gap))/2,y0=125;
+  const page=mobilePage('select',CONTRACTS.length,size);
+  WEB_UI.page.select=page;
+  for(let k=0;k<size;k++){
+    const q=CONTRACTS[page*size+k];if(!q)break;
+    tile(x0+(k%cols)*(tw+gap),y0+Math.floor(k/cols)*(th+gap),tw,th,q.id+1,q.name,
+         contractStars(q.id),false,()=>startContract(q.id));
+  }
+  txt('OPEN: practice   BANK: precision   CHAIN: TNT   GUARD: reinforced',W/2,416,14,'#cfd','center');
+  txt('Contracts use their own stars. Your campaign and custom levels stay intact.',W/2,442,13,'#cfd','center');
+  mobilePager('select',CONTRACTS.length,size,H-60);
+}
 
 // ---------- custom levels ----------
 let CL=LEVELS[0],testing=false;
@@ -5837,7 +5913,10 @@ function drawEditor(){
 // ---------- level finished: stars, achievements ----------
 function onWin(){
   const st=men>=2?3:men>=1?2:1,sc=Math.round(score);
-  if(CL&&CL.custom){if(testing||true)ST().customWins++}
+  if(CL&&Number.isInteger(CL.contract)){
+    if(!PD.contracts||typeof PD.contracts!=='object'||Array.isArray(PD.contracts))PD.contracts={};
+    PD.contracts[CL.contract]=Math.max(contractStars(CL.contract),st);
+  }else if(CL&&CL.custom){ST().customWins++}
   else{const hadValve=valveOpen();PD.stars[level]=Math.max(PD.stars[level]||0,st);PD.best[level]=Math.max(PD.best[level]||0,sc);ST().wins++;
     if(!hadValve&&valveOpen())toast('ach','Air valve unlocked!','select AIR VALVE from the toolbar')}
   const used=CL?CL.men-men:0;if(used<=1)ST().oneShots++;

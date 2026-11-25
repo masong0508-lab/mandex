@@ -1,0 +1,12 @@
+name: Demolition contract layouts
+on:
+  push:
+    paths: ['web/index.html','test/browser_contracts_test.js','.github/workflows/browser-contracts.yml']
+  pull_request:
+    paths: ['web/index.html','test/browser_contracts_test.js','.github/workflows/browser-contracts.yml']
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node test/browser_contracts_test.js
