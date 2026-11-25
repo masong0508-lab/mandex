@@ -132,7 +132,7 @@ int main(void){
     { MxOptions bad = { 5, 200 }; uint8_t bb[MX_SAVE_MAX]; MxOptions r2 = { 0, 0 }; int nn = mx_meta_pack_opt(&A, 0, &bad, bb, (int)sizeof bb);
       CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, nn) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_NONE, "an out-of-range tool packs as NONE, any non-zero collapse as on"); }
     { uint8_t bb[MX_SAVE_MAX]; memcpy(bb, b, n1); bb[n1 - 5] = 0xFF; reseal(bb, n1); MxOptions r2 = { 0, 0 };
-      CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, n1) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_NONE, "an options byte with an invalid tool loads as NONE, never trusted"); }
+      CHECK(mx_meta_unpack_opt(&B, &of2, &r2, bb, n1) == 1 && r2.collapse == 1 && r2.tool == MX_TOOL_BREAKER, "reserved high bits ignored; tool seven is Breaker"); }
     { MxOptions sent = { 1, MX_TOOL_BEANS }; uint8_t bb[MX_SAVE_MAX]; memcpy(bb, b, n1); bb[0] ^= 1; MxStats X; fill(&X);
       CHECK(mx_meta_unpack_opt(&X, &of2, &sent, bb, n1) == 0 && sent.collapse == 1 && sent.tool == MX_TOOL_BEANS, "a failed unpack leaves the options untouched"); }
     CHECK(mx_meta_unpack_opt(&B, &of2, 0, b, n1) == 1, "options pointer may be NULL");
