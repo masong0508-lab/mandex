@@ -751,7 +751,7 @@ function cycleWebCap(o){o.renderCap=WEB_FRAME_CAPS[(WEB_FRAME_CAPS.indexOf(o.ren
 function cycleWebScale(o){o.renderScale=WEB_SCALES[(WEB_SCALES.indexOf(o.renderScale||0)+1)%WEB_SCALES.length]}
 function cycleWebFX(o){if(o.ecoFX===undefined)o.ecoFX=true;else if(o.ecoFX===true)o.ecoFX=false;else delete o.ecoFX;webEcoFX=o.ecoFX===true}
 function webFXLabel(o){return o.ecoFX===undefined?'AUTO':o.ecoFX?'ECO':'FULL'}
-function webProfileLabel(o){return webProfile(o).toUpperCase()}
+function webProfileLabel(o){const p=webProfile(o);return p==='low'?'LOW END':p.toUpperCase()}
 function webCapLabel(o){return o.renderCap===30||o.renderCap===60?o.renderCap+' FPS':'AUTO'}
 function webScaleLabel(o){return o.renderScale>0&&WEB_SCALES.includes(o.renderScale)?Math.round(o.renderScale*100)+'%':'AUTO'}
 function chip(x,y,col,vx,vy){if(parts.length>fxLimit())return;P({k:0,x,y,vx,vy,l:1+rnd()*1.2,l0:2,c:col,s:2+rnd()*2})}
@@ -3856,7 +3856,11 @@ function drawRoomDetails(xlo,xhi,ylo,yhi){
 }
 function draw(){
   hits=[];
-  webScreenTransform();const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
+  webScreenTransform();
+  // Settings is opaque. No sky, scenery, gradients or animated menu actors
+  // need to be submitted behind it on a weak GPU.
+  if(state==='options'){drawSettings();drawToasts(frameDt);return}
+  const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
   if(camOn){ctx.fillStyle='#3d8fe8';ctx.fillRect(0,0,W,H);ctx.save();ctx.scale(CAM.z,CAM.z);ctx.translate(-CAM.x,-CAM.y)}
   if(camOn&&CAM.y<0){ctx.drawImage(bgA,0,0,WW,GY,0,CAM.y,WW,GY-CAM.y);ctx.drawImage(bgA,0,GY,WW,WH-GY,0,GY,WW,WH-GY)}else ctx.drawImage(bgA,0,0);
   if(camOn){const dh=Math.max(0,(CAM.y+H/CAM.z)-WH);if(dh>0){const g=ctx.createLinearGradient(0,WH,0,WH+dh);g.addColorStop(0,'#4d311d');g.addColorStop(1,'#2a1a10');ctx.fillStyle=g;ctx.fillRect(CAM.x-2,WH-1,W/CAM.z+4,dh+2)}}   // portrait: the earth continues below the ground line   // sky stretches up so the sun is never cut off
@@ -5357,38 +5361,75 @@ function drawMobileOutfits(){
   });
   mobilePager('outfit',OUTFITS.length,size);
 }
-function drawMobileOptions(){
-  const page=WEB_UI.page.options?1:0,o=OPT();
-  mobileHeader('OPTIONS',page?'SOUND, SCREEN & DATA':'GAMEPLAY',goMenu);
-  mobileTab(12,108,252,'GAMEPLAY',()=>{WEB_UI.page.options=0},page===0);
-  mobileTab(276,108,252,'SOUND & DATA',()=>{WEB_UI.page.options=1},page===1);
-  let y=169;const rh=58,gap=8;
-  function row(label,value,fn,on){
-    btn(20,y,W-40,rh,label+': '+value,()=>{fn();pdTouch();pdSave();SFX.pop()},
-        {size:label.length>20?15:17,on:!!on});
-    y+=rh+gap;
-  }
-  if(!page){
-    row('COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',()=>{o.collapse=!o.collapse},o.collapse);
-    row('START TOOL',toolName(),toolCycle,toolName()!=='NONE');
-    row('AIM GUIDE',GUIDES[o.guide==null?2:o.guide],()=>{o.guide=((o.guide==null?2:o.guide)+1)%3},(o.guide==null?2:o.guide)>0);
-    row('BURP CHARGE',o.burpCharge?'ON':'OFF',()=>{o.burpCharge=!o.burpCharge},o.burpCharge);
-    row('STOMACH NEVER BURSTS',o.noBurst?'ON':'OFF',()=>{o.noBurst=!o.noBurst},o.noBurst);
-    row('LANDLORDS FIGHT BACK',o.fight===false?'OFF':'ON',()=>{o.fight=o.fight===false?true:false},o.fight!==false);
+// The same four-page settings model drives both orientations. Every row is
+// one large tap target; the right-aligned value explains what tapping cycles.
+const SETTINGS_TABS=['GAMEPLAY','PERFORMANCE','AUDIO','SAVE DATA'];
+function settingsPage(){return Math.max(0,Math.min(3,WEB_UI.page.options|0))}
+function drawSettings(){
+  const portrait=isPortrait(),page=settingsPage(),o=OPT();
+  WEB_UI.page.options=page;
+  ctx.fillStyle='#111827';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#ffd23f';ctx.fillRect(0,0,W,5);
+  txt('OPTIONS',W/2,portrait?53:40,portrait?34:29,'#ffd23f','center');
+  btn(12,12,portrait?91:100,42,'< MENU',goMenu,{size:15});
+  const margin=portrait?16:28,gap=8,tabY=portrait?86:64,tabW=(W-2*margin-3*gap)/4;
+  for(let k=0;k<4;k++)btn(margin+k*(tabW+gap),tabY,tabW,44,SETTINGS_TABS[k],
+    ()=>{WEB_UI.page.options=k},{size:portrait?12:16,on:page===k,col:'#ffd23f'});
+  const cap=webRenderCap(o),scale=webRenderScale(o),budget=webFxBudget(o);
+  const tier=['QUALITY','BALANCED','LOW END'][webEffectiveTier(o)];
+  const shakeName=SHAKES.find(a=>a[1]===(o.shake==null?1:o.shake))?.[0]||'FULL';
+  const shakeCycle=()=>{const k=SHAKES.findIndex(a=>a[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(k+1)%SHAKES.length][1]};
+  const now=performance.now(),rows=[];
+  const add=(name,value,detail,fn,on=false)=>rows.push({name,value,detail,fn,on});
+  const toggle=(key)=>{o[key]=!o[key]};
+  if(page===0){
+    add('COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF','Fallen rubble stays loose and can topple.',()=>toggle('collapse'),!!o.collapse);
+    add('START TOOL',toolName(),'Choose your first power or air valve.',toolCycle,toolName()!=='NONE');
+    add('AIM GUIDE',GUIDES[o.guide==null?2:o.guide],'Preview your launch trajectory.',()=>{o.guide=((o.guide==null?2:o.guide)+1)%3},(o.guide==null?2:o.guide)>0);
+    add('BURP CHARGE',o.burpCharge?'ON':'OFF','Charge the soda-powered attack.',()=>toggle('burpCharge'),!!o.burpCharge);
+    add('NO STOMACH BURST',o.noBurst?'ON':'OFF','Cheat: disable over-inflation bursts.',()=>toggle('noBurst'),!!o.noBurst);
+    add('LANDLORD DEFENCE',o.fight===false?'OFF':'ON','Let landlords fight back.',()=>{o.fight=o.fight===false},o.fight!==false);
+  }else if(page===1){
+    add('PERFORMANCE PROFILE',webProfileLabel(o),'Auto adapts; Low End favors smooth play.',()=>cycleWebProfile(o),webProfile(o)!=='auto');
+    add('RENDER FRAME CAP',webCapLabel(o),'30 saves CPU; 60 feels smoother.',()=>cycleWebCap(o),!!o.renderCap);
+    add('RENDER RESOLUTION',webScaleLabel(o),'Lower pixels, same controls and camera.',()=>cycleWebScale(o),!!o.renderScale);
+    add('DECORATIVE EFFECTS',webFXLabel(o),'Fewer sparks and dust, same destruction.',()=>cycleWebFX(o),o.ecoFX===true);
+    add('SCREEN SHAKE',shakeName,'Reduce motion during impacts.',shakeCycle,shakeName!=='FULL');
+    add('FPS / SIM MONITOR',frameMeterVisible?'ON':'OFF','Show measured FPS and simulation speed.',()=>{frameMeterVisible=!frameMeterVisible;o.showPerf=frameMeterVisible},frameMeterVisible);
+  }else if(page===2){
+    const v=Math.round(optVol()*100);
+    add('MASTER SOUND',muted?'OFF':'ON','Music, voices and impact effects.',()=>{audioInit();setMuted(!muted)},!muted);
+    add('VOLUME UP',v+'%','Increase master volume by 10%.',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol()});
+    add('VOLUME DOWN',v+'%','Decrease master volume by 10%.',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol()});
   }else{
-    row('SOUND',muted?'OFF':'ON',()=>{audioInit();setMuted(!muted)},!muted);
-    const val=Math.round(optVol()*100);
-    row('VOLUME',val+'%',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol()},val>0);
-    row('VOLUME DOWN',val+'%',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol()},false);
-    row('SCREEN SHAKE',SHAKES.find(s=>s[1]===(o.shake==null?1:o.shake))?.[0]||'FULL',()=>{let i=SHAKES.findIndex(s=>s[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1]},(o.shake==null?1:o.shake)>0);
-    row('DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX},!webEcoFX);
-    if(y+rh<H-72)row('RESET OPTIONS','DEFAULT',()=>{if(performance.now()<armReset){optsReset();armReset=0}else armReset=performance.now()+3000},false);
-    if(y+rh<H-68)row('ERASE PROGRESS','CONFIRM',()=>{if(performance.now()<armProg){progReset();armProg=0}else armProg=performance.now()+3000},false);
+    const reset=now<armReset,erase=now<armProg;
+    add('RESET SETTINGS',reset?'CONFIRM':'DEFAULT','Restore settings; keep progress and levels.',()=>{if(reset){optsReset();armReset=0;toast('ach','Options reset','')}else{armReset=performance.now()+3000;armProg=0}},reset);
+    add('ERASE PROGRESS',erase?'CONFIRM':'RESET','Clear stars and unlocks; keep custom maps.',()=>{if(erase){progReset();armProg=0;toast('ach','Progress erased','')}else{armProg=performance.now()+3000;armReset=0}},erase);
   }
-  if(!page)txt('TNT CAN SURVIVE FALLS. HARD HITS LIGHT A FUSE.',W/2,H-95,13,'#ffe190','center');
-  if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{WEB_UI.page.options=1},{size:18});
-  else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{WEB_UI.page.options=0},{size:18});
+  const top=portrait?171:150,columns=portrait?1:2,rowGap=portrait?6:12;
+  const nRows=Math.ceil(rows.length/columns),foot=portrait?86:74;
+  const rh=Math.min(portrait?69:90,Math.floor((H-top-foot-(nRows-1)*rowGap)/Math.max(1,nRows)));
+  const rw=(W-2*margin-(columns-1)*gap)/columns;
+  txt(page===1?tier+'  /  '+cap+' FPS CAP  /  '+Math.round(scale*100)+'% PIXELS':page===0?'PLAY YOUR WAY':page===2?'SOUND & VOLUME':'YOUR SAVE FILE',
+    W/2,portrait?151:135,portrait?15:17,'#b7d5e9','center');
+  rows.forEach((row,k)=>{
+    const x=margin+(k%columns)*(rw+gap),y=top+Math.floor(k/columns)*(rh+rowGap);
+    btn(x,y,rw,rh,'',()=>{row.fn();pdTouch();pdSave();SFX.pop()},{on:false});
+    const valW=portrait?142:133;
+    ctx.fillStyle=row.on?'#285c58':'#293548';ctx.fillRect(x+rw-valW-9,y+8,valW,rh-16);
+    txt(row.name,x+12,y+Math.min(23,rh*.34),portrait?16:17,'#fff','left');
+    txt(row.detail,x+12,y+rh-12,portrait?12:12,'#b7c5d8','left');
+    txt(row.value,x+rw-valW/2-9,y+rh/2+5,portrait?16:15,row.on?'#baf6ce':'#ffe090','center');
+  });
+  if(page===1){
+    txt('Physics target: 60 updates/sec. Effects budget: '+budget+'.',W/2,H-49,portrait?14:15,'#b7d5e9','center');
+    txt('If gameplay slows, try LOW END or 60% resolution.',W/2,H-26,portrait?13:14,'#cfd','center');
+  }else if(page===3){
+    txt('Custom creator levels are preserved.',W/2,H-38,15,'#cfd','center');
+    txt('Destructive actions require a second tap within 3 seconds.',W/2,H-16,12,'#b7c5d8','center');
+  }else txt(page===0?'TNT: soft falls can survive; hard impacts may light a fuse.':'Changes are saved automatically.',W/2,H-29,portrait?13:15,'#cfd','center');
 }
+function drawMobileOptions(){drawSettings()}
 /* Portrait creator: a genuine 120-column editing surface with horizontal
    panning, unclipped world-cell touch mapping and a separate tool/action tray.
    No copy of E.g, no second offscreen canvas and no changed save encoding. */
@@ -5518,42 +5559,9 @@ function drawMenu(){
 let sliderDrag=false,sliX=0,sliW=1,armReset=0,armProg=0;
 function setVolFromX(x){const o=OPT();o.vol=clamp(Math.round((x-sliX)/sliW*20)/20,0,1);applyVol();pdTouch()}
 const GUIDES=['OFF','SHORT','FULL'],SHAKES=[['OFF',0],['LOW',.5],['FULL',1]];
-function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX'])delete o[k];o.tool='none';muted=false;webEcoFX=false;applyVol();pdTouch();pdSave()}
+function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX','performance','renderCap','renderScale','showPerf'])delete o[k];o.tool='none';muted=false;webEcoFX=false;frameMeterVisible=false;webPerfBad=webPerfGood=0;applyVol();pdTouch();pdSave()}
 function progReset(){PD.stars={};PD.best={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
-function drawOptions(){
-  ctx.fillStyle='rgba(10,14,30,.62)';ctx.fillRect(0,0,W,H);
-  txt('OPTIONS',W/2,56,40,'#ffd23f','center','#7a1a1a');btn(16,14,90,36,'< MENU',goMenu,{size:16});
-  const o=OPT(),now=performance.now(),cw=430,lx=40,rx=W-40-cw,rh=46,gap=8;let y=98,ry=98;
-  const head=(x,yy,t)=>{txt(t,x+cw/2,yy+14,15,'#ffb03a','center','#5a2a00')};
-  const row=(x,yy,label,val,fn,col,on)=>{btn(x,yy,cw,rh,label+(val!=null?':  '+val:''),fn,{size:17,on:on,col:col||'#7dff5a'})};
-  // ---- left: gameplay ----
-  head(lx,y,'GAMEPLAY');y+=26;
-  row(lx,y,'COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',()=>{o.collapse=!o.collapse;pdTouch();pdSave();SFX.pop()},null,!!o.collapse);y+=rh+2;
-  txt(o.collapse?'Rubble can topple. TNT: soft falls safe; hard hits may light a fuse.':'Rubble settles and locks. TNT can survive a soft landing.',lx+cw/2,y+12,13,'#cfd','center');y+=gap+14;
-  row(lx,y,'START TOOL',toolName(),()=>{toolCycle();pdTouch();pdSave();SFX.pop()},'#ffd23f',true);y+=rh+gap;
-  row(lx,y,'AIM GUIDE (DOTS)',GUIDES[o.guide==null?2:o.guide],()=>{o.guide=((o.guide==null?2:o.guide)+1)%3;pdTouch();pdSave();SFX.pop()},'#9fd8ff',(o.guide==null?2:o.guide)>0);y+=rh+gap;
-  row(lx,y,'BURP CHARGE',o.burpCharge?'ON':'OFF',()=>{o.burpCharge=!o.burpCharge;pdTouch();pdSave();SFX.pop()},null,!!o.burpCharge);y+=rh+gap;
-  row(lx,y,'CHEAT: STOMACH NEVER BURSTS',o.noBurst?'ON':'OFF',()=>{o.noBurst=!o.noBurst;pdTouch();pdSave();SFX.pop()},'#ff9ec8',!!o.noBurst);y+=rh+gap;
-  row(lx,y,'LANDLORDS FIGHT BACK',o.fight===false?'OFF':'ON',()=>{o.fight=o.fight===false?true:false;pdTouch();pdSave();SFX.pop()},'#ffb03a',o.fight!==false);
-  // ---- right: sound & screen ----
-  head(rx,ry,'SOUND & SCREEN');ry+=26;
-  row(rx,ry,'SOUND',muted?'OFF':'ON',()=>{audioInit();setMuted(!muted);if(!muted)SFX.boing()},null,!muted);ry+=rh+gap;
-  // volume slider: a track you can drag, with - / + buttons
-  const v=optVol(),bw2=40;sliX=rx+bw2+14;sliW=cw-2*(bw2+14);
-  txt('VOLUME  '+Math.round(v*100)+'%',rx+cw/2,ry+11,14,muted?'#889':'#fff','center');
-  const ty=ry+rh-14;ctx.save();ctx.globalAlpha=muted?.45:1;ctx.fillStyle='rgba(15,18,30,.85)';rrect(sliX,ty-5,sliW,10,5);ctx.fill();ctx.fillStyle='#7dff5a';rrect(sliX,ty-5,Math.max(10,sliW*v),10,5);ctx.fill();
-  ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sliX+sliW*v,ty,11,0,7);ctx.fill();ctx.stroke();ctx.restore();
-  hits.push({x:sliX-12,y:ry+14,w:sliW+24,h:rh-10,fn:()=>{audioInit();sliderDrag=true;setVolFromX(mouseX)}});
-  btn(rx,ry+8,bw2,rh-8,'-',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol();pdTouch();pdSave();SFX.boing()},{size:22});
-  btn(rx+cw-bw2,ry+8,bw2,rh-8,'+',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol();pdTouch();pdSave();SFX.boing()},{size:22});
-  ry+=rh+gap+4;
-  row(rx,ry,'SCREEN SHAKE',(SHAKES.find(a=>a[1]===(o.shake==null?1:o.shake))||SHAKES[2])[0],()=>{const i=SHAKES.findIndex(a=>a[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1];shake=Math.max(shake,8);pdTouch();pdSave();SFX.pop()},'#9fd8ff',(o.shake==null?1:o.shake)>0);ry+=rh+gap;
-  row(rx,ry,'DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX;pdTouch();pdSave();SFX.pop()},'#9fd8ff',!webEcoFX);ry+=rh+gap+10;
-  head(rx,ry,'DATA');ry+=26;
-  const a1=now<armReset,a2=now<armProg;
-  btn(rx,ry,cw,rh-6,a1?'TAP AGAIN: RESET ALL OPTIONS':'RESET OPTIONS TO DEFAULT',()=>{if(a1){optsReset();armReset=0;toast('ach','Options reset','')}else{armReset=performance.now()+3000;armProg=0}},{size:15,on:a1,col:'#ffb03a'});ry+=rh-6+gap;
-  btn(rx,ry,cw,rh-6,a2?'TAP AGAIN: ERASE STARS, ACHIEVEMENTS, OUTFITS':'RESET PROGRESS',()=>{if(a2){progReset();armProg=0;toast('ach','Progress erased','')}else{armProg=performance.now()+3000;armReset=0}},{size:15,on:a2,col:'#ff5a5a'});
-  txt('Levels you made in the creator are never erased.   Esc = back,  M = mute',W/2,H-14,13,'#cfd','center')}
+function drawOptions(){drawSettings()}
 function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
   hits.push({x,y,w,h,fn:locked?()=>SFX.pop():fn});const hov=mouseX>=x&&mouseX<x+w&&mouseY>=y&&mouseY<y+h;
   ctx.save();rrect(x,y,w,h,10);ctx.fillStyle=locked?'rgba(30,34,48,.8)':hov?'rgba(255,255,255,.3)':'rgba(15,18,30,.78)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=hov&&!locked?'#fff':'rgba(255,255,255,.3)';ctx.stroke();
@@ -5970,10 +5978,10 @@ setInterval(()=>{if(pdDirty)pdSave();if(state==='play'||state==='win')achCheck()
 buildSprites();buildBG();
 // Same measured definitions as the console HUDs: submitted images per real
 // second vs physics update calls per real second. F3 turns the overlay on.
-let frameMeterVisible=false,frameMeterClock=0,frameMeterDraws=0,frameMeterSims=0,frameMeterGameTime=0;
+let frameMeterVisible=!!OPT().showPerf,frameMeterClock=0,frameMeterDraws=0,frameMeterSims=0,frameMeterGameTime=0;
 let frameMeterFps=0,frameMeterSps=0,frameMeterSpeed=0;
 addEventListener('keydown',e=>{
-  if(e.code==='F3'&&!e.repeat){frameMeterVisible=!frameMeterVisible;e.preventDefault()}
+  if(e.code==='F3'&&!e.repeat){frameMeterVisible=!frameMeterVisible;OPT().showPerf=frameMeterVisible;pdTouch();pdSave();e.preventDefault()}
   if(e.code==='F4'&&!e.repeat){cycleWebFX(OPT());pdTouch();pdSave();e.preventDefault()}
 });
 function drawFrameMeter(){
