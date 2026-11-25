@@ -1183,6 +1183,29 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
   }
 }
 
+/* Pair/static penetration correction moves the chunk centre at the end of
+   the solver, after its cell positions were cached. Refresh only translated
+   bodies once per GAME update (not each substep), before TNT/HUD/rendering.
+   Reusing the first live cell recovers the accumulated shift even if a
+   body has gone to sleep. No extra per-cell rotation or buffer is needed. */
+static void sync_chunk_poses(MxWorld *w){
+  for(int c=0;c<MX_MAX_CHUNKS;c++){
+    MxChunk *ch=&w->chunks[c];
+    if(!ch->active)continue;
+    int k=0;
+    while(k<ch->count&&ch->cells[k].dead)k++;
+    if(k==ch->count)continue;
+    MxCell *a=&ch->cells[k];
+    real dx=ch->x+rmul(ch->cs,a->lx)-rmul(ch->sn,a->ly)-a->wx;
+    real dy=ch->y+rmul(ch->sn,a->lx)+rmul(ch->cs,a->ly)-a->wy;
+    if(!dx&&!dy)continue;
+    for(;k<ch->count;k++){
+      a=&ch->cells[k];
+      if(!a->dead){a->wx+=dx;a->wy+=dy;}
+    }
+  }
+}
+
 static const int8_t OFFS[9][2] = {{0,0},{0,-1},{-1,0},{1,0},{0,-2},{-1,-1},{1,-1},{-2,0},{2,0}};
 static void settle(MxWorld *w, MxChunk *ch, int keep_upright){
   real ang = keep_upright ? 0 : ch->ang, half = R(1.5708);
@@ -2965,6 +2988,7 @@ void mx_update(MxWorld *w, real dt){
 #endif
     step_chunks(w, sdt);
   }
+  sync_chunk_poses(w);
   update_moving_tnt(w);
   process_expl(w); /* collisions can light TNT AFTER the initial explosion pass */
   clean_chunks(w, dt);
