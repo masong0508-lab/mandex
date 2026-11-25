@@ -1099,6 +1099,19 @@ function stepChunks(dt){
   for(let i=0,n=Math.min(bucketCount,CHUNK_BUCKET_CACHE_MAX);i<n;i++)CHUNK_BUCKET_POOL[i].length=0;
   map.clear();
 }
+// Match the visible rotated slab and its world-space hitboxes after the
+// final penetration correction, before moving TNT is tested. Translate
+// cached cells only when needed; never redo their per-cell rotation.
+function syncChunkPoses(){
+  for(const ch of chunks){
+    let k=0;while(k<ch.cells.length&&ch.cells[k].dead)k++;
+    if(k===ch.cells.length)continue;
+    const a=ch.cells[k],dx=ch.x+ch.cs*a.lx-ch.sn*a.ly-a.wx,
+                        dy=ch.y+ch.sn*a.lx+ch.cs*a.ly-a.wy;
+    if(!dx&&!dy)continue;
+    for(;k<ch.cells.length;k++){const cell=ch.cells[k];if(!cell.dead){cell.wx+=dx;cell.wy+=dy}}
+  }
+}
 function cleanChunks(dt){
   for(let k=chunks.length-1;k>=0;k--){const ch=chunks[k];let lost=false;
     for(const a of ch.cells)if(a.dead){lost=true;score+=5}
@@ -1934,6 +1947,7 @@ function update(dt){
   if(needSupport)supportPass();
   for(const ch of chunks)if(ch.hasTnt){ch.tntImpact=0;ch.tntHit=null}
   for(let i=0;i<6;i++)stepChunks(dt/6);
+  syncChunkPoses();
   updateMovingTnt();
   processExpl(); // process detonations caused by late rubble contacts this frame
   cleanChunks(dt);
