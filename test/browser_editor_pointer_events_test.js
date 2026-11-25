@@ -16,7 +16,7 @@ const editor=new Function(`
  const cv={addEventListener(n,fn){(events[n]||=[]).push(fn)},
            setPointerCapture(id){captures.push(id)}};
  let mouseX=0,mouseY=0,dragging=false,sliderDrag=false,sodaHold=false,state='edit',
-     portrait=false;
+     portrait=false,powerPickerOpen=false;
  const WEB_UI={gesture:null,editorHeight:480},TID={},man=null;
  const E={drag:null,pointer:null,starters:false};
  const audioInit=()=>{},gagReset=()=>{},pt=e=>[e.x,e.y],
