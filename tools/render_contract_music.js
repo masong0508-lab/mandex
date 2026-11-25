@@ -1,0 +1,628 @@
+/* Original, deterministic Mandex contract music. Run node tools/render_contract_music.js
+ * to regenerate the optional PCM loops. No external samples or dependencies. */
+'use strict';
+const SONGS=[
+  {
+    "id": "permit-panic",
+    "name": "Permit Panic",
+    "bpm": 144,
+    "root": 50,
+    "mode": "dorian",
+    "prog": [
+      0,
+      0,
+      3,
+      4,
+      0,
+      5,
+      3,
+      4,
+      2,
+      5,
+      0,
+      4,
+      3,
+      2,
+      5,
+      0
+    ],
+    "leads": [
+      [
+        7,
+        -1,
+        10,
+        9,
+        7,
+        5,
+        -1,
+        3
+      ],
+      [
+        5,
+        7,
+        -1,
+        10,
+        9,
+        7,
+        3,
+        -1
+      ],
+      [
+        10,
+        12,
+        10,
+        -1,
+        8,
+        7,
+        5,
+        -1
+      ],
+      [
+        9,
+        7,
+        5,
+        3,
+        -1,
+        5,
+        7,
+        -1
+      ],
+      [
+        7,
+        7,
+        9,
+        10,
+        -1,
+        12,
+        10,
+        9
+      ],
+      [
+        5,
+        -1,
+        7,
+        5,
+        3,
+        -1,
+        2,
+        3
+      ],
+      [
+        8,
+        10,
+        12,
+        10,
+        8,
+        7,
+        -1,
+        5
+      ],
+      [
+        9,
+        7,
+        -1,
+        5,
+        3,
+        2,
+        0,
+        -1
+      ],
+      [
+        4,
+        -1,
+        7,
+        9,
+        11,
+        9,
+        7,
+        -1
+      ],
+      [
+        5,
+        7,
+        8,
+        12,
+        10,
+        8,
+        -1,
+        7
+      ],
+      [
+        3,
+        5,
+        7,
+        -1,
+        10,
+        9,
+        7,
+        5
+      ],
+      [
+        9,
+        12,
+        9,
+        7,
+        -1,
+        5,
+        7,
+        -1
+      ],
+      [
+        10,
+        12,
+        15,
+        12,
+        10,
+        8,
+        7,
+        5
+      ],
+      [
+        9,
+        7,
+        4,
+        2,
+        -1,
+        4,
+        7,
+        9
+      ],
+      [
+        8,
+        7,
+        5,
+        3,
+        5,
+        7,
+        8,
+        -1
+      ],
+      [
+        7,
+        5,
+        3,
+        2,
+        0,
+        -1,
+        0,
+        -1
+      ]
+    ],
+    "swing": 0.09,
+    "style": 0
+  },
+  {
+    "id": "concrete-shuffle",
+    "name": "Concrete Shuffle",
+    "bpm": 128,
+    "root": 45,
+    "mode": "minor",
+    "prog": [
+      0,
+      5,
+      3,
+      4,
+      0,
+      3,
+      5,
+      4,
+      3,
+      3,
+      5,
+      6,
+      0,
+      5,
+      4,
+      0
+    ],
+    "leads": [
+      [
+        12,
+        -1,
+        10,
+        7,
+        -1,
+        3,
+        5,
+        7
+      ],
+      [
+        8,
+        10,
+        -1,
+        12,
+        10,
+        8,
+        5,
+        -1
+      ],
+      [
+        7,
+        -1,
+        5,
+        3,
+        5,
+        7,
+        10,
+        -1
+      ],
+      [
+        9,
+        7,
+        5,
+        2,
+        4,
+        5,
+        7,
+        -1
+      ],
+      [
+        12,
+        10,
+        7,
+        5,
+        -1,
+        3,
+        5,
+        7
+      ],
+      [
+        3,
+        7,
+        10,
+        12,
+        10,
+        7,
+        5,
+        3
+      ],
+      [
+        8,
+        10,
+        12,
+        -1,
+        15,
+        12,
+        10,
+        8
+      ],
+      [
+        7,
+        5,
+        4,
+        2,
+        -1,
+        5,
+        7,
+        9
+      ],
+      [
+        15,
+        12,
+        10,
+        7,
+        10,
+        12,
+        -1,
+        15
+      ],
+      [
+        10,
+        7,
+        5,
+        3,
+        -1,
+        7,
+        10,
+        12
+      ],
+      [
+        8,
+        12,
+        15,
+        12,
+        8,
+        5,
+        -1,
+        7
+      ],
+      [
+        10,
+        14,
+        17,
+        14,
+        10,
+        7,
+        5,
+        -1
+      ],
+      [
+        12,
+        10,
+        7,
+        3,
+        5,
+        7,
+        10,
+        12
+      ],
+      [
+        8,
+        5,
+        3,
+        5,
+        8,
+        10,
+        12,
+        -1
+      ],
+      [
+        9,
+        7,
+        5,
+        4,
+        2,
+        4,
+        5,
+        7
+      ],
+      [
+        12,
+        7,
+        3,
+        0,
+        3,
+        5,
+        0,
+        -1
+      ]
+    ],
+    "swing": 0.18,
+    "style": 1
+  },
+  {
+    "id": "final-notice-funk",
+    "name": "Final Notice Funk",
+    "bpm": 160,
+    "root": 48,
+    "mode": "minor",
+    "prog": [
+      0,
+      3,
+      0,
+      4,
+      5,
+      3,
+      4,
+      0,
+      0,
+      6,
+      5,
+      4,
+      3,
+      5,
+      4,
+      0
+    ],
+    "leads": [
+      [
+        0,
+        7,
+        -1,
+        12,
+        10,
+        7,
+        3,
+        -1
+      ],
+      [
+        7,
+        10,
+        12,
+        -1,
+        15,
+        12,
+        10,
+        7
+      ],
+      [
+        3,
+        5,
+        7,
+        10,
+        7,
+        5,
+        -1,
+        3
+      ],
+      [
+        9,
+        12,
+        14,
+        12,
+        9,
+        7,
+        5,
+        -1
+      ],
+      [
+        8,
+        12,
+        15,
+        12,
+        -1,
+        8,
+        5,
+        7
+      ],
+      [
+        10,
+        7,
+        5,
+        3,
+        7,
+        10,
+        12,
+        -1
+      ],
+      [
+        9,
+        7,
+        5,
+        2,
+        5,
+        7,
+        9,
+        12
+      ],
+      [
+        12,
+        10,
+        7,
+        5,
+        3,
+        2,
+        0,
+        -1
+      ],
+      [
+        12,
+        15,
+        19,
+        15,
+        12,
+        10,
+        7,
+        -1
+      ],
+      [
+        14,
+        17,
+        19,
+        17,
+        14,
+        10,
+        7,
+        10
+      ],
+      [
+        15,
+        12,
+        8,
+        5,
+        8,
+        12,
+        15,
+        -1
+      ],
+      [
+        14,
+        12,
+        9,
+        7,
+        5,
+        2,
+        5,
+        7
+      ],
+      [
+        15,
+        12,
+        10,
+        7,
+        10,
+        12,
+        15,
+        17
+      ],
+      [
+        12,
+        15,
+        20,
+        17,
+        15,
+        12,
+        8,
+        5
+      ],
+      [
+        14,
+        12,
+        9,
+        7,
+        5,
+        7,
+        9,
+        12
+      ],
+      [
+        12,
+        7,
+        3,
+        0,
+        3,
+        2,
+        0,
+        -1
+      ]
+    ],
+    "swing": 0.04,
+    "style": 2
+  }
+];
+function renderSong(song){
+ const sr=22050,beat=60/song.bpm,bars=16,seconds=bars*beat*4,N=Math.round(seconds*sr),mix=new Float32Array(N);
+ let seed=(song.root*1234567+song.bpm*31337)>>>0;
+ const noise=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296)*2-1;
+ const TAU=2*Math.PI,scale=song.mode==="dorian"?[0,2,3,5,7,9,10]:[0,2,3,5,7,8,10];
+ const midi=note=>440*Math.pow(2,(note-69)/12);
+ const deg=k=>scale[((k%7)+7)%7]+12*Math.floor(k/7);
+ function place(start,dur,fn){const n=Math.floor(start*sr),len=Math.min(Math.floor(dur*sr),N-n);for(let i=0;i<len;i++)mix[n+i]+=fn(i/sr,i,len)}
+ function note(start,dur,pitch,amp,type){
+  const f=midi(pitch);place(start,dur,(t,i,len)=>{
+    const a=Math.min(1,t/.007),r=Math.min(1,(len-i)/(sr*.035)),p=TAU*f*t;
+    let v,e;
+    if(type===0){v=.71*Math.sin(p)+.19*Math.sin(p*2)+.08*Math.sin(p*3)+.03*Math.sin(p*5);e=Math.exp(-t*3.8)}
+    else if(type===1){v=.59*Math.sin(p)+.29*Math.sin(p*2+Math.sin(p)*.6)+.08*Math.sin(p*4);e=Math.exp(-t*5.5)}
+    else if(type===2){v=.56*Math.sin(p+.9*Math.exp(-t*5)*Math.sin(p*2))+.22*Math.sin(p*2)+.1*Math.sin(p*3);e=Math.exp(-t*4)}
+    else{v=.49*Math.sin(p)+.20*Math.sin(p*2+.08)+.11*Math.sin(p*3)+.07*Math.sin(p*4)+.07*Math.sin(p*1.003);e=Math.exp(-t*1.6)}
+    return amp*a*r*e*v;
+  })
+ }
+ function drum(start,type,amp){
+  if(type===0){place(start,.24,t=>{const p=TAU*(49*t+7.7*(1-Math.exp(-t*17)));return amp*Math.sin(p)*Math.exp(-t*18)*Math.min(1,t/.003)})}
+  else if(type===1){let last=0;place(start,.20,t=>{let n=noise(),v=n-last;last=n;return amp*(v*.46*Math.exp(-t*19)+Math.sin(TAU*174*t)*.38*Math.exp(-t*32))*Math.min(1,t/.002)})}
+  else{let last=0;place(start,type===3?.17:.065,t=>{let n=noise(),v=n-last;last=n;return amp*(v*.48+Math.sin(TAU*6340*t)*.09)*Math.exp(-t*(type===3?25:70))*Math.min(1,t/.002)})}
+ }
+ for(let b=0;b<bars;b++){
+  const base=b*4*beat,d=song.prog[b],root=song.root+deg(d);
+  const chord=[root, song.root+deg(d+2),song.root+deg(d+4),song.root+deg(d+6)];
+  const bassPattern=song.style===0?[0,0,7,12,0,3,7,10]:song.style===1?[0,-1,7,0,12,7,-1,3]:[0,0,12,7,0,7,10,12];
+  for(let k=0;k<8;k++){
+    const t=base+(k*.5+(k&1?song.swing:0))*beat;
+    const bp=bassPattern[k];if(bp>=0){const f=bp===3?chord[1]-root:bp===10?chord[3]-root:bp;note(t,beat*(k===7?.37:.42),root-12+f,.20,0)}
+    const lead=song.leads[b][k];
+    if(lead>=0){const high=song.root+12+lead;note(t,beat*.44,high,(b>=8?.128:.115),song.style===1?2:1);
+      if(b>=12&&k%2===0)note(t+beat*.012,beat*.32,high-12,.038,2)}
+    drum(t,2,k%2?.038:.026);
+    if((song.style===0&&[0,3,4,6].includes(k))||(song.style===1&&[0,4,7].includes(k))||(song.style===2&&[0,2,4,5,7].includes(k)))drum(t,0,.32);
+    if(k===2||k===6)drum(t,1,.21);
+    if((b===3||b===7||b===11||b===15)&&k===7)drum(t+beat*.19,1,.13);
+    if(k===7&&b%2===0)drum(t,3,.042);
+  }
+  const stabs=song.style===0?[.5,1.5,2.5,3.5]:song.style===1?[.75,2,3.25]:[0,1.5,2.5,3.5];
+  for(const t of stabs)for(let j=1;j<chord.length;j++)note(base+t*beat,beat*(song.style===1?.72:.39),chord[j]+12,.036,3);
+  if(b>=8&&b<12){
+    for(let k=0;k<4;k++)note(base+k*beat+.24*beat,beat*.64,chord[k%3]+12,.055,2);
+  }
+ }
+ let peak=0,sum=0;for(let i=0;i<N;i++){const fade=Math.min(1,i/(sr*.008),(N-1-i)/(sr*.02));mix[i]=Math.tanh(mix[i]*1.6)*fade;peak=Math.max(peak,Math.abs(mix[i]));sum+=mix[i]*mix[i]}
+ const wave=new Uint8Array(44+N*2),v=new DataView(wave.buffer);
+ const ascii=(offset,s)=>{for(let i=0;i<s.length;i++)wave[offset+i]=s.charCodeAt(i)};
+ ascii(0,"RIFF");v.setUint32(4,wave.length-8,true);ascii(8,"WAVEfmt ");v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ascii(36,"data");v.setUint32(40,N*2,true);
+ const gain=.84/(peak||1);for(let i=0;i<N;i++)v.setInt16(44+2*i,Math.round(mix[i]*gain*32767),true);
+ return {wave,seconds:N/sr,peak:.84,rms:Math.sqrt(sum/N)*gain};
+}
+const fs=require('fs'),path=require('path'),dir=path.join(__dirname,'../web/audio');
+fs.mkdirSync(dir,{recursive:true});
+for(const song of SONGS){const a=renderSong(song);fs.writeFileSync(path.join(dir,song.id+'.wav'),a.wave);console.log(song.name,a.wave.length,a.seconds.toFixed(2)+'s',a.rms.toFixed(3)+' RMS')}

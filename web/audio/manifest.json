@@ -1,0 +1,39 @@
+{
+  "format": "PCM WAV 16-bit mono",
+  "original": true,
+  "tracks": [
+    {
+      "id": "permit-panic",
+      "title": "Permit Panic",
+      "bytes": 1176044,
+      "durationSeconds": 26.666666666666668,
+      "bpm": 144,
+      "rate": 22050,
+      "channels": 1,
+      "peak": 0.84,
+      "rms": 0.15537508468580108
+    },
+    {
+      "id": "concrete-shuffle",
+      "title": "Concrete Shuffle",
+      "bytes": 1323044,
+      "durationSeconds": 30,
+      "bpm": 128,
+      "rate": 22050,
+      "channels": 1,
+      "peak": 0.84,
+      "rms": 0.1507121871234756
+    },
+    {
+      "id": "final-notice-funk",
+      "title": "Final Notice Funk",
+      "bytes": 1058444,
+      "durationSeconds": 24,
+      "bpm": 160,
+      "rate": 22050,
+      "channels": 1,
+      "peak": 0.84,
+      "rms": 0.1671456132070503
+    }
+  ]
+}
