@@ -16,7 +16,7 @@ const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const V=8,ROWS=60,GY=ROWS*V,G=900,K=1100,RC=V*.5;let COLS=120;   // COLS: 120 for every level except the wide finale (see setWorld)
 let W=960,H=540,WW=960;const WH=540;   // W,H = the screen (960x540, or a tall 540xN in portrait play); WW,WH = the world (WW = COLS*V: 960, or 2880 for the wide finale)
 let SX=128,SY=GY-118,VX=36,VY=SY+58;const PULL=92,VGRAB=40,VKEEP=44,VPULL=76;   // VX,VY: the air valve, tucked in the far lower-left corner: a full pull-back stops ~15px short of it
-let pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1}};
+let pw={sel:null,tool:'none',left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1,breaker:1}};
 const DX=[1,-1,0,0],DY=[0,0,1,-1];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v,rnd=Math.random;
 const idx=(x,y)=>y*COLS+x,inb=(x,y)=>x>=0&&x<COLS&&y>=0&&y<ROWS;
@@ -49,11 +49,13 @@ let combo=0,comboPeak=0,comboLeft=0,bankLeft=0;  // streak and optional rubber b
 //  AUDIO (tiny synth)
 // =====================================================================
 let AC=null,master=null,muted=false;const lastSnd={};
+let contractAudio=null,contractAudioKey='',contractAudioState='idle';
+const CONTRACT_TRACKS=['permit-panic','concrete-shuffle','final-notice-funk','overtime-drive','night-shift-shuffle','crown-finale'];
 function optVol(){const v=OPT().vol;return v==null?1:v}   // OPTIONS: master volume 0..1
-function applyVol(){if(master)master.gain.value=.55*optVol()}
-function setMuted(b){muted=!!b;OPT().muted=muted;pdTouch();pdSave()}
+function applyVol(){if(master)master.gain.value=.55*optVol();if(contractAudio)contractAudio.volume=contractVolume()}
+function setMuted(b){muted=!!b;OPT().muted=muted;if(muted)stopContractAudio();pdTouch();pdSave()}
 const shakeScale=()=>{const v=OPT().shake;return v==null?1:v};   // OPTIONS: screen shake 0 / .5 / 1
-function audioInit(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.55*optVol();master.connect(AC.destination);setTimeout(crackLoad,0)}catch(e){AC=null}}
+function audioInit(){if(AC){if(AC.state==='suspended')AC.resume().catch(()=>{});return}try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.55*optVol();master.connect(AC.destination);setTimeout(crackLoad,0)}catch(e){AC=null}}
 function can(k,ms){const n=performance.now();if(lastSnd[k]&&n-lastSnd[k]<ms)return false;lastSnd[k]=n;return true}
 // ---- music: the same 8-bar theme as the consoles (A minor, melody + bass, plucked decay), scheduled ahead on the WebAudio clock
 const MUS_T=[12,-1,15,-1,19,-1,17,15, 17,-1,15,-1,12,-1,-1,-1, 15,-1,19,-1,22,-1,19,15, 17,-1,14,-1,10,-1,-1,-1, 12,-1,15,-1,19,-1,20,19, 17,-1,20,-1,24,-1,20,17, 22,-1,19,-1,17,-1,14,-1, 12,-1,15,-1,12,-1,-1,-1];
@@ -66,9 +68,53 @@ function musPump(){if(!musOn||!AC)return;if(document.hidden||musNext<AC.currentT
     if(n>=0){let k=1;while(musStep+k<64&&MUS_T[musStep+k]<0)k++;musNote(220*Math.pow(2,n/12),musNext,k*MUS_STEP,.2)}
     if((musStep&3)===0)musNote(MUS_B[musStep>>3][(musStep>>2)&1],musNext,4*MUS_STEP,.17);
     musNext+=MUS_STEP;musStep=(musStep+1)%64}}
-function musUpdate(){const want=!!AC&&!muted&&state==='play';
-  if(want&&!musOn){musOn=true;musStep=0;musNext=AC.currentTime+.1;musTimer=setInterval(musPump,80);musPump()}
-  else if(!want&&musOn){musOn=false;clearInterval(musTimer)}}
+// Optional authored soundtrack: one lazily streamed HTML media element.
+ // Missing files, disabled recording, blocked autoplay, or standalone HTML
+ // automatically use the original low-memory oscillator score instead.
+function contractVolume(){return Math.max(0,Math.min(1,.70*optVol()))}
+function contractTrack(l){
+  if(l<60||l>=84)return '';
+  return CONTRACT_TRACKS[l<66?0:l<72?1:l<76?2:l<79?3:l<82?4:5];
+}
+function disposeContractAudio(a){
+  if(!a)return;
+  try{a.pause();a.removeAttribute('src');a.load()}catch(_){}
+}
+function stopContractAudio(){
+  const a=contractAudio;contractAudio=null;contractAudioKey='';contractAudioState='idle';
+  disposeContractAudio(a);
+}
+function syncContractMusic(want){
+  const key=want&&typeof Audio==='function'&&OPT().contractMusic!==false?contractTrack(level):'';
+  if(!key){if(contractAudioKey)stopContractAudio();return false}
+  if(key!==contractAudioKey){
+    stopContractAudio();contractAudioKey=key;contractAudioState='loading';
+    let a;
+    function fail(){
+      if(contractAudio!==a||contractAudioKey!==key)return;
+      contractAudio=null;contractAudioState='fallback';disposeContractAudio(a);
+    }
+    try{
+      a=new Audio();contractAudio=a;
+      a.preload='none';a.loop=true;a.volume=contractVolume();
+      a.addEventListener('error',fail,{once:true});
+      a.src='audio/'+key+'.wav';
+      const started=a.play();
+      if(started&&typeof started.then==='function')started.then(()=>{
+        if(contractAudio===a&&contractAudioKey===key)contractAudioState='playing';
+      },fail);
+      else contractAudioState='playing';
+    }catch(e){if(a)fail();else contractAudioState='fallback'}
+  }
+  return contractAudioState==='playing';
+}
+function musUpdate(){
+  const want=!!AC&&!muted&&!document.hidden&&state==='play';
+  const synth=want&&!syncContractMusic(want);
+  if(!want)syncContractMusic(false);
+  if(synth&&!musOn){musOn=true;musStep=0;musNext=AC.currentTime+.1;musTimer=setInterval(musPump,80);musPump()}
+  else if(!synth&&musOn){musOn=false;clearInterval(musTimer)}
+}
 function noise(dur,f0,f1,g,type){if(!AC||muted)return;const n=(AC.sampleRate*dur)|0,b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);
   for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);const s=AC.createBufferSource();s.buffer=b;const f=AC.createBiquadFilter();f.type=type||'lowpass';
   f.frequency.setValueAtTime(f0,AC.currentTime);f.frequency.exponentialRampToValueAtTime(Math.max(30,f1),AC.currentTime+dur);
@@ -195,7 +241,15 @@ const clouds=[{x:100,y:70,s:1,v:6},{x:430,y:48,s:.8,v:4},{x:660,y:110,s:1.1,v:8}
 //  WORLD BUILDING
 // =====================================================================
 function set(x,y,m){if(!inb(x,y))return;const i=idx(x,y);grid[i]=m;hp[i]=m?MAT[m].hp:0;anch[i]=0}
-function rect(x,y,w,h,m){for(let j=0;j<h;j++)for(let i=0;i<w;i++)set(x+i,y+j,m)}
+function rect(x,y,w,h,m){
+  if(!Number.isInteger(x)||!Number.isInteger(y)||!Number.isInteger(w)||!Number.isInteger(h)||!grid.fill||!hp.fill||!anch.fill){
+    for(let j=0;j<h;j++)for(let i=0;i<w;i++)set(x+i,y+j,m);return;
+  }
+  const x0=Math.max(0,x),x1=Math.min(COLS,x+w),y0=Math.max(0,y),y1=Math.min(ROWS,y+h);
+  if(x0>=x1||y0>=y1)return;
+  const v=m?MAT[m].hp:0;
+  for(let j=y0;j<y1;j++){const a=idx(x0,j),b=a+x1-x0;grid.fill(m,a,b);hp.fill(v,a,b);anch.fill(0,a,b)}
+}
 function house(o){
   // wt = wall thickness (cells), ft = thickness of the upper floor slabs (they grow DOWN so floor tops stay put), fh = floor height
   const{x,w,floors,fh=9,wt=1,ft=1,wall,floor,roof,gable,paper='#e8d3a8',crenel,g=ROWS-1}=o,top=g+1-(floors*fh+1);
@@ -590,7 +644,33 @@ const EARLY_TACTICS=[
 ];
 for(let i=0;i<EARLY_TACTICS.length;i++)
   if(!LEVELS[i].tip)LEVELS[i].tip=EARLY_TACTICS[i];
-const chEnd=l=>l<CH1?CH1:l<CH2?CH2:LEVELS.length;   // the last level of the chapter that level l belongs to
+const chEnd=l=>l<CH1?CH1:l<CH2?CH2:l<CH3_END?CH3_END:LEVELS.length;
+const CH3_END=LEVELS.length;
+// Generated from content/demolition_contracts.json. No extra fetch or map
+// cache: the standalone HTML remains offline-playable. Construct only
+// the contract that is selected, never all its voxel grids at boot.
+const CONTRACT_DATA=[{"name":"Glass Exchange","men":6,"power":6,"walk":false,"tip":"BREAKER: SHATTER THE GLASS EXCHANGE","brief":"Two linked storefronts protect a thrower. Cut through the glass entry and avoid wasting energy on the steel rear office.","ops":[["h",47,59,12,2,9,1,1,4,1,4,0,0],["h",66,59,12,3,8,1,1,2,1,6,0,0],["h",91,59,12,2,9,1,1,6,1,1,0,0],["r",58,49,9,1,1],["n",48,59],["n",67,51],["t",53,59,0,3],["t",53,50,2,3],["t",72,59,1,3],["t",72,51,1,3],["t",72,43,0,3],["t",97,59,4,3],["t",97,50,2,3]]},{"name":"Crane Yard","men":7,"power":4,"walk":false,"tip":"TURBO: HIT THE CRANE'S WOODEN BRACE","brief":"A crane-like timber truss spans a work yard; strike the braces to send its counterweight into the depot.","ops":[["h",51,59,11,3,9,1,1,6,1,1,0,0],["h",86,59,12,2,10,1,1,2,1,3,0,0],["r",61,29,24,2,1],["r",81,31,3,28,6],["r",75,27,8,2,6],["r",65,31,2,21,1],["n",66,52],["n",87,59],["t",56,59,1,3],["t",56,50,2,3],["t",56,41,0,3],["t",92,59,3,3],["t",92,49,2,3],["t",78,59,0,3]]},{"name":"Spring Freight","men":6,"power":2,"walk":false,"tip":"TOWEL: GLIDE OVER THE RUBBER WALL","brief":"A low roof and a tall rubber barricade force an aerial approach. Glide into the elevated warehouse before diving.","ops":[["h",48,59,10,2,9,1,1,7,1,1,0,0],["r",62,37,2,23,7],["h",72,59,13,3,9,1,1,2,1,4,0,0],["h",96,59,11,1,11,1,1,1,1,1,0,0],["r",63,58,8,2,8],["n",74,50],["t",53,59,0,3],["t",53,50,1,3],["t",78,59,3,3],["t",78,50,2,3],["t",78,41,0,3],["t",101,59,1,3]]},{"name":"Powder Dispatch","men":6,"power":3,"walk":false,"tip":"SPLAT: START A WIDE TNT CHAIN","brief":"A depot's separate powder stores are connected by vulnerable wooden walkways; choose the first impact carefully.","ops":[["h",43,59,10,2,8,1,1,1,1,1,0,0],["h",61,59,11,2,9,1,1,4,1,4,0,0],["h",81,59,12,2,9,1,1,2,1,1,0,0],["h",101,59,10,1,10,1,1,3,1,1,0,0],["r",52,50,10,1,1],["r",71,50,11,1,1],["n",44,51],["n",62,59],["n",82,50],["n",102,59],["t",48,59,0,3],["t",48,51,2,3],["t",66,59,1,3],["t",66,50,0,3],["t",87,59,3,3],["t",87,50,0,3],["t",106,59,0,3]]},{"name":"Sinking Court","men":7,"power":5,"walk":false,"tip":"QUAKE: CRACK THE SAND FOUNDATIONS","brief":"Two offices sit on erodible dunes; the compact Quake attack can release a foundation and shift entire floors.","ops":[["m",43,32,9],["h",53,50,12,2,9,1,1,2,1,3,0,0],["m",81,30,8],["h",90,51,12,2,9,1,1,1,1,1,0,0],["n",44,59],["n",82,59],["t",59,50,1,3],["t",59,41,2,3],["t",96,51,4,3],["t",96,42,1,3],["t",77,59,3,3],["t",113,59,0,3]]},{"name":"Rooftop Relay","men":6,"power":1,"walk":false,"tip":"BEANS: BOOST BETWEEN THE HIGH ROOFS","brief":"A low first roof hides a tall glass block. Use a midair jet to reach the upper offices and land on the far annex.","ops":[["h",44,59,12,2,9,1,1,1,1,1,0,0],["h",66,59,12,4,10,1,1,4,1,4,0,0],["h",91,59,12,3,9,1,1,2,1,3,0,0],["r",77,29,15,1,1],["n",67,39],["n",92,50],["t",50,59,0,3],["t",50,50,0,3],["t",72,59,1,3],["t",72,49,2,3],["t",72,39,1,3],["t",72,29,2,3],["t",97,59,3,3],["t",97,41,1,3]]},{"name":"Bailiff Barracks","men":7,"power":6,"walk":true,"tip":"BREAKER: BREACH THE BARRACKS THEN WALK","brief":"On-foot clearing of a three-story compound, with two jump pads and deliberate door gaps.","ops":[["h",43,59,13,3,10,1,1,2,1,3,0,0],["r",43,53,1,6,0],["r",55,43,1,6,0],["r",54,49,2,1,0],["r",44,39,3,1,0],["r",51,58,4,1,7],["p",51,58,4],["r",45,48,4,1,7],["p",45,48,4],["h",72,59,12,2,10,1,1,1,1,1,0,0],["r",72,53,1,6,0],["h",94,59,12,2,10,1,1,3,1,1,0,0],["t",48,59,1,3],["t",52,49,3,3],["t",49,39,2,3],["t",78,59,1,3],["t",78,49,2,3],["t",100,59,4,3],["t",100,49,1,3],["n",73,59]]},{"name":"Vacuum Post","men":6,"power":4,"walk":false,"tip":"TURBO: ENTER THE FIRST POSTAL TUBE","brief":"Two postal tubes bypass a fortified sorting office. The exit opens into a brittle upper gallery.","ops":[["h",64,59,12,3,10,2,1,6,1,4,0,0],["h",90,59,12,2,10,1,1,4,1,1,0,0],["r",54,28,2,32,6],["r",64,53,2,6,0],["r",64,43,2,6,0],["u",37.5,42.5,66.75,57],["u",44.5,27.5,66.75,47],["n",66,39],["n",91,59],["t",70,59,3,3],["t",70,49,2,3],["t",70,39,1,3],["t",96,59,0,3],["t",96,49,2,3]]},{"name":"Tenement Cascade","men":7,"power":5,"walk":false,"tip":"QUAKE: DROP THE LOW LINKED SUPPORTS","brief":"Three different-height blocks share narrow links and a weak first floor; the collapsing front can knock into the middle.","ops":[["h",44,59,11,3,9,1,1,1,1,1,0,0],["h",61,59,12,4,8,1,1,2,1,1,0,0],["h",84,59,12,3,9,1,1,3,1,1,0,0],["r",54,50,8,2,1],["r",72,43,13,1,1],["n",45,59],["n",62,51],["n",85,50],["t",49,59,0,3],["t",49,50,1,3],["t",49,41,2,3],["t",67,59,4,3],["t",67,51,0,3],["t",67,35,2,3],["t",90,59,3,3],["t",90,41,1,3]]},{"name":"Safe Landing Lab","men":6,"power":2,"walk":false,"tip":"TOWEL: USE THE RUBBER AND SAND BEDS","brief":"A lab with isolated TNT racks, rubber pads, and a sand-catching pit teaches deliberate soft or hard impacts.","ops":[["h",44,59,12,2,9,1,1,4,1,4,0,0],["h",67,59,12,2,9,1,1,7,1,1,0,0],["h",91,59,12,2,9,1,1,2,1,1,0,0],["r",46,59,8,1,8],["r",69,59,8,1,7],["r",69,50,8,1,7],["n",45,50],["n",68,50],["n",92,59],["t",50,59,0,3],["t",50,50,2,3],["t",73,59,1,3],["t",73,50,0,3],["t",97,59,3,3],["t",97,50,2,3]]},{"name":"Clerk's Citadel","men":8,"power":6,"walk":false,"tip":"BREAKER: FIND THE CITADEL'S WEAK DOORS","brief":"Thick stone and steel surround a much weaker gatehouse; penetrate deliberately instead of throwing every man at the outer wall.","ops":[["h",43,59,10,2,9,1,1,2,1,1,0,0],["h",63,59,20,3,10,2,2,3,6,3,0,1],["h",96,59,12,3,9,1,1,6,1,1,0,0],["r",63,53,2,6,1],["r",81,43,2,6,4],["n",64,59],["n",97,50],["t",48,59,3,3],["t",48,50,0,3],["t",69,59,4,3],["t",77,49,2,3],["t",69,39,1,3],["t",102,59,3,3],["t",102,50,7,3],["t",102,41,2,3]]},{"name":"Parry Platform","men":6,"power":3,"walk":true,"tip":"SPLAT: LAND THEN PARRY THE BRIEFCASES","brief":"On-foot mission with stepped offices, jump pads and throwers. The wide impact can clear the entrance before the melee.","ops":[["h",43,59,12,2,10,1,1,1,1,1,0,0],["r",43,53,1,6,0],["h",66,59,12,3,9,1,1,2,1,1,0,0],["r",66,53,1,6,0],["r",77,44,1,6,0],["r",68,58,4,1,7],["p",68,58,4],["r",73,49,4,1,7],["p",73,49,4],["h",91,59,12,2,9,1,1,4,1,4,0,0],["t",49,59,1,3],["t",49,49,2,3],["t",74,59,2,3],["t",70,50,3,3],["t",72,41,2,3],["t",97,59,4,3],["t",97,50,1,3],["n",92,59]]},{"name":"Night Market","men":7,"power":1,"walk":false,"tip":"BEANS: BOOST OVER THE MARKET CANOPIES","brief":"A chain of market booths leads to a tall office with a healer and a shield guard.","ops":[["h",41,59,10,1,8,1,1,1,1,4,0,0],["h",54,59,10,1,8,1,1,7,1,1,0,0],["h",68,59,10,2,8,1,1,4,1,4,0,0],["h",88,59,13,4,9,1,1,2,1,3,0,0],["r",50,49,5,1,1],["r",63,49,6,1,1],["n",69,59],["n",89,50],["t",46,59,1,3],["t",59,59,5,3],["t",73,59,2,3],["t",73,51,0,3],["t",94,59,4,3],["t",94,50,7,3],["t",94,41,3,3],["t",94,32,2,3]]},{"name":"Triple Rent Vault","men":8,"power":4,"walk":false,"tip":"TURBO: THREAD THE VAULT ENTRY LANES","brief":"Three vaults rise from the street; the wooden roof and glass windows are intentional access routes.","ops":[["h",45,59,12,2,9,2,1,3,1,1,0,0],["h",64,59,12,3,9,2,1,6,1,1,0,0],["h",87,59,16,4,9,2,1,6,1,4,0,0],["r",45,53,2,6,4],["r",64,53,2,6,1],["r",87,44,2,6,4],["n",46,50],["n",65,41],["n",88,32],["t",51,59,3,3],["t",51,50,1,3],["t",70,59,4,3],["t",70,50,2,3],["t",70,41,0,3],["t",91,59,6,3],["t",98,50,7,3],["t",91,41,4,3],["t",98,32,2,3]]},{"name":"Skyline Reckoning","men":8,"power":5,"walk":false,"tip":"QUAKE: REMOVE THE SKYLINE'S KEY PIERS","brief":"A timber tower, stone block and glass high-rise test roof strikes, cascading failures and moving TNT.","ops":[["h",44,59,11,4,9,1,1,1,1,1,0,0],["h",62,59,16,4,9,1,1,3,1,3,0,0],["h",87,59,14,5,9,1,1,4,1,6,0,0],["r",54,32,9,1,1],["r",77,32,11,1,1],["n",45,59],["n",63,50],["n",88,41],["t",49,59,1,3],["t",49,41,2,3],["t",49,32,0,3],["t",66,59,3,3],["t",73,50,4,3],["t",66,32,7,3],["t",91,59,6,3],["t",97,41,2,3],["t",91,23,4,3]]},{"name":"Final Notice","men":10,"power":6,"walk":false,"tip":"BREAKER: CRACK THE FINAL NOTICE TOWER","brief":"The contract finale combines a soft sand approach, steel fortress, boss offices, vulnerable transfer bridges, and enough charges for a thoughtful sequence.","ops":[["h",39,59,10,2,9,1,1,7,1,1,0,0],["m",52,22,5],["h",57,54,12,3,9,1,1,2,1,4,0,0],["h",80,59,22,4,10,2,2,6,1,3,0,1],["r",69,36,12,2,1],["r",80,53,2,6,4],["r",100,43,2,6,1],["n",40,59],["n",58,54],["n",81,39],["n",98,29],["t",44,59,3,3],["t",44,50,0,3],["t",63,54,1,3],["t",63,45,2,3],["t",63,36,4,3],["t",85,59,6,3],["t",96,59,4,3],["t",85,49,7,3],["t",96,39,2,3],["t",85,29,6,3],["t",95,29,4,3]]},{"name":"Switchback Depot","men":7,"power":2,"walk":false,"tip":"TOWEL: CROSS THE STEPPED FREIGHT ROOFS","brief":"Three stepped freight sheds create a rising route. Float above the rubber buffer, then dive onto the wooden roof of the dispatch office.","ops":[["h",43,59,12,1,9,1,1,7,1,1,0,0],["h",62,59,12,2,9,1,1,2,1,4,0,0],["h",88,59,13,4,9,1,1,4,1,4,0,0],["r",55,58,6,2,8],["r",74,41,15,1,1],["n",63,59],["n",89,41],["t",49,59,0,3],["t",68,59,1,3],["t",68,50,2,3],["t",94,59,3,3],["t",94,50,1,3],["t",94,41,4,3],["t",94,32,2,3]]},{"name":"Claims Arcade","men":7,"power":6,"walk":true,"tip":"BREAKER: OPEN THE ARCADE THEN WALK","brief":"A narrow street of claims offices has low entry doors and a pair of rubber jump pads. Reach the upper throwers after opening the storefront.","ops":[["h",44,59,13,3,10,1,1,2,1,4,0,0],["r",44,53,1,6,0],["r",56,43,1,6,0],["r",52,49,3,1,0],["r",45,58,3,1,7],["p",45,58,3],["r",52,48,3,1,7],["p",52,48,3],["h",75,59,12,2,10,1,1,4,1,4,0,0],["r",75,53,1,6,0],["h",96,59,12,2,9,1,1,3,1,1,0,0],["n",97,50],["t",50,59,1,3],["t",49,49,2,3],["t",50,39,3,3],["t",81,59,1,3],["t",81,49,2,3],["t",102,59,4,3],["t",102,50,7,3]]},{"name":"Silt Exchange","men":7,"power":5,"walk":false,"tip":"QUAKE: RELEASE THE SAND SUPPORTS","brief":"Two raised offices stand on broad sand foundations. A low rubber shelter delays the direct approach; remove the supports and use the moving debris.","ops":[["h",39,59,11,1,9,1,1,7,1,1,0,0],["m",55,26,6],["h",62,53,12,2,9,1,1,2,1,4,0,0],["m",84,30,7],["h",92,52,13,3,9,1,1,1,1,1,0,0],["n",55,59],["n",84,59],["t",44,59,0,3],["t",68,53,1,3],["t",68,44,2,3],["t",98,52,4,3],["t",98,43,7,3],["t",98,34,3,3]]},{"name":"Express Returns","men":7,"power":4,"walk":false,"tip":"TURBO: USE THE HIGH RETURN TUBE","brief":"A steel screen guards the returns center. Two pneumatic routes deliver you through side doors, one to the receiving floor and one to the upper desk.","ops":[["h",65,59,13,3,10,2,1,6,1,4,0,0],["r",65,53,2,6,0],["r",65,33,2,6,0],["r",54,25,2,35,6],["u",37.5,42.5,67.75,57],["u",44.5,25.5,67.75,37],["h",91,59,13,2,10,1,1,4,1,4,0,0],["n",66,49],["n",92,59],["t",71,59,3,3],["t",71,49,1,3],["t",71,39,2,3],["t",97,59,4,3],["t",97,49,2,3]]},{"name":"The Paper Chain","men":8,"power":3,"walk":false,"tip":"SPLAT: LINK THE POWDER STORES","brief":"Four small buildings share two narrow timber links. Hit a powder rack on the lowest level to set loose the front pair, then clear the high offices.","ops":[["h",40,59,10,2,9,1,1,1,1,1,0,0],["h",56,59,11,3,9,1,1,4,1,4,0,0],["h",76,59,12,2,9,1,1,2,1,1,0,0],["h",99,59,11,2,10,1,1,3,1,1,0,0],["r",49,50,8,1,1],["r",66,41,11,1,1],["n",41,59],["n",57,50],["n",77,59],["n",100,49],["t",45,59,0,3],["t",45,50,1,3],["t",61,59,2,3],["t",61,50,1,3],["t",61,41,0,3],["t",82,59,4,3],["t",82,50,2,3],["t",104,59,3,3],["t",104,49,7,3]]},{"name":"Air Rights","men":7,"power":1,"walk":false,"tip":"BEANS: BOOST TO THE TOP FLOOR","brief":"A tall glass office stands beyond a lower brick stair and a spring screen. Save a boost for its top floor, where a healer protects the last guard.","ops":[["h",44,59,12,2,9,1,1,2,1,1,0,0],["r",59,42,2,18,7],["h",67,59,13,3,9,1,1,1,1,1,0,0],["h",91,59,13,5,9,1,1,4,1,4,0,0],["r",79,32,13,1,1],["n",68,50],["n",92,23],["t",50,59,0,3],["t",50,50,2,3],["t",73,59,1,3],["t",73,41,3,3],["t",97,59,4,3],["t",97,41,1,3],["t",97,32,7,3],["t",97,23,2,3]]},{"name":"Night Court Annex","men":8,"power":6,"walk":true,"tip":"BREAKER: BREACH THE SHIELD GUARD'S HALL","brief":"Clear the entrance from the street and use the spring ledges to reach two guarded floors. The back annex houses a boss and a healer.","ops":[["h",45,59,13,3,10,1,1,3,1,1,0,0],["r",45,53,1,6,0],["r",57,43,1,6,0],["r",53,49,3,1,0],["r",46,58,3,1,7],["p",46,58,3],["r",53,48,3,1,7],["p",53,48,3],["h",73,59,12,2,10,1,1,2,1,1,0,0],["r",73,53,1,6,0],["h",93,59,13,3,10,1,1,6,1,4,0,0],["r",93,53,1,6,4],["n",94,49],["t",51,59,4,3],["t",50,49,2,3],["t",51,39,1,3],["t",79,59,3,3],["t",79,49,2,3],["t",99,59,6,3],["t",99,49,7,3],["t",99,39,4,3]]},{"name":"Crown of Concrete","men":10,"power":5,"walk":false,"tip":"QUAKE: DROP THE THREE TRANSFER PIERS","brief":"The final overtime contract combines sand-supported stairs, an exposed timber connector, and a steel crown. Tackle the supports first, then finish the defended upper floors.","ops":[["h",39,59,11,2,9,1,1,7,1,1,0,0],["m",53,23,5],["h",58,54,13,3,9,1,1,2,1,4,0,0],["h",84,59,22,4,10,2,2,6,1,3,0,0],["r",70,36,15,2,1],["r",84,53,2,6,4],["r",104,43,2,6,1],["n",40,59],["n",59,54],["n",85,39],["n",103,29],["t",44,59,3,3],["t",44,50,0,3],["t",64,54,1,3],["t",64,45,2,3],["t",64,36,4,3],["t",90,59,6,3],["t",100,59,4,3],["t",90,49,7,3],["t",100,39,2,3],["t",90,29,6,3],["t",100,29,4,3]]}];
+const CONTRACT_POWERS=['none','beans','towel','splat','turbo','quake','breaker'];
+const CONTRACT_KINDS=['','walker','thrower','bat','shield','sprinter','boss','healer'];
+for(const contract of CONTRACT_DATA){
+  LEVELS.push({name:contract.name,men:contract.men,walk:contract.walk,tip:contract.tip,brief:contract.brief,
+    bonusPower:CONTRACT_POWERS[contract.power],contract:true,build(){
+      let roomsBuilt=0;
+      const colors=['#e8d3a8','#d8e0e8','#e8d8e8','#dce6cf'];
+      for(const [op,...a] of contract.ops){
+        switch(op){
+        case 'h':{const [x,g,w,floors,fh,wt,ft,wall,floor,roof,gable,crenel]=a;
+          house({x,g,w,floors,fh,wt,ft,wall,floor,roof,gable:!!gable,crenel:!!crenel,paper:colors[roomsBuilt++&3]});break}
+        case 't':tgt(a[0],a[1],CONTRACT_KINDS[a[2]],a[3]);break;
+        case 'r':rect(...a);break;
+        case 'n':tnt(...a);break;
+        case 'p':pads.push({x:a[0]*V,y:a[1]*V,w:a[2]*V});break;
+        case 'u':tube('#ffbf70',a[0]*V,a[1]*V,a[2]*V,a[3]*V,0);break;
+        case 'm':mound(...a);break;
+        }
+      }
+    }});
+}
 // ---- pneumatic tubes ----
 // Keep the orientation stable when the sling or tube fires left.
 // Mirror the facing sprite, but pitch against abs(horizontal velocity),
@@ -639,10 +719,11 @@ function unclipTargets(){for(const t of targets){const row=Math.floor(t.y/V+.875
 function load(l,custom){
   CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
-  /* The air valve and every tool begin unequipped for each new level;
-     a previously saved AIR choice cannot obstruct the very next shot. */
-  OPT().tool='none';
-  pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;bankLeft=0;banner=2.4;waitT=0;
+  // The saved default is a preference, not the current shot's selection.
+  // Air/soda are never automatically equipped because they need a gesture.
+  powerPickerOpen=false;
+  pw={sel:null,tool:'none',left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1,breaker:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;bankLeft=0;banner=2.4;waitT=0;
+  if(CL.bonusPower&&Object.prototype.hasOwnProperty.call(pw.left,CL.bonusPower))pw.left[CL.bonusPower]=2;
   tntLiveFuses=0;tubes=[];pads=[];CL.build();paper.fill(0);interiors.forEach((r,n)=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(inb(x,y))paper[idx(x,y)]=n+1});unclipTargets();
   zonePaid=[];if(CL.slings){const zb=CL.zones||[];for(const t of targets){t.zone=0;for(let k=0;k<zb.length;k++)if(t.x>=zb[k]*V)t.zone=k+1}setSling(0)}else{SX=128;SY=GY-118;VX=36;VY=SY+58;slingK=0}
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
@@ -670,6 +751,8 @@ function nextMan(){
   bankLeft=0;
   if(men>0)man={mode:'aim',x:SX,y:SY,vx:0,vy:0,ang:0,spin:0,face:1,t:0,a:1,R:14,dive:false,gt:0,hitCd:0,gooT:0,pop:1,stT:0,swT:0,G:gagNew(2.5,4,3),jg:jigNew(),inf:0,seated:false,pwr:null,vlv:false,airT:0,beaned:false,bel:0,burped:false,burpT:0,chug:null};
   else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};
+  powerPickerOpen=false;pw.tool='none';pw.sel=null;
+  if(man.mode==='aim')toolArm();
 }
 const aliveTargets=()=>targets.reduce((n,t)=>n+(t.alive?1:0),0);
 // Objective text is the same across web, DS, 3DS and Dreamcast. Reuse a
@@ -721,9 +804,43 @@ function objectiveLabel(o){
    reducing ONLY decorative particle overdraw.  Extra particle objects are
    created transiently but not retained, so random-number consumption and
    gameplay difficulty remain independent of this graphics-only setting. */
-let webEcoFX=false;
-function fxLimit(){return webEcoFX?360:1400}
-function chip(x,y,col,vx,vy){if(parts.length>fxLimit())return;P({k:0,x,y,vx,vy,l:1+rnd()*1.2,l0:2,c:col,s:2+rnd()*2})}
+// Rendering preferences never change simulation rate or structural limits.
+// Existing ecoFX saves migrate naturally into the manual FX override.
+const WEB_PROFILES=['auto','quality','balanced','low'];
+const WEB_FRAME_CAPS=[0,30,60],WEB_SCALES=[0,1,.75,.6];
+let webEcoFX=false,webPerfTier=0,webPerfBad=0,webPerfGood=0,webFxCap=1400,webDetailedLighting=true;
+function webProfile(o){return WEB_PROFILES.includes(o.performance)?o.performance:'auto'}
+function webEffectiveTier(o){
+  const p=webProfile(o);return p==='quality'?0:p==='balanced'?1:p==='low'?2:webPerfTier;
+}
+function webRenderScale(o){const v=o.renderScale;return WEB_SCALES.includes(v)&&v>0?v:[1,.75,.6][webEffectiveTier(o)]}
+function webRenderCap(o){return o.renderCap===30||o.renderCap===60?o.renderCap:webEffectiveTier(o)>0?30:60}
+function webFxBudget(o){const t=webEffectiveTier(o);return o.ecoFX===false?1400:o.ecoFX===true?360:t===2?220:t===1?360:1400}
+function webLightingDetail(o){return o.lighting==='full'||(o.lighting!=='lite'&&webEffectiveTier(o)<2)}
+function webLightingLabel(o){return o.lighting==='full'?'FULL':o.lighting==='lite'?'LITE':'AUTO'}
+function cycleWebLighting(o){o.lighting=o.lighting==='full'?'lite':o.lighting==='lite'?'auto':'full'}
+function fxLimit(){return webFxCap}
+function webPerfSample(o,elapsed,cpu,playing){
+  if(webProfile(o)!=='auto'||!playing||!(elapsed>0)||elapsed>.25){
+    webPerfBad=webPerfGood=0;return false;
+  }
+  // Sustained CPU overload or delayed RAFs, with recovery hysteresis.
+  const bad=cpu>23||elapsed>.043,good=cpu<10&&elapsed<.025;
+  webPerfBad=bad?webPerfBad+elapsed:Math.max(0,webPerfBad-elapsed*.5);
+  webPerfGood=good?webPerfGood+elapsed:0;
+  if(webPerfBad>=.75&&webPerfTier<2){webPerfTier++;webPerfBad=webPerfGood=0;return true}
+  if(webPerfGood>=6&&webPerfTier>0){webPerfTier--;webPerfBad=webPerfGood=0;return true}
+  return false;
+}
+function cycleWebProfile(o){o.performance=WEB_PROFILES[(WEB_PROFILES.indexOf(webProfile(o))+1)%WEB_PROFILES.length];webPerfBad=webPerfGood=0}
+function cycleWebCap(o){o.renderCap=WEB_FRAME_CAPS[(WEB_FRAME_CAPS.indexOf(o.renderCap||0)+1)%WEB_FRAME_CAPS.length]}
+function cycleWebScale(o){o.renderScale=WEB_SCALES[(WEB_SCALES.indexOf(o.renderScale||0)+1)%WEB_SCALES.length]}
+function cycleWebFX(o){if(o.ecoFX===undefined)o.ecoFX=true;else if(o.ecoFX===true)o.ecoFX=false;else delete o.ecoFX;webEcoFX=o.ecoFX===true}
+function webFXLabel(o){return o.ecoFX===undefined?'AUTO':o.ecoFX?'ECO':'FULL'}
+function webProfileLabel(o){const p=webProfile(o);return p==='low'?'LOW END':p.toUpperCase()}
+function webCapLabel(o){return o.renderCap===30||o.renderCap===60?o.renderCap+' FPS':'AUTO'}
+function webScaleLabel(o){return o.renderScale>0&&WEB_SCALES.includes(o.renderScale)?Math.round(o.renderScale*100)+'%':'AUTO'}
+function chip(x,y,col,vx,vy){if(parts.length>=fxLimit())return;P({k:0,x,y,vx,vy,l:1+rnd()*1.2,l0:2,c:col,s:2+rnd()*2})}
 function dust(x,y,n,sz){for(let i=0;i<n&&parts.length<fxLimit();i++)P({k:1,x:x+(rnd()-.5)*V,y:y+(rnd()-.5)*V,vx:(rnd()-.5)*60,vy:-rnd()*45-8,l:.7+rnd()*.8,l0:1.5,s:sz*(.6+rnd()*.8)})}
 function spark(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd()*6.28,s=rnd()*sp;P({k:2,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,l:.25+rnd()*.35,l0:.5})}}
 function goo(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd()*6.28,s=rnd()*sp;P({k:3,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-80,l:.8+rnd()*.6,l0:1.4,s:2+rnd()*3})}}
@@ -772,23 +889,74 @@ function kill(x,y,bvx,bvy){
 function live(){return OPT().collapse&&state==='play'}
 function busy(){for(const c of chunks)if(!c.rest)return true;return false}
 function wake(ch){ch.rest=false;ch.sleep=0;ch.restT=0;ch.age=Math.max(ch.age,.2)}
-function wakeAt(px,py,r){for(const c of chunks)if(c.rest&&Math.hypot(c.x-px,c.y-py)<c.rad+r)wake(c)}
+function wakeAt(px,py,r){
+  for(const c of chunks)if(c.rest){
+    const dx=c.x-px,dy=c.y-py,reach=c.rad+r;
+    if(Math.abs(dx)>=reach||Math.abs(dy)>=reach)continue;
+    if(Math.hypot(dx,dy)<reach)wake(c);
+  }
+}
 function markDmg(x,y){for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(inb(nx,ny))dmg[idx(nx,ny)]=1}}
+// Keep exactly the original weakest-80 rule, including stable scan-order
+// ties, without allocating an array/pair for every damaged voxel and sorting
+// the entire affected building. Heap storage is independent of world size.
+let AFTERSHOCK_ZONE=new Uint8Array(0);
+const CRUMBLE_LIMIT=80,CRUMBLE_ID=new Uint16Array(CRUMBLE_LIMIT),
+      CRUMBLE_RATIO=new Float64Array(CRUMBLE_LIMIT);
+function crumbleWorse(r,i,s,j){return r>s||(r===s&&i>j)}
+function crumbleOffer(n,r,i){
+  let k;
+  if(n<CRUMBLE_LIMIT){
+    k=n++;
+    while(k>0){
+      const p=(k-1)>>1;
+      if(!crumbleWorse(r,i,CRUMBLE_RATIO[p],CRUMBLE_ID[p]))break;
+      CRUMBLE_RATIO[k]=CRUMBLE_RATIO[p];CRUMBLE_ID[k]=CRUMBLE_ID[p];k=p;
+    }
+  }else{
+    if(!crumbleWorse(CRUMBLE_RATIO[0],CRUMBLE_ID[0],r,i))return n;
+    k=0;
+    for(;;){
+      let j=k*2+1;if(j>=n)break;
+      if(j+1<n&&crumbleWorse(CRUMBLE_RATIO[j+1],CRUMBLE_ID[j+1],CRUMBLE_RATIO[j],CRUMBLE_ID[j]))j++;
+      if(!crumbleWorse(CRUMBLE_RATIO[j],CRUMBLE_ID[j],r,i))break;
+      CRUMBLE_RATIO[k]=CRUMBLE_RATIO[j];CRUMBLE_ID[k]=CRUMBLE_ID[j];k=j;
+    }
+  }
+  CRUMBLE_RATIO[k]=r;CRUMBLE_ID[k]=i;return n;
+}
 function aftershock(){
-  const zone=new Uint8Array(COLS*ROWS);let any=false;
-  for(let i=0;i<dmg.length;i++)if(dmg[i]||brk[i]){const x=i%COLS,y=(i/COLS)|0;
-    for(let j=-2;j<=2;j++)for(let k=-2;k<=2;k++){if(Math.abs(j)+Math.abs(k)>3)continue;const X=x+k,Y=y+j;if(inb(X,Y)){zone[idx(X,Y)]=1;any=true}}}
-  dmg.fill(0);if(!any)return;
-  const weak=[];
-  for(let i=0;i<grid.length;i++){const m=grid[i];if(!zone[i]||!m||m===SAND)continue;
-    anch[i]=0;const r=hp[i]/MAT[m].hp;if(r<.7)weak.push([r,i])}
-  weak.sort((a,b)=>a[0]-b[0]);
-  let sx=0,sy=0,n=0;
-  for(const[,i]of weak.slice(0,80)){const x=i%COLS,y=(i/COLS)|0;
+  if(AFTERSHOCK_ZONE.length!==grid.length)AFTERSHOCK_ZONE=new Uint8Array(grid.length);
+  else AFTERSHOCK_ZONE.fill(0);
+  const zone=AFTERSHOCK_ZONE;let lo=grid.length,hi=-1;
+  for(let i=0;i<dmg.length;i++)if(dmg[i]||brk[i]){
+    const x=i%COLS,y=(i/COLS)|0;
+    for(let dy=-2;dy<=2;dy++){
+      const yy=y+dy;if(yy<0||yy>=ROWS)continue;
+      const reach=Math.min(2,3-Math.abs(dy)),x0=Math.max(0,x-reach),x1=Math.min(COLS-1,x+reach);
+      const first=idx(x0,yy),last=idx(x1,yy);
+      zone.fill(1,first,last+1);
+      if(first<lo)lo=first;if(last>hi)hi=last;
+    }
+  }
+  dmg.fill(0);if(hi<lo)return;
+  let n=0;
+  for(let i=lo;i<=hi;i++){
+    const m=grid[i];if(!zone[i]||!m||m===SAND)continue;
+    anch[i]=0;const r=hp[i]/MAT[m].hp;if(r<.7)n=crumbleOffer(n,r,i);
+  }
+  // Joint writes are bitwise OR and the centroid sums are integral:
+  // selecting the same members is sufficient; their order cannot change
+  // the result or the single CRUMBLE event.
+  let sx=0,sy=0;
+  for(let k=0;k<n;k++){
+    const i=CRUMBLE_ID[k],x=i%COLS,y=(i/COLS)|0;
     for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];brk[i]|=1<<d;if(inb(nx,ny))brk[idx(nx,ny)]|=1<<(d^1)}
-    sx+=x;sy+=y;n++}
+    sx+=x;sy+=y;
+  }
   needSupport=true;
-  if(n){shake=Math.max(shake,3);SFX.thud(.5);popText(sx/n*V+V/2,sy/n*V-30,'CRUMBLE!','#ffd23f',26)}}
+  if(n){shake=Math.max(shake,3);SFX.thud(.5);popText(sx/n*V+V/2,sy/n*V-30,'CRUMBLE!','#ffd23f',26)}
+}
 function damageCell(x,y,d){if(!inb(x,y))return 0;const i=idx(x,y);
   if(!grid[i]){if(paper[i]&&d>=4)paperHit(x,y);return 0}
   if(hp[i]<=d)return kill(x,y,0,0);hp[i]-=d;return d}
@@ -796,10 +964,21 @@ function blast(cx,cy,r,power){let spent=0;const R=Math.ceil(r);
   for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){const d=Math.hypot(i,j);if(d>r)continue;spent+=damageCell(cx+i,cy+j,power*(1-d/r)+(d<1?power*.25:0))}return spent}
 function applyImpulse(ch,px,py,jx,jy){ch.vx+=jx/ch.m;ch.vy+=jy/ch.m;ch.w+=((px-ch.x)*jy-(py-ch.y)*jx)/ch.I;ch.sleep=0}
 function shockwave(px,py,rpx,power){
-  for(const ch of chunks){const dx=ch.x-px,dy=ch.y-py,d=Math.hypot(dx,dy)||1;if(d>rpx*1.9)continue;const f=(1-d/(rpx*1.9))*power;
+  const chunkReach=rpx*1.9,targetReach=rpx*1.05,partReach=rpx*1.6;
+  for(const ch of chunks){const dx=ch.x-px,dy=ch.y-py;
+    if(Math.abs(dx)>chunkReach||Math.abs(dy)>chunkReach)continue;
+    const d=Math.hypot(dx,dy)||1;if(d>chunkReach)continue;const f=(1-d/chunkReach)*power;
     applyImpulse(ch,ch.x-dx*.3,ch.y-dy*.3,dx/d*f,dy/d*f-f*.35)}
-  for(const t of targets)if(t.alive&&Math.hypot(t.x-px,t.y-py)<rpx*1.05)killTarget(t,true);
-  for(const p of parts){const dx=p.x-px,dy=p.y-py,d=Math.hypot(dx,dy)||1;if(d<rpx*1.6&&p.k!==5){p.vx+=dx/d*260;p.vy+=dy/d*260}}}
+  for(const t of targets)if(t.alive){
+    const dx=t.x-px,dy=t.y-py;
+    if(Math.abs(dx)>targetReach||Math.abs(dy)>targetReach)continue;
+    if(Math.hypot(dx,dy)<targetReach)killTarget(t,true);
+  }
+  for(const p of parts){if(p.k===5)continue;
+    const dx=p.x-px,dy=p.y-py;
+    if(Math.abs(dx)>partReach||Math.abs(dy)>partReach)continue;
+    const d=Math.hypot(dx,dy)||1;if(d<partReach){p.vx+=dx/d*260;p.vy+=dy/d*260}}
+}
 /* Match the console core's structural-shock reactions without a per-frame
    enemy/hazard scan.  Only real collapse events call this bounded loop.
    Nothing allocated; existing panic and dodge fields drive the animations. */
@@ -870,12 +1049,18 @@ function updateMovingTnt(){
   }
   tntLiveFuses=live;
 }
-function processExpl(){let n=0;
-  while(explQ.length&&n++<80){const[x,y]=explQ.shift(),px=x*V+V/2,py=y*V+V/2;onBoom();
+function processExpl(){let head=0;
+  // New charges append to the same FIFO while blasts run. Consume by
+  // index, then compact once rather than shifting the entire queue up to
+  // eighty times during the most CPU-intensive moment of a demolition.
+  while(head<explQ.length&&head<80){const[x,y]=explQ[head++],px=x*V+V/2,py=y*V+V/2;onBoom();
     blast(x,y,7,95);blastMovingTnt(px,py);wobBlast(x,y,14,26);shockwave(px,py,7*V,5200);lordShock(px,py,14*V,.8);shake=Math.max(shake,9);slow=Math.max(slow,.35);freeze=Math.max(freeze,3);flash=.35;SFX.boom();
     ring(px,py,90,'#ffcf6b');
     for(let k=0;k<30;k++)P({k:2,x:px,y:py,vx:(rnd()-.5)*620,vy:-rnd()*520,l:.5+rnd()*.5,l0:1});
-    for(let k=0;k<8;k++)P({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}}
+    for(let k=0;k<8;k++)P({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}
+  if(head===explQ.length)explQ.length=0;
+  else if(head){explQ.copyWithin(0,head);explQ.length-=head;}
+}
 
 // ---------- wobble lattice (mirrors core/mx.c): every voxel is a mass on springs to its 4 neighbours ----------
 // offsets ox/oy are in cells, velocities in cells/s.  Hits inject velocity that travels as a wave; a joint that
@@ -903,11 +1088,18 @@ function jointBreakLimit(i,j,m,mj){
   if(hp[i]*2<=MAT[m].hp||hp[j]*2<=MAT[mj].hp)return lim*.85;
   return lim;
 }
+// One row-major occupied list replaces the second and third full-grid
+// sweeps. Rebuild on each substep so edited/destroyed cells cannot go stale.
+// The scratch resizes only on a world-width change, not during collapse.
+let WOB_OCCUPIED=new Uint16Array(0);
+const WOB_NEIGHBORS=[0,0,0,0];
 function wobStep(dt){
   for(let m=1;m<MAT.length;m++)FD[m]=Math.max(0,1-MAT[m].damp*dt);
-  const NB=[0,0,0,0];
+  if(WOB_OCCUPIED.length!==grid.length)WOB_OCCUPIED=new Uint16Array(grid.length);
+  const NB=WOB_NEIGHBORS,occupied=WOB_OCCUPIED;let count=0;
   for(let y=0;y<ROWS-1;y++){const lean=LEANK*(ROWS-1-y);
     for(let x=0;x<COLS;x++){const i=y*COLS+x,m=grid[i];if(!m)continue;
+      occupied[count++]=i;
       const bk=brk[i],Ki=MAT[m].K;let ax=0,ay=0;
       NB[0]=x+1<COLS?i+1:-1;NB[1]=x>0?i-1:-1;NB[2]=i+COLS;NB[3]=y>0?i-COLS:-1;
       for(let d=0;d<4;d++){const j=NB[d];if(j<0||((bk>>d)&1))continue;const mj=grid[j];if(!mj)continue;
@@ -917,10 +1109,10 @@ function wobStep(dt){
       ovx[i]=clamp((ovx[i]+(ax*a+(lean-HOMEK)*ox[i])*dt)*f,-WOB_VMAX,WOB_VMAX);
       ovy[i]=clamp((ovy[i]+(ay*a-HOMEK*oy[i])*dt)*f,-WOB_VMAX,WOB_VMAX)}}
   let maxv=0,maxo=0;
-  for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS;x++){const i=y*COLS+x;if(!grid[i])continue;
+  for(let k=0;k<count;k++){const i=occupied[k];
     ox[i]=clamp(ox[i]+ovx[i]*dt,-WOB_OMAX,WOB_OMAX);oy[i]=clamp(oy[i]+ovy[i]*dt,-WOB_OMAX,WOB_OMAX);
     const sv=Math.abs(ovx[i])+Math.abs(ovy[i]),so=Math.abs(ox[i])+Math.abs(oy[i]);if(sv>maxv)maxv=sv;if(so>maxo)maxo=so}
-  for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS;x++){const i=y*COLS+x,m=grid[i];if(!m)continue;
+  for(let k=0;k<count;k++){const i=occupied[k],x=i%COLS,y=(i/COLS)|0,m=grid[i];
     for(let d=0;d<3;d+=2){const j=d===0?(x+1<COLS?i+1:-1):i+COLS;if(j<0||((brk[i]>>d)&1))continue;const mj=grid[j];if(!mj)continue;
       const s=Math.abs(ox[j]-ox[i])+Math.abs(oy[j]-oy[i]),lim=jointBreakLimit(i,j,m,mj);
       if(s>lim){brk[i]|=1<<d;brk[j]|=1<<(d^1);needSupport=true;if(crackEv<4){crackEv++;crackFx(x,y,m,d)}}}}
@@ -1020,9 +1212,14 @@ const CHUNK_HASH=new Map(),CHUNK_BUCKET_POOL=[];
 const CHUNK_BUCKET_CACHE_MAX=2048;
 function stepChunks(dt){
   if(!chunks.length)return;
+  const pairContacts=chunks.length>1;
   const map=CHUNK_HASH;map.clear();let bucketCount=0;
   for(const ch of chunks){if(!ch.rest){ch.vy+=G*dt;ch.vx*=.9995;ch.w*=.998;ch.x+=ch.vx*dt;ch.y+=ch.vy*dt;ch.ang+=ch.w*dt;ch.cs=Math.cos(ch.ang);ch.sn=Math.sin(ch.ang)}ch.cx=ch.cy=0;ch.cn=0;
-    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
+    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}
+      // A lone slab cannot collide with another rubble body. Keep the
+      // transforms and static contacts, but skip all spatial-hash work.
+      if(!pairContacts)continue;
+      const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
       b=bucketCount<CHUNK_BUCKET_CACHE_MAX?(CHUNK_BUCKET_POOL[bucketCount]||(CHUNK_BUCKET_POOL[bucketCount]=[])):[];
       bucketCount++;map.set(k,b)
     }b.push(a)}}
@@ -1030,7 +1227,13 @@ function stepChunks(dt){
     for(const a of ch.cells){
       if(a.dead)continue;
       const gx=Math.floor(a.wx/V),gy=Math.floor(a.wy/V);
-      for(let j=gy-1;j<=(ch.rest?gy-2:gy+1)&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){
+      // A half-cell circle can touch only its containing tile and the
+      // neighbor on either side of the local midpoint, never both sides.
+      // Preserve row/column order and the exact narrow-phase test below.
+      const fx=a.wx-gx*V,fy=a.wy-gy*V;
+      const left=gx-(fx<RC?1:0),right=gx+(V-fx<RC?1:0);
+      const top=gy-(fy<RC?1:0),bottom=gy+(V-fy<RC?1:0);
+      for(let j=top;j<=bottom&&!ch.rest&&!a.dead;j++)for(let i=left;i<=right&&!a.dead;i++){
         if(!(j>=ROWS||(inb(i,j)&&grid[idx(i,j)])))continue;
         const bx=i*V,by=j*V,qx=clamp(a.wx,bx,bx+V),qy=clamp(a.wy,by,by+V),dx=a.wx-qx,dy=a.wy-qy,d2=dx*dx+dy*dy;
         if(d2>=RC*RC)continue;let nx,ny,pen;
@@ -1040,8 +1243,12 @@ function stepChunks(dt){
         resolveStatic(ch,a,nx,ny,Math.min(pen,4),i,j)}
       // A fatal contact keeps its impulse, then the shattered cell stops
       // colliding immediately. Cleanup/mass updates still happen once later.
-      if(a.dead)continue;
+      if(a.dead||!pairContacts)continue;
       for(let j=gy-1;j<=gy+1&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){const b=map.get((i+4)*1024+(j+4));if(!b)continue;
+        // Each body inserts its cells contiguously. If the first and last
+        // entries share an owner, this bucket has no other owner between.
+        // The existing ID rule rejects every candidate in an older/self bucket.
+        if(b[0].ch===b[b.length-1].ch&&b[0].ch.id<=ch.id)continue;
         for(const o of b){if(a.dead)break;if(o.dead)continue;const oc=o.ch;if(oc.id<=ch.id)continue;const dx=a.wx-o.wx,dy=a.wy-o.wy,d2=dx*dx+dy*dy;if(d2>=V*V||d2<1e-6)continue;
           const d=Math.sqrt(d2),nx=dx/d,ny=dy/d,pen=V-d,rax=a.wx-ch.x,ray=a.wy-ch.y,rbx=o.wx-oc.x,rby=o.wy-oc.y;
           const vax=ch.vx-ch.w*ray,vay=ch.vy+ch.w*rax,vbx=oc.vx-oc.w*rby,vby=oc.vy+oc.w*rbx,vn=(vax-vbx)*nx+(vay-vby)*ny;
@@ -1066,17 +1273,40 @@ function stepChunks(dt){
   for(let i=0,n=Math.min(bucketCount,CHUNK_BUCKET_CACHE_MAX);i<n;i++)CHUNK_BUCKET_POOL[i].length=0;
   map.clear();
 }
+// Match the visible rotated slab and its world-space hitboxes after the
+// final penetration correction, before moving TNT is tested. Translate
+// cached cells only when needed; never redo their per-cell rotation.
+function syncChunkPoses(){
+  for(const ch of chunks){
+    let k=0;while(k<ch.cells.length&&ch.cells[k].dead)k++;
+    if(k===ch.cells.length)continue;
+    const a=ch.cells[k],dx=ch.x+ch.cs*a.lx-ch.sn*a.ly-a.wx,
+                        dy=ch.y+ch.sn*a.lx+ch.cs*a.ly-a.wy;
+    if(!dx&&!dy)continue;
+    for(;k<ch.cells.length;k++){const cell=ch.cells[k];if(!cell.dead){cell.wx+=dx;cell.wy+=dy}}
+  }
+}
 function cleanChunks(dt){
   for(let k=chunks.length-1;k>=0;k--){const ch=chunks[k];let lost=false;
     for(const a of ch.cells)if(a.dead){lost=true;score+=5}
-    if(lost){ch.cells=ch.cells.filter(a=>!a.dead);if(!ch.cells.length){chunks.splice(k,1);continue}recompute(ch)}
+    if(lost){
+      // Preserve live fragment identity and order without allocating a
+      // replacement array on each impact-heavy frame.
+      let n=0;for(const a of ch.cells)if(!a.dead)ch.cells[n++]=a;
+      ch.cells.length=n;
+      if(!n){chunks.splice(k,1);continue}recompute(ch)
+    }
     if(ch.hitCd>0)ch.hitCd-=dt;
     if(ch.tntFused){ch.sleep=0;continue} // the fuse cannot vanish when rubble welds
     if(ch.x<-250||ch.x>WW+250||ch.y>WH+300){chunks.splice(k,1);continue}
     const sp=Math.hypot(ch.vx,ch.vy)+Math.abs(ch.w)*18;
     if(ch.rest){
       if(!live()||sp>30||(ch.restT+=dt)>2.4+(ch.id%7)*.3)wake(ch);else{ch.vx=ch.vy=ch.w=0;continue}}
-    if(sp>40&&live())for(const o of chunks)if(o.rest&&Math.hypot(o.x-ch.x,o.y-ch.y)<o.rad+ch.rad+V*2)wake(o);
+    if(sp>40&&live())for(const o of chunks)if(o.rest){
+      const dx=o.x-ch.x,dy=o.y-ch.y,reach=o.rad+ch.rad+V*2;
+      if(Math.abs(dx)>=reach||Math.abs(dy)>=reach)continue;
+      if(Math.hypot(dx,dy)<reach)wake(o);
+    }
     if(sp<8&&ch.age>.15){ch.sleep+=dt;if(ch.sleep>.5){
       if(live()){ch.rest=true;ch.restT=0;ch.vx=ch.vy=ch.w=0}else{settleRaw(ch,false);chunks.splice(k,1)}}}else ch.sleep=0}
   if(chunks.length>140&&live()){
@@ -1110,14 +1340,38 @@ function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long 
     if(stom(m)>.5){SFX.creak(Math.min(1,stom(m)))}
     if(stom(m)>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
   if(!OPT().noBurst&&stom(m)>=1)explodeMan()}
-// ---- gameplay toolbar: valve and six tools are opt-in. Three reserved slots remain for future updates.
-const TOOLS=[{id:'valve',name:'AIR VALVE'},{id:'burp',name:'BURPBURSTER'},{id:'beans',name:'BEANS'},{id:'towel',name:'TOWEL'},{id:'splat',name:'SPLAT'},{id:'turbo',name:'TURBO'},{id:'quake',name:'QUAKE'}].concat(Array.from({length:3},(_,i)=>({id:'slot'+(i+7),name:'',reserved:true})));
-const toolList=()=>TOOLS.filter(t=>!t.reserved);          // what the player can actually pick
-const toolOn=id=>(OPT().tool||'none')===id;                // the air valve exists only after explicit selection
-function toolCycle(){const ids=['none'].concat(toolList().map(t=>t.id)),o=OPT(),i=ids.indexOf(o.tool||'none');o.tool=ids[(i+1)%ids.length]}
-const PWTOOLS=['beans','towel','splat','turbo','quake'];
-function toolArm(){const t=OPT().tool||'none';if(man.mode!=='aim'||man.chug||pw.sel==='burp')return;pw.sel=PWTOOLS.includes(t)&&pw.left[t]>0?t:null}
-const toolName=()=>{const t=OPT().tool||'none';return t==='none'?'NONE':(TOOLS.find(x=>x.id===t)||{name:'?'}).name};
+// Direct selection is a per-shot decision; the Options default is only
+// applied on reload, and cannot silently re-arm a tool while aiming.
+const TOOLS=[
+  {id:'valve',name:'AIR VALVE',desc:'Reusable. Fill up at the valve; drag off before launch.'},
+  {id:'burp',name:'BURPBURSTER',desc:'Tap the soda stand first. Tap in flight to burp.'},
+  {id:'beans',name:'BEANS',desc:'Tap in flight for one extra jet.'},
+  {id:'towel',name:'TOWEL',desc:'Reduced gravity during the first 1.8 seconds.'},
+  {id:'splat',name:'SPLAT',desc:'Wide goo blast on landing.'},
+  {id:'turbo',name:'TURBO',desc:'35% faster launch at the same pull.'},
+  {id:'quake',name:'QUAKE',desc:'Compact, stronger landing shockwave.'},
+  {id:'breaker',name:'BREAKER',desc:'35% less energy per wall HP; plow further.'}
+];
+const toolList=()=>TOOLS;
+const PWTOOLS=['beans','towel','splat','turbo','quake','breaker'];
+const DEFAULT_TOOLS=['none',...PWTOOLS];
+let powerPickerOpen=false;
+const toolOn=id=>pw.tool===id;
+function toolCycle(){const o=OPT(),i=DEFAULT_TOOLS.indexOf(o.tool||'none');o.tool=DEFAULT_TOOLS[(i+1)%DEFAULT_TOOLS.length]}
+function powerStock(id){return id==='valve'?(valveOpen()?1:0):id==='none'?1:Math.max(0,pw.left[id]||0)}
+function selectShotTool(id){
+  if(state!=='play'||man.mode!=='aim'||dragging||man.chug||man.stun>0)return false;
+  if(id!=='none'&&!TOOLS.some(t=>t.id===id))return false;
+  if(!powerStock(id))return false;
+  if(id!=='valve'&&(man.seated||man.vlv)){man.seated=man.vlv=false;man.x=SX;man.y=SY}
+  pw.tool=id;
+  // Soda is armed only by a completed chug, not by tapping its card.
+  pw.sel=PWTOOLS.includes(id)?id:id==='burp'&&pw.sel==='burp'?'burp':null;
+  return true;
+}
+function toolArm(){const t=OPT().tool||'none';if(PWTOOLS.includes(t)&&powerStock(t))selectShotTool(t)}
+const nameForTool=id=>id==='none'?'NONE':(TOOLS.find(x=>x.id===id)||{name:'NONE'}).name;
+const toolName=()=>nameForTool(OPT().tool||'none');
 function valveOpen(){return PD.unlockAll||storyDone()>=3}   // unlockable: beat 3 story levels (U on the level select unlocks everything)
 function drawValve(){
   if(!toolOn('valve'))return;
@@ -1166,13 +1420,14 @@ function drawInfFX(m){
 function manPlow(){
   bounceRubber();
   const m=man,R=m.R,mass=(m.dive?2.6:1)*(1+m.inf*1.5+(m.bel||0)*.9);let s=Math.hypot(m.vx,m.vy),E=.5*mass*s*s;const E0=E;let touched=false;
+  const costPerHP=m.pwr==='breaker'?K*.65:K;
   const x0=Math.floor((m.x-R)/V),x1=Math.floor((m.x+R)/V),y0=Math.floor((m.y-R)/V),y1=Math.floor((m.y+R)/V),list=[];
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(!inb(x,y)||!grid[idx(x,y)]||grid[idx(x,y)]===RUBBER)continue;
     const qx=clamp(m.x,x*V,x*V+V),qy=clamp(m.y,y*V,y*V+V),d=Math.hypot(m.x-qx,m.y-qy);if(d<R)list.push({d,x,y})}
   if(list.length){touched=true;list.sort((p,q)=>p.d-q.d);
-    for(const c of list){const i=idx(c.x,c.y);if(!grid[i])continue;const cost=hp[i]*K;
+    for(const c of list){const i=idx(c.x,c.y);if(!grid[i])continue;const cost=hp[i]*costPerHP;
       if(E>=cost){E-=cost;const h=kill(c.x,c.y,m.vx,m.vy);for(let d=0;d<4;d++)damageCell(c.x+DX[d],c.y+DY[d],h*.18)}
-      else{hp[i]-=E/K;E=0;spark(m.x+m.vx*.02,m.y+m.vy*.02,6,260);break}}}
+      else{hp[i]-=E/costPerHP;E=0;spark(m.x+m.vx*.02,m.y+m.vy*.02,6,260);break}}}
   /* Flying physics runs eight substeps each update. Reject far chunks and
      cells using two cheap axes before the original exact hypot check.
      Preserve strict '>' for chunk range and '>=' for individual contacts. */
@@ -1186,8 +1441,8 @@ function manPlow(){
       if(a.dead)continue;
       const dx=a.wx-m.x,dy=a.wy-m.y;
       if(Math.abs(dx)>=cellReach||Math.abs(dy)>=cellReach||
-         Math.hypot(dx,dy)>=cellReach)continue;touched=true;hit=true;ax+=a.wx;ay+=a.wy;n++;const cost=a.h*K;
-      if(E>=cost){E-=cost;if(a.m===TNT)movedTntBoom(a);else{a.dead=true;const c=MAT[a.m].c;for(let k=0;k<2;k++)chip(a.wx,a.wy,c,m.vx*.25+(rnd()-.5)*200,m.vy*.25-rnd()*150)}}else{a.h-=E/K;E=0}}
+         Math.hypot(dx,dy)>=cellReach)continue;touched=true;hit=true;ax+=a.wx;ay+=a.wy;n++;const cost=a.h*costPerHP;
+      if(E>=cost){E-=cost;if(a.m===TNT)movedTntBoom(a);else{a.dead=true;const c=MAT[a.m].c;for(let k=0;k<2;k++)chip(a.wx,a.wy,c,m.vx*.25+(rnd()-.5)*200,m.vy*.25-rnd()*150)}}else{a.h-=E/costPerHP;E=0}}
     if(hit&&ch.hitCd<=0){ch.hitCd=.12;applyImpulse(ch,ax/n,ay/n,m.vx*mass*.9,m.vy*mass*.9)}}
   /* Man-target proximity is checked for every flight substep. Squared
      distance avoids a square root for each landlord without sacrificing
@@ -1452,9 +1707,20 @@ function manStep(dt){
   manPlow()}
 // The sling can be stretched on past a full pull when you drag toward the air valve (see pointermove); power never exceeds a full pull.
 function pullVec(){let dx=SX-man.x,dy=SY-man.y;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}return[dx,dy]}
-function launch(){const[dx,dy]=pullVec();if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}man.x=SX-dx;man.y=SY-dy;
+function launch(){if(state!=='play'||man.mode!=='aim'||man.stun>0||man.chug||man.seated||man.vlv)return;
+  const[dx,dy]=pullVec();if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}man.x=SX-dx;man.y=SY-dy;
   const sp0=1-.5*man.inf-.1*(man.bel||0);man.R=14*(1+.9*man.inf+.35*(man.bel||0));man.vx=dx*9.2*sp0;man.vy=dy*9.2*sp0;man.mode='fly';if(man.inf>.6){ST().inflated++;popText(man.x,man.y-60,'HOT AIR!','#9fd8ff',26)}
-  if(pw.sel){man.pwr=pw.sel;man.bm=pw.sel==='burp'?burpMult(man):1;pw.left[pw.sel]--;ST()['pw_'+pw.sel]++;pw.sel=null}
+  man.pwr=null;
+  if(pw.sel){
+    const id=pw.sel;
+    if((PWTOOLS.includes(id)||id==='burp')&&powerStock(id)>0){
+      man.pwr=id;man.bm=id==='burp'?burpMult(man):1;pw.left[id]--;
+      const key='pw_'+id;ST()[key]=(ST()[key]||0)+1;
+    }
+    pw.sel=null;
+  }
+  pw.tool='none';powerPickerOpen=false;
+  if(man.pwr==='breaker'){ring(man.x,man.y,35,'#90e6ff');popText(man.x,man.y-35,'BREAKER READY','#90e6ff',20)}
   if(man.pwr==='turbo'){
     man.vx*=1.35;man.vy*=1.35;
     if(man.jg){man.jg.bvx+=Math.sign(man.vx)*24;man.jg.bvy-=11;man.jg.sq=1;man.jg.st=0;}
@@ -1501,7 +1767,7 @@ function updChug(dt){const m=man,c=m.chug;
   const ph=t<CT_A?0:t<CT_BK?1:t<CT_C?2:t<CT_TB?3:t<CT_D?4:5;
   if(ph!==c.ph){c.ph=ph;if(ph===2||ph===4){ring(STX,CHUG_Y-20,26,'#fff');popText(STX,CHUG_Y-60,ph===2?'GLUG!':'GLUG GLUG!','#ffd23f',20)}}
   c.th=ph===1?Math.PI*easeIO((t-CT_A)/(CT_BK-CT_A)):ph===2?Math.PI:ph===3?Math.PI+Math.PI*easeIO((t-CT_C)/(CT_TB-CT_C)):0;
-  if(ph===2||ph===4){c.gt-=dt;if(c.gt<=0){c.gt=.12;SFX.gulp();if(stom(m)>.6)SFX.creak(Math.min(1,stom(m)));if(stom(m)>.5&&rnd()<.3)sweat(m.x,m.y-20);if(parts.length<1200)P({k:6,x:STX+8,y:CHUG_Y-24,vx:(rnd()-.5)*30,vy:-30-rnd()*30,l:.5,l0:.5,s:2,c:'#dff3ff'})}}
+  if(ph===2||ph===4){c.gt-=dt;if(c.gt<=0){c.gt=.12;SFX.gulp();if(stom(m)>.6)SFX.creak(Math.min(1,stom(m)));if(stom(m)>.5&&rnd()<.3)sweat(m.x,m.y-20);if(parts.length<Math.min(1200,fxLimit()))P({k:6,x:STX+8,y:CHUG_Y-24,vx:(rnd()-.5)*30,vy:-30-rnd()*30,l:.5,l0:.5,s:2,c:'#dff3ff'})}}
   const fl=ph===5?BEL_MAX+(BEL_SET-BEL_MAX)*easeIO((t-CT_D)/(CT_END-CT_D)):.15*clamp((t-CT_BK)/(CT_TB-CT_BK),0,1)+(BEL_MAX-.15)*clamp((t-CT_TB)/(CT_D-CT_TB),0,1);
   m.bel=Math.max(0,Math.min(stomCap()-m.inf,c.b0+c.extra+fl));if(!OPT().noBurst&&stom(m)>=SODA_BURST){m.chug=null;sodaHold=false;explodeMan();return}   // half the belly is hidden behind his back; the rest is revealed on the turn
   if(ph===0){const u=t/CT_A;m.x=SX+(STX-SX)*u;m.y=SY+(CHUG_Y-SY)*u-Math.sin(u*Math.PI)*34}
@@ -1606,12 +1872,18 @@ function pwQuake(armed,spent){
   ctx.lineTo(cx-2,y-3);ctx.closePath();ctx.fill();
   txt('QUAKE',cx,y+27,10,'#ffd23f','center');ctx.restore();
 }
-function drawPwProp(){if(state!=='play')return;const t=OPT().tool||'none';if(!PWTOOLS.includes(t))return;const armed=pw.sel===t&&man.mode==='aim',spent=pw.left[t]<=0;
+function drawPwProp(){if(state!=='play')return;const t=pw.tool||'none';if(!PWTOOLS.includes(t))return;const armed=pw.sel===t&&man.mode==='aim',spent=pw.left[t]<=0;
+  if(t==='breaker'){
+    ctx.save();ctx.fillStyle='#253c51';ctx.fillRect(SX-58,GY-33,44,28);ctx.strokeStyle='#90e6ff';ctx.lineWidth=2;ctx.strokeRect(SX-58,GY-33,44,28);
+    txt('BRK',SX-36,GY-14,12,armed?'#90e6ff':'#ccd','center');ctx.restore();return;
+  }
   (t==='beans'?pwBeans:t==='towel'?pwTowel:t==='splat'?pwSplat:t==='turbo'?pwTurbo:pwQuake)(armed,spent)}
 // in flight: the towel cape, a goo trail, stink behind the beans, fizz around a loaded burp
-function pwFlightFX(m){const R=m.R||14,sp=Math.hypot(m.vx,m.vy)||1,ux=-m.vx/sp,uy=-m.vy/sp,t=time;
-  if(m.mode!=='fly')return;
+function pwFlightFX(m){
+  if(m.mode!=='fly'||!m.pwr)return;
+  const R=m.R||14,sp=Math.hypot(m.vx,m.vy)||1,ux=-m.vx/sp,uy=-m.vy/sp,t=time;
   if(m.pwr==='turbo'){for(let i=0;i<5;i++){const d=R+i*6,x=ux*d+Math.sin(t*13+i)*2,y=uy*d+Math.cos(t*11+i)*2;ctx.globalAlpha=.75-i*.12;ctx.fillStyle=i%2?'#fff':'#ffca59';ctx.fillRect(x-2,y-2,4,4)}ctx.globalAlpha=1}
+  if(m.pwr==='breaker'){ctx.strokeStyle='#90e6ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,R+3,-.85,.85);ctx.stroke()}
   if(m.pwr==='quake'&&!m.splatted){ctx.globalAlpha=.65+.2*Math.sin(t*7);ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,R+4,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1}
   if(m.pwr==='splat'&&!m.splatted){for(let i=0;i<7;i++){const d=R*.8+i*9+Math.sin(t*14+i*2)*2,x=ux*d+(pwQ(i)-.5)*10,y=uy*d+(pwQ(i+9)-.5)*10,r=Math.max(1.6,5.4-i*.55);ctx.globalAlpha=Math.max(.2,1-i*.11);ctx.fillStyle=pwVG(y-r,y+r,[0,'#b8ff7a',1,'#46a024']);ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle='#1c4a0c';ctx.stroke()}
     ctx.globalAlpha=1;for(const a of[.5,2.3,4.1]){const x=Math.cos(a)*R*.7,y=Math.sin(a)*R*.7;ctx.fillStyle='#8cf04a';ctx.beginPath();ctx.ellipse(x,y,4.4,3.2,a,0,7);ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle='#1c4a0c';ctx.stroke();ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(x-1.6,y-1.6,1.8,1)}}
@@ -1859,7 +2131,7 @@ function updTargets(dt){
 //  UPDATE
 // =====================================================================
 function update(dt){
-  if(state==='play')toolArm();
+  if(state==='play'&&powerPickerOpen&&man.mode==='aim')return;
   crackEv=0;time+=dt;for(const c of clouds){c.x+=c.v*dt;if(c.x>WW+140)c.x=-160}
   if(outfitCur.rainbow)applyOutfit(outfitCur,time);
   if(state==='cutscene'){cutTick(dt);titleTick(dt);return}
@@ -1879,7 +2151,7 @@ function update(dt){
     for(let i=0;i<8&&man.mode==='fly';i++)manStep(dt/8);
     if(man.mode==='fly'){const m=man;m.face=flightFaceFor(m.vx,m.face);
       m.ang+=(m.dive?0:(flightPitch(m.vx,m.vy)-m.ang)*.15);if(m.dive)m.spin+=dt*14;
-      m.gooT+=dt;if(m.gooT>.04){m.gooT=0;if(parts.length<1200)parts.push({k:3,x:m.x-m.vx*.01,y:m.y-m.vy*.01,vx:-m.vx*.05+(rnd()-.5)*40,vy:(rnd()-.5)*40,l:.7,l0:.7,s:2+rnd()*2})}
+      m.gooT+=dt;if(m.gooT>.04){m.gooT=0;if(parts.length<Math.min(1200,fxLimit()))P({k:3,x:m.x-m.vx*.01,y:m.y-m.vy*.01,vx:-m.vx*.05+(rnd()-.5)*40,vy:(rnd()-.5)*40,l:.7,l0:.7,s:2+rnd()*2})}
       m.stT+=dt;if(m.stT>.2){m.stT=0;const c=Math.cos(m.ang),sn=Math.sin(m.ang);   // stink trail
         P({k:6,x:m.x+(-30*c-8*sn),y:m.y+(-30*sn+8*c),vx:-m.vx*.04+(rnd()-.5)*20,vy:-12-rnd()*16,l:.9+rnd()*.4,l0:1.3,s:5+rnd()*3,c:'#a6d63c'})}
       if(m.x>WW+100||m.x<-100||m.gt>9)m.mode='done'}
@@ -1887,7 +2159,7 @@ function update(dt){
     const by=Math.floor((m.y+m.R+2)/V),gx=Math.floor(m.x/V);
     if(m.t<1.8&&m.y+m.R<GY-2&&!(inb(gx,by)&&grid[idx(gx,by)]))m.y+=16*dt;
     if(m.gooT>.35){m.gooT=0;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);for(let j=-2;j<=2;j++)for(let i=-2;i<=2;i++)damageCell(cx+i,cy+j,5);
-      if(parts.length<1200)parts.push({k:3,x:m.x+(rnd()-.5)*24,y:m.y+10,vx:0,vy:20,l:.9,l0:.9,s:3})}
+      if(parts.length<Math.min(1200,fxLimit()))P({k:3,x:m.x+(rnd()-.5)*24,y:m.y+10,vx:0,vy:20,l:.9,l0:.9,s:3})}
     for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<m.R+t.r+6)killTarget(t);
     m.a=m.t>2?Math.max(0,1-(m.t-2)/.6):1;if(m.t>2.6){goo(m.x,m.y,20,240);SFX.pop();m.mode='done'}}
   if(man.mode==='walk')walkStep(dt);
@@ -1901,6 +2173,7 @@ function update(dt){
   if(needSupport)supportPass();
   for(const ch of chunks)if(ch.hasTnt){ch.tntImpact=0;ch.tntHit=null}
   for(let i=0;i<6;i++)stepChunks(dt/6);
+  syncChunkPoses();
   updateMovingTnt();
   processExpl(); // process detonations caused by late rubble contacts this frame
   cleanChunks(dt);
@@ -1941,15 +2214,20 @@ function pPoly(pts,fill){const p=new Path2D();let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
 let SBA=null,SBB=null;
 function blobShade(parts,m,sc,o){
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
-  for(const q of parts){const b=q.bb;for(const[X,Y]of[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]]){const u=m.a*X+m.c*Y+m.e,v=m.b*X+m.d*Y+m.f;x0=Math.min(x0,u);y0=Math.min(y0,v);x1=Math.max(x1,u);y1=Math.max(y1,v)}}
+  for(const q of parts){const b=q.bb;
+    for(let k=0;k<4;k++){const X=b[k&1?2:0],Y=b[k&2?3:1];
+      const u=m.a*X+m.c*Y+m.e,v=m.b*X+m.d*Y+m.f;
+      x0=Math.min(x0,u);y0=Math.min(y0,v);x1=Math.max(x1,u);y1=Math.max(y1,v);
+    }
+  }
   const pad=Math.ceil(5*sc)+2;x0=Math.floor(x0)-pad;y0=Math.floor(y0)-pad;const w=Math.ceil(x1-x0)+pad,h=Math.ceil(y1-y0)+pad;
   if(!(w>1&&h>1)||w*h>4e6)return;
   if(!SBA){SBA=mkCanvas(w,h);SBB=mkCanvas(w,h)}
   if(SBA.width<w||SBA.height<h){const W=Math.max(SBA.width,w),H=Math.max(SBA.height,h);SBA.width=SBB.width=W;SBA.height=SBB.height=H}
-  const cut=(cv,dx,dy,col)=>{const c=cv.getContext('2d');c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-over';c.clearRect(0,0,cv.width,cv.height);
+  const cut=(cv,dx,dy,col)=>{const c=cv.getContext('2d');c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-over';c.clearRect(0,0,w,h);
     c.setTransform(m.a,m.b,m.c,m.d,m.e-x0,m.f-y0);c.fillStyle='#000';for(const q of parts)c.fill(q.p);
     c.globalCompositeOperation='destination-out';c.setTransform(m.a,m.b,m.c,m.d,m.e-x0+dx*sc,m.f-y0+dy*sc);for(const q of parts)c.fill(q.p);
-    c.globalCompositeOperation='source-in';c.setTransform(1,0,0,1,0,0);c.fillStyle=col;c.fillRect(0,0,cv.width,cv.height)};
+    c.globalCompositeOperation='source-in';c.setTransform(1,0,0,1,0,0);c.fillStyle=col;c.fillRect(0,0,w,h)};
   cut(SBA,-(o.sd==null?2.4:o.sd),-(o.sd==null?3:o.sd*1.25),o.shc||'rgba(168,84,48,.30)');
   if(o.hl!==0)cut(SBB,1.2,1.5,o.hlc||'rgba(255,255,255,.34)');
   ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(SBA,0,0,w,h,x0,y0,w,h);if(o.hl!==0)ctx.drawImage(SBB,0,0,w,h,x0,y0,w,h);ctx.restore()}
@@ -1970,12 +2248,14 @@ function bellyDetail(f){const cy=-2+f*14,rx=22+f*16,ry=17+f*20;ctx.save();
   ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-nw*.5,ny-nh*.5,nw*.35,nh*.3,0,0,6.3);ctx.fill();
   ctx.fillStyle='rgba(90,30,30,.4)';ctx.beginPath();ctx.ellipse(0,cy+ry*1.02,rx*.92,ry*.12,0,0,3.1416);ctx.fill();   // the overhang's shadow on the waistband
   ctx.restore()}
-function blob(parts,o){o=o||{};const m=ctx.getTransform(),sc=Math.hypot(m.a,m.b)||1,ow=o.ow==null?1.7:o.ow;
+function blob(parts,o){o=o||{};const ow=o.ow==null?1.7:o.ow;
   ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=OUT;ctx.fillStyle=OUT;ctx.lineWidth=ow*2;
   if(o.clip)ctx.clip(o.clip);
   if(ow>0)for(const q of parts){if(q.noout)continue;if(q.o)ctx.stroke(q.o);else{ctx.fill(q.p);ctx.stroke(q.p)}}
   for(const q of parts){ctx.fillStyle=q.fill||o.fill||SK;ctx.fill(q.p)}
-  if(o.sh!==0)blobShade(parts,m,sc,o);
+  // Full mode keeps the original rim light and shadow compositor.
+  // Lite mode retains all contours, poses, fills and hand-drawn detail.
+  if(o.sh!==0&&webDetailedLighting){const m=ctx.getTransform();blobShade(parts,m,Math.hypot(m.a,m.b)||1,o);}
   ctx.restore()}
 // soft cloth: a curved ribbon (waistband, cuff) along y=yc(x) from xa to xb, half-height hw (thinner toward both ends), with a slight ripple; stitched stripes on top
 function ribbonPoly(xa,xb,yc,hw,n,fill,rip){if(THONG){hw=Math.max(.9,hw*.3);fill=TG}const T=[],B=[];for(let i=0;i<=n;i++){const x=xa+(xb-xa)*i/n,u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u),r=(rip||0)*Math.sin(x*.85+1);T.push([x,yc(x)-h+r]);B.push([x,yc(x)+h+r*.7])}return pPoly(T.concat(B.reverse()),fill)}
@@ -3269,20 +3549,45 @@ const MAN_FRAMES={
   NAV_A:_F(.36,[0,-44]),NAV_A2:_F(.36,[0,-44]),NAV_B:_F(.36,[0,-44]),NAV_C:_F(.36,[0,-44]),NAV_D:_F(.36,[0,-44]),NAV_E:_F(.36,[0,-44]),KISS_A:_F(.36,[0,-44]),KISS_A2:_F(.36,[0,-44]),KISS_B:_F(.36,[0,-44]),KISS_C:_F(.36,[0,-44]),
   SLEEP_A:_F(.36,[1.7,-40.9]),SLEEP_B:_F(.36,[2,-39.9]),SAD:_F(.36,[0,-39]),
   CAPE_A:_F(.36,[0,-44]),SPIN_0:_F(.36,[0,-44]),SPIN_1:_F(.36,[0,-44]),SPIN_2:_F(.36,[0,-44]),SPIN_3:_F(.36,[0,-44]),SPIN_4:_F(.36,[0,-44]),SPIN_5:_F(.36,[0,-44]),SPIN_6:_F(.36,[0,-44]),SPIN_7:_F(.36,[0,-44]),SPIN_8:_F(.36,[0,-44]),SPIN_9:_F(.36,[0,-44]),SPIN_10:_F(.36,[0,-44]),SPIN_11:_F(.36,[0,-44]),SPIN_12:_F(.36,[0,-44]),SPIN_R1:_F(.36,[0,-44]),SPIN_R2:_F(.36,[0,-44]),SPIN_R3:_F(.36,[0,-44]),SPIN_R4:_F(.36,[0,-44]),SPIN_R5:_F(.36,[0,-44]),SPIN_R6:_F(.36,[0,-44]),SPIN_R7:_F(.36,[0,-44]),SPIN_R8:_F(.36,[0,-44]),SPIN_R9:_F(.36,[0,-44]),SPIN_R10:_F(.36,[0,-44]),SPIN_R11:_F(.36,[0,-44]),SPIN_BL:_F(.36,[0,-44]),SPIN_BR:_F(.36,[0,-44]),OOPS_A:_F(.36,[0,-44]),OOPS_B:_F(.36,[0,-44]),OOPS_C:_F(.36,[0,-44]),OOPS_D:_F(.36,[0,-44]),OOPS_E:_F(.36,[0,-44]),OOPS_F:_F(.36,[0,-44]),OOPS_G:_F(.36,[0,-44]),OOPS_H:_F(.36,[0,-44]),BACK_C:_F(.36,null),BACK_L:_F(.36,null),BACK_R:_F(.36,null),FART_A:_F(.36,null),FART_B:_F(.36,null)};
-function P(o){if(parts.length<fxLimit())parts.push(o)}
+function P(o){
+  if(parts.length<fxLimit()){parts.push(o);return}
+  // In an effect-heavy scene, don't lose the blast/impact ring simply
+  // because decorative sparks and dust consumed the whole phone budget.
+  if(o.k===5)for(let i=0;i<parts.length;i++){
+    const k=parts[i].k;
+    if(k===0||k===1||k===2||k===3||k===6){parts[i]=o;return}
+  }
+}
 function sweat(x,y){P({k:7,g:1,x:x+(rnd()-.5)*10,y:y+(rnd()-.5)*4,vx:(rnd()-.5)*6,vy:0,l:1.1,l0:1.1,s:1.6+rnd()*.9,c:'#bfe8ff'})}   // a bead forms on the skin, swells, then trickles down
 function updParts(dt){
-  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0){parts.splice(i,1);continue}
+  // Keep the original reverse update/audio order. Compact expired effects
+  // in a single stable forward pass; thousands of simultaneous deaths no
+  // longer repeatedly shift the surviving particle array.
+  let expired=false;
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0){expired=true;continue}
     if(p.k===1||p.k===6){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.98;p.vy*=.99;continue}
     if(p.k===5||(p.k===8&&p.sp))continue;
     if(p.k>=9){p.x+=p.vx*dt;p.y+=p.vy*dt;continue}
     p.vy+=(p.k===2?G*.4:p.g?G*.12:G)*dt;const ox=p.x,oy=p.y;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.k===4){p.vx*=.97;p.vy=Math.min(p.vy,90);p.r+=dt*6}
     if(p.y>GY-2){p.y=GY-2;p.vy*=-.3;p.vx*=.6;if(p.k===8&&!p.sp){p.sp=1;SFX.booger()}}
-    if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}}
-function updTexts(dt){for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=28*dt;if(t.t>t.l)texts.splice(i,1)}}
+    if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}
+  if(expired){let write=0;for(let i=0;i<parts.length;i++){const p=parts[i];if(!(p.l<=0))parts[write++]=p;}parts.length=write;}
+}
+function updTexts(dt){
+  let write=0;
+  for(let i=0;i<texts.length;i++){const t=texts[i];t.t+=dt;t.y-=28*dt;if(!(t.t>t.l))texts[write++]=t;}
+  texts.length=write;
+}
 let endT=0;
-function drawParts(){
+function drawParts(x0=-Infinity,x1=Infinity,y0=-Infinity,y1=Infinity){
+  const cull=x0!==-Infinity;
   for(const p of parts){const a=p.l/p.l0;
+    // Skip bounds math entirely for unzoomed screens.
+    if(cull){
+      const pad=p.k===2?Math.max(Math.abs(p.vx),Math.abs(p.vy))*.035+3:
+        Math.max(40,(p.s||0)*3+8);
+      if(p.x+pad<x0||p.x-pad>x1||p.y+pad<y0||p.y-pad>y1)continue;
+    }
     if(p.k===0){ctx.globalAlpha=Math.min(1,p.l);ctx.fillStyle=p.c;ctx.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s)}
     else if(p.k===1){ctx.globalAlpha=a*.5;ctx.fillStyle=p.c||'#e6e0d2';ctx.beginPath();ctx.arc(p.x,p.y,p.s*(1+(1-a)*1.4),0,7);ctx.fill()}
     else if(p.k===2){ctx.globalAlpha=Math.min(1,a*1.4);ctx.strokeStyle='#ffd36b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*.035,p.y-p.vy*.035);ctx.stroke()}
@@ -3651,7 +3956,11 @@ function layoutTick(){
     for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
     CAM.reset=true;CAM.snap=true;hits=[];
   }
-  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
+  const scale=state!=='options'&&typeof webRenderScale==='function'&&typeof OPT==='function'?webRenderScale(OPT()):1;
+  const bw=Math.max(1,Math.round(w*scale)),bh=Math.max(1,Math.round(h*scale));
+  if(w!==W||h!==H){W=w;H=h;CAM.snap=true;}
+  // Keep logical coordinates for camera, UI and pointer conversion.
+  if(cv.width!==bw||cv.height!==bh){cv.width=bw;cv.height=bh;_vig=null;}
   if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed){
     WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
     const rect=document.body.getBoundingClientRect(),
@@ -3703,17 +4012,18 @@ function camTick(dt){
   // behind the mission HUD or the feet behind the timer/control strip.
   if(walking)CAM.y=clamp(CAM.y,m.y-(H-174-22*z)/z,m.y-(138+40*z)/z);
 }
+function webScreenTransform(){ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0)}
 const toWorld=(sx,sy)=>CAM.on?[sx/CAM.z+CAM.x,sy/CAM.z+CAM.y]:[sx,sy];
 const toScreen=(x,y)=>CAM.on?[(x-CAM.x)*CAM.z,(y-CAM.y)*CAM.z]:[x,y];
 let AIM0={sx:0,sy:0,wx:0,wy:0};
 
 // the last pass over the picture: a warm key light from the sun's corner, cooler shadows, a soft vignette and a hint of bloom, so the flat flash-game colours sit together
 let _vig=null;
-function grade(){ctx.save();ctx.setTransform(1,0,0,1,0,0);
-  if(!_vig||_vig.w!==W||_vig.h!==H){const c=mkCanvas(W,H),x=c.getContext('2d');let g=x.createRadialGradient(W*.5,H*.46,H*.35,W*.5,H*.5,H*.98);g.addColorStop(0,'rgba(20,30,70,0)');g.addColorStop(1,'rgba(15,20,55,.42)');x.fillStyle=g;x.fillRect(0,0,W,H);
+function grade(){ctx.save();webScreenTransform();
+  if(!_vig||_vig.width!==cv.width||_vig.height!==cv.height){const c=mkCanvas(cv.width,cv.height),x=c.getContext('2d');x.scale(cv.width/W,cv.height/H);let g=x.createRadialGradient(W*.5,H*.46,H*.35,W*.5,H*.5,H*.98);g.addColorStop(0,'rgba(20,30,70,0)');g.addColorStop(1,'rgba(15,20,55,.42)');x.fillStyle=g;x.fillRect(0,0,W,H);
     g=x.createLinearGradient(W,0,0,H*.9);g.addColorStop(0,'rgba(255,214,150,.34)');g.addColorStop(.5,'rgba(255,214,150,0)');x.globalCompositeOperation='soft-light';x.fillStyle=g;x.fillRect(0,0,W,H);
     g=x.createLinearGradient(0,H*.55,0,H);g.addColorStop(0,'rgba(60,70,140,0)');g.addColorStop(1,'rgba(60,70,140,.35)');x.fillStyle=g;x.fillRect(0,0,W,H);_vig=c;_vig.w=W;_vig.h=H}
-  ctx.drawImage(_vig,0,0);ctx.restore()}
+  ctx.drawImage(_vig,0,0,W,H);ctx.restore()}
 // Interior silhouettes and glazing are attached to the actual wallpaper
 // cells, not to the camera. The voxel pass still occludes these details and
 // collapses remove them with their supporting room paper. No image assets.
@@ -3753,7 +4063,13 @@ function drawRoomDetails(xlo,xhi,ylo,yhi){
 }
 function draw(){
   hits=[];
-  ctx.setTransform(1,0,0,1,0,0);const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
+  webScreenTransform();
+  // Settings is opaque. No sky, scenery, gradients or animated menu actors
+  // need to be submitted behind it on a weak GPU.
+  if(state==='options'){drawSettings();drawToasts(frameDt);return}
+  if(state==='select'&&contractReview>=CH3_END){drawContractReview();return}
+  if(state==='play'&&powerPickerOpen&&man.mode==='aim'){drawPowerPicker();return}
+  const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
   if(camOn){ctx.fillStyle='#3d8fe8';ctx.fillRect(0,0,W,H);ctx.save();ctx.scale(CAM.z,CAM.z);ctx.translate(-CAM.x,-CAM.y)}
   if(camOn&&CAM.y<0){ctx.drawImage(bgA,0,0,WW,GY,0,CAM.y,WW,GY-CAM.y);ctx.drawImage(bgA,0,GY,WW,WH-GY,0,GY,WW,WH-GY)}else ctx.drawImage(bgA,0,0);
   if(camOn){const dh=Math.max(0,(CAM.y+H/CAM.z)-WH);if(dh>0){const g=ctx.createLinearGradient(0,WH,0,WH+dh);g.addColorStop(0,'#4d311d');g.addColorStop(1,'#2a1a10');ctx.fillStyle=g;ctx.fillRect(CAM.x-2,WH-1,W/CAM.z+4,dh+2)}}   // portrait: the earth continues below the ground line   // sky stretches up so the sun is never cut off
@@ -3787,8 +4103,14 @@ function draw(){
     x=x2}}
   drawRoomDetails(paperX0,paperX1,paperY0,paperY1);
   drawSling(true);drawValve();drawBurpStand();drawPwProp();
-  const cx0=Math.max(0,Math.floor(CAM.x/V)-2),cx1=Math.min(COLS,Math.ceil((CAM.x+W/CAM.z)/V)+2);   // only the columns on screen
-  for(let y=0;y<ROWS;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
+  // Restrict both axes at zoom. Allow the full wobble displacement and
+  // shake excursion so swaying tiles entering the viewport never vanish.
+  const voxelPad=(wobOn?WOB_OMAX+1:1)*V+paperShake;
+  const cx0=camOn?Math.max(0,Math.floor((CAM.x-voxelPad)/V)):0;
+  const cx1=camOn?Math.min(COLS,Math.ceil((CAM.x+W/CAM.z+voxelPad)/V)):COLS;
+  const cy0=camOn?Math.max(0,Math.floor((CAM.y-voxelPad)/V)):0;
+  const cy1=camOn?Math.min(ROWS,Math.ceil((CAM.y+H/CAM.z+voxelPad)/V)):ROWS;
+  for(let y=cy0;y<cy1;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
     if(wobOn){px=Math.round(px+ox[i]*V);py=Math.round(py+oy[i]*V)}   // swaying with the wobble
     ctx.drawImage(SPR[m][hsh(x,y)&3][r>.66?0:r>.33?1:2],px,py);
     if(brk[i]){ctx.fillStyle=m===GLASS?'rgba(255,255,255,.95)':'rgba(15,8,4,.8)';const b=brk[i];   // snapped joints show as cracks
@@ -3815,7 +4137,12 @@ function draw(){
   }
   const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';
   for(const t of targets)if(t.alive){
-    const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);
+    const[tx,ty]=targetOffset(t);
+    // Includes boss size, weapon swings, HP bars and the LAST marker.
+    // Use the same shake-expanded viewport as rubble; do not touch AI.
+    if(camOn&&(t.x+tx+112<rubbleX0||t.x+tx-112>rubbleX1||
+               t.y+ty+112<rubbleY0||t.y+ty-112>rubbleY1))continue;
+    ctx.save();ctx.translate(tx,ty);drawLandlord(t);
     // A compact locator above the surviving actor, positioned in the same
     // transformed world coordinate system as the actual landlord artwork.
     if(lastTargetVisible && t.collapseRolled!==2)
@@ -3828,16 +4155,19 @@ function draw(){
   if(pads.length)drawPads();
   // sling band behind man
   if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX+13,SY+24);ctx.lineTo(man.x+4,man.y+6);ctx.stroke()}
-  if(man.mode==='aim'&&dragging){const pv=pullVec(),vx=pv[0]*9.2,vy=pv[1]*9.2;const gd=OPT().guide==null?2:OPT().guide;for(let t=.06,i=0;t<[0,.55,1.7][gd];t+=.075,i++){ctx.fillStyle=`rgba(255,255,255,${.9-i*.035})`;ctx.beginPath();ctx.arc(man.x+vx*t,man.y+vy*t+450*t*t,3.4-i*.07,0,7);ctx.fill()}}
+  if(man.mode==='aim'&&dragging){const pv=pullVec(),id=powerStock(pw.sel)>0?pw.sel:null,sp=(1-.5*man.inf-.1*(man.bel||0))*(id==='turbo'?1.35:1),vx=pv[0]*9.2*sp,vy=pv[1]*9.2*sp;const gd=OPT().guide==null?2:OPT().guide;for(let t=.06,i=0;t<[0,.55,1.7][gd];t+=.075,i++){ctx.fillStyle=`rgba(255,255,255,${.9-i*.035})`;ctx.beginPath();ctx.arc(man.x+vx*t,man.y+vy*t+(id==='towel'?135:450)*t*t,3.4-i*.07,0,7);ctx.fill()}}
   renderMan();if(man.mode==='aim'||man.mode==='fly')drawInfFX(man);
   if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX-12,SY+22);ctx.lineTo(man.x-2,man.y+6);ctx.stroke()}
   drawSling(false);
-  drawParts();drawTexts();
+  if(camOn)drawParts(rubbleX0,rubbleX1,rubbleY0,rubbleY1);
+  else drawParts();
+  drawTexts();
   ctx.restore();
   if(camOn)ctx.restore();
   grade();
   if(flash>0){ctx.fillStyle=`rgba(255,240,200,${flash*.9})`;ctx.fillRect(0,0,W,H)}
-  drawHUD();drawObjectiveEdge();drawToasts(frameDt)}
+  drawHUD();drawObjectiveEdge();drawToasts(frameDt);
+}
 // Screen-space HUD cue; does not pan, collide with or change the final
 // landlord. Skip it entirely if the actor is already in the camera view.
 function drawObjectiveEdge(){
@@ -3908,7 +4238,7 @@ function drawHUD(){
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
-  if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
+  if(state==='play'){const tid=pw.tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
     if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
       btn(W-212,H-44,96,32,'< SLING',()=>goSling(slingK-1),{size:13,disabled:slingK<=0});btn(W-108,H-44,96,32,'SLING >',()=>goSling(slingK+1),{size:13,disabled:slingK>=CL.slings.length-1});void ny}
     // Separate immediate shot readiness from tool inventory. The
@@ -3923,15 +4253,45 @@ function drawHUD(){
            ready==='RELEASE TO LAUNCH'?'#7dff5a':'#ffe190','center');
       }
     }
-    if(man.mode!=='walk')btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
-    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
+    if(man.mode==='aim')btn(12,H-54,P?Math.min(W-24,238):260,42,'POWER: '+nameForTool(tid)+chg,()=>{
+      if(!dragging&&!man.chug&&!(man.stun>0)){powerPickerOpen=true;SFX.pop()}
+    },{size:14,on:tid!=='none',disabled:dragging||!!man.chug||man.stun>0});
+    if(pw.sel){const tip=TOOLS.find(t=>t.id===pw.sel);if(tip)txt(tip.desc,W/2,H-102,P?12:14,'#ffd23f','center')}
+  }
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
-  if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
+  else if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
-  if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
+  if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);const titleSize=P?Math.min(28,Math.floor((W-28)/Math.max(1,CL.name.length*.64))):40;
+    const tip=CL.tip||'Evict landlords. Falling TNT may survive!',tipSize=P?Math.min(15,Math.floor((W-24)/Math.max(1,tip.length*.58))):20;
+    txt(CL.name,W/2,180,titleSize,'#fff','center');txt(tip,W/2,214,tipSize,'#ffd23f','center');
+    if(CL.bonusPower)txt('BONUS: 2x '+CL.bonusPower.toUpperCase(),W/2,240,P?15:18,'#90e6ff','center');ctx.globalAlpha=1}
   if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
   if(state==='play')btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
   if(state==='win'||state==='lose')drawEnd()}
+// Modal power inventory; clicking outside cannot start a drag or launch.
+function drawPowerPicker(){
+  hits=[];
+  const portrait=isPortrait(),margin=portrait?14:110,wide=W-2*margin;
+  const top=portrait?112:78,rows=5,gap=6,rowH=Math.min(87,Math.floor((H-top-88-(rows-1)*gap)/rows));
+  ctx.fillStyle='#111827';ctx.fillRect(0,0,W,H);
+  txt('POWER UPS',W/2,45,portrait?32:30,'#ffd23f','center');
+  txt('Select one for this shot. Stock is spent only on launch.',W/2,portrait?75:64,portrait?14:13,'#cfd','center');
+  const choices=[{id:'none',name:'NORMAL SHOT',desc:'No charge spent.'},...TOOLS];
+  const cw=(wide-gap)/2;
+  for(let k=0;k<choices.length;k++){
+    const t=choices[k],x=margin+(k%2)*(cw+gap),y=top+Math.floor(k/2)*(rowH+gap),stock=powerStock(t.id),selected=pw.tool===t.id;
+    btn(x,y,cw,rowH,'',()=>{if(selectShotTool(t.id)){powerPickerOpen=false;hits=[];SFX.pop()}},
+      {on:selected,disabled:!stock});
+    txt(t.name,x+10,y+20,portrait?14:16,selected?'#172437':stock?'#fff':'#8993a5','left');
+    const label=t.id==='none'?'FREE':t.id==='valve'?(stock?'REUSABLE':'LOCKED'):(stock?'x'+stock:'USED');
+    txt(label,x+cw-9,y+20,12,selected?'#172437':stock?'#9debc1':'#ff9e9e','right');
+    // Fit descriptions into two readable lines, retaining the full action.
+    const max=portrait?30:46,words=(t.id==='valve'&&!stock?'Beat 3 story levels to unlock.':t.desc).split(' '),detailColor=selected?'#24364a':'#c7d5e9';let line='',ny=y+39;
+    for(const word of words){if(line.length&&line.length+word.length+1>max){txt(line,x+10,ny,portrait?11:13,detailColor,'left');ny+=14;line=word}else line+=(line?' ':'')+word}
+    if(line)txt(line,x+10,ny,portrait?11:13,detailColor,'left');
+  }
+  btn(margin,H-62,wide,46,'CLOSE / KEEP CURRENT',()=>{powerPickerOpen=false;hits=[]},{size:16});
+}
 function star(x,y,r,on){ctx.fillStyle=on?'#ffd23f':'#3a3f55';ctx.strokeStyle='#000';ctx.lineWidth=3;ctx.beginPath();for(let i=0;i<10;i++){const a=-1.5708+i*.6283,rr=i%2?r*.45:r;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.closePath();ctx.stroke();ctx.fill()}
 function drawEnd(){
   ctx.fillStyle='rgba(8,10,20,.72)';ctx.fillRect(0,0,W,H);const win=state==='win';
@@ -3955,7 +4315,7 @@ function drawEnd(){
   else{btn(cx-125,by,120,bh,'RETRY',retry,{size:16,on:true});btn(cx+5,by,120,bh,testing?'EDITOR':'LEVELS',backFromPlay,{size:16})}}
 // the WHOLE title picture (the full backdrop, no text but the logo) for the consoles: tools/gen_title.py draws it into a w x h canvas and the small screens pan across it; words = bake the logo in (the Dreamcast has no font)
 function drawTitlePicture(w,h,t,words){
-  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);const k=h/WH;ctx.save();ctx.scale(k,k);
+  webScreenTransform();ctx.clearRect(0,0,w,h);const k=h/WH;ctx.save();ctx.scale(k,k);
   ctx.drawImage(bgA,0,0);for(const c of clouds)drawCloud(c);ctx.drawImage(bgB,0,0);ctx.fillStyle='rgba(10,14,30,.35)';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate(700,GY-4);ctx.scale(2.2,2.2);drawSlamScene(t);ctx.restore();
   if(words){ctx.save();ctx.translate(270,170);ctx.rotate(-.03);txt('MANDEX',0,0,96,'#ffd23f','center','#7a1a1a');ctx.restore()}
@@ -3972,7 +4332,7 @@ function drawTitle(){
 // =====================================================================
 function pt(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
 function retry(){load(level,CL&&CL.custom?CL:undefined)}
-function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else if(level+1===CH1)startCutEnd(1);else if(level+1===CH2)startCutEnd(2);else{state='ending';endScroll=0;hits=[]}}
+function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else if(level+1===CH1)startCutEnd(1);else if(level+1===CH2)startCutEnd(2);else if(level>=CH3_END){selTab=4;goSelect();toast('ach','Contracts complete!','Replay for three stars.')}else{state='ending';endScroll=0;hits=[]}}
 let endScroll=0;
 const CREDITS=['MANDEX','THE LANDLORD SMASHER','','Every landlord has been evicted.','The neighbourhood is free.','Rent is cancelled.','','STARRING','The Man  -  as himself','His Towel  -  as the cape','The Belly  -  stunts and special effects','','LANDLORDS HARMED','all of them','','Thank you for playing!'];
 function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);endScroll+=frameDt*26;const PT=W<700,cx=PT?W/2:W/2+190;
@@ -3981,9 +4341,10 @@ function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);end
   JIG={bo:[sw*4,Math.cos(ph)*1.5],ro:[sw*5,0],bs:[1,1]};drawManFrame(seg===0?(sw>0?'DANCE_A':'DANCE_B'):seg===1?(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C'):(Math.sin(time*3)>.4?'BK_B':sw>0?'POSE_A':'POSE_B'));JIG=null;ctx.restore();
   if(rnd()<.25)P({k:rnd()<.5?12:13,x:rnd()*W,y:H+10,vx:(rnd()-.5)*30,vy:-60-rnd()*60,l:3,l0:3,s:5+rnd()*5,ph:rnd()*6});if(rnd()<.3)P({k:13,x:rnd()*W,y:rnd()*H,vx:0,vy:0,l:.7,l0:1,s:5+rnd()*6,ph:0});
   drawParts();btn(W-150,H-56,130,40,'MENU',goMenu,{size:16,on:true})}
-function backFromPlay(){if(testing){openEditor(true);return}goSelect()}
+function backFromPlay(){powerPickerOpen=false;if(testing){openEditor(true);return}goSelect()}
 cv.addEventListener('pointerdown',e=>{
   audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
+  if(state==='play'&&powerPickerOpen){hitTest(x,y);return}
   if(state==='cutscene'){cutClick(x,y);return}
   if(state==='title'){goMenu();return}
   if(isPortrait()&&['menu','select','ach','outfit','options'].includes(state)){
@@ -4077,10 +4438,12 @@ cv.addEventListener('lostpointercapture',e=>{
 });
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
+  if(state==='play'&&powerPickerOpen){if(e.key==='Escape')powerPickerOpen=false;e.preventDefault();return}
   if(e.code==='Space'){dive();e.preventDefault()}
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
   if(state==='title')return;
   if(state==='play'&&CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){if(e.key==='[')goSling(slingK-1);if(e.key===']')goSling(slingK+1)}
+  if(e.key==='Escape'&&state==='select'&&contractReview>=CH3_END){contractReview=-1;contractPlan=null;hits=[];return}
   if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'&&E.starters){E.starters=false}else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending')goMenu();return}
   if(state==='select'&&(e.key==='u'||e.key==='U')){PD.unlockAll=!PD.unlockAll;pdTouch();toast('ach',PD.unlockAll?'All levels unlocked':'Levels locked again','');return}
   if(state==='edit'){const k=e.key.toLowerCase();
@@ -4103,7 +4466,7 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.
 //  META: save data, achievements, outfits, menus, level select, LEVEL CREATOR
 // =====================================================================
 const SAVE_KEY='mandex.save.v1';
-const ST0=()=>({kills:0,cells:0,booms:0,shots:0,flops:0,wins:0,oneShots:0,created:0,customWins:0,exported:0,maxChain:0,bestScore:0,inflated:0,pops:0,pw_beans:0,pw_towel:0,pw_splat:0,pw_burp:0,pw_turbo:0,pw_quake:0});
+const ST0=()=>({kills:0,cells:0,booms:0,shots:0,flops:0,wins:0,oneShots:0,created:0,customWins:0,exported:0,maxChain:0,bestScore:0,inflated:0,pops:0,pw_beans:0,pw_towel:0,pw_splat:0,pw_burp:0,pw_turbo:0,pw_quake:0,pw_breaker:0});
 let PD={stars:{},best:{},ach:{},outfit:'classic',own:{},custom:[],st:ST0(),unlockAll:false,opt:{collapse:false,tool:'none'}};
 function pdLoad(){try{const s=localStorage.getItem(SAVE_KEY);if(s){const o=JSON.parse(s);PD=Object.assign(PD,o);PD.st=Object.assign(ST0(),o.st||{})}}catch(e){}}
 let pdDirty=false;
@@ -4115,6 +4478,9 @@ function pdTouch(){pdDirty=true}
 pdLoad();
 const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'none'});
 webEcoFX=!!OPT().ecoFX;             // load saved touch-friendly effects preference
+// A conservative starting hint; measured frame costs can override it.
+if(typeof navigator!=='undefined'&&navigator.deviceMemory>0&&navigator.deviceMemory<=2)webPerfTier=1;
+webFxCap=webFxBudget(OPT());webDetailedLighting=webLightingDetail(OPT());
 muted=!!OPT().muted;
 const ST=()=>PD.st;
 const totalStars=()=>{let n=0;for(const k in PD.stars)if(+k>=0&&+k<CH1)n+=PD.stars[k]||0;return n};
@@ -4236,10 +4602,10 @@ function drawToasts(dt){
 
 // ---------- screens ----------
 const UISTATES=['menu','select','ach','outfit','options','ending'];
-let selTab=0;
+let selTab=0,contractReview=-1,contractPlan=null;
 function goMenu(){state='menu';hits=[]}
-function goSelect(){state='select';hits=[]}
-function startStory(i){testing=false;selTab=i>=CH2?3:i>=CH1?2:0;if(i===0){startCut();return}if(i===CH2){startCut3();return}load(i)}
+function goSelect(){state='select';hits=[];contractReview=-1;contractPlan=null}
+function startStory(i){contractReview=-1;contractPlan=null;testing=false;selTab=i>=CH3_END?4:i>=CH2?3:i>=CH1?2:0;if(i===0){startCut();return}if(i===CH2){startCut3();return}load(i);if(i>=CH3_END)musUpdate()}
 // ---------- OPENING CUTSCENE: the origin of MANDEX (plays before story level 1; tap = next, SKIP or Esc = straight to the level) ----------
 let cutI=0,cutT=0,cutFx=0;
 let CUTS=null,cutDone=()=>load(0);
@@ -5102,7 +5468,8 @@ function drawCutscene(){
   for(let i=0;i<CUTS.length;i++){ctx.fillStyle=i===cutI?'#ffd23f':'rgba(255,255,255,.4)';ctx.beginPath();ctx.arc(24+i*16,24,4,0,7);ctx.fill()}}
 
 const ch2Unlocked=i=>PD.unlockAll||i===CH1||(PD.stars[i-1]||0)>0;
-const ch3Unlocked=i=>PD.unlockAll||(i===CH2?(PD.stars[CH2-1]||0)>0:(PD.stars[i-1]||0)>0);   // the first chapter 2 level is open; the rest unlock in order
+const ch3Unlocked=i=>PD.unlockAll||(i===CH2?(PD.stars[CH2-1]||0)>0:(PD.stars[i-1]||0)>0);
+const contractUnlocked=i=>i>=CH3_END&&i<LEVELS.length&&(PD.unlockAll||i<CH3_END+3||i===CH3_END+16||(PD.stars[i-1]||0)>0); // first Overtime mission is a new entry point
 function storyUnlocked(i){return PD.unlockAll||i<3||(PD.stars[i-1]||0)>0}
 /* Portrait pages are deliberately drawn in the existing 2D canvas (and
    share the same btn()/hitTest(), game actions and save model). These are
@@ -5181,26 +5548,92 @@ function drawMobileMenu(){
 function mobileSelectItems(){
   if(selTab===0)return LEVELS.slice(0,CH1).map((q,i)=>({label:(i+1)+'. '+q.name,stars:PD.stars[i]||0,locked:!storyUnlocked(i),fn:()=>startStory(i)}));
   if(selTab===2)return LEVELS.slice(CH1,CH2).map((q,i)=>({label:(CH1+i+1)+'. '+q.name,stars:PD.stars[CH1+i]||0,locked:!ch2Unlocked(CH1+i),fn:()=>startStory(CH1+i)}));
-  if(selTab===3)return LEVELS.slice(CH2).map((q,i)=>({label:(CH2+i+1)+'. '+q.name,stars:PD.stars[CH2+i]||0,locked:!ch3Unlocked(CH2+i),fn:()=>startStory(CH2+i)}));
+  if(selTab===4)return LEVELS.slice(CH3_END).map((q,i)=>({label:(i+1)+'. '+q.name,stars:PD.stars[CH3_END+i]||0,locked:!contractUnlocked(CH3_END+i),fn:()=>openContract(CH3_END+i),contract:q}));
+  if(selTab===3)return LEVELS.slice(CH2,CH3_END).map((q,i)=>({label:(CH2+i+1)+'. '+q.name,stars:PD.stars[CH2+i]||0,locked:!ch3Unlocked(CH2+i),fn:()=>startStory(CH2+i)}));
   const items=[{label:'+ CREATE NEW LEVEL',fn:()=>openEditor(false)},
     {label:'IMPORT LEVEL CODE',fn:importCode}];
   PD.custom.forEach((q,i)=>items.push({label:(i+1)+'. '+q.n,custom:true,i,fn:()=>startCustom(i)}));
   return items;
 }
+// Lightweight pre-mission site plan. The plan never writes to the live
+// world and is cached for the selected contract only. Every operation is
+// displayed as a structural schematic, not a fake prediction of physics.
+function makeContractPlan(data){
+  const image=mkCanvas(480,240),c=image.getContext('2d'),scale=4;
+  c.fillStyle='#0d1828';c.fillRect(0,0,480,240);
+  c.strokeStyle='#22364b';c.lineWidth=1;
+  c.beginPath();for(let x=0;x<=120;x+=10){c.moveTo(x*scale,0);c.lineTo(x*scale,240)}
+  for(let y=0;y<=60;y+=10){c.moveTo(0,y*scale);c.lineTo(480,y*scale)}c.stroke();
+  function block(x,y,w,h,m){c.fillStyle=m?MAT[m].c:'#0d1828';c.fillRect(x*scale,y*scale,w*scale,h*scale)}
+  const targets=[],pipes=[],springs=[];
+  for(const [op,...a] of data.ops){
+    if(op==='h'){
+      const[x,g,w,fl,fh,wt,ft,wall,floor,roof,gable,crenel]=a,top=g-fl*fh;
+      for(let k=0;k<=fl;k++)block(x,g-k*fh,w,k?ft:1,floor);
+      for(let k=0;k<fl;k++){const row=g-k*fh,y=row-fh+ft;block(x,y,wt,row-y,wall);block(x+w-wt,y,wt,row-y,wall);if(w>13)block(x+(w>>1),y,1,row-y,wall===6?6:1)}
+      if(gable){for(let k=0;k<7&&w+2-2*k>1;k++)block(x-1+k,top-1-k,w+2-2*k,1,roof)}
+      else block(x-1,top-2,w+2,2,roof);
+      if(crenel)for(let k=0;k<w+2;k+=2)block(x-1+k,top-3,1,1,roof);
+    }else if(op==='r')block(...a);
+    else if(op==='n')block(a[0],a[1]-2,2,2,5);
+    else if(op==='m'){for(let k=0;k<a[2]&&a[1]-2*k>0;k++)block(a[0]+k,59-k,a[1]-2*k,1,8)}
+    else if(op==='t')targets.push(a);
+    else if(op==='u')pipes.push(a);
+    else if(op==='p')springs.push(a);
+  }
+  c.strokeStyle='#ffd486';c.lineWidth=2;c.setLineDash([4,3]);
+  for(const [ax,ay,bx,by]of pipes){c.beginPath();c.moveTo(ax*scale,ay*scale);c.lineTo(bx*scale,by*scale);c.stroke()}
+  c.setLineDash([]);
+  for(const [x,y,w] of springs){c.fillStyle='#ff83ba';c.fillRect(x*scale,y*scale,w*scale,3)}
+  c.fillStyle='#7dffaf';c.fillRect(16*scale-2,45.25*scale-2,5,5);
+  for(const [x,y,k] of targets){c.fillStyle=k===6?'#ffe28a':'#ff8b9d';c.beginPath();c.arc((x+.5)*scale,(y-1.2)*scale,k===6?4.2:3.2,0,Math.PI*2);c.fill();c.strokeStyle='#111827';c.lineWidth=1;c.stroke()}
+  return image;
+}
+function openContract(i){
+  if(!contractUnlocked(i)||i<CH3_END||i>=LEVELS.length)return;
+  contractReview=i;contractPlan=makeContractPlan(CONTRACT_DATA[i-CH3_END]);hits=[];
+}
+function drawContractReview(){
+  const i=contractReview,q=LEVELS[i],d=CONTRACT_DATA[i-CH3_END],p=isPortrait(),margin=p?18:32;
+  ctx.fillStyle='#101826';ctx.fillRect(0,0,W,H);
+  txt('CONTRACT '+(i-CH3_END+1)+' / '+CONTRACT_DATA.length,W/2,p?45:35,16,'#90e6ff','center');
+  txt(q.name.toUpperCase(),W/2,p?85:75,p?28:35,'#fff','center');
+  const mapW=p?W-2*margin:510,mapH=mapW/2,mapX=p?margin:32,mapY=p?108:101;
+  if(contractPlan)ctx.drawImage(contractPlan,mapX,mapY,mapW,mapH);
+  const tx=p?margin:568,ty=p?mapY+mapH+27:123,tw=p?W-2*margin:W-tx-24;
+  txt('MISSION BRIEF',tx,ty,17,'#90e6ff','left');
+  let line='',yy=ty+28;const max=p?60:40;
+  for(const word of d.brief.split(' ')){
+    if(line.length&&line.length+word.length+1>max){txt(line,tx,yy,p?14:15,'#d3deec','left');yy+=22;line=word}
+    else line+=(line?' ':'')+word;
+  }
+  if(line){txt(line,tx,yy,p?14:15,'#d3deec','left');yy+=24}
+  txt(d.ops.filter(a=>a[0]==='t').length+' LANDLORDS  /  '+q.men+' MEN',tx,yy+5,16,'#fff','left');
+  txt('BONUS: 2x '+q.bonusPower.toUpperCase(),tx,yy+31,18,'#90e6ff','left');
+  txt('BEST '+(PD.best[i]||0)+'   /   '+(PD.stars[i]||0)+' STARS',tx,yy+56,14,'#ffd23f','left');
+  const y=H-68,bw=(W-2*margin-10)/2;
+  btn(margin,y,bw,48,'< CONTRACTS',()=>{contractReview=-1;contractPlan=null;hits=[]},{size:16});
+  btn(margin+bw+10,y,bw,48,'START MISSION',()=>startStory(i),{size:17,on:true,col:'#90e6ff'});
+}
 function drawMobileSelect(){
-  mobileHeader('SELECT LEVEL',selTab===1?'YOUR CUSTOM LEVELS':'CHOOSE A DISTRICT',goMenu);
-  const labels=['STORY','MY LEVELS','CHAPTER 2','CHAPTER 3'],tabs=[0,1,2,3];
-  for(let i=0;i<4;i++)mobileTab(12+(i%2)*264,101,252,labels[i],
-    ()=>{selTab=tabs[i];WEB_UI.page.select=0},selTab===tabs[i]);
+  if(contractReview>=CH3_END){drawContractReview();return}
+  mobileHeader('SELECT LEVEL',selTab===1?'YOUR CUSTOM LEVELS':selTab===4?'DEMOLITION CONTRACTS':'CHOOSE A DISTRICT',goMenu);
+  const labels=['STORY','CHAPTER 2','CHAPTER 3','CONTRACTS','MY LEVELS'],tabs=[0,2,3,4,1];
+  for(let i=0;i<5;i++){
+    const first=i<3,x=first?12+i*174:12+(i-3)*264,y=first?101:151,w=first?168:252;
+    mobileTab(x,y,w,labels[i],()=>{selTab=tabs[i];WEB_UI.page.select=0},selTab===tabs[i]);
+  }
   const items=mobileSelectItems(),top=208,rh=94,rowGap=8,cols=2,
     visibleRows=Math.max(2,Math.floor((H-top-94)/(rh+rowGap))),size=visibleRows*cols,
     page=mobilePage('select',items.length,size),start=page*size;
   for(let j=start;j<Math.min(items.length,start+size);j++){
     const it=items[j],k=j-start,x=12+(k%2)*264,y=top+Math.floor(k/2)*(rh+rowGap);
-    const label=it.locked?'LOCKED':it.label;
+    const label=it.label;
     btn(x,y,252,rh,label,()=>{if(!it.locked)it.fn();else SFX.pop()},
         {size:it.label.length>19?12:15,on:!it.locked&&it.stars>=2});
+    if(it.locked)txt('LOCKED',x+126,y+rh-12,13,'#aab','center');
     if(!it.locked&&it.stars)txt('★'.repeat(it.stars),x+126,y+rh-8,15,'#ffd23f','center');
+    if(it.contract&&!it.locked)txt('2x '+it.contract.bonusPower.toUpperCase(),x+126,y+rh-24,13,'#90e6ff','center');
     if(it.custom&&it.i!=null){
       btn(x+4,y+rh-44,76,40,'EDIT',()=>openEditor(false,it.i),{size:12});
       btn(x+86,y+rh-44,70,40,'SHARE',()=>exportCode(PD.custom[it.i]),{size:12});
@@ -5239,38 +5672,77 @@ function drawMobileOutfits(){
   });
   mobilePager('outfit',OUTFITS.length,size);
 }
-function drawMobileOptions(){
-  const page=WEB_UI.page.options?1:0,o=OPT();
-  mobileHeader('OPTIONS',page?'SOUND, SCREEN & DATA':'GAMEPLAY',goMenu);
-  mobileTab(12,108,252,'GAMEPLAY',()=>{WEB_UI.page.options=0},page===0);
-  mobileTab(276,108,252,'SOUND & DATA',()=>{WEB_UI.page.options=1},page===1);
-  let y=169;const rh=58,gap=8;
-  function row(label,value,fn,on){
-    btn(20,y,W-40,rh,label+': '+value,()=>{fn();pdTouch();pdSave();SFX.pop()},
-        {size:label.length>20?15:17,on:!!on});
-    y+=rh+gap;
-  }
-  if(!page){
-    row('COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',()=>{o.collapse=!o.collapse},o.collapse);
-    row('START TOOL',toolName(),toolCycle,toolName()!=='NONE');
-    row('AIM GUIDE',GUIDES[o.guide==null?2:o.guide],()=>{o.guide=((o.guide==null?2:o.guide)+1)%3},(o.guide==null?2:o.guide)>0);
-    row('BURP CHARGE',o.burpCharge?'ON':'OFF',()=>{o.burpCharge=!o.burpCharge},o.burpCharge);
-    row('STOMACH NEVER BURSTS',o.noBurst?'ON':'OFF',()=>{o.noBurst=!o.noBurst},o.noBurst);
-    row('LANDLORDS FIGHT BACK',o.fight===false?'OFF':'ON',()=>{o.fight=o.fight===false?true:false},o.fight!==false);
+// The same four-page settings model drives both orientations. Every row is
+// one large tap target; the right-aligned value explains what tapping cycles.
+const SETTINGS_TABS=['GAMEPLAY','PERFORMANCE','AUDIO','SAVE DATA'];
+function settingsPage(){return Math.max(0,Math.min(3,WEB_UI.page.options|0))}
+function drawSettings(){
+  const portrait=isPortrait(),page=settingsPage(),o=OPT();
+  WEB_UI.page.options=page;
+  ctx.fillStyle='#111827';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#ffd23f';ctx.fillRect(0,0,W,5);
+  txt('OPTIONS',W/2,portrait?53:40,portrait?34:29,'#ffd23f','center');
+  btn(12,12,portrait?91:100,42,'< MENU',goMenu,{size:15});
+  const margin=portrait?16:28,gap=8,tabY=portrait?86:64,tabW=(W-2*margin-3*gap)/4;
+  for(let k=0;k<4;k++)btn(margin+k*(tabW+gap),tabY,tabW,44,SETTINGS_TABS[k],
+    ()=>{WEB_UI.page.options=k},{size:portrait?12:16,on:page===k,col:'#ffd23f'});
+  const cap=webRenderCap(o),scale=webRenderScale(o),budget=webFxBudget(o);
+  const tier=['QUALITY','BALANCED','LOW END'][webEffectiveTier(o)];
+  const shakeName=SHAKES.find(a=>a[1]===(o.shake==null?1:o.shake))?.[0]||'FULL';
+  const shakeCycle=()=>{const k=SHAKES.findIndex(a=>a[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(k+1)%SHAKES.length][1]};
+  const now=performance.now(),rows=[];
+  const add=(name,value,detail,fn,on=false)=>rows.push({name,value,detail,fn,on});
+  const toggle=(key)=>{o[key]=!o[key]};
+  if(page===0){
+    add('COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF','Fallen rubble stays loose and can topple.',()=>toggle('collapse'),!!o.collapse);
+    add('START POWER',toolName(),'Pre-arm an available power on reload.',toolCycle,toolName()!=='NONE');
+    add('AIM GUIDE',GUIDES[o.guide==null?2:o.guide],'Preview your launch trajectory.',()=>{o.guide=((o.guide==null?2:o.guide)+1)%3},(o.guide==null?2:o.guide)>0);
+    add('BURP CHARGE',o.burpCharge?'ON':'OFF','Charge the soda-powered attack.',()=>toggle('burpCharge'),!!o.burpCharge);
+    add('NO STOMACH BURST',o.noBurst?'ON':'OFF','Cheat: disable over-inflation bursts.',()=>toggle('noBurst'),!!o.noBurst);
+    add('LANDLORD DEFENCE',o.fight===false?'OFF':'ON','Let landlords fight back.',()=>{o.fight=o.fight===false},o.fight!==false);
+  }else if(page===1){
+    add('PERFORMANCE PROFILE',webProfileLabel(o),'Auto adapts; Low End favors smooth play.',()=>cycleWebProfile(o),webProfile(o)!=='auto');
+    add('RENDER FRAME CAP',webCapLabel(o),'30 saves CPU; 60 feels smoother.',()=>cycleWebCap(o),!!o.renderCap);
+    add('RENDER RESOLUTION',webScaleLabel(o),'Lower pixels, same controls and camera.',()=>cycleWebScale(o),!!o.renderScale);
+    add('DECORATIVE EFFECTS',webFXLabel(o),'Fewer sparks and dust, same destruction.',()=>cycleWebFX(o),o.ecoFX===true);
+    add('SCREEN SHAKE',shakeName,'Reduce motion during impacts.',shakeCycle,shakeName!=='FULL');
+    add('FPS / SIM MONITOR',frameMeterVisible?'ON':'OFF','Show measured FPS and simulation speed.',()=>{frameMeterVisible=!frameMeterVisible;o.showPerf=frameMeterVisible},frameMeterVisible);
+    add('CHARACTER LIGHTING',webLightingLabel(o),'Lite skips costly shadow masks.',()=>cycleWebLighting(o),o.lighting==='lite');
+  }else if(page===2){
+    const v=Math.round(optVol()*100);
+    add('MASTER SOUND',muted?'OFF':'ON','Music, voices and impact effects.',()=>{audioInit();setMuted(!muted)},!muted);
+    add('VOLUME UP',v+'%','Increase master volume by 10%.',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol()});
+    add('VOLUME DOWN',v+'%','Decrease master volume by 10%.',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol()});
+    add('CONTRACT MUSIC',o.contractMusic===false?'SYNTH':'ORIGINAL','Stream music if the optional audio pack is present.',()=>{o.contractMusic=o.contractMusic===false;},o.contractMusic!==false);
   }else{
-    row('SOUND',muted?'OFF':'ON',()=>{audioInit();setMuted(!muted)},!muted);
-    const val=Math.round(optVol()*100);
-    row('VOLUME',val+'%',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol()},val>0);
-    row('VOLUME DOWN',val+'%',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol()},false);
-    row('SCREEN SHAKE',SHAKES.find(s=>s[1]===(o.shake==null?1:o.shake))?.[0]||'FULL',()=>{let i=SHAKES.findIndex(s=>s[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1]},(o.shake==null?1:o.shake)>0);
-    row('DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX},!webEcoFX);
-    if(y+rh<H-72)row('RESET OPTIONS','DEFAULT',()=>{if(performance.now()<armReset){optsReset();armReset=0}else armReset=performance.now()+3000},false);
-    if(y+rh<H-68)row('ERASE PROGRESS','CONFIRM',()=>{if(performance.now()<armProg){progReset();armProg=0}else armProg=performance.now()+3000},false);
+    const reset=now<armReset,erase=now<armProg;
+    add('RESET SETTINGS',reset?'CONFIRM':'DEFAULT','Restore settings; keep progress and levels.',()=>{if(reset){optsReset();armReset=0;toast('ach','Options reset','')}else{armReset=performance.now()+3000;armProg=0}},reset);
+    add('ERASE PROGRESS',erase?'CONFIRM':'RESET','Clear stars and unlocks; keep custom maps.',()=>{if(erase){progReset();armProg=0;toast('ach','Progress erased','')}else{armProg=performance.now()+3000;armReset=0}},erase);
   }
-  if(!page)txt('TNT CAN SURVIVE FALLS. HARD HITS LIGHT A FUSE.',W/2,H-95,13,'#ffe190','center');
-  if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{WEB_UI.page.options=1},{size:18});
-  else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{WEB_UI.page.options=0},{size:18});
+  const top=portrait?171:150,columns=portrait?1:2,rowGap=portrait?6:12;
+  const nRows=Math.ceil(rows.length/columns),foot=portrait?86:74;
+  const rh=Math.min(portrait?69:90,Math.floor((H-top-foot-(nRows-1)*rowGap)/Math.max(1,nRows)));
+  const rw=(W-2*margin-(columns-1)*gap)/columns;
+  txt(page===1?tier+'  /  '+cap+' FPS CAP  /  '+Math.round(scale*100)+'% RESOLUTION':page===0?'PLAY YOUR WAY':page===2?'SOUND & VOLUME':'YOUR SAVE FILE',
+    W/2,portrait?151:135,portrait?15:17,'#b7d5e9','center');
+  rows.forEach((row,k)=>{
+    const x=margin+(k%columns)*(rw+gap),y=top+Math.floor(k/columns)*(rh+rowGap);
+    btn(x,y,rw,rh,'',()=>{row.fn();pdTouch();pdSave();SFX.pop()},{on:false});
+    const valW=portrait?142:133;
+    ctx.fillStyle=row.on?'#285c58':'#293548';ctx.fillRect(x+rw-valW-9,y+8,valW,rh-16);
+    txt(row.name,x+12,y+Math.min(23,rh*.34),portrait?16:17,'#fff','left');
+    txt(row.detail,x+12,y+rh-12,portrait?12:12,'#b7c5d8','left');
+    txt(row.value,x+rw-valW/2-9,y+rh/2+5,portrait?16:15,row.on?'#baf6ce':'#ffe090','center');
+  });
+  if(page===1){
+    txt('Physics target: 60 updates/sec. Effects budget: '+budget+'.',W/2,H-49,portrait?14:15,'#b7d5e9','center');
+    txt('If gameplay slows, try LOW END or 60% resolution.',W/2,H-26,portrait?13:14,'#cfd','center');
+  }else if(page===3){
+    txt('Custom creator levels are preserved.',W/2,H-38,15,'#cfd','center');
+    txt('Destructive actions require a second tap within 3 seconds.',W/2,H-16,12,'#b7c5d8','center');
+  }else txt(page===0?'TNT: soft falls can survive; hard impacts may light a fuse.':'Changes are saved automatically.',W/2,H-29,portrait?13:15,'#cfd','center');
 }
+function drawMobileOptions(){drawSettings()}
 /* Portrait creator: a genuine 120-column editing surface with horizontal
    panning, unclipped world-cell touch mapping and a separate tool/action tray.
    No copy of E.g, no second offscreen canvas and no changed save encoding. */
@@ -5400,42 +5872,9 @@ function drawMenu(){
 let sliderDrag=false,sliX=0,sliW=1,armReset=0,armProg=0;
 function setVolFromX(x){const o=OPT();o.vol=clamp(Math.round((x-sliX)/sliW*20)/20,0,1);applyVol();pdTouch()}
 const GUIDES=['OFF','SHORT','FULL'],SHAKES=[['OFF',0],['LOW',.5],['FULL',1]];
-function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX'])delete o[k];o.tool='none';muted=false;webEcoFX=false;applyVol();pdTouch();pdSave()}
+function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX','performance','renderCap','renderScale','showPerf','lighting','contractMusic'])delete o[k];o.tool='none';muted=false;webEcoFX=false;frameMeterVisible=false;webPerfBad=webPerfGood=0;applyVol();pdTouch();pdSave()}
 function progReset(){PD.stars={};PD.best={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
-function drawOptions(){
-  ctx.fillStyle='rgba(10,14,30,.62)';ctx.fillRect(0,0,W,H);
-  txt('OPTIONS',W/2,56,40,'#ffd23f','center','#7a1a1a');btn(16,14,90,36,'< MENU',goMenu,{size:16});
-  const o=OPT(),now=performance.now(),cw=430,lx=40,rx=W-40-cw,rh=46,gap=8;let y=98,ry=98;
-  const head=(x,yy,t)=>{txt(t,x+cw/2,yy+14,15,'#ffb03a','center','#5a2a00')};
-  const row=(x,yy,label,val,fn,col,on)=>{btn(x,yy,cw,rh,label+(val!=null?':  '+val:''),fn,{size:17,on:on,col:col||'#7dff5a'})};
-  // ---- left: gameplay ----
-  head(lx,y,'GAMEPLAY');y+=26;
-  row(lx,y,'COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',()=>{o.collapse=!o.collapse;pdTouch();pdSave();SFX.pop()},null,!!o.collapse);y+=rh+2;
-  txt(o.collapse?'Rubble can topple. TNT: soft falls safe; hard hits may light a fuse.':'Rubble settles and locks. TNT can survive a soft landing.',lx+cw/2,y+12,13,'#cfd','center');y+=gap+14;
-  row(lx,y,'START TOOL',toolName(),()=>{toolCycle();pdTouch();pdSave();SFX.pop()},'#ffd23f',true);y+=rh+gap;
-  row(lx,y,'AIM GUIDE (DOTS)',GUIDES[o.guide==null?2:o.guide],()=>{o.guide=((o.guide==null?2:o.guide)+1)%3;pdTouch();pdSave();SFX.pop()},'#9fd8ff',(o.guide==null?2:o.guide)>0);y+=rh+gap;
-  row(lx,y,'BURP CHARGE',o.burpCharge?'ON':'OFF',()=>{o.burpCharge=!o.burpCharge;pdTouch();pdSave();SFX.pop()},null,!!o.burpCharge);y+=rh+gap;
-  row(lx,y,'CHEAT: STOMACH NEVER BURSTS',o.noBurst?'ON':'OFF',()=>{o.noBurst=!o.noBurst;pdTouch();pdSave();SFX.pop()},'#ff9ec8',!!o.noBurst);y+=rh+gap;
-  row(lx,y,'LANDLORDS FIGHT BACK',o.fight===false?'OFF':'ON',()=>{o.fight=o.fight===false?true:false;pdTouch();pdSave();SFX.pop()},'#ffb03a',o.fight!==false);
-  // ---- right: sound & screen ----
-  head(rx,ry,'SOUND & SCREEN');ry+=26;
-  row(rx,ry,'SOUND',muted?'OFF':'ON',()=>{audioInit();setMuted(!muted);if(!muted)SFX.boing()},null,!muted);ry+=rh+gap;
-  // volume slider: a track you can drag, with - / + buttons
-  const v=optVol(),bw2=40;sliX=rx+bw2+14;sliW=cw-2*(bw2+14);
-  txt('VOLUME  '+Math.round(v*100)+'%',rx+cw/2,ry+11,14,muted?'#889':'#fff','center');
-  const ty=ry+rh-14;ctx.save();ctx.globalAlpha=muted?.45:1;ctx.fillStyle='rgba(15,18,30,.85)';rrect(sliX,ty-5,sliW,10,5);ctx.fill();ctx.fillStyle='#7dff5a';rrect(sliX,ty-5,Math.max(10,sliW*v),10,5);ctx.fill();
-  ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sliX+sliW*v,ty,11,0,7);ctx.fill();ctx.stroke();ctx.restore();
-  hits.push({x:sliX-12,y:ry+14,w:sliW+24,h:rh-10,fn:()=>{audioInit();sliderDrag=true;setVolFromX(mouseX)}});
-  btn(rx,ry+8,bw2,rh-8,'-',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol();pdTouch();pdSave();SFX.boing()},{size:22});
-  btn(rx+cw-bw2,ry+8,bw2,rh-8,'+',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol();pdTouch();pdSave();SFX.boing()},{size:22});
-  ry+=rh+gap+4;
-  row(rx,ry,'SCREEN SHAKE',(SHAKES.find(a=>a[1]===(o.shake==null?1:o.shake))||SHAKES[2])[0],()=>{const i=SHAKES.findIndex(a=>a[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1];shake=Math.max(shake,8);pdTouch();pdSave();SFX.pop()},'#9fd8ff',(o.shake==null?1:o.shake)>0);ry+=rh+gap;
-  row(rx,ry,'DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX;pdTouch();pdSave();SFX.pop()},'#9fd8ff',!webEcoFX);ry+=rh+gap+10;
-  head(rx,ry,'DATA');ry+=26;
-  const a1=now<armReset,a2=now<armProg;
-  btn(rx,ry,cw,rh-6,a1?'TAP AGAIN: RESET ALL OPTIONS':'RESET OPTIONS TO DEFAULT',()=>{if(a1){optsReset();armReset=0;toast('ach','Options reset','')}else{armReset=performance.now()+3000;armProg=0}},{size:15,on:a1,col:'#ffb03a'});ry+=rh-6+gap;
-  btn(rx,ry,cw,rh-6,a2?'TAP AGAIN: ERASE STARS, ACHIEVEMENTS, OUTFITS':'RESET PROGRESS',()=>{if(a2){progReset();armProg=0;toast('ach','Progress erased','')}else{armProg=performance.now()+3000;armReset=0}},{size:15,on:a2,col:'#ff5a5a'});
-  txt('Levels you made in the creator are never erased.   Esc = back,  M = mute',W/2,H-14,13,'#cfd','center')}
+function drawOptions(){drawSettings()}
 function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
   hits.push({x,y,w,h,fn:locked?()=>SFX.pop():fn});const hov=mouseX>=x&&mouseX<x+w&&mouseY>=y&&mouseY<y+h;
   ctx.save();rrect(x,y,w,h,10);ctx.fillStyle=locked?'rgba(30,34,48,.8)':hov?'rgba(255,255,255,.3)':'rgba(15,18,30,.78)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=hov&&!locked?'#fff':'rgba(255,255,255,.3)';ctx.stroke();
@@ -5445,15 +5884,24 @@ function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
   ctx.font='bold 13px "Trebuchet MS",sans-serif';let s=name;while(ctx.measureText(s).width>w-16&&s.length>3)s=s.slice(0,-2);if(s!==name)s+='…';
   txt(s,x+w/2,y+h-12,13,locked?'#778':'#fff','center');ctx.restore()}
 function drawSelect(){
+  if(contractReview>=CH3_END){drawContractReview();return}
   ctx.fillStyle='rgba(10,14,30,.55)';ctx.fillRect(0,0,W,H);
   txt('SELECT LEVEL',W/2,52,40,'#ffd23f','center','#7a1a1a');
   btn(16,14,90,36,'< MENU',goMenu,{size:16});
-  btn(W/2-336,66,160,34,'STORY',()=>{selTab=0},{on:selTab===0,size:16});
-  btn(W/2-166,66,160,34,'CHAPTER 2 (WIP)',()=>{selTab=2},{on:selTab===2,size:14,col:'#ffb03a'});
-  btn(W/2+4,66,160,34,'CHAPTER 3 (WIP)',()=>{selTab=3},{on:selTab===3,size:14,col:'#9aa4d8'});
-  btn(W/2+174,66,160,34,'MY LEVELS',()=>{selTab=1},{on:selTab===1,size:16});
-  if(selTab===3){
-    const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n3=LEVELS.length-CH2,th=60;
+  const tabs=[['STORY',0],['CHAPTER 2',2],['CHAPTER 3',3],['CONTRACTS',4],['MY LEVELS',1]];
+  tabs.forEach(([label,id],i)=>btn(W/2-420+i*170,66,160,36,label,()=>{selTab=id},{on:selTab===id,size:15}));
+  if(selTab===4){
+    const count=LEVELS.length-CH3_END,page=mobilePager('contractGrid',count,16,H-62),start=page*16;
+    txt(page?'OVERTIME CONTRACTS':'DEMOLITION CONTRACTS',W/2,134,24,'#90e6ff','center');
+    const cols=4,tw=206,th=70,gap=10,x0=(W-(cols*tw+(cols-1)*gap))/2;
+    for(let k=start;k<Math.min(count,start+16);k++){
+      const i=CH3_END+k,slot=k-start,x=x0+slot%cols*(tw+gap),y=150+Math.floor(slot/cols)*(th+gap),q=LEVELS[i],locked=!contractUnlocked(i);
+      tile(x,y,tw,th,k+1,q.name,PD.stars[i]||0,locked,()=>openContract(i));
+      if(!locked)txt('2x '+q.bonusPower.toUpperCase(),x+tw/2,y+39,12,'#90e6ff','center');
+    }
+    txt('Two recommended charges per contract. First Overtime mission open.',W/2,H-16,14,'#cfd','center');
+  }else if(selTab===3){
+    const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n3=CH3_END-CH2,th=60;
     txt('CHAPTER 3  -  THE WOLFMAN',W/2,134,24,'#9aa4d8','center','#10132a');
     for(let k=0;k<n3;k++){const x=x0+(k%cols)*(tw+gx),y=y0+((k/cols)|0)*(th+10),i=CH2+k;tile(x,y,tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!ch3Unlocked(i),()=>startStory(i))}
     txt('New landlords: health bars, riot shields, sprinters, healers, bosses.',W/2,Math.min(H-34,y0+Math.ceil(n3/cols)*(th+10)+24),14,'#fff','center');
@@ -5802,7 +6250,7 @@ function drawBrushPanel(){
   btn(8,392,100,40,'ERASE',()=>{E.tool='erase'},{size:14,on:E.tool==='erase'});
   btn(116,392,100,40,'LANDLORD',()=>{E.tool='lord'},{size:13,on:E.tool==='lord',col:'#ff8a8a'})}
 function drawEditor(){
-  ctx.setTransform(1,0,0,1,0,0);
+  webScreenTransform();
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const m=E.g[idx(x,y)];if(m)ctx.drawImage(SPR[m][hsh(x,y)&3][0],x*V,y*V)}
   ctx.fillStyle='rgba(255,60,60,.14)';ctx.fillRect(0,0,EMIN*V,GY);ctx.strokeStyle='rgba(255,90,90,.7)';ctx.setLineDash([6,5]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(EMIN*V,0);ctx.lineTo(EMIN*V,GY);ctx.stroke();ctx.setLineDash([]);
   txt('SLING AREA',EMIN*V/2,34,14,'#ffb0b0','center');drawBrushPanel();
@@ -5852,19 +6300,19 @@ setInterval(()=>{if(pdDirty)pdSave();if(state==='play'||state==='win')achCheck()
 buildSprites();buildBG();
 // Same measured definitions as the console HUDs: submitted images per real
 // second vs physics update calls per real second. F3 turns the overlay on.
-let frameMeterVisible=false,frameMeterClock=0,frameMeterDraws=0,frameMeterSims=0,frameMeterGameTime=0;
+let frameMeterVisible=!!OPT().showPerf,frameMeterClock=0,frameMeterDraws=0,frameMeterSims=0,frameMeterGameTime=0;
 let frameMeterFps=0,frameMeterSps=0,frameMeterSpeed=0;
 addEventListener('keydown',e=>{
-  if(e.code==='F3'&&!e.repeat){frameMeterVisible=!frameMeterVisible;e.preventDefault()}
-  if(e.code==='F4'&&!e.repeat){webEcoFX=!webEcoFX;OPT().ecoFX=webEcoFX;pdTouch();pdSave();e.preventDefault()}
+  if(e.code==='F3'&&!e.repeat){frameMeterVisible=!frameMeterVisible;OPT().showPerf=frameMeterVisible;pdTouch();pdSave();e.preventDefault()}
+  if(e.code==='F4'&&!e.repeat){cycleWebFX(OPT());pdTouch();pdSave();e.preventDefault()}
 });
 function drawFrameMeter(){
-  ctx.save();ctx.setTransform(1,0,0,1,0,0);
+  ctx.save();webScreenTransform();
   ctx.fillStyle='rgba(8,12,27,.9)';ctx.fillRect(8,8,277,48);
   ctx.font='bold 13px monospace';ctx.textAlign='left';ctx.fillStyle='#ffdc81';
   ctx.fillText('RENDER '+frameMeterFps+' FPS   SIM '+frameMeterSps+' SPS',16,27);
   ctx.fillStyle='#eee';
-  ctx.fillText('GAME TIME '+frameMeterSpeed+'%  FX '+(webEcoFX?'ECO':'FULL')+' [F4]',16,46);
+  ctx.fillText('GAME TIME '+frameMeterSpeed+'%  FX '+webFXLabel(OPT())+' [F4]',16,46);
   ctx.restore();
 }
 /* Physics and game logic must not run once per monitor refresh: at 120/144 Hz
@@ -5880,29 +6328,44 @@ function webSimSteps(elapsed){
   webSimCarry=Math.max(0,webSimCarry-steps*WEB_SIM_DT);
   return steps;
 }
-let last=performance.now(),frameDt=.016;
+let last=performance.now(),frameDt=.016,webLastDraw=-Infinity,webNextDraw=-Infinity,webDrawCap=0,webDrawState='',webDrawMode='',webDrawW=0,webDrawH=0;
+function webNextPaint(t,cap,next,force){const period=1000/cap;return force?t+period:Math.max(t-period,next)+period}
+document.addEventListener('visibilitychange',()=>{
+  last=performance.now();webLastDraw=webNextDraw=-Infinity;webSimCarry=0;webPerfBad=webPerfGood=0;
+  if(document.hidden)musUpdate();
+});
 function loop(t){
   const raw=Math.min(.5,Math.max(0,(t-last)/1000));
-  last=t;frameDt=Math.min(.033,raw);
+  last=t;
+  if(document.hidden){webSimCarry=0;requestAnimationFrame(loop);return}
   const ticks=webSimSteps(raw);
-  let sim=0;
+  let sim=0,painted=false,started=performance.now();
   try{
+    webFxCap=webFxBudget(OPT());webDetailedLighting=webLightingDetail(OPT()); // resolve preferences once, not for every particle
     layoutTick();
     for(let i=0;i<ticks;i++){
-      const playing=state==='play';
+      const playing=state==='play'&&!powerPickerOpen;
       update(WEB_SIM_DT);
       if(playing)sim++;
     }
-    camTick(Math.min(.067,raw));musUpdate();draw();
+    camTick(Math.min(.067,raw));musUpdate();
+    const mode=(man&&man.mode||'')+(powerPickerOpen?':powers':''),cap=webRenderCap(OPT());
+    const force=state!==webDrawState||mode!==webDrawMode||cv.width!==webDrawW||cv.height!==webDrawH||cap!==webDrawCap;
+    if(force||t+1>=webNextDraw){
+      frameDt=Math.min(.067,Math.max(0,(t-webLastDraw)/1000));
+      draw();if(frameMeterVisible&&state==='play')drawFrameMeter();painted=true;webLastDraw=t;
+      webNextDraw=webNextPaint(t,cap,webNextDraw,force);webDrawCap=cap;
+      webDrawState=state;webDrawMode=mode;webDrawW=cv.width;webDrawH=cv.height;
+    }
+    webPerfSample(OPT(),raw,performance.now()-started,state==='play'&&!powerPickerOpen);
   }catch(e){console.error(e)}
-  frameMeterClock+=raw;frameMeterDraws++;frameMeterSims+=sim;frameMeterGameTime+=sim*WEB_SIM_DT;
+  frameMeterClock+=raw;frameMeterDraws+=painted?1:0;frameMeterSims+=sim;frameMeterGameTime+=sim*WEB_SIM_DT;
   if(frameMeterClock>=2){
     frameMeterFps=Math.round(frameMeterDraws/frameMeterClock);
     frameMeterSps=Math.round(frameMeterSims/frameMeterClock);
     frameMeterSpeed=Math.round(100*frameMeterGameTime/frameMeterClock);
     frameMeterClock=0;frameMeterDraws=0;frameMeterSims=0;frameMeterGameTime=0;
   }
-  if(frameMeterVisible)drawFrameMeter();
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

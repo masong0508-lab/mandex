@@ -83,12 +83,17 @@ const ctx=new Proxy({measureText:s=>({width:String(s).length*10})},{
 });
 const env={
   W:540,H:960,ctx,WEB_UI:{portrait:true,page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0},
-  state:'menu',time:1,frameDt:.016,muted:false,webEcoFX:false,
+  state:'menu',time:1,frameDt:.016,muted:false,webEcoFX:false,frameMeterVisible:false,armReset:0,armProg:0,
+  isPortrait:()=>true,
+  webRenderCap:()=>30,webRenderScale:()=>.75,webFxBudget:()=>360,webEffectiveTier:()=>1,
+  webProfileLabel:()=>'AUTO',webProfile:()=>'auto',webCapLabel:()=>'AUTO',webScaleLabel:()=>'AUTO',webFXLabel:()=>'AUTO',
+  cycleWebProfile:()=>{},cycleWebCap:()=>{},cycleWebScale:()=>{},cycleWebFX:()=>{},
+  webLightingLabel:()=>'AUTO',cycleWebLighting:()=>{},
   hits:records,ACH:Array.from({length:17},(_,i)=>({id:'a'+i,n:'Achievement '+i,d:'Earn '+i})),
   OUTFITS:Array.from({length:16},(_,i)=>({id:'look'+i,n:'Outfit '+i})),
   outfitCur:{n:'Classic Red'},PD:{stars:{},ach:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
-  LEVELS:Array.from({length:60},(_,i)=>({name:'District Building '+i})),
-  CH1:20,CH2:40,selTab:0,
+  LEVELS:Array.from({length:84},(_,i)=>({name:'District Building '+i,bonusPower:'breaker'})),
+  CH1:20,CH2:40,CH3_END:60,selTab:0,contractReview:-1,contractUnlocked:()=>true,openContract:()=>{},
   GUIDES:['OFF','SHORT','FULL'],SHAKES:[['OFF',0],['LOW',.5],['FULL',1]],
   OPT:()=>({}),optVol:()=>.8,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
   btn:(x,y,w,h,label,fn,o)=>records.push({x,y,w,h,label,fn}),
@@ -118,9 +123,9 @@ function inspect(kind){
 for(const height of [760,960,1170]){
   env.H=height;env.W=540;
   inspect('menu');
-  for(const tab of [0,1,2,3]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
+  for(const tab of [0,1,2,3,4]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
   inspect('ach');inspect('outfit');
-  for(const page of [0,1]){env.WEB_UI.page.options=page;inspect('options')}
+  for(const page of [0,1,2,3]){env.WEB_UI.page.options=page;inspect('options')}
 }
 assert(html.includes('WEB_UI.gesture={id:e.pointerId,x,y,screen:state}'),
  'portrait menu activation must defer to pointerup so swipes do not fire buttons');

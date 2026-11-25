@@ -312,19 +312,23 @@ void swiWaitForVBlank(void){
       TCHECK(!world.valve_ok&&!valve_equipped,"air valve is absent by default");
       TCHECK(aim_tool_at(&(touchPosition){.px=12,.py=158})==0,"DS AIR touch target fits within lower screen");
       TCHECK(aim_tool_at(&(touchPosition){.px=110,.py=180})==4,"DS TURBO has a distinct tappable slot");
-      TCHECK(aim_tool_at(&(touchPosition){.px=200,.py=180})==5,"DS QUAKE has a distinct tappable slot");
+      TCHECK(aim_tool_at(&(touchPosition){.px=165,.py=180})==5,"DS QUAKE has a distinct tappable slot");
     }
     if(vf==4){g_keys|=KEY_TOUCH;g_touch.px=20;g_touch.py=158;}
     if(vf==5)TCHECK(world.valve_ok&&valve_equipped,"tapping AIR reveals the valve");
     if(vf==8){g_keys|=KEY_TOUCH;g_touch.px=110;g_touch.py=180;}
     if(vf==9)TCHECK(!world.valve_ok&&!valve_equipped&&world.pw_sel==PW_TURBO,"TURBO replaces AIR and arms one shot");
-    if(vf==12){g_keys|=KEY_TOUCH;g_touch.px=200;g_touch.py=180;}
+    if(vf==12){g_keys|=KEY_TOUCH;g_touch.px=165;g_touch.py=180;}
     if(vf==13)TCHECK(world.pw_sel==PW_QUAKE,"QUAKE selected from touchscreen");
     if(vf==16){g_keys|=KEY_TOUCH;g_touch.px=20;g_touch.py=158;}
     if(vf==17)TCHECK(world.valve_ok&&world.pw_sel==0,"AIR selection disarms QUAKE");
     if(vf==20){g_keys|=KEY_TOUCH;g_touch.px=20;g_touch.py=158;}
     if(vf==21)TCHECK(!world.valve_ok&&!valve_equipped,"AIR can be turned off before normal aiming");
-    if(vf==23){printf(fails?"toolbar: %d FAILED\n":"toolbar: all passed\n",fails);exit(fails!=0);}
+    if(vf==23){g_keys|=KEY_TOUCH;g_touch.px=220;g_touch.py=180;}
+    if(vf==24)TCHECK(world.pw_sel==PW_BREAKER&&world.pw_left[PW_BREAKER]==1,"BREAKER direct selection does not consume stock");
+    if(vf==26){g_keys|=KEY_TOUCH;g_touch.px=220;g_touch.py=180;}
+    if(vf==27)TCHECK(world.pw_sel==PW_NONE,"tapping selected Breaker again disarms");
+    if(vf==29){printf(fails?"toolbar: %d FAILED\n":"toolbar: all passed\n",fails);exit(fails!=0);}
   } else if(getenv("OPTIONS_TEST")){                                       /* port 13: the options screen, the start tool, the speed safety net, saving */
     static int fails, st, men0, f0;
 #define PCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
@@ -345,8 +349,8 @@ void swiWaitForVBlank(void){
     if(vf == 25){ PCHECK(opt.tool == MX_TOOL_BEANS, "tapping elsewhere on the row steps forward"); shot("opt3"); }
     if(vf == 26) g_keys |= KEY_LEFT; if(vf == 28) PCHECK(opt.tool == MX_TOOL_VALVE, "d-pad left steps back");
     if(vf == 29) g_keys |= KEY_LEFT; if(vf == 31) PCHECK(opt.tool == MX_TOOL_NONE, "...to none");
-    if(vf == 32) g_keys |= KEY_LEFT; if(vf == 34) PCHECK(opt.tool == MX_TOOL_QUAKE, "...wraps around to quake");
-    if(vf == 35) g_keys |= KEY_LEFT; if(vf == 37) PCHECK(opt.tool == MX_TOOL_TURBO, "...then to turbo");
+    if(vf == 32) g_keys |= KEY_LEFT; if(vf == 34) PCHECK(opt.tool == MX_TOOL_BREAKER, "...wraps around to breaker");
+    if(vf == 35) g_keys |= KEY_LEFT; if(vf == 37) PCHECK(opt.tool == MX_TOOL_QUAKE, "...then to quake");
     if(vf == 38) g_keys |= KEY_DOWN; if(vf == 40) PCHECK(opt_cur == 2, "d-pad down to the landlords-fight-back row");
     if(vf == 41) g_keys |= KEY_A; if(vf == 43){ PCHECK(opt.nofight == 1 && world.nofight == 1, "A on the fight-back row switches it off (and the world follows)"); shot("opt4f"); }
     if(vf == 44) g_keys |= KEY_A; if(vf == 46) PCHECK(opt.nofight == 0 && world.nofight == 0, "...and back on");
@@ -1099,7 +1103,21 @@ static int ds_objective_probe(void){
          many,last,secure,marked);
   return 0;
 }
+static int ring_angle_probe(void){
+  unsigned checks=0;
+  for(int n=8;n<=64;n++){
+    DsRingAngle a=ds_ring_angles(n);
+    for(int k=0;k<n;k++){
+      const real old=rdiv(RI(k)*6283/n,RI(1000)),now=ds_ring_next(&a);
+      if(old!=now){fprintf(stderr,"DS_RING_ANGLE_FAIL n=%d k=%d old=%d new=%d\n",n,k,(int)old,(int)now);return 1;}
+      checks++;
+    }
+  }
+  printf("DS_RING_ANGLE_PASS exact_angles=%u\n",checks);
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("DS_RING_ANGLE_PROBE"))return ring_angle_probe();
   if(getenv("DS_OBJECTIVE_PROBE"))return ds_objective_probe();
   if(getenv("DS_PARTICLE_EDGE_PROBE"))return particle_edge_probe();
   if(getenv("DS_RUBBLE_DAMAGE_PROBE"))return chunk_damage_probe();

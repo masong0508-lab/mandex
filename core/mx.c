@@ -868,6 +868,7 @@ static MxChunk *chunk_slot(MxWorld *w){
 
 static MX_HOT void support_pass(MxWorld *w){
   w->need_support = 0;
+  w->retry_cd = 0;
   memset(w->hb, 255, sizeof w->hb);
   unsigned head = 0, tail = 0;
   const unsigned QM = 8191;
@@ -893,19 +894,20 @@ static MX_HOT void support_pass(MxWorld *w){
   for(int i = 0; i < MX_ROWS * MX_COLS; i++){
     if(!w->grid[i] || w->grid[i] == MX_SAND || w->hb[i] != 255 || w->vis[i]) continue;
     MxChunk *ch = chunk_slot(w);
-    if(!ch) w->retry_cd = 20;            /* no free body right now: stay standing, but look again in a third of a second (a slab must not hang in the air for good) */
+    /* No free slot and no recyclable sleeper: nothing else in this pass
+       can allocate a body. Leave the remaining islands untouched; retry
+       as soon as cleanup frees a slot, with the old timeout as a fallback. */
+    if(!ch){w->retry_cd = 20;return;}
     int sp = 0, n = 0, oversized = 0;
     w->stack[sp++] = (uint16_t)i; w->vis[i] = 1;
     while(sp){
       int a = w->stack[--sp], x = a % MX_COLS, y = a / MX_COLS;
       /* Detach the first contiguous 512 voxels; let the rest fall on
          later support passes instead of leaving a giant wall hanging. */
-      if(ch){
-        if(n < MX_CHUNK_CELLS){
-          MxCell *c = &ch->cells[n++];
-          c->lx = RI(x); c->ly = RI(y); c->m = w->grid[a]; c->h = w->hp[a]; c->dead = 0;
-        } else oversized = 1;
-      }
+      if(n < MX_CHUNK_CELLS){
+        MxCell *c = &ch->cells[n++];
+        c->lx = RI(x); c->ly = RI(y); c->m = w->grid[a]; c->h = w->hp[a]; c->dead = 0;
+      } else oversized = 1;
       for(int d = 0; d < 4; d++){
         int nx = x + DX[d], ny = y + DY[d];
         if(!INB(nx, ny)) continue;
@@ -913,7 +915,6 @@ static MX_HOT void support_pass(MxWorld *w){
         if(w->grid[j] && w->grid[j] != MX_SAND && w->hb[j] == 255 && !w->vis[j] && !((w->brk[a] >> d) & 1)){ w->vis[j] = 1; w->stack[sp++] = (uint16_t)j; }
       }
     }
-    if(!ch) continue;                   /* no slot: retry when a sleeper settles */
     if(oversized) w->need_support = 1;  /* unsupported remainder falls next pass */
     /* The existing visited byte already marks the whole disconnected
        region as 1. Temporarily mark the selected <=512 cells as 2 so the
@@ -951,20 +952,20 @@ static MX_HOT void support_pass(MxWorld *w){
       wob_zero(w, gi); clear_links(w, gi);
     }
     cx = rdiv(cx, M); cy = rdiv(cy, M);
-    real rad = 0, tq = 0, ti = 0, cvx = rdiv(mvx, M), cvy = rdiv(mvy, M);
+    real rad2 = 0, tq = 0, ti = 0, cvx = rdiv(mvx, M), cvy = rdiv(mvy, M);
     for(int k = 0; k < n; k++){
       MxCell *c = &ch->cells[k];
       real d = MATS[c->m].d, rx = c->lx + R(0.5) - cx, ry = c->ly + R(0.5) - cy;
-      tq += rmul(d, rmul(rx, c->wy - cvy) - rmul(ry, c->wx - cvx)); ti += rmul(d, rmul(rx, rx) + rmul(ry, ry));
+      const real dist2 = rmul(rx, rx) + rmul(ry, ry);
+      tq += rmul(d, rmul(rx, c->wy - cvy) - rmul(ry, c->wx - cvx)); ti += rmul(d, dist2);
       c->lx = rx; c->ly = ry; c->wx = c->lx + cx; c->wy = c->ly + cy;
-      real r = rsqrt(rmul(c->lx, c->lx) + rmul(c->ly, c->ly));
-      if(r > rad) rad = r;
+      if(dist2 > rad2) rad2 = dist2;
     }
     ch->rest = 0; ch->restT = 0;
     ch->active = 1; ch->count = n; ch->x = cx; ch->y = cy; ch->ang = 0;
     ch->vx = rclamp(cvx, -WOB_VMAX, WOB_VMAX); ch->vy = rclamp(cvy, -WOB_VMAX, WOB_VMAX);
     ch->w = ti > R(1) ? rclamp(rdiv(tq, ti), -RI(6), RI(6)) : 0;   /* the sway becomes a topple */
-    ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rad + R(1); ch->cs = RI(1); ch->sn = 0;
+    ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rsqrt(rad2) + R(1); ch->cs = RI(1); ch->sn = 0;
     ch->px = cx; ch->py = cy; ch->pa = 0;
     ch->tnt_hit=-1;
     recompute(ch);
@@ -1028,9 +1029,18 @@ static MX_HOT void resolve_static(MxWorld *w, MxChunk *ch, MxCell *a, real nx, r
 }
 
 static MX_HOT void step_chunks(MxWorld *w, real dt){
-  int any = 0;
-  for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active){ any = 1; break; }
-  if(!any) return;
+  /* A single falling slab still needs gravity, rotation and static-wall
+     contacts, but cannot collide with another rigid body. Do not populate
+     or query the spatial hash in that common early-collapse case. */
+  int bodies = 0;
+  for(int c = 0; c < MX_MAX_CHUNKS; c++)
+    if(w->chunks[c].active && ++bodies == 2) break;
+  if(!bodies) return;
+#ifdef MX_REFERENCE_CHUNK_HASH
+  const int pair_contacts = 1;  /* test-only A/B oracle */
+#else
+  const int pair_contacts = bodies > 1;
+#endif
   if(w->bh_hi >= w->bh_lo) memset(&w->bhead[w->bh_lo * (MX_COLS + 4)], 0xff, (size_t)(w->bh_hi - w->bh_lo + 1) * (MX_COLS + 4) * sizeof w->bhead[0]);
   int blo = MX_ROWS + 4, bhi = -1;
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
@@ -1050,7 +1060,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         a->wx = ch->x + rmul(ch->cs, a->lx) - rmul(ch->sn, a->ly);
         a->wy = ch->y + rmul(ch->sn, a->lx) + rmul(ch->cs, a->ly);
       }
-      if(!a->edge) continue;
+      if(!a->edge || !pair_contacts) continue;
       int gx = rfloor(a->wx) + 2, gy = rfloor(a->wy) + 2;
       if(gx < 0) gx = 0;
       if(gx > MX_COLS + 3) gx = MX_COLS + 3;
@@ -1073,7 +1083,18 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
       int gx = rfloor(a->wx), gy = rfloor(a->wy);
       /* Cleanup follows all substeps. Keep the fatal contact's response,
        * but stop this cell's scan as soon as that response shatters it. */
-      for(int j = gy - 1; j <= gy + 1 && !a->dead; j++) for(int k = gx - 1; k <= gx + 1 && !a->dead; k++){
+      /* A radius-half-cell circle cannot reach both adjacent tiles on
+         one axis. Exclude exact tangencies (the narrow phase rejects
+         them) before reading static geometry. The contact order remains
+         top-to-bottom, left-to-right in float and DS fixed point. */
+#ifdef MX_REFERENCE_STATIC_CONTACTS
+      const int left=gx-1,right=gx+1,top=gy-1,bottom=gy+1;
+#else
+      const real fx=a->wx-RI(gx),fy=a->wy-RI(gy);
+      const int left=gx-(fx<RC),right=gx+(RI(1)-fx<RC);
+      const int top=gy-(fy<RC),bottom=gy+(RI(1)-fy<RC);
+#endif
+      for(int j = top; j <= bottom && !a->dead; j++) for(int k = left; k <= right && !a->dead; k++){
         if(!solid_cell(w, k, j)) continue;
         real qx = rclamp(a->wx, RI(k), RI(k + 1)), qy = rclamp(a->wy, RI(j), RI(j + 1));
         real dx = a->wx - qx, dy = a->wy - qy, d2 = rmul(dx, dx) + rmul(dy, dy);
@@ -1094,7 +1115,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         if(pen > RI(4)) pen = RI(4);
         resolve_static(w, ch, a, nx, ny, pen, k, j);
       }
-      if(a->dead) continue;
+      if(a->dead || !pair_contacts) continue;
       /* chunk vs chunk: circle-circle through the spatial buckets */
       int bx0 = gx + 1, by0 = gy + 1;
       for(int by = by0; by <= by0 + 2 && !a->dead; by++) for(int bx = bx0; bx <= bx0 + 2 && !a->dead; bx++){
@@ -1106,7 +1127,12 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
           if(oc < c && !och->rest) continue;     /* moving pairs are tested once (from the lower index); a sleeper is tested from whichever moving body reaches it */
           MxCell *o = &och->cells[id % MX_CHUNK_CELLS];
           if(o->dead) continue;
-          real dx = a->wx - o->wx, dy = a->wy - o->wy, d2 = rmul(dx, dx) + rmul(dy, dy);
+          real dx = a->wx - o->wx, dy = a->wy - o->wy;
+          /* Clamped edge buckets can contain very distant off-map debris.
+             Reject impossible contacts before fixed-point squaring, which
+             could otherwise wrap and produce phantom collisions. */
+          if(dx <= -RI(1) || dx >= RI(1) || dy <= -RI(1) || dy >= RI(1)) continue;
+          real d2 = rmul(dx, dx) + rmul(dy, dy);
           if(d2 >= RI(1) || d2 < R(0.0005)) continue;
           real d = rsqrt(d2), nx = rdiv(dx, d), ny = rdiv(dy, d), pen = RI(1) - d;
           real rax = a->wx - ch->x, ray = a->wy - ch->y, rbx = o->wx - och->x, rby = o->wy - och->y;
@@ -1165,6 +1191,29 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
       ch->x += rmul(ch->cx, s); ch->y += rmul(ch->cy, s);
     }
     ch->age += dt;
+  }
+}
+
+/* Pair/static penetration correction moves the chunk centre at the end of
+   the solver, after its cell positions were cached. Refresh only translated
+   bodies once per GAME update (not each substep), before TNT/HUD/rendering.
+   Reusing the first live cell recovers the accumulated shift even if a
+   body has gone to sleep. No extra per-cell rotation or buffer is needed. */
+static void sync_chunk_poses(MxWorld *w){
+  for(int c=0;c<MX_MAX_CHUNKS;c++){
+    MxChunk *ch=&w->chunks[c];
+    if(!ch->active)continue;
+    int k=0;
+    while(k<ch->count&&ch->cells[k].dead)k++;
+    if(k==ch->count)continue;
+    MxCell *a=&ch->cells[k];
+    real dx=ch->x+rmul(ch->cs,a->lx)-rmul(ch->sn,a->ly)-a->wx;
+    real dy=ch->y+rmul(ch->sn,a->lx)+rmul(ch->cs,a->ly)-a->wy;
+    if(!dx&&!dy)continue;
+    for(;k<ch->count;k++){
+      a=&ch->cells[k];
+      if(!a->dead){a->wx+=dx;a->wy+=dy;}
+    }
   }
 }
 
@@ -1411,6 +1460,9 @@ static MX_HOT void man_plow(MxWorld *w){
   bounce_rubber(w);
   MxMan *m = &w->man;
   real mass = rmul(m->dive ? R(2.6) : RI(1), RI(1) + rmul(m->inf, R(1.5)));
+  /* BREAKER: 35% less energy per HP on structural material. Same
+     radius, velocity, rebound rules and damage accounting. */
+  const real cost_per_hp=m->pwr==PW_BREAKER?rmul(KCOST,R(0.65)):KCOST;
   real s2 = rmul(m->vx, m->vx) + rmul(m->vy, m->vy);
   real E = rmul(R(0.5), rmul(mass, s2)), E0 = E;
   int touched = 0;
@@ -1432,13 +1484,13 @@ static MX_HOT void man_plow(MxWorld *w){
   for(int k = 0; k < n; k++){
     int i = IDX(list[k].x, list[k].y);
     if(!w->grid[i]) continue;
-    real cost = rmul(w->hp[i], KCOST);
+    real cost = rmul(w->hp[i], cost_per_hp);
     if(E >= cost){
       E -= cost;
       real h = kill(w, list[k].x, list[k].y, m->vx, m->vy);
       for(int d = 0; d < 4; d++) damage_cell(w, list[k].x + DX[d], list[k].y + DY[d], rmul(h, R(0.18)));
     } else {
-      w->hp[i] -= rdiv(E, KCOST); E = 0; break;
+      w->hp[i] -= rdiv(E, cost_per_hp); E = 0; break;
     }
   }
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
@@ -1457,12 +1509,12 @@ static MX_HOT void man_plow(MxWorld *w){
       if(rabs(ddx)>=MAN_R+RC||rabs(ddy)>=MAN_R+RC)continue;
       if(rmul(ddx, ddx) + rmul(ddy, ddy) >= lim) continue;
       touched = 1; hit = 1; ax += a->wx; ay += a->wy; cnt++;
-      real cost = rmul(a->h, KCOST);
+      real cost = rmul(a->h, cost_per_hp);
       if(E >= cost){ E -= cost;
         if(a->m==MX_TNT)destroy_moving_tnt(w,a);
         else {a->dead=1;ev(w,EV_CELL,a->wx,a->wy,a->m,rmul(m->vx,R(0.25)),rmul(m->vy,R(0.25)));}
       }
-      else { a->h -= rdiv(E, KCOST); E = 0; }
+      else { a->h -= rdiv(E, cost_per_hp); E = 0; }
     }
     if(hit && ch->hitCd <= 0){
       ch->hitCd = R(0.12);
@@ -1612,8 +1664,9 @@ void mx_release(MxWorld *w){
   ev(w, EV_LAUNCH, m->x, m->y, 0, 0, 0);
 }
 void mx_select_power(MxWorld *w, int pw){
-  if(w->man.mode != MAN_AIM || pw < PW_BEANS || pw >= PW_COUNT || w->pw_left[pw] <= 0) return;
-  w->pw_sel = (w->pw_sel == pw) ? 0 : pw;
+  if(w->state!=MX_PLAY||w->man.mode != MAN_AIM || pw < PW_NONE || pw >= PW_COUNT) return;
+  if(pw==PW_NONE || w->pw_sel==pw){w->pw_sel=PW_NONE;return;}
+  if(w->pw_left[pw]>0)w->pw_sel=pw;
 }
 void mx_dive(MxWorld *w){
   MxMan *m = &w->man;
@@ -2333,8 +2386,11 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   "Glass Menagerie", "Penthouse Panic", "Mail Room Mayhem", "Rent Strike", "Sand Standoff", "Landlord HQ",
   /* chapter 3: the Wolfman */
   "Full Moon Rising", "Howling Heights", "Flea Market", "Fang Street", "Bad Moon Brick", "Wolf Pack Lofts", "Moonlit Mortgage", "Claw Foreclosure", "Growl Gardens", "Night Shift",
-  "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord"};
-static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
+  "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord",
+  /* chapter 4: Demolition Contracts */
+  "Glass Exchange", "Crane Yard", "Spring Freight", "Powder Dispatch", "Sinking Court", "Rooftop Relay", "Bailiff Barracks", "Vacuum Post", "Tenement Cascade", "Safe Landing Lab", "Clerk's Citadel", "Parry Platform", "Night Market", "Triple Rent Vault", "Skyline Reckoning", "Final Notice", "Switchback Depot", "Claims Arcade", "Silt Exchange", "Express Returns", "The Paper Chain", "Air Rights", "Night Court Annex", "Crown of Concrete"};
+static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9, 6, 7, 6, 6, 7, 6, 7, 6, 7, 6, 8, 6, 7, 8, 8, 10, 7, 7, 7, 7, 8, 7, 8, 10};
+static const uint8_t CONTRACT_POWER[MX_CONTRACT_COUNT]={6, 4, 2, 3, 5, 1, 6, 4, 5, 2, 6, 3, 1, 4, 5, 6, 2, 6, 5, 4, 3, 1, 6, 5};
 const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
 /* Compact ROM-only guidance; each hint fits a 256-pixel DS banner. */
 const char *mx_level_tactic(int l){
@@ -2390,6 +2446,10 @@ const char *mx_level_tactic(int l){
   };
   if(l<0 || l>=MX_NUM_LEVELS)return "EVICT EVERY LANDLORD";
   if(l<MX_CH3_START)return early[l];
+  if(l>=MX_CONTRACT_START){
+    static const char *const tips[MX_CONTRACT_COUNT]={"BREAKER: SHATTER THE GLASS EXCHANGE", "TURBO: HIT THE CRANE'S WOODEN BRACE", "TOWEL: GLIDE OVER THE RUBBER WALL", "SPLAT: START A WIDE TNT CHAIN", "QUAKE: CRACK THE SAND FOUNDATIONS", "BEANS: BOOST BETWEEN THE HIGH ROOFS", "BREAKER: BREACH THE BARRACKS THEN WALK", "TURBO: ENTER THE FIRST POSTAL TUBE", "QUAKE: DROP THE LOW LINKED SUPPORTS", "TOWEL: USE THE RUBBER AND SAND BEDS", "BREAKER: FIND THE CITADEL'S WEAK DOORS", "SPLAT: LAND THEN PARRY THE BRIEFCASES", "BEANS: BOOST OVER THE MARKET CANOPIES", "TURBO: THREAD THE VAULT ENTRY LANES", "QUAKE: REMOVE THE SKYLINE'S KEY PIERS", "BREAKER: CRACK THE FINAL NOTICE TOWER", "TOWEL: CROSS THE STEPPED FREIGHT ROOFS", "BREAKER: OPEN THE ARCADE THEN WALK", "QUAKE: RELEASE THE SAND SUPPORTS", "TURBO: USE THE HIGH RETURN TUBE", "SPLAT: LINK THE POWDER STORES", "BEANS: BOOST TO THE TOP FLOOR", "BREAKER: BREACH THE SHIELD GUARD'S HALL", "QUAKE: DROP THE THREE TRANSFER PIERS"};
+    return tips[l-MX_CONTRACT_START];
+  }
   int i=l-MX_CH3_START;
   if(i==0)return "WOLFMAN: LANDLORDS HAVE HEALTH BARS";
   if(i==5)return "SHIELD GUARDS: HIT FROM BEHIND";
@@ -2499,7 +2559,456 @@ static void build_ch3(MxWorld *w, int i){
   }
 }
 
+/* Generated from content/demolition_contracts.json. Fixed-size native
+   world pools are unchanged; only the selected contract is constructed. */
+static void build_contract(MxWorld *w,int i){
+  switch(i){
+  case 0: /* Glass Exchange */
+    house_ex(w,47,59,12,2,9,1,1,4,1,4,0,0);
+    house_ex(w,66,59,12,3,8,1,1,2,1,6,0,0);
+    house_ex(w,91,59,12,2,9,1,1,6,1,1,0,0);
+    rect_fill(w,58,49,9,1,1);
+    tnt(w,48,59);
+    tnt(w,67,51);
+    tgtr(w,53,59,0,3);
+    tgtr(w,53,50,2,3);
+    tgtr(w,72,59,1,3);
+    tgtr(w,72,51,1,3);
+    tgtr(w,72,43,0,3);
+    tgtr(w,97,59,4,3);
+    tgtr(w,97,50,2,3);
+    break;
+  case 1: /* Crane Yard */
+    house_ex(w,51,59,11,3,9,1,1,6,1,1,0,0);
+    house_ex(w,86,59,12,2,10,1,1,2,1,3,0,0);
+    rect_fill(w,61,29,24,2,1);
+    rect_fill(w,81,31,3,28,6);
+    rect_fill(w,75,27,8,2,6);
+    rect_fill(w,65,31,2,21,1);
+    tnt(w,66,52);
+    tnt(w,87,59);
+    tgtr(w,56,59,1,3);
+    tgtr(w,56,50,2,3);
+    tgtr(w,56,41,0,3);
+    tgtr(w,92,59,3,3);
+    tgtr(w,92,49,2,3);
+    tgtr(w,78,59,0,3);
+    break;
+  case 2: /* Spring Freight */
+    house_ex(w,48,59,10,2,9,1,1,7,1,1,0,0);
+    rect_fill(w,62,37,2,23,7);
+    house_ex(w,72,59,13,3,9,1,1,2,1,4,0,0);
+    house_ex(w,96,59,11,1,11,1,1,1,1,1,0,0);
+    rect_fill(w,63,58,8,2,8);
+    tnt(w,74,50);
+    tgtr(w,53,59,0,3);
+    tgtr(w,53,50,1,3);
+    tgtr(w,78,59,3,3);
+    tgtr(w,78,50,2,3);
+    tgtr(w,78,41,0,3);
+    tgtr(w,101,59,1,3);
+    break;
+  case 3: /* Powder Dispatch */
+    house_ex(w,43,59,10,2,8,1,1,1,1,1,0,0);
+    house_ex(w,61,59,11,2,9,1,1,4,1,4,0,0);
+    house_ex(w,81,59,12,2,9,1,1,2,1,1,0,0);
+    house_ex(w,101,59,10,1,10,1,1,3,1,1,0,0);
+    rect_fill(w,52,50,10,1,1);
+    rect_fill(w,71,50,11,1,1);
+    tnt(w,44,51);
+    tnt(w,62,59);
+    tnt(w,82,50);
+    tnt(w,102,59);
+    tgtr(w,48,59,0,3);
+    tgtr(w,48,51,2,3);
+    tgtr(w,66,59,1,3);
+    tgtr(w,66,50,0,3);
+    tgtr(w,87,59,3,3);
+    tgtr(w,87,50,0,3);
+    tgtr(w,106,59,0,3);
+    break;
+  case 4: /* Sinking Court */
+    mound(w,43,32,9);
+    house_ex(w,53,50,12,2,9,1,1,2,1,3,0,0);
+    mound(w,81,30,8);
+    house_ex(w,90,51,12,2,9,1,1,1,1,1,0,0);
+    tnt(w,44,59);
+    tnt(w,82,59);
+    tgtr(w,59,50,1,3);
+    tgtr(w,59,41,2,3);
+    tgtr(w,96,51,4,3);
+    tgtr(w,96,42,1,3);
+    tgtr(w,77,59,3,3);
+    tgtr(w,113,59,0,3);
+    break;
+  case 5: /* Rooftop Relay */
+    house_ex(w,44,59,12,2,9,1,1,1,1,1,0,0);
+    house_ex(w,66,59,12,4,10,1,1,4,1,4,0,0);
+    house_ex(w,91,59,12,3,9,1,1,2,1,3,0,0);
+    rect_fill(w,77,29,15,1,1);
+    tnt(w,67,39);
+    tnt(w,92,50);
+    tgtr(w,50,59,0,3);
+    tgtr(w,50,50,0,3);
+    tgtr(w,72,59,1,3);
+    tgtr(w,72,49,2,3);
+    tgtr(w,72,39,1,3);
+    tgtr(w,72,29,2,3);
+    tgtr(w,97,59,3,3);
+    tgtr(w,97,41,1,3);
+    break;
+  case 6: /* Bailiff Barracks */
+    w->walk=1;
+    house_ex(w,43,59,13,3,10,1,1,2,1,3,0,0);
+    rect_fill(w,43,53,1,6,0);
+    rect_fill(w,55,43,1,6,0);
+    rect_fill(w,54,49,2,1,0);
+    rect_fill(w,44,39,3,1,0);
+    rect_fill(w,51,58,4,1,7);
+    pad(w,51,58,4);
+    rect_fill(w,45,48,4,1,7);
+    pad(w,45,48,4);
+    house_ex(w,72,59,12,2,10,1,1,1,1,1,0,0);
+    rect_fill(w,72,53,1,6,0);
+    house_ex(w,94,59,12,2,10,1,1,3,1,1,0,0);
+    tgtr(w,48,59,1,3);
+    tgtr(w,52,49,3,3);
+    tgtr(w,49,39,2,3);
+    tgtr(w,78,59,1,3);
+    tgtr(w,78,49,2,3);
+    tgtr(w,100,59,4,3);
+    tgtr(w,100,49,1,3);
+    tnt(w,73,59);
+    break;
+  case 7: /* Vacuum Post */
+    house_ex(w,64,59,12,3,10,2,1,6,1,4,0,0);
+    house_ex(w,90,59,12,2,10,1,1,4,1,1,0,0);
+    rect_fill(w,54,28,2,32,6);
+    rect_fill(w,64,53,2,6,0);
+    rect_fill(w,64,43,2,6,0);
+    tube(w,R(37.5),R(42.5),R(66.75),R(57));
+    tube(w,R(44.5),R(27.5),R(66.75),R(47));
+    tnt(w,66,39);
+    tnt(w,91,59);
+    tgtr(w,70,59,3,3);
+    tgtr(w,70,49,2,3);
+    tgtr(w,70,39,1,3);
+    tgtr(w,96,59,0,3);
+    tgtr(w,96,49,2,3);
+    break;
+  case 8: /* Tenement Cascade */
+    house_ex(w,44,59,11,3,9,1,1,1,1,1,0,0);
+    house_ex(w,61,59,12,4,8,1,1,2,1,1,0,0);
+    house_ex(w,84,59,12,3,9,1,1,3,1,1,0,0);
+    rect_fill(w,54,50,8,2,1);
+    rect_fill(w,72,43,13,1,1);
+    tnt(w,45,59);
+    tnt(w,62,51);
+    tnt(w,85,50);
+    tgtr(w,49,59,0,3);
+    tgtr(w,49,50,1,3);
+    tgtr(w,49,41,2,3);
+    tgtr(w,67,59,4,3);
+    tgtr(w,67,51,0,3);
+    tgtr(w,67,35,2,3);
+    tgtr(w,90,59,3,3);
+    tgtr(w,90,41,1,3);
+    break;
+  case 9: /* Safe Landing Lab */
+    house_ex(w,44,59,12,2,9,1,1,4,1,4,0,0);
+    house_ex(w,67,59,12,2,9,1,1,7,1,1,0,0);
+    house_ex(w,91,59,12,2,9,1,1,2,1,1,0,0);
+    rect_fill(w,46,59,8,1,8);
+    rect_fill(w,69,59,8,1,7);
+    rect_fill(w,69,50,8,1,7);
+    tnt(w,45,50);
+    tnt(w,68,50);
+    tnt(w,92,59);
+    tgtr(w,50,59,0,3);
+    tgtr(w,50,50,2,3);
+    tgtr(w,73,59,1,3);
+    tgtr(w,73,50,0,3);
+    tgtr(w,97,59,3,3);
+    tgtr(w,97,50,2,3);
+    break;
+  case 10: /* Clerk's Citadel */
+    house_ex(w,43,59,10,2,9,1,1,2,1,1,0,0);
+    house_ex(w,63,59,20,3,10,2,2,3,6,3,0,1);
+    house_ex(w,96,59,12,3,9,1,1,6,1,1,0,0);
+    rect_fill(w,63,53,2,6,1);
+    rect_fill(w,81,43,2,6,4);
+    tnt(w,64,59);
+    tnt(w,97,50);
+    tgtr(w,48,59,3,3);
+    tgtr(w,48,50,0,3);
+    tgtr(w,69,59,4,3);
+    tgtr(w,77,49,2,3);
+    tgtr(w,69,39,1,3);
+    tgtr(w,102,59,3,3);
+    tgtr(w,102,50,7,3);
+    tgtr(w,102,41,2,3);
+    break;
+  case 11: /* Parry Platform */
+    w->walk=1;
+    house_ex(w,43,59,12,2,10,1,1,1,1,1,0,0);
+    rect_fill(w,43,53,1,6,0);
+    house_ex(w,66,59,12,3,9,1,1,2,1,1,0,0);
+    rect_fill(w,66,53,1,6,0);
+    rect_fill(w,77,44,1,6,0);
+    rect_fill(w,68,58,4,1,7);
+    pad(w,68,58,4);
+    rect_fill(w,73,49,4,1,7);
+    pad(w,73,49,4);
+    house_ex(w,91,59,12,2,9,1,1,4,1,4,0,0);
+    tgtr(w,49,59,1,3);
+    tgtr(w,49,49,2,3);
+    tgtr(w,74,59,2,3);
+    tgtr(w,70,50,3,3);
+    tgtr(w,72,41,2,3);
+    tgtr(w,97,59,4,3);
+    tgtr(w,97,50,1,3);
+    tnt(w,92,59);
+    break;
+  case 12: /* Night Market */
+    house_ex(w,41,59,10,1,8,1,1,1,1,4,0,0);
+    house_ex(w,54,59,10,1,8,1,1,7,1,1,0,0);
+    house_ex(w,68,59,10,2,8,1,1,4,1,4,0,0);
+    house_ex(w,88,59,13,4,9,1,1,2,1,3,0,0);
+    rect_fill(w,50,49,5,1,1);
+    rect_fill(w,63,49,6,1,1);
+    tnt(w,69,59);
+    tnt(w,89,50);
+    tgtr(w,46,59,1,3);
+    tgtr(w,59,59,5,3);
+    tgtr(w,73,59,2,3);
+    tgtr(w,73,51,0,3);
+    tgtr(w,94,59,4,3);
+    tgtr(w,94,50,7,3);
+    tgtr(w,94,41,3,3);
+    tgtr(w,94,32,2,3);
+    break;
+  case 13: /* Triple Rent Vault */
+    house_ex(w,45,59,12,2,9,2,1,3,1,1,0,0);
+    house_ex(w,64,59,12,3,9,2,1,6,1,1,0,0);
+    house_ex(w,87,59,16,4,9,2,1,6,1,4,0,0);
+    rect_fill(w,45,53,2,6,4);
+    rect_fill(w,64,53,2,6,1);
+    rect_fill(w,87,44,2,6,4);
+    tnt(w,46,50);
+    tnt(w,65,41);
+    tnt(w,88,32);
+    tgtr(w,51,59,3,3);
+    tgtr(w,51,50,1,3);
+    tgtr(w,70,59,4,3);
+    tgtr(w,70,50,2,3);
+    tgtr(w,70,41,0,3);
+    tgtr(w,91,59,6,3);
+    tgtr(w,98,50,7,3);
+    tgtr(w,91,41,4,3);
+    tgtr(w,98,32,2,3);
+    break;
+  case 14: /* Skyline Reckoning */
+    house_ex(w,44,59,11,4,9,1,1,1,1,1,0,0);
+    house_ex(w,62,59,16,4,9,1,1,3,1,3,0,0);
+    house_ex(w,87,59,14,5,9,1,1,4,1,6,0,0);
+    rect_fill(w,54,32,9,1,1);
+    rect_fill(w,77,32,11,1,1);
+    tnt(w,45,59);
+    tnt(w,63,50);
+    tnt(w,88,41);
+    tgtr(w,49,59,1,3);
+    tgtr(w,49,41,2,3);
+    tgtr(w,49,32,0,3);
+    tgtr(w,66,59,3,3);
+    tgtr(w,73,50,4,3);
+    tgtr(w,66,32,7,3);
+    tgtr(w,91,59,6,3);
+    tgtr(w,97,41,2,3);
+    tgtr(w,91,23,4,3);
+    break;
+  case 15: /* Final Notice */
+    house_ex(w,39,59,10,2,9,1,1,7,1,1,0,0);
+    mound(w,52,22,5);
+    house_ex(w,57,54,12,3,9,1,1,2,1,4,0,0);
+    house_ex(w,80,59,22,4,10,2,2,6,1,3,0,1);
+    rect_fill(w,69,36,12,2,1);
+    rect_fill(w,80,53,2,6,4);
+    rect_fill(w,100,43,2,6,1);
+    tnt(w,40,59);
+    tnt(w,58,54);
+    tnt(w,81,39);
+    tnt(w,98,29);
+    tgtr(w,44,59,3,3);
+    tgtr(w,44,50,0,3);
+    tgtr(w,63,54,1,3);
+    tgtr(w,63,45,2,3);
+    tgtr(w,63,36,4,3);
+    tgtr(w,85,59,6,3);
+    tgtr(w,96,59,4,3);
+    tgtr(w,85,49,7,3);
+    tgtr(w,96,39,2,3);
+    tgtr(w,85,29,6,3);
+    tgtr(w,95,29,4,3);
+    break;
+  case 16: /* Switchback Depot */
+    house_ex(w,43,59,12,1,9,1,1,7,1,1,0,0);
+    house_ex(w,62,59,12,2,9,1,1,2,1,4,0,0);
+    house_ex(w,88,59,13,4,9,1,1,4,1,4,0,0);
+    rect_fill(w,55,58,6,2,8);
+    rect_fill(w,74,41,15,1,1);
+    tnt(w,63,59);
+    tnt(w,89,41);
+    tgtr(w,49,59,0,3);
+    tgtr(w,68,59,1,3);
+    tgtr(w,68,50,2,3);
+    tgtr(w,94,59,3,3);
+    tgtr(w,94,50,1,3);
+    tgtr(w,94,41,4,3);
+    tgtr(w,94,32,2,3);
+    break;
+  case 17: /* Claims Arcade */
+    w->walk=1;
+    house_ex(w,44,59,13,3,10,1,1,2,1,4,0,0);
+    rect_fill(w,44,53,1,6,0);
+    rect_fill(w,56,43,1,6,0);
+    rect_fill(w,52,49,3,1,0);
+    rect_fill(w,45,58,3,1,7);
+    pad(w,45,58,3);
+    rect_fill(w,52,48,3,1,7);
+    pad(w,52,48,3);
+    house_ex(w,75,59,12,2,10,1,1,4,1,4,0,0);
+    rect_fill(w,75,53,1,6,0);
+    house_ex(w,96,59,12,2,9,1,1,3,1,1,0,0);
+    tnt(w,97,50);
+    tgtr(w,50,59,1,3);
+    tgtr(w,49,49,2,3);
+    tgtr(w,50,39,3,3);
+    tgtr(w,81,59,1,3);
+    tgtr(w,81,49,2,3);
+    tgtr(w,102,59,4,3);
+    tgtr(w,102,50,7,3);
+    break;
+  case 18: /* Silt Exchange */
+    house_ex(w,39,59,11,1,9,1,1,7,1,1,0,0);
+    mound(w,55,26,6);
+    house_ex(w,62,53,12,2,9,1,1,2,1,4,0,0);
+    mound(w,84,30,7);
+    house_ex(w,92,52,13,3,9,1,1,1,1,1,0,0);
+    tnt(w,55,59);
+    tnt(w,84,59);
+    tgtr(w,44,59,0,3);
+    tgtr(w,68,53,1,3);
+    tgtr(w,68,44,2,3);
+    tgtr(w,98,52,4,3);
+    tgtr(w,98,43,7,3);
+    tgtr(w,98,34,3,3);
+    break;
+  case 19: /* Express Returns */
+    house_ex(w,65,59,13,3,10,2,1,6,1,4,0,0);
+    rect_fill(w,65,53,2,6,0);
+    rect_fill(w,65,33,2,6,0);
+    rect_fill(w,54,25,2,35,6);
+    tube(w,R(37.5),R(42.5),R(67.75),R(57));
+    tube(w,R(44.5),R(25.5),R(67.75),R(37));
+    house_ex(w,91,59,13,2,10,1,1,4,1,4,0,0);
+    tnt(w,66,49);
+    tnt(w,92,59);
+    tgtr(w,71,59,3,3);
+    tgtr(w,71,49,1,3);
+    tgtr(w,71,39,2,3);
+    tgtr(w,97,59,4,3);
+    tgtr(w,97,49,2,3);
+    break;
+  case 20: /* The Paper Chain */
+    house_ex(w,40,59,10,2,9,1,1,1,1,1,0,0);
+    house_ex(w,56,59,11,3,9,1,1,4,1,4,0,0);
+    house_ex(w,76,59,12,2,9,1,1,2,1,1,0,0);
+    house_ex(w,99,59,11,2,10,1,1,3,1,1,0,0);
+    rect_fill(w,49,50,8,1,1);
+    rect_fill(w,66,41,11,1,1);
+    tnt(w,41,59);
+    tnt(w,57,50);
+    tnt(w,77,59);
+    tnt(w,100,49);
+    tgtr(w,45,59,0,3);
+    tgtr(w,45,50,1,3);
+    tgtr(w,61,59,2,3);
+    tgtr(w,61,50,1,3);
+    tgtr(w,61,41,0,3);
+    tgtr(w,82,59,4,3);
+    tgtr(w,82,50,2,3);
+    tgtr(w,104,59,3,3);
+    tgtr(w,104,49,7,3);
+    break;
+  case 21: /* Air Rights */
+    house_ex(w,44,59,12,2,9,1,1,2,1,1,0,0);
+    rect_fill(w,59,42,2,18,7);
+    house_ex(w,67,59,13,3,9,1,1,1,1,1,0,0);
+    house_ex(w,91,59,13,5,9,1,1,4,1,4,0,0);
+    rect_fill(w,79,32,13,1,1);
+    tnt(w,68,50);
+    tnt(w,92,23);
+    tgtr(w,50,59,0,3);
+    tgtr(w,50,50,2,3);
+    tgtr(w,73,59,1,3);
+    tgtr(w,73,41,3,3);
+    tgtr(w,97,59,4,3);
+    tgtr(w,97,41,1,3);
+    tgtr(w,97,32,7,3);
+    tgtr(w,97,23,2,3);
+    break;
+  case 22: /* Night Court Annex */
+    w->walk=1;
+    house_ex(w,45,59,13,3,10,1,1,3,1,1,0,0);
+    rect_fill(w,45,53,1,6,0);
+    rect_fill(w,57,43,1,6,0);
+    rect_fill(w,53,49,3,1,0);
+    rect_fill(w,46,58,3,1,7);
+    pad(w,46,58,3);
+    rect_fill(w,53,48,3,1,7);
+    pad(w,53,48,3);
+    house_ex(w,73,59,12,2,10,1,1,2,1,1,0,0);
+    rect_fill(w,73,53,1,6,0);
+    house_ex(w,93,59,13,3,10,1,1,6,1,4,0,0);
+    rect_fill(w,93,53,1,6,4);
+    tnt(w,94,49);
+    tgtr(w,51,59,4,3);
+    tgtr(w,50,49,2,3);
+    tgtr(w,51,39,1,3);
+    tgtr(w,79,59,3,3);
+    tgtr(w,79,49,2,3);
+    tgtr(w,99,59,6,3);
+    tgtr(w,99,49,7,3);
+    tgtr(w,99,39,4,3);
+    break;
+  case 23: /* Crown of Concrete */
+    house_ex(w,39,59,11,2,9,1,1,7,1,1,0,0);
+    mound(w,53,23,5);
+    house_ex(w,58,54,13,3,9,1,1,2,1,4,0,0);
+    house_ex(w,84,59,22,4,10,2,2,6,1,3,0,0);
+    rect_fill(w,70,36,15,2,1);
+    rect_fill(w,84,53,2,6,4);
+    rect_fill(w,104,43,2,6,1);
+    tnt(w,40,59);
+    tnt(w,59,54);
+    tnt(w,85,39);
+    tnt(w,103,29);
+    tgtr(w,44,59,3,3);
+    tgtr(w,44,50,0,3);
+    tgtr(w,64,54,1,3);
+    tgtr(w,64,45,2,3);
+    tgtr(w,64,36,4,3);
+    tgtr(w,90,59,6,3);
+    tgtr(w,100,59,4,3);
+    tgtr(w,90,49,7,3);
+    tgtr(w,100,39,2,3);
+    tgtr(w,90,29,6,3);
+    tgtr(w,100,29,4,3);
+    break;
+  }
+}
 static void build(MxWorld *w, int l){
+  if(l>=MX_CONTRACT_START){build_contract(w,l-MX_CONTRACT_START);return;}
   if(l >= MX_CH3_START){ build_ch3(w, l - MX_CH3_START); return; }
   const int W_ = MX_WOOD, B = MX_BRICK, S = MX_STONE, ST = MX_STEEL, RU = MX_RUBBER;
   switch(l){
@@ -2788,7 +3297,8 @@ static void load_level(MxWorld *w, int level, int district){
       }
     }
   }
-  w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = w->pw_left[PW_TURBO] = w->pw_left[PW_QUAKE] = 1;
+  w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = w->pw_left[PW_TURBO] = w->pw_left[PW_QUAKE] = w->pw_left[PW_BREAKER] = 1;
+  if(level>=MX_CONTRACT_START)w->pw_left[CONTRACT_POWER[level-MX_CONTRACT_START]]=2;
   w->sand_on = 1;
   /* anything that wouldn't hold at spawn is welded in place, so levels never collapse on load */
   support_pass(w);
@@ -2816,9 +3326,18 @@ void mx_set_wobble_budget(MxWorld *w, int cells){ w->wob_budget = cells < 0 ? 0 
 void mx_set_substeps(MxWorld *w, int n){ w->substeps = n < 2 ? 2 : n > 4 ? 4 : n; }
 void mx_preview_point(const MxWorld *w, real t, real *ox, real *oy){
   const MxMan *m = &w->man;
-  real vx = rmul(MX_ANCHOR_X - m->x, R(9.2)), vy = rmul(MX_ANCHOR_Y - m->y, R(9.2));
-  *ox = m->x + rmul(vx, t);
-  *oy = m->y + rmul(vy, t) + rmul(rmul(GRAV, R(0.5)), rmul(t, t));
+  const int pw=w->pw_sel>PW_NONE&&w->pw_sel<PW_COUNT&&w->pw_left[w->pw_sel]>0?w->pw_sel:PW_NONE;
+  const real sp=RI(1)-rmul(m->inf,R(0.5));
+  real vx=rmul(rmul(MX_ANCHOR_X-m->x,R(9.2)),sp),vy=rmul(rmul(MX_ANCHOR_Y-m->y,R(9.2)),sp);
+  if(pw==PW_TURBO){vx=rmul(vx,R(1.35));vy=rmul(vy,R(1.35));}
+  real fall=rmul(rmul(GRAV,R(0.5)),rmul(t,t));
+  if(pw==PW_TOWEL){
+    real a=t<R(1.8)?t:R(1.8),b=t-a;
+    real g=rmul(GRAV,R(0.3));
+    fall=rmul(rmul(g,R(0.5)),rmul(a,a))+rmul(rmul(g,a),b)+rmul(rmul(GRAV,R(0.5)),rmul(b,b));
+  }
+  *ox=m->x+rmul(vx,t);
+  *oy=m->y+rmul(vy,t)+fall;
 }
 int mx_targets_alive(const MxWorld *w){ int n = 0; for(int i = 0; i < w->ntargets; i++) n += w->targets[i].alive; return n; }
 int mx_cells_left(const MxWorld *w){ int n = 0; for(int i = 0; i < MX_ROWS * MX_COLS; i++) n += w->grid[i] != 0; return n; }
@@ -2950,9 +3469,16 @@ void mx_update(MxWorld *w, real dt){
 #endif
     step_chunks(w, sdt);
   }
+  sync_chunk_poses(w);
   update_moving_tnt(w);
   process_expl(w); /* collisions can light TNT AFTER the initial explosion pass */
   clean_chunks(w, dt);
+  /* A saturated pool used to leave unsupported slabs hovering for up to
+     twenty updates after a slot became free. Respect the support budget,
+     but schedule the next permitted pass immediately. */
+  if(w->retry_cd > 0)for(int c=0;c<MX_MAX_CHUNKS;c++)if(!w->chunks[c].active){
+    w->retry_cd=0;w->need_support=1;break;
+  }
   MX_PH_MARK(3);
   if(w->wob_on){
     MX_WOB_MARK(0);

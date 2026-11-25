@@ -37,6 +37,12 @@ function collide(){
 }
 const first=collide();
 check(first[0]>0&&first[1]>0,'adjacent rubble chunks collide');
+check(a.cells[0].wx!==a.x,'fixture exercises centre displacement after hash insertion');
+syncChunkPoses();
+check(a.cells[0].wx===a.x&&b.cells[0].wx===b.x&&a.cells[0].wy===a.y&&b.cells[0].wy===b.y,
+      'rubble hitboxes follow the corrected visible positions');
+syncChunkPoses();
+check(a.cells[0].wx===a.x&&b.cells[0].wx===b.x,'pose synchronization is idempotent');
 check(CHUNK_HASH.size===0,'spatial hash cleared after each physics step');
 check(CHUNK_BUCKET_POOL.length===2,'initial broadphase creates two buckets');
 const cached=CHUNK_BUCKET_POOL.slice();
@@ -49,13 +55,31 @@ for(let k=0;k<40;k++){
  check(CHUNK_HASH.size===0&&cached.every(b=>b.length===0),
        'no stale references after repeated broadphase passes');
 }
-chunks=[a];resetBody(a,100,100);stepChunks(0);
+chunks=[a];resetBody(a,100,100);
+let sets=0,gets=0;
+const oldSet=CHUNK_HASH.set,oldGet=CHUNK_HASH.get;
+CHUNK_HASH.set=function(k,v){sets++;return oldSet.call(this,k,v)};
+CHUNK_HASH.get=function(k){gets++;return oldGet.call(this,k)};
+stepChunks(0);
+check(sets===0&&gets===0,'single moving body performs no inter-body hash work');
 check(CHUNK_HASH.size===0&&CHUNK_BUCKET_POOL.every(b=>b.length===0),
       'removed chunks cannot persist through the collision cache');
+const solo=body(3,[[0,0],[8,0],[16,0]]);resetBody(solo,100,100);
+solo.cells[1].lx=8;solo.cells[2].lx=16;solo.vx=12;
+chunks=[solo];grid[idx(12,12)]=1;
+const beforeStatic=staticContacts;
+stepChunks(1/60);
+check(solo.x>100&&solo.cells[1].wx>108,'single-body motion and cell transforms still run');
+check(staticContacts>beforeStatic,'single body still tests static geometry');
+check(sets===0&&gets===0,'multi-cell lone slab also skips hash operations');
+grid.fill(0);staticContacts=0;
+check(JSON.stringify(collide())===JSON.stringify(first),'hash rebuilds on transition back to two bodies');
+CHUNK_HASH.set=oldSet;CHUNK_HASH.get=oldGet;
 function large(count,cols){
  COLS=cols;grid=new Uint8Array(COLS*ROWS);
  const points=[];for(let i=0;i<count;i++)points.push([(i%COLS)*V+4,Math.floor(i/COLS)*V+4]);
- chunks=[body(5,points,true)];stepChunks(0);
+ // Two actual bodies exercise the capped cache, not the lone-body bypass.
+ chunks=[body(5,points,true),body(6,[[cols*V+40,40]],true)];stepChunks(0);
 }
 large(2105,120);
 check(CHUNK_BUCKET_POOL.length===CHUNK_BUCKET_CACHE_MAX,

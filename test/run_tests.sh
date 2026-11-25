@@ -77,12 +77,20 @@ echo "--- Browser walk physics parity, reusable touch controls and character-det
 if command -v node >/dev/null 2>&1;then node browser_walk_memory_test.js;fi
 echo "--- Browser: cached structural-support buffers, 120/360 world widths ---"
 if command -v node >/dev/null 2>&1;then node browser_support_cache_test.js;fi
+echo "--- Browser: occupied wobble solver parity, camera bounds and blast/effect compaction ---"
+if command -v node >/dev/null 2>&1;then
+  node browser_wobble_parity_test.js
+  node browser_standing_view_test.js
+  node browser_blast_effects_test.js
+  node browser_collapse_hotpath_test.js
+fi
 echo "--- Browser: bounded collision hashing, repeated contacts and no stale rubble refs ---"
 if command -v node >/dev/null 2>&1;then node browser_collision_hash_test.js;fi
 echo "--- Browser walking camera: portrait focus, zoom bounds and world edges ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_camera_test.js;fi
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
 if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
+if command -v node >/dev/null 2>&1;then node browser_phone_performance_test.js;fi
 echo "--- Browser custom levels: safe 360-column finale transition ---"
 if command -v node >/dev/null 2>&1;then node browser_custom_level_width_test.js;fi
 echo "--- Browser editor: real pointer events and touch cancellation ---"
@@ -99,7 +107,21 @@ echo "--- Browser creator: bounded MX1 imports, Unicode share names and legacy c
 if command -v node >/dev/null 2>&1;then node browser_creator_codec_test.js;fi
 echo "--- Web: touch capture, landscape/portrait two-thumb controls, safe camera pan ---"
 if command -v node >/dev/null 2>&1;then node browser_multitouch_test.js;fi
-echo "--- Stage guidance: all 60 console levels and 40 browser early-stage tactics ---"
+echo "--- Authored contract campaign: native fixed/float geometry, web parity and power stock ---"
+for mode in float fixed; do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core contract_campaign_test.c -lm -o contract_campaign_$mode
+  ./contract_campaign_$mode
+done
+if command -v node >/dev/null 2>&1;then
+  node browser_contract_campaign_test.js
+  node browser_rect_fastpath_test.js
+  node browser_contract_pager_test.js
+  node ../tools/render_contract_music.js
+  node browser_contract_music_test.js
+fi
+echo "--- Stage guidance: all console levels and 40 browser early-stage tactics ---"
 for mode in float fixed;do
   flags=''
   if test "$mode" = fixed;then flags="-DMX_FIXED";fi
@@ -138,8 +160,13 @@ for mode in float fixed;do
   test "$mode" = fixed && flags="-DMX_FIXED"
   gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core tool_feedback_test.c ../core/mx.c ../core/cloth.c -lm -o tool_feedback_$mode
   ./tool_feedback_$mode
+  gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core breaker_power_test.c -lm -o breaker_power_$mode
+  ./breaker_power_$mode
 done
-if command -v node >/dev/null 2>&1;then node browser_tool_feedback_test.js;fi
+if command -v node >/dev/null 2>&1;then
+  node browser_tool_feedback_test.js
+  node browser_power_picker_test.js
+fi
 echo "--- Browser side -> rear -> side pose coherence at 60Hz ---"
 if command -v node >/dev/null 2>&1;then node browser_turn_pose_test.js;fi
 echo "--- Browser walking gait: actual contacts, 4-cell stride, and reusable pose ---"
@@ -177,6 +204,15 @@ for mode in float fixed; do
   test "$mode" = fixed && defs="-DMX_FIXED"
   gcc -std=gnu99 -O2 -Wno-unused-function $defs -I../core chunk_contact_lifetime_test.c -lm -o chunk_contact_lifetime_$mode
   ./chunk_contact_lifetime_$mode
+  gcc -std=gnu99 -O2 -Wno-unused-function $defs -DMX_REFERENCE_CHUNK_HASH -DMX_REFERENCE_STATIC_CONTACTS -I../core chunk_contact_lifetime_test.c -lm -o chunk_contact_reference_$mode
+  MX_SOLO_HASH_TRACE=1 ./chunk_contact_lifetime_$mode > "/tmp/mandex_solo_opt_$mode.txt"
+  MX_SOLO_HASH_TRACE=1 ./chunk_contact_reference_$mode > "/tmp/mandex_solo_ref_$mode.txt"
+  cmp "/tmp/mandex_solo_opt_$mode.txt" "/tmp/mandex_solo_ref_$mode.txt"
+  cat "/tmp/mandex_solo_opt_$mode.txt"
+  MX_CONTACT_LIVE_TRACE=1 ./chunk_contact_lifetime_$mode > "/tmp/mandex_contact_opt_$mode.txt"
+  MX_CONTACT_LIVE_TRACE=1 ./chunk_contact_reference_$mode > "/tmp/mandex_contact_ref_$mode.txt"
+  cmp "/tmp/mandex_contact_opt_$mode.txt" "/tmp/mandex_contact_ref_$mode.txt"
+  cat "/tmp/mandex_contact_opt_$mode.txt"
 done
 if command -v node >/dev/null 2>&1;then node browser_dead_rubble_test.js;fi
 echo "--- BANK SHOT trick bonus: true rubber rebound, direct eviction only, 2s expiry (fixed/float) ---"
@@ -309,6 +345,7 @@ for L in 0 9 20 21 29 39 50 59; do
 done
 echo "--- DS landlord walking phase: exhaustively match 1,966,080 fixed-point values to original float phase ---"
 DS_WALK_PHASE_PROBE=1 ./ds_render
+DS_RING_ANGLE_PROBE=1 ./ds_render
 echo "--- DS walking phase fastpath: sampled complete gameplay frame hashes vs original for 5 levels ---"
 for mode in 0 1; do
   gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_INTEGER_WALK_PHASE=$mode \

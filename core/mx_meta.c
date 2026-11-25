@@ -150,7 +150,9 @@ int mx_level_unlocked(const MxStats *s, int level){
    * or the default all-open configuration. */
   if(level < 0 || level >= MX_NUM_LEVELS) return 0;
 #ifdef MX_LEVEL_LOCKS
-  return s->unlock_all || level < 3 || (level < MX_NUM_LEVELS && s->stars[level - 1] > 0);
+  return s->unlock_all || level < 3 ||
+         (level>=MX_CONTRACT_START&&level<MX_CONTRACT_START+3) || level==MX_CONTRACT_START+16 ||
+         s->stars[level - 1] > 0;
 #else
   (void)s; (void)level; return 1;
 #endif
@@ -197,10 +199,10 @@ static int save_size(int nlev, int ver){ return SAVE_STARS + nlev + 4 + 1 + 4 * 
 
 void mx_options_default(MxOptions *o){ o->collapse = 0; o->tool = MX_TOOL_NONE; o->nofight = 0; }
 const char *mx_tool_name(int t){
-  static const char *const N[MX_NUM_TOOLS] = { "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE" };
+  static const char *const N[MX_NUM_TOOLS] = { "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE", "BREAKER" };
   return t >= 0 && t < MX_NUM_TOOLS ? N[t] : "?";
 }
-int mx_tool_power(int t){ return t == MX_TOOL_BEANS ? PW_BEANS : t == MX_TOOL_TOWEL ? PW_TOWEL : t == MX_TOOL_SPLAT ? PW_SPLAT : t == MX_TOOL_TURBO ? PW_TURBO : t == MX_TOOL_QUAKE ? PW_QUAKE : PW_NONE; }
+int mx_tool_power(int t){ return t == MX_TOOL_BEANS ? PW_BEANS : t == MX_TOOL_TOWEL ? PW_TOWEL : t == MX_TOOL_SPLAT ? PW_SPLAT : t == MX_TOOL_TURBO ? PW_TURBO : t == MX_TOOL_QUAKE ? PW_QUAKE : t == MX_TOOL_BREAKER ? PW_BREAKER : PW_NONE; }
 
 int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap){ return mx_meta_pack_opt(s, outfit, 0, out, cap); }
 int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t *out, int cap){

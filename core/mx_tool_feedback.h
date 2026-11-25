@@ -18,7 +18,7 @@ typedef struct {
    in mx_meta.h (whose mx_tool_name has a different index mapping). */
 static inline const char *mx_power_name(int id){
   static const char *const names[PW_COUNT] = {
-    "NONE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE"
+    "NONE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE", "BREAKER"
   };
   return (unsigned)id<PW_COUNT?names[id]:"NONE";
 }
@@ -31,6 +31,7 @@ static inline const char *mx_tool_effect(int id){
     case PW_SPLAT:return "GOO ON IMPACT";
     case PW_TURBO:return "FASTER LAUNCH";
     case PW_QUAKE:return "LANDING SHOCKWAVE";
+    case PW_BREAKER:return "35% LESS WALL ENERGY";
     default:return "";
   }
 }
@@ -71,6 +72,14 @@ static inline MxToolFeedback mx_tool_feedback(const MxWorld *w){
   real d2=rmul(dx,dx)+rmul(dy,dy);
   u.phase=d2>=R(3)?MX_SHOT_PULL:MX_SHOT_IDLE;
   return u;
+}
+/* The next button press must name the actual action, not always a dive.
+   Beans consume their one mid-air activation before normal dive is available. */
+static inline const char *mx_flight_action(const MxWorld *w){
+  const MxMan *m=&w->man;
+  if(w->state!=MX_PLAY||m->mode!=MAN_FLY)return "";
+  if(m->pwr==PW_BEANS&&!m->beaned)return "FART JET";
+  return m->dive?"":"BELLY FLOP";
 }
 static inline const char *mx_tool_status_label(int phase){
   switch(phase){

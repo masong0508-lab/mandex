@@ -62,7 +62,9 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #endif
 #define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    60
+#define MX_NUM_LEVELS    84
+#define MX_CONTRACT_START 60
+#define MX_CONTRACT_COUNT (MX_NUM_LEVELS-MX_CONTRACT_START)
 #define MX_CH2_START     20      /* chapter 2: levels 20-39 */
 #define MX_CH3_START     40      /* chapter 3 (the Wolfman): levels 40-59 */
 #define MX_STORY_LEVELS  20      /* chapter 1: the story achievements and outfits count only these, so adding levels never moves earned goalposts */
@@ -129,7 +131,7 @@ enum {
   EV_TNT_SAFE  /* loose TNT survived a moderate impact without igniting */
 };
 /* power-ups: one use of each per level */
-enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT, PW_TURBO, PW_QUAKE, PW_COUNT }; /* appended: preserve legacy save IDs */
+enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT, PW_TURBO, PW_QUAKE, PW_BREAKER, PW_COUNT }; /* appended: preserve legacy save IDs */
 
 typedef struct { uint8_t type, m; real x, y, a, b; } MxEvent;
 

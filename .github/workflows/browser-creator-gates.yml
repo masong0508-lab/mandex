@@ -7,6 +7,7 @@ on:
       - "web/**"
       - "test/browser_*.js"
       - "test/browser_*.py"
+      - "tools/render_contract_music.js"
       - ".github/workflows/browser-creator-gates.yml"
   push:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - "web/**"
       - "test/browser_*.js"
       - "test/browser_*.py"
+      - "tools/render_contract_music.js"
       - ".github/workflows/browser-creator-gates.yml"
   workflow_dispatch:
 
@@ -33,6 +35,8 @@ jobs:
         run: node test/browser_creator_codec_test.js
       - name: Portrait and landscape navigation, editor, world coordinates
         run: node test/browser_orientation_test.js
+      - name: Low-end phones, independent frame pacing and responsive performance settings
+        run: node test/browser_phone_performance_test.js
       - name: Captured multitouch and camera safety
         run: node test/browser_multitouch_test.js
       - name: Shared walk controls and collision memory
@@ -53,6 +57,18 @@ jobs:
         run: node test/browser_rubble_draw_test.js
       - name: Shattered debris stops contacting during its solver step
         run: node test/browser_dead_rubble_test.js
+      - name: Exact static collision bounds and bounded aftershock selection
+        run: node test/browser_collapse_hotpath_test.js
+      - name: Contract campaign geometry, metadata, and roster
+        run: node test/browser_contract_campaign_test.js
+      - name: Exact clipped rectangle spans and all contract menu pages
+        run: |
+          node test/browser_rect_fastpath_test.js
+          node test/browser_contract_pager_test.js
+      - name: Original soundtrack files and lazy browser fallback
+        run: |
+          node tools/render_contract_music.js
+          node test/browser_contract_music_test.js
 
   canvas:
     runs-on: ubuntu-latest
@@ -70,6 +86,8 @@ jobs:
         run: python3 test/browser_canvas_cull_test.py --out-dir out/browser-canvas
       - name: Exercise live keyboard, slingshot and orientation input
         run: python3 test/browser_input_smoke.py --out-dir out/browser-canvas/input
+      - name: Real Chromium phone performance settings and scaled slingshot
+        run: python3 test/browser_phone_canvas_test.py --out-dir out/browser-canvas/phone
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -30,7 +30,7 @@ static void wall(int x,int y,int mat){
 }
 int main(void){
   CHECK(sizeof(MxCell)==24,"fuse fits existing mobile voxel layout");
-  CHECK(MX_NUM_LEVELS==60,"existing 60-level save/progression preserved");
+  CHECK(MX_CONTRACT_START==60&&MX_NUM_LEVELS>=76,"existing 60 level IDs preserved; contracts appended");
   scene();
   MxChunk *ch=charge(R(20.5),R(20.5));
   CHECK(ch->has_tnt && !ch->tnt_fused,"detached TNT starts alive, unarmed");

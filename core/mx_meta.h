@@ -48,7 +48,7 @@ void mx_outfit_shades(int i, uint8_t out[6][3]);
 int mx_outfit_skin(int i, uint8_t out[4][3]);      /* returns 1 when the outfit is furry */
 
 /* ---- options (port 13): kept by each front-end, saved in the blob (version 2).  Default = collapse off / no gadget. The air valve must be armed in the gameplay toolbar. ---- */
-enum { MX_TOOL_NONE, MX_TOOL_VALVE, MX_TOOL_BEANS, MX_TOOL_TOWEL, MX_TOOL_SPLAT, MX_TOOL_TURBO, MX_TOOL_QUAKE, MX_NUM_TOOLS };   /* new tool IDs appended, preserving all save index meanings; fits bits 1-3 */
+enum { MX_TOOL_NONE, MX_TOOL_VALVE, MX_TOOL_BEANS, MX_TOOL_TOWEL, MX_TOOL_SPLAT, MX_TOOL_TURBO, MX_TOOL_QUAKE, MX_TOOL_BREAKER, MX_NUM_TOOLS };   /* new tool IDs appended, preserving all save index meanings; fits bits 1-3 */
 typedef struct { uint8_t collapse, tool, nofight; } MxOptions;   /* collapse: collapsible buildings; tool: the start tool (MX_TOOL_*); nofight: 1 = landlords just stand there (default 0: they fight back) */
 void mx_options_default(MxOptions *o);
 const char *mx_tool_name(int tool);                      /* "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE" */
@@ -71,6 +71,11 @@ int mx_tool_power(int tool);                             /* the PW_* a start too
    still loads (missing levels read as 0, extra ones are dropped); any other layout change must bump the version byte. */
 #define MX_SAVE_VERSION 2
 #define MX_SAVE_MAX (66 + MX_NUM_LEVELS + 4 + 1 + 4 * MX_NUM_LEVELS + 1 + 4)
+/* 84-level payload = 496 bytes; journal header is 12, so a Dreamcast
+   512-byte VMU sector and existing DS/3DS journal slots still fit. */
+#if MX_SAVE_MAX + 12 > 512
+#error "Progress journal exceeds existing single-sector save budget"
+#endif
 uint32_t mx_crc32(const uint8_t *p, int n);
 /* returns the number of bytes written, or 0 if cap is too small */
 int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap);                                  /* = mx_meta_pack_opt with the default options */

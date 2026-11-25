@@ -1201,6 +1201,25 @@ static void draw_man(const View *v){
 #ifndef MX_DS_PARTICLE_VIEW_CULL
 #define MX_DS_PARTICLE_VIEW_CULL 1
 #endif
+/* Exact integer DDA for the ring's original angle formula:
+   floor(floor(k*4096*6283/n)/1000) == floor(k*4096*6283/(n*1000)).
+   Two divisions per RING instead of two per DOT; no table or extra RAM. */
+typedef struct { int angle,carry,step,rem,den; } DsRingAngle;
+static inline DsRingAngle ds_ring_angles(int n){
+  const int den=n*1000,num=4096*6283;
+  const DsRingAngle a={0,0,num/den,num%den,den};
+  return a;
+}
+static inline real ds_ring_next(DsRingAngle *a){
+  const real old=a->angle;
+  a->angle+=a->step;
+  a->carry+=a->rem;
+  if(a->carry>=a->den){a->carry-=a->den;a->angle++;}
+  return old;
+}
+#ifndef MX_DS_RING_ANGLE_STEP
+#define MX_DS_RING_ANGLE_STEP 1
+#endif
 static void draw_parts(const View *v){
   for(int i = 0; i < (MX_DS_PARTICLE_BOUNDS ? part_high_water : NPART); i++){
     const Part *p = &parts[i];
@@ -1257,8 +1276,15 @@ static void draw_parts(const View *v){
       if(age * 3 > p->max * 2 && (frame & 1)) break;
       int u = 256 - (256 - age * 256 / p->max) * (256 - age * 256 / p->max) / 256;
       int rad = (p->r * v->ppc >> 6) * u >> 8, n = 8 + rad * 2; if(n > 64) n = 64;                /* about a dot every 3 px */
+#if MX_DS_RING_ANGLE_STEP
+      DsRingAngle angles=ds_ring_angles(n);
+#endif
       for(int k = 0; k < n; k++){
+#if MX_DS_RING_ANGLE_STEP
+        real a=ds_ring_next(&angles);
+#else
         real a = rdiv(RI(k) * 6283 / n, RI(1000));
+#endif
         gfx_px(v->buf, px + (int)((rcos(a) * rad) >> 12), py + (int)((rsin(a) * rad) >> 12), p->col);
       }
       break; }
@@ -1507,21 +1533,22 @@ static void bottom_overview(View *v){
   button(v->buf, 170, 170, 46, 16, "RESTART");
   button(v->buf, 220, 170, 32, 16, "MENU");
   }
-  if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) gfx_text_c(v->buf, 128, 6, "TAP = BELLY FLOP!", C_WHITE, C_BLACK, 1);
+  {const char *action=mx_flight_action(&world);if(*action)gfx_text_c(v->buf,128,6,world.man.pwr==PW_BEANS&&!world.man.beaned?"TAP = FART JET":"TAP = BELLY FLOP",C_WHITE,C_BLACK,1);}
 }
 
 /* Six real touch targets fit the 256x192 lower DS screen. The existing
    power gauge keeps its own 82px strip; no sprites or framebuffers added. */
-static const struct { int x,y,w,h,pw; const char *name; } AIM_TOOLS[6]={
+static const struct { int x,y,w,h,pw; const char *name; } AIM_TOOLS[7]={
   {6,150,82,18,0,"AIR VALVE"},
   {94,150,49,18,PW_BEANS,"BEANS"},
   {146,150,49,18,PW_TOWEL,"TOWEL"},
   {198,150,51,18,PW_SPLAT,"SPLAT"},
-  {94,172,75,16,PW_TURBO,"TURBO"},
-  {174,172,75,16,PW_QUAKE,"QUAKE"}
+  {94,172,49,16,PW_TURBO,"TURBO"},
+  {146,172,49,16,PW_QUAKE,"QUAKE"},
+  {198,172,51,16,PW_BREAKER,"BREAK"}
 };
 static int aim_tool_at(const touchPosition *t){
-  for(int i=0;i<6;i++)if(hit(t,AIM_TOOLS[i].x,AIM_TOOLS[i].y,AIM_TOOLS[i].w,AIM_TOOLS[i].h))return i;
+  for(int i=0;i<7;i++)if(hit(t,AIM_TOOLS[i].x,AIM_TOOLS[i].y,AIM_TOOLS[i].w,AIM_TOOLS[i].h))return i;
   return -1;
 }
 /* the 4 px/cell sling zoom */
@@ -1549,7 +1576,7 @@ static void bottom_aim(View *v){
     gfx_text_c(v->buf,128,139,mx_tool_status_label(cue.phase),
                cue.phase==MX_SHOT_DAZED?C_RED:
                cue.phase==MX_SHOT_PULL?C_GOO:C_WHITE,C_BLACK,1);
-  for(int k=0;k<6;k++){
+  for(int k=0;k<7;k++){
     int pw=AIM_TOOLS[k].pw;
     int left=k==0?mx_valve_unlocked(&stats):world.pw_left[pw]>0;
     int on=k==0?world.valve_ok:world.pw_sel==pw;
@@ -1804,8 +1831,8 @@ static void options_bottom(u8 *b){
       const char *v = mx_tool_name(opt.tool);
       gfx_text(b, x + w - 8 - gfx_text_w(v, 2), y + 3, v, C_GOLD, 2);
       gfx_text(b, x + 6, y + 17, "<", C_WHITE, 2); gfx_text(b, x + 6 + 12, y + 17, ">", C_WHITE, 2);
-      static const char *const D1[MX_NUM_TOOLS] = { "NO GADGET; EQUIP ONE IN THE AIM TOOLBAR", "AIR VALVE: EQUIP IN THE AIM TOOLBAR", "BEANS: PRE-ARM WHEN YOU RELOAD", "TOWEL: PRE-ARM WHEN YOU RELOAD", "SPLAT: PRE-ARM WHEN YOU RELOAD", "TURBO: FASTER LAUNCH, 1 PER LEVEL", "QUAKE: HEAVY IMPACT, 1 PER LEVEL" };
-      static const char *const D2[MX_NUM_TOOLS] = { "AIR STAYS HIDDEN UNTIL TAPPED", "AIR IS OFF AT LEVEL START", "ONE USE PER LEVEL; AIR STAYS OFF", "ONE USE PER LEVEL; AIR STAYS OFF", "ONE USE PER LEVEL; AIR STAYS OFF", "NO HEAP / EXTRA ASSETS", "STRONGER, SMALLER SHOCK THAN SPLAT" };
+      static const char *const D1[MX_NUM_TOOLS] = { "NO GADGET; EQUIP ONE IN THE AIM TOOLBAR", "AIR VALVE: EQUIP IN THE AIM TOOLBAR", "BEANS: PRE-ARM WHEN YOU RELOAD", "TOWEL: PRE-ARM WHEN YOU RELOAD", "SPLAT: PRE-ARM WHEN YOU RELOAD", "TURBO: FASTER LAUNCH, 1 PER LEVEL", "QUAKE: HEAVY IMPACT, 1 PER LEVEL", "BREAKER: LESS WALL ENERGY" };
+      static const char *const D2[MX_NUM_TOOLS] = { "AIR STAYS HIDDEN UNTIL TAPPED", "AIR IS OFF AT LEVEL START", "ONE USE PER LEVEL; AIR STAYS OFF", "ONE USE PER LEVEL; AIR STAYS OFF", "ONE USE PER LEVEL; AIR STAYS OFF", "NO HEAP / EXTRA ASSETS", "STRONGER, SMALLER SHOCK THAN SPLAT", "35% LESS ENERGY PER BLOCK HP" };
       gfx_text(b, x + 34, y + 21, D1[opt.tool], C_WHITE, 1);
       gfx_text(b, x + 34, y + 29, D2[opt.tool], C_GRAY, 1);
     } else if(i == OPT_FIGHT){

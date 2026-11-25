@@ -1057,7 +1057,7 @@ static void draw_all(void){
     text("TIME", 238, 51, 12, WHITE, 2, Z_HUD + 0.1f);
     text("A JUMP   B PUNCH   X SLAM   L GIVE UP", 320, 466, 14, argb(255, 255, 255, 205), 1, Z_HUD);
   }
-  if(m->mode == MAN_FLY && !m->dive) text("PRESS A = BELLY FLOP", 320, 466, 20, argb(255, 255, 255, 205), 1, Z_HUD);
+  {const char *action=mx_flight_action(&world);if(*action)text(m->pwr==PW_BEANS&&!m->beaned?"PRESS A = FART JET":"PRESS A = BELLY FLOP",320,466,20,argb(255,255,255,205),1,Z_HUD);}
   if(world.state == MX_PLAY && m->mode == MAN_AIM){
     MxToolFeedback cue=mx_tool_feedback(&world);
     if(cue.selected)

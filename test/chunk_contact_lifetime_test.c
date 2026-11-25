@@ -66,7 +66,52 @@ static unsigned live_trace(void){
   return hash;
 }
 
+/* Exercise the real solver across 1 -> 2 -> 1 active bodies. In the
+ * lone-body case all physics except inter-body contacts must still run. */
+static unsigned solo_trace(void){
+  scene();
+  MxChunk *a=body(0,R(20.8),R(20.5),MX_STEEL,RI(1000),0);
+  a->count=2;a->cells[1].lx=R(-1.2);a->cells[1].m=MX_STEEL;
+  a->cells[1].h=RI(1000);a->cells[1].edge=1;recompute(a);
+  wall(21,20);a->vx=RI(30);
+  step_chunks(&w,0);
+  CHECK(a->cn>0&&a->vx<RI(30),"lone slab still hits the standing wall");
+#ifndef MX_REFERENCE_CHUNK_HASH
+  CHECK(w.bh_hi<w.bh_lo&&hash_entries()==0,"lone body writes no collision buckets");
+#endif
+  /* Discard wall and reset the moving body's velocity to isolate a pair. */
+  memset(w.grid,0,sizeof w.grid);a->x=RI(20);a->y=RI(20);
+  a->vx=a->vy=a->w=0;a->ang=0;
+  MxChunk *b=body(1,R(20.5),RI(20),MX_STEEL,RI(1000),0);
+  step_chunks(&w,0);
+  CHECK(a->cn>0&&b->cn>0,"second body immediately rebuilds the collision hash");
+  b->active=0;
+  for(int i=0;i<80;i++)step_chunks(&w,R(1.0/240.0));
+  CHECK(a->age>0&&a->y>RI(20),"lone slab retains integration after removal");
+#ifndef MX_REFERENCE_CHUNK_HASH
+  CHECK(w.bh_hi<w.bh_lo&&hash_entries()==0,"multi-to-single transition clears the previous hash");
+#endif
+  /* Ignore only the transient collision-hash scratch, not gameplay state. */
+  memset(w.bhead,0,sizeof w.bhead);memset(w.bnext,0,sizeof w.bnext);
+  w.bh_lo=w.bh_hi=0;
+  unsigned hash=2166136261u;
+  const unsigned char *bytes=(const unsigned char *)&w;
+  for(size_t i=0;i<sizeof w;i++){hash^=bytes[i];hash*=16777619u;}
+  return hash;
+}
+
 int main(void){
+  if(getenv("MX_SOLO_HASH_TRACE")){
+    printf("CHUNK_SOLO_TRACE %08x\n",solo_trace());return failures!=0;
+  }
+  /* A clamped left-edge bucket can include fragments 1024 cells apart.
+   * In 20.12 math, squaring that separation wraps to zero. */
+  scene();
+  MxChunk *near=body(0,R(-1.5),RI(20),MX_STEEL,RI(150),0);
+  MxChunk *far=body(1,R(-1025.5),R(20.5),MX_STEEL,RI(150),1);
+  step_chunks(&w,0);
+  CHECK(near->cn==0&&far->cn==0,"off-map hash aliases must not cause ghost contacts");
+  solo_trace();
   /* This trace can also be run against the prior core to require exact
    * whole-world parity when every participating fragment remains alive. */
   if(getenv("MX_CONTACT_LIVE_TRACE")){
