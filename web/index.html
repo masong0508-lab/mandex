@@ -806,7 +806,13 @@ function kill(x,y,bvx,bvy){
 function live(){return OPT().collapse&&state==='play'}
 function busy(){for(const c of chunks)if(!c.rest)return true;return false}
 function wake(ch){ch.rest=false;ch.sleep=0;ch.restT=0;ch.age=Math.max(ch.age,.2)}
-function wakeAt(px,py,r){for(const c of chunks)if(c.rest&&Math.hypot(c.x-px,c.y-py)<c.rad+r)wake(c)}
+function wakeAt(px,py,r){
+  for(const c of chunks)if(c.rest){
+    const dx=c.x-px,dy=c.y-py,reach=c.rad+r;
+    if(Math.abs(dx)>=reach||Math.abs(dy)>=reach)continue;
+    if(Math.hypot(dx,dy)<reach)wake(c);
+  }
+}
 function markDmg(x,y){for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(inb(nx,ny))dmg[idx(nx,ny)]=1}}
 function aftershock(){
   const zone=new Uint8Array(COLS*ROWS);let any=false;
@@ -1093,7 +1099,13 @@ function stepChunks(dt){
     for(const a of ch.cells){
       if(a.dead)continue;
       const gx=Math.floor(a.wx/V),gy=Math.floor(a.wy/V);
-      for(let j=gy-1;j<=(ch.rest?gy-2:gy+1)&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){
+      // A half-cell circle can touch only its containing tile and the
+      // neighbor on either side of the local midpoint, never both sides.
+      // Preserve row/column order and the exact narrow-phase test below.
+      const fx=a.wx-gx*V,fy=a.wy-gy*V;
+      const left=gx-(fx<RC?1:0),right=gx+(V-fx<RC?1:0);
+      const top=gy-(fy<RC?1:0),bottom=gy+(V-fy<RC?1:0);
+      for(let j=top;j<=bottom&&!ch.rest&&!a.dead;j++)for(let i=left;i<=right&&!a.dead;i++){
         if(!(j>=ROWS||(inb(i,j)&&grid[idx(i,j)])))continue;
         const bx=i*V,by=j*V,qx=clamp(a.wx,bx,bx+V),qy=clamp(a.wy,by,by+V),dx=a.wx-qx,dy=a.wy-qy,d2=dx*dx+dy*dy;
         if(d2>=RC*RC)continue;let nx,ny,pen;
@@ -1149,14 +1161,24 @@ function syncChunkPoses(){
 function cleanChunks(dt){
   for(let k=chunks.length-1;k>=0;k--){const ch=chunks[k];let lost=false;
     for(const a of ch.cells)if(a.dead){lost=true;score+=5}
-    if(lost){ch.cells=ch.cells.filter(a=>!a.dead);if(!ch.cells.length){chunks.splice(k,1);continue}recompute(ch)}
+    if(lost){
+      // Preserve live fragment identity and order without allocating a
+      // replacement array on each impact-heavy frame.
+      let n=0;for(const a of ch.cells)if(!a.dead)ch.cells[n++]=a;
+      ch.cells.length=n;
+      if(!n){chunks.splice(k,1);continue}recompute(ch)
+    }
     if(ch.hitCd>0)ch.hitCd-=dt;
     if(ch.tntFused){ch.sleep=0;continue} // the fuse cannot vanish when rubble welds
     if(ch.x<-250||ch.x>WW+250||ch.y>WH+300){chunks.splice(k,1);continue}
     const sp=Math.hypot(ch.vx,ch.vy)+Math.abs(ch.w)*18;
     if(ch.rest){
       if(!live()||sp>30||(ch.restT+=dt)>2.4+(ch.id%7)*.3)wake(ch);else{ch.vx=ch.vy=ch.w=0;continue}}
-    if(sp>40&&live())for(const o of chunks)if(o.rest&&Math.hypot(o.x-ch.x,o.y-ch.y)<o.rad+ch.rad+V*2)wake(o);
+    if(sp>40&&live())for(const o of chunks)if(o.rest){
+      const dx=o.x-ch.x,dy=o.y-ch.y,reach=o.rad+ch.rad+V*2;
+      if(Math.abs(dx)>=reach||Math.abs(dy)>=reach)continue;
+      if(Math.hypot(dx,dy)<reach)wake(o);
+    }
     if(sp<8&&ch.age>.15){ch.sleep+=dt;if(ch.sleep>.5){
       if(live()){ch.rest=true;ch.restT=0;ch.vx=ch.vy=ch.w=0}else{settleRaw(ch,false);chunks.splice(k,1)}}}else ch.sleep=0}
   if(chunks.length>140&&live()){
