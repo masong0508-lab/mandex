@@ -2386,8 +2386,11 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   "Glass Menagerie", "Penthouse Panic", "Mail Room Mayhem", "Rent Strike", "Sand Standoff", "Landlord HQ",
   /* chapter 3: the Wolfman */
   "Full Moon Rising", "Howling Heights", "Flea Market", "Fang Street", "Bad Moon Brick", "Wolf Pack Lofts", "Moonlit Mortgage", "Claw Foreclosure", "Growl Gardens", "Night Shift",
-  "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord"};
-static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
+  "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord",
+  /* chapter 4: Demolition Contracts */
+  "Glass Exchange", "Crane Yard", "Spring Freight", "Powder Dispatch", "Sinking Court", "Rooftop Relay", "Bailiff Barracks", "Vacuum Post", "Tenement Cascade", "Safe Landing Lab", "Clerk's Citadel", "Parry Platform", "Night Market", "Triple Rent Vault", "Skyline Reckoning", "Final Notice"};
+static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9, 6, 7, 6, 6, 7, 6, 7, 6, 7, 6, 8, 6, 7, 8, 8, 10};
+static const uint8_t CONTRACT_POWER[MX_CONTRACT_COUNT]={6, 4, 2, 3, 5, 1, 6, 4, 5, 2, 6, 3, 1, 4, 5, 6};
 const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
 /* Compact ROM-only guidance; each hint fits a 256-pixel DS banner. */
 const char *mx_level_tactic(int l){
@@ -2443,6 +2446,10 @@ const char *mx_level_tactic(int l){
   };
   if(l<0 || l>=MX_NUM_LEVELS)return "EVICT EVERY LANDLORD";
   if(l<MX_CH3_START)return early[l];
+  if(l>=MX_CONTRACT_START){
+    static const char *const tips[MX_CONTRACT_COUNT]={"BREAKER: SHATTER THE GLASS EXCHANGE", "TURBO: HIT THE CRANE'S WOODEN BRACE", "TOWEL: GLIDE OVER THE RUBBER WALL", "SPLAT: START A WIDE TNT CHAIN", "QUAKE: CRACK THE SAND FOUNDATIONS", "BEANS: BOOST BETWEEN THE HIGH ROOFS", "BREAKER: BREACH THE BARRACKS THEN WALK", "TURBO: ENTER THE FIRST POSTAL TUBE", "QUAKE: DROP THE LOW LINKED SUPPORTS", "TOWEL: USE THE RUBBER AND SAND BEDS", "BREAKER: FIND THE CITADEL'S WEAK DOORS", "SPLAT: LAND THEN PARRY THE BRIEFCASES", "BEANS: BOOST OVER THE MARKET CANOPIES", "TURBO: THREAD THE VAULT ENTRY LANES", "QUAKE: REMOVE THE SKYLINE'S KEY PIERS", "BREAKER: CRACK THE FINAL NOTICE TOWER"};
+    return tips[l-MX_CONTRACT_START];
+  }
   int i=l-MX_CH3_START;
   if(i==0)return "WOLFMAN: LANDLORDS HAVE HEALTH BARS";
   if(i==5)return "SHIELD GUARDS: HIT FROM BEHIND";
@@ -2552,7 +2559,301 @@ static void build_ch3(MxWorld *w, int i){
   }
 }
 
+/* Generated from content/demolition_contracts.json. Fixed-size native
+   world pools are unchanged; only the selected contract is constructed. */
+static void build_contract(MxWorld *w,int i){
+  switch(i){
+  case 0: /* Glass Exchange */
+    house_ex(w,47,59,12,2,9,1,1,4,1,4,0,0);
+    house_ex(w,66,59,12,3,8,1,1,2,1,6,0,0);
+    house_ex(w,91,59,12,2,9,1,1,6,1,1,0,0);
+    rect_fill(w,58,49,9,1,1);
+    tnt(w,48,59);
+    tnt(w,67,51);
+    tgtr(w,53,59,0,3);
+    tgtr(w,53,50,2,3);
+    tgtr(w,72,59,1,3);
+    tgtr(w,72,51,1,3);
+    tgtr(w,72,43,0,3);
+    tgtr(w,97,59,4,3);
+    tgtr(w,97,50,2,3);
+    break;
+  case 1: /* Crane Yard */
+    house_ex(w,51,59,11,3,9,1,1,6,1,1,0,0);
+    house_ex(w,86,59,12,2,10,1,1,2,1,3,0,0);
+    rect_fill(w,61,29,24,2,1);
+    rect_fill(w,81,31,3,28,6);
+    rect_fill(w,75,27,8,2,6);
+    rect_fill(w,65,31,2,21,1);
+    tnt(w,66,52);
+    tnt(w,87,59);
+    tgtr(w,56,59,1,3);
+    tgtr(w,56,50,2,3);
+    tgtr(w,56,41,0,3);
+    tgtr(w,92,59,3,3);
+    tgtr(w,92,49,2,3);
+    tgtr(w,78,59,0,3);
+    break;
+  case 2: /* Spring Freight */
+    house_ex(w,48,59,10,2,9,1,1,7,1,1,0,0);
+    rect_fill(w,62,37,2,23,7);
+    house_ex(w,72,59,13,3,9,1,1,2,1,4,0,0);
+    house_ex(w,96,59,11,1,11,1,1,1,1,1,0,0);
+    rect_fill(w,63,58,8,2,8);
+    tnt(w,74,50);
+    tgtr(w,53,59,0,3);
+    tgtr(w,53,50,1,3);
+    tgtr(w,78,59,3,3);
+    tgtr(w,78,50,2,3);
+    tgtr(w,78,41,0,3);
+    tgtr(w,101,59,1,3);
+    break;
+  case 3: /* Powder Dispatch */
+    house_ex(w,43,59,10,2,8,1,1,1,1,1,0,0);
+    house_ex(w,61,59,11,2,9,1,1,4,1,4,0,0);
+    house_ex(w,81,59,12,2,9,1,1,2,1,1,0,0);
+    house_ex(w,101,59,10,1,10,1,1,3,1,1,0,0);
+    rect_fill(w,52,50,10,1,1);
+    rect_fill(w,71,50,11,1,1);
+    tnt(w,44,51);
+    tnt(w,62,59);
+    tnt(w,82,50);
+    tnt(w,102,59);
+    tgtr(w,48,59,0,3);
+    tgtr(w,48,51,2,3);
+    tgtr(w,66,59,1,3);
+    tgtr(w,66,50,0,3);
+    tgtr(w,87,59,3,3);
+    tgtr(w,87,50,0,3);
+    tgtr(w,106,59,0,3);
+    break;
+  case 4: /* Sinking Court */
+    mound(w,43,32,9);
+    house_ex(w,53,50,12,2,9,1,1,2,1,3,0,0);
+    mound(w,81,30,8);
+    house_ex(w,90,51,12,2,9,1,1,1,1,1,0,0);
+    tnt(w,44,59);
+    tnt(w,82,59);
+    tgtr(w,59,50,1,3);
+    tgtr(w,59,41,2,3);
+    tgtr(w,96,51,4,3);
+    tgtr(w,96,42,1,3);
+    tgtr(w,77,59,3,3);
+    tgtr(w,113,59,0,3);
+    break;
+  case 5: /* Rooftop Relay */
+    house_ex(w,44,59,12,2,9,1,1,1,1,1,0,0);
+    house_ex(w,66,59,12,4,10,1,1,4,1,4,0,0);
+    house_ex(w,91,59,12,3,9,1,1,2,1,3,0,0);
+    rect_fill(w,77,29,15,1,1);
+    tnt(w,67,39);
+    tnt(w,92,50);
+    tgtr(w,50,59,0,3);
+    tgtr(w,50,50,0,3);
+    tgtr(w,72,59,1,3);
+    tgtr(w,72,49,2,3);
+    tgtr(w,72,39,1,3);
+    tgtr(w,72,29,2,3);
+    tgtr(w,97,59,3,3);
+    tgtr(w,97,41,1,3);
+    break;
+  case 6: /* Bailiff Barracks */
+    w->walk=1;
+    house_ex(w,43,59,13,3,10,1,1,2,1,3,0,0);
+    rect_fill(w,43,53,1,6,0);
+    rect_fill(w,55,43,1,6,0);
+    rect_fill(w,54,49,2,1,0);
+    rect_fill(w,44,39,3,1,0);
+    rect_fill(w,51,58,4,1,7);
+    pad(w,51,58,4);
+    rect_fill(w,45,48,4,1,7);
+    pad(w,45,48,4);
+    house_ex(w,72,59,12,2,10,1,1,1,1,1,0,0);
+    rect_fill(w,72,53,1,6,0);
+    house_ex(w,94,59,12,2,10,1,1,3,1,1,0,0);
+    tgtr(w,49,59,1,3);
+    tgtr(w,49,49,3,3);
+    tgtr(w,49,39,2,3);
+    tgtr(w,78,59,1,3);
+    tgtr(w,78,49,2,3);
+    tgtr(w,100,59,4,3);
+    tgtr(w,100,49,1,3);
+    tnt(w,73,59);
+    break;
+  case 7: /* Vacuum Post */
+    house_ex(w,64,59,12,3,10,2,1,6,1,4,0,0);
+    house_ex(w,90,59,12,2,10,1,1,4,1,1,0,0);
+    rect_fill(w,54,28,2,32,6);
+    rect_fill(w,64,53,2,6,0);
+    rect_fill(w,64,43,2,6,0);
+    tube(w,R(37.5),R(42.5),R(66.75),R(57));
+    tube(w,R(44.5),R(27.5),R(66.75),R(47));
+    tnt(w,66,39);
+    tnt(w,91,59);
+    tgtr(w,70,59,3,3);
+    tgtr(w,70,49,2,3);
+    tgtr(w,70,39,1,3);
+    tgtr(w,96,59,0,3);
+    tgtr(w,96,49,2,3);
+    break;
+  case 8: /* Tenement Cascade */
+    house_ex(w,44,59,11,3,9,1,1,1,1,1,0,0);
+    house_ex(w,61,59,12,4,8,1,1,2,1,1,0,0);
+    house_ex(w,84,59,12,3,9,1,1,3,1,1,0,0);
+    rect_fill(w,54,50,8,2,1);
+    rect_fill(w,72,43,13,1,1);
+    tnt(w,45,59);
+    tnt(w,62,51);
+    tnt(w,85,50);
+    tgtr(w,49,59,0,3);
+    tgtr(w,49,50,1,3);
+    tgtr(w,49,41,2,3);
+    tgtr(w,67,59,4,3);
+    tgtr(w,67,51,0,3);
+    tgtr(w,67,35,2,3);
+    tgtr(w,90,59,3,3);
+    tgtr(w,90,41,1,3);
+    break;
+  case 9: /* Safe Landing Lab */
+    house_ex(w,44,59,12,2,9,1,1,4,1,4,0,0);
+    house_ex(w,67,59,12,2,9,1,1,7,1,1,0,0);
+    house_ex(w,91,59,12,2,9,1,1,2,1,1,0,0);
+    rect_fill(w,46,59,8,1,8);
+    rect_fill(w,69,59,8,1,7);
+    rect_fill(w,69,50,8,1,7);
+    tnt(w,45,50);
+    tnt(w,68,50);
+    tnt(w,92,59);
+    tgtr(w,50,59,0,3);
+    tgtr(w,50,50,2,3);
+    tgtr(w,73,59,1,3);
+    tgtr(w,73,50,0,3);
+    tgtr(w,97,59,3,3);
+    tgtr(w,97,50,2,3);
+    break;
+  case 10: /* Clerk's Citadel */
+    house_ex(w,43,59,10,2,9,1,1,2,1,1,0,0);
+    house_ex(w,63,59,20,3,10,2,2,3,6,3,0,1);
+    house_ex(w,96,59,12,3,9,1,1,6,1,1,0,0);
+    rect_fill(w,63,53,2,6,1);
+    rect_fill(w,81,43,2,6,4);
+    tnt(w,64,59);
+    tnt(w,97,50);
+    tgtr(w,48,59,3,3);
+    tgtr(w,48,50,0,3);
+    tgtr(w,69,59,4,3);
+    tgtr(w,77,49,2,3);
+    tgtr(w,69,39,1,3);
+    tgtr(w,102,59,3,3);
+    tgtr(w,102,50,7,3);
+    tgtr(w,102,41,2,3);
+    break;
+  case 11: /* Parry Platform */
+    w->walk=1;
+    house_ex(w,43,59,12,2,10,1,1,1,1,1,0,0);
+    rect_fill(w,43,53,1,6,0);
+    house_ex(w,66,59,12,3,9,1,1,2,1,1,0,0);
+    rect_fill(w,66,53,1,6,0);
+    rect_fill(w,77,44,1,6,0);
+    rect_fill(w,68,58,4,1,7);
+    pad(w,68,58,4);
+    rect_fill(w,73,49,4,1,7);
+    pad(w,73,49,4);
+    house_ex(w,91,59,12,2,9,1,1,4,1,4,0,0);
+    tgtr(w,49,59,1,3);
+    tgtr(w,49,49,2,3);
+    tgtr(w,72,59,2,3);
+    tgtr(w,72,50,3,3);
+    tgtr(w,72,41,2,3);
+    tgtr(w,97,59,4,3);
+    tgtr(w,97,50,1,3);
+    tnt(w,92,59);
+    break;
+  case 12: /* Night Market */
+    house_ex(w,41,59,10,1,8,1,1,1,1,4,0,0);
+    house_ex(w,54,59,10,1,8,1,1,7,1,1,0,0);
+    house_ex(w,68,59,10,2,8,1,1,4,1,4,0,0);
+    house_ex(w,88,59,13,4,9,1,1,2,1,3,0,0);
+    rect_fill(w,50,49,5,1,1);
+    rect_fill(w,63,49,6,1,1);
+    tnt(w,69,59);
+    tnt(w,89,50);
+    tgtr(w,46,59,1,3);
+    tgtr(w,59,59,5,3);
+    tgtr(w,73,59,2,3);
+    tgtr(w,73,51,0,3);
+    tgtr(w,94,59,4,3);
+    tgtr(w,94,50,7,3);
+    tgtr(w,94,41,3,3);
+    tgtr(w,94,32,2,3);
+    break;
+  case 13: /* Triple Rent Vault */
+    house_ex(w,45,59,12,2,9,2,1,3,1,1,0,0);
+    house_ex(w,64,59,12,3,9,2,1,6,1,1,0,0);
+    house_ex(w,87,59,14,4,9,2,1,6,1,4,0,0);
+    rect_fill(w,45,53,2,6,4);
+    rect_fill(w,64,53,2,6,1);
+    rect_fill(w,87,44,2,6,4);
+    tnt(w,46,50);
+    tnt(w,65,41);
+    tnt(w,88,32);
+    tgtr(w,51,59,3,3);
+    tgtr(w,51,50,1,3);
+    tgtr(w,70,59,4,3);
+    tgtr(w,70,50,2,3);
+    tgtr(w,70,41,0,3);
+    tgtr(w,91,59,6,3);
+    tgtr(w,97,50,7,3);
+    tgtr(w,91,41,4,3);
+    tgtr(w,97,32,2,3);
+    break;
+  case 14: /* Skyline Reckoning */
+    house_ex(w,44,59,11,4,9,1,1,1,1,1,0,0);
+    house_ex(w,62,59,16,4,9,1,1,3,1,3,0,0);
+    house_ex(w,87,59,14,5,9,1,1,4,1,6,0,0);
+    rect_fill(w,54,32,9,1,1);
+    rect_fill(w,77,32,11,1,1);
+    tnt(w,45,59);
+    tnt(w,63,50);
+    tnt(w,88,41);
+    tgtr(w,49,59,1,3);
+    tgtr(w,49,41,2,3);
+    tgtr(w,49,32,0,3);
+    tgtr(w,66,59,3,3);
+    tgtr(w,73,50,4,3);
+    tgtr(w,66,32,7,3);
+    tgtr(w,91,59,6,3);
+    tgtr(w,97,41,2,3);
+    tgtr(w,91,23,4,3);
+    break;
+  case 15: /* Final Notice */
+    house_ex(w,39,59,10,2,9,1,1,7,1,1,0,0);
+    mound(w,52,22,5);
+    house_ex(w,57,54,12,3,9,1,1,2,1,4,0,0);
+    house_ex(w,80,59,22,4,10,2,2,6,1,3,0,1);
+    rect_fill(w,69,36,12,2,1);
+    rect_fill(w,80,53,2,6,4);
+    rect_fill(w,100,43,2,6,1);
+    tnt(w,40,59);
+    tnt(w,58,54);
+    tnt(w,81,39);
+    tnt(w,98,29);
+    tgtr(w,44,59,3,3);
+    tgtr(w,44,50,0,3);
+    tgtr(w,63,54,1,3);
+    tgtr(w,63,45,2,3);
+    tgtr(w,63,36,4,3);
+    tgtr(w,85,59,6,3);
+    tgtr(w,96,59,4,3);
+    tgtr(w,85,49,7,3);
+    tgtr(w,96,39,2,3);
+    tgtr(w,85,29,6,3);
+    tgtr(w,96,29,4,3);
+    break;
+  }
+}
 static void build(MxWorld *w, int l){
+  if(l>=MX_CONTRACT_START){build_contract(w,l-MX_CONTRACT_START);return;}
   if(l >= MX_CH3_START){ build_ch3(w, l - MX_CH3_START); return; }
   const int W_ = MX_WOOD, B = MX_BRICK, S = MX_STONE, ST = MX_STEEL, RU = MX_RUBBER;
   switch(l){
@@ -2842,6 +3143,7 @@ static void load_level(MxWorld *w, int level, int district){
     }
   }
   w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = w->pw_left[PW_TURBO] = w->pw_left[PW_QUAKE] = w->pw_left[PW_BREAKER] = 1;
+  if(level>=MX_CONTRACT_START)w->pw_left[CONTRACT_POWER[level-MX_CONTRACT_START]]=2;
   w->sand_on = 1;
   /* anything that wouldn't hold at spawn is welded in place, so levels never collapse on load */
   support_pass(w);
