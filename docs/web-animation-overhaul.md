@@ -1,0 +1,5 @@
+# Browser animation quality pass
+
+Walking now uses distance-locked stance/swing cycles, articulated knees, grounded soles, smooth airborne and landing poses, an immediate punch extension and timer-based recovery, and a trailing cape. Flight ragdolls use the signed sprite transform; dive rotation retains its incoming orientation and stable facing. Cached landlord movement and attack poses have more animation stages. Rigid rubble rendering samples a bounded interpolation between fixed physics updates without changing collision coordinates. The performance menu and 132 maps remain intact.
+
+Verified in Chromium portrait and landscape: 192 finite leg IK samples (98 planted), 180 fixed walking ticks per orientation including direction changes, jump, stomp and punch, left/right ragdoll transform round trips, dive rotation continuity and angle wrap interpolation. No browser console or page errors in these scenarios. The Ultra Low contract draw benchmark measured about 5.6 ms CPU time with 4x desktop throttling; this is not a real-phone FPS claim. Native sprite atlases are unchanged in this browser-focused pass.

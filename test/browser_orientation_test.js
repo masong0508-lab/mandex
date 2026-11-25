@@ -26,7 +26,7 @@ const layout=extract('const CAM=', 'function camTick(');
 const h=new Function('cv','window','document',`
   let W=960,H=540,COLS=120,state='menu',dragging=true,sliderDrag=true,
       E={drag:{pen:true}},KEYS={TL:true},TID={7:'TL'},hits=[1],_vig=null,
-      CL={cols:120};
+      CL={cols:120},perf={res:1},outputScale=1;
   function setWorld(cols){COLS=cols}
   ${layout}
   return {
@@ -76,7 +76,7 @@ for(const height of [720,960,1200]){
     'portrait editor touch maps to correct underlying world cell');
 }
 const mobile=extract('/* Portrait pages are deliberately','function drawMenu(){');
-const records=[];
+const records=[];let settingsOpened=0;
 const ctx=new Proxy({measureText:s=>({width:String(s).length*10})},{
   get(target,key){return key in target?target[key]:()=>{}},
   set(target,key,value){target[key]=value;return true}
@@ -88,12 +88,12 @@ const env={
   OUTFITS:Array.from({length:16},(_,i)=>({id:'look'+i,n:'Outfit '+i})),
   outfitCur:{n:'Classic Red'},PD:{stars:{},ach:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
   LEVELS:Array.from({length:60},(_,i)=>({name:'District Building '+i})),
-  CH1:20,CH2:40,selTab:0,
+  CH1:20,CH2:40,selTab:0,CONTRACT_ITEMS:Array.from({length:72},(_,i)=>({label:'Contract '+i,stars:0,locked:false,fn:()=>{}})),
   GUIDES:['OFF','SHORT','FULL'],SHAKES:[['OFF',0],['LOW',.5],['FULL',1]],
   OPT:()=>({}),optVol:()=>.8,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
   btn:(x,y,w,h,label,fn,o)=>records.push({x,y,w,h,label,fn}),
   panel:()=>{},txt:()=>{},drawSlamScene:()=>{},drawManFrame:()=>{},
-  goMenu:()=>{},goSelect:()=>{},startStory:()=>{},startCustom:()=>{},
+  goMenu:()=>{},goSelect:()=>{},startStory:()=>{},startCustom:()=>{},openSettings:()=>{settingsOpened++},
   openEditor:()=>{},importCode:()=>{},exportCode:()=>{},confirmDel:()=>true,
   pdSave:()=>{},pdTouch:()=>{},equip:()=>{},setMuted:()=>{},audioInit:()=>{},
   toolName:()=> 'NONE',toolCycle:()=>{},ownedCount:()=>4,achCount:()=>2,totalStars:()=>3,
@@ -118,9 +118,9 @@ function inspect(kind){
 for(const height of [760,960,1170]){
   env.H=height;env.W=540;
   inspect('menu');
-  for(const tab of [0,1,2,3]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
+  for(const tab of [0,1,2,3,4]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
   inspect('ach');inspect('outfit');
-  for(const page of [0,1]){env.WEB_UI.page.options=page;inspect('options')}
+  const before=settingsOpened;methods.options();assert.strictEqual(settingsOpened,before+1,'portrait settings opens the responsive DOM dialog');
 }
 assert(html.includes('WEB_UI.gesture={id:e.pointerId,x,y,screen:state}'),
  'portrait menu activation must defer to pointerup so swipes do not fire buttons');

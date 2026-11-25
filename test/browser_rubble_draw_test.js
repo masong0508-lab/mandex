@@ -16,7 +16,7 @@ const program=`
 const V=8;
 let W=960,H=640,CAM={x:285,y:95,z:1.8},camOn=true,shake=0,shakeOption=1;
 let shakeX=0,shakeY=0;
-const shakeScale=()=>shakeOption;
+const shakeScale=()=>shakeOption;const drawRubbleCached=()=>false;const rubbleRenderPose=ch=>ch;
 const MAT=Array.from({length:9},(_,i)=>({hp:80}));
 const SPR=Array.from({length:9},(_,i)=>Array.from({length:4},(_,v)=>
   Array.from({length:3},(_,d)=>({id:i+'/'+v+'/'+d}))));

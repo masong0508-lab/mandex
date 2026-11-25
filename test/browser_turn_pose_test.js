@@ -13,8 +13,8 @@ for(const [remaining,expected] of [[.2,0],[.15,1.2],[.1,2.4],[.05,1.2],[0,0],[-1
     'browser lunge follows console anticipation/recovery duration');
 }
 assert(helper.lunge(.1,6)===0,'turning cannot slide the grounded punch pose');
-assert(html.includes('ctx.translate(visualFace<0?-punchLunge:punchLunge,0)'),
-  'the real browser character paint, not the physics body, receives the lunge');
+assert(html.includes('visualFace=walkPose(m)')&&html.includes('drawSpin(q.th,q)'),
+  'real walking sprite uses the articulated pose');
 assert(Math.abs(helper.angle(12)-Math.PI/2)<eps,'first frame is the original side profile');
 assert(Math.abs(helper.angle(6)-Math.PI)<eps,'turning reaches exact rear view at midpoint');
 assert(Math.abs(helper.angle(0)-Math.PI/2)<eps,'turn returns to the opposite side view');
@@ -47,6 +47,7 @@ const walk=new Function(`
   function walkPunch(){punchFace=man.face;man.pCd=.3;man.pT=.2}
   function walkSlam(){throw Error('unexpected slam')}
   function killTarget(){throw Error('unexpected target')}
+  ${html.slice(html.indexOf('function walkAnimTick('),html.indexOf('function walkFootSample('))}
   ${html.slice(walkStart,walkEnd)}
   return {
     reset(face,onFloor){

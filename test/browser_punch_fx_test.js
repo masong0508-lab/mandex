@@ -12,7 +12,7 @@ const punch=section('function walkPunch(){','function walkSlam(');
 const painter=section('function walkTurnAngle(','/* Two fingers on the same virtual key');
 const harness=`
   let man,time=0,JIG=null,hit=null;
-  const V=8,WHH=19,cases=[],SFX={whoosh(){}};
+  const V=8,WHH=19,cases=[],SFX={whoosh(){}};const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   function walkHit(cx,cy,hw,hh){hit={cx,cy,hw,hh};return 0;}
   let strokes=[],draws=[];
   const ctx={

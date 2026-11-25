@@ -10,7 +10,7 @@ const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 const begin=html.indexOf('const WEB_SIM_DT=');
 const end=html.indexOf('let last=performance.now()',begin);
 assert(begin>0&&end>begin,'inline fixed-step scheduler exists');
-assert(html.includes('const ticks=webSimSteps(raw);'),'game loop actually uses scheduler');
+assert(/\bticks\s*=\s*webSimSteps\(raw\)/.test(html),'game loop actually uses scheduler');
 assert(html.includes('update(WEB_SIM_DT);'),'game logic uses fixed timestep');
 assert(html.includes('frameMeterSims+=sim;'),'FPS overlay counts real simulation calls');
 const build=new Function(html.slice(begin,end)+'\nreturn {tick:webSimSteps, carry:()=>webSimCarry};');
