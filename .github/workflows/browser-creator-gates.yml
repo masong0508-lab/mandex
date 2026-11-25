@@ -33,6 +33,8 @@ jobs:
         run: node test/browser_creator_codec_test.js
       - name: Portrait and landscape navigation, editor, world coordinates
         run: node test/browser_orientation_test.js
+      - name: Low-end phones, independent frame pacing and responsive performance settings
+        run: node test/browser_phone_performance_test.js
       - name: Captured multitouch and camera safety
         run: node test/browser_multitouch_test.js
       - name: Shared walk controls and collision memory
