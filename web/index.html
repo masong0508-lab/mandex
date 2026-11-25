@@ -16,7 +16,7 @@ const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const V=8,ROWS=60,GY=ROWS*V,G=900,K=1100,RC=V*.5;let COLS=120;   // COLS: 120 for every level except the wide finale (see setWorld)
 let W=960,H=540,WW=960;const WH=540;   // W,H = the screen (960x540, or a tall 540xN in portrait play); WW,WH = the world (WW = COLS*V: 960, or 2880 for the wide finale)
 let SX=128,SY=GY-118,VX=36,VY=SY+58;const PULL=92,VGRAB=40,VKEEP=44,VPULL=76;   // VX,VY: the air valve, tucked in the far lower-left corner: a full pull-back stops ~15px short of it
-let pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1}};
+let pw={sel:null,tool:'none',left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1,breaker:1}};
 const DX=[1,-1,0,0],DY=[0,0,1,-1];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v,rnd=Math.random;
 const idx=(x,y)=>y*COLS+x,inb=(x,y)=>x>=0&&x<COLS&&y>=0&&y<ROWS;
@@ -639,10 +639,10 @@ function unclipTargets(){for(const t of targets){const row=Math.floor(t.y/V+.875
 function load(l,custom){
   CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
-  /* The air valve and every tool begin unequipped for each new level;
-     a previously saved AIR choice cannot obstruct the very next shot. */
-  OPT().tool='none';
-  pw={sel:null,left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;bankLeft=0;banner=2.4;waitT=0;
+  // The saved default is a preference, not the current shot's selection.
+  // Air/soda are never automatically equipped because they need a gesture.
+  powerPickerOpen=false;
+  pw={sel:null,tool:'none',left:{beans:1,towel:1,splat:1,burp:1,turbo:1,quake:1,breaker:1}};chunks=[];parts=[];texts=[];targets=[];cases=[];interiors=[];explQ=[];state='play';winT=loseT=0;men=CL.men;score=0;shownScore=0;combo=comboPeak=0;comboLeft=0;bankLeft=0;banner=2.4;waitT=0;
   tntLiveFuses=0;tubes=[];pads=[];CL.build();paper.fill(0);interiors.forEach((r,n)=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(inb(x,y))paper[idx(x,y)]=n+1});unclipTargets();
   zonePaid=[];if(CL.slings){const zb=CL.zones||[];for(const t of targets){t.zone=0;for(let k=0;k<zb.length;k++)if(t.x>=zb[k]*V)t.zone=k+1}setSling(0)}else{SX=128;SY=GY-118;VX=36;VY=SY+58;slingK=0}
   supportPass();for(const ch of chunks)settleRaw(ch,true);chunks=[];
@@ -670,6 +670,8 @@ function nextMan(){
   bankLeft=0;
   if(men>0)man={mode:'aim',x:SX,y:SY,vx:0,vy:0,ang:0,spin:0,face:1,t:0,a:1,R:14,dive:false,gt:0,hitCd:0,gooT:0,pop:1,stT:0,swT:0,G:gagNew(2.5,4,3),jg:jigNew(),inf:0,seated:false,pwr:null,vlv:false,airT:0,beaned:false,bel:0,burped:false,burpT:0,chug:null};
   else man={mode:'none',x:-999,y:-999,t:0,a:1,R:14};
+  powerPickerOpen=false;pw.tool='none';pw.sel=null;
+  if(man.mode==='aim')toolArm();
 }
 const aliveTargets=()=>targets.reduce((n,t)=>n+(t.alive?1:0),0);
 // Objective text is the same across web, DS, 3DS and Dreamcast. Reuse a
@@ -1257,14 +1259,38 @@ function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long 
     if(stom(m)>.5){SFX.creak(Math.min(1,stom(m)))}
     if(stom(m)>.3&&rnd()<.22){const side=dragging&&m.vlv;sweat(m.x+(side?5:0),m.y-(side?36:20))}}
   if(!OPT().noBurst&&stom(m)>=1)explodeMan()}
-// ---- gameplay toolbar: valve and six tools are opt-in. Three reserved slots remain for future updates.
-const TOOLS=[{id:'valve',name:'AIR VALVE'},{id:'burp',name:'BURPBURSTER'},{id:'beans',name:'BEANS'},{id:'towel',name:'TOWEL'},{id:'splat',name:'SPLAT'},{id:'turbo',name:'TURBO'},{id:'quake',name:'QUAKE'}].concat(Array.from({length:3},(_,i)=>({id:'slot'+(i+7),name:'',reserved:true})));
-const toolList=()=>TOOLS.filter(t=>!t.reserved);          // what the player can actually pick
-const toolOn=id=>(OPT().tool||'none')===id;                // the air valve exists only after explicit selection
-function toolCycle(){const ids=['none'].concat(toolList().map(t=>t.id)),o=OPT(),i=ids.indexOf(o.tool||'none');o.tool=ids[(i+1)%ids.length]}
-const PWTOOLS=['beans','towel','splat','turbo','quake'];
-function toolArm(){const t=OPT().tool||'none';if(man.mode!=='aim'||man.chug||pw.sel==='burp')return;pw.sel=PWTOOLS.includes(t)&&pw.left[t]>0?t:null}
-const toolName=()=>{const t=OPT().tool||'none';return t==='none'?'NONE':(TOOLS.find(x=>x.id===t)||{name:'?'}).name};
+// Direct selection is a per-shot decision; the Options default is only
+// applied on reload, and cannot silently re-arm a tool while aiming.
+const TOOLS=[
+  {id:'valve',name:'AIR VALVE',desc:'Reusable. Fill up at the valve; drag off before launch.'},
+  {id:'burp',name:'BURPBURSTER',desc:'Tap the soda stand first. Tap in flight to burp.'},
+  {id:'beans',name:'BEANS',desc:'Tap in flight for one extra jet.'},
+  {id:'towel',name:'TOWEL',desc:'Reduced gravity during the first 1.8 seconds.'},
+  {id:'splat',name:'SPLAT',desc:'Wide goo blast on landing.'},
+  {id:'turbo',name:'TURBO',desc:'35% faster launch at the same pull.'},
+  {id:'quake',name:'QUAKE',desc:'Compact, stronger landing shockwave.'},
+  {id:'breaker',name:'BREAKER',desc:'35% less energy per wall HP; plow further.'}
+];
+const toolList=()=>TOOLS;
+const PWTOOLS=['beans','towel','splat','turbo','quake','breaker'];
+const DEFAULT_TOOLS=['none',...PWTOOLS];
+let powerPickerOpen=false;
+const toolOn=id=>pw.tool===id;
+function toolCycle(){const o=OPT(),i=DEFAULT_TOOLS.indexOf(o.tool||'none');o.tool=DEFAULT_TOOLS[(i+1)%DEFAULT_TOOLS.length]}
+function powerStock(id){return id==='valve'?(valveOpen()?1:0):id==='none'?1:Math.max(0,pw.left[id]||0)}
+function selectShotTool(id){
+  if(state!=='play'||man.mode!=='aim'||dragging||man.chug||man.stun>0)return false;
+  if(id!=='none'&&!TOOLS.some(t=>t.id===id))return false;
+  if(!powerStock(id))return false;
+  if(id!=='valve'&&(man.seated||man.vlv)){man.seated=man.vlv=false;man.x=SX;man.y=SY}
+  pw.tool=id;
+  // Soda is armed only by a completed chug, not by tapping its card.
+  pw.sel=PWTOOLS.includes(id)?id:id==='burp'&&pw.sel==='burp'?'burp':null;
+  return true;
+}
+function toolArm(){const t=OPT().tool||'none';if(PWTOOLS.includes(t)&&powerStock(t))selectShotTool(t)}
+const nameForTool=id=>id==='none'?'NONE':(TOOLS.find(x=>x.id===id)||{name:'NONE'}).name;
+const toolName=()=>nameForTool(OPT().tool||'none');
 function valveOpen(){return PD.unlockAll||storyDone()>=3}   // unlockable: beat 3 story levels (U on the level select unlocks everything)
 function drawValve(){
   if(!toolOn('valve'))return;
@@ -1313,13 +1339,14 @@ function drawInfFX(m){
 function manPlow(){
   bounceRubber();
   const m=man,R=m.R,mass=(m.dive?2.6:1)*(1+m.inf*1.5+(m.bel||0)*.9);let s=Math.hypot(m.vx,m.vy),E=.5*mass*s*s;const E0=E;let touched=false;
+  const costPerHP=m.pwr==='breaker'?K*.65:K;
   const x0=Math.floor((m.x-R)/V),x1=Math.floor((m.x+R)/V),y0=Math.floor((m.y-R)/V),y1=Math.floor((m.y+R)/V),list=[];
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(!inb(x,y)||!grid[idx(x,y)]||grid[idx(x,y)]===RUBBER)continue;
     const qx=clamp(m.x,x*V,x*V+V),qy=clamp(m.y,y*V,y*V+V),d=Math.hypot(m.x-qx,m.y-qy);if(d<R)list.push({d,x,y})}
   if(list.length){touched=true;list.sort((p,q)=>p.d-q.d);
-    for(const c of list){const i=idx(c.x,c.y);if(!grid[i])continue;const cost=hp[i]*K;
+    for(const c of list){const i=idx(c.x,c.y);if(!grid[i])continue;const cost=hp[i]*costPerHP;
       if(E>=cost){E-=cost;const h=kill(c.x,c.y,m.vx,m.vy);for(let d=0;d<4;d++)damageCell(c.x+DX[d],c.y+DY[d],h*.18)}
-      else{hp[i]-=E/K;E=0;spark(m.x+m.vx*.02,m.y+m.vy*.02,6,260);break}}}
+      else{hp[i]-=E/costPerHP;E=0;spark(m.x+m.vx*.02,m.y+m.vy*.02,6,260);break}}}
   /* Flying physics runs eight substeps each update. Reject far chunks and
      cells using two cheap axes before the original exact hypot check.
      Preserve strict '>' for chunk range and '>=' for individual contacts. */
@@ -1333,8 +1360,8 @@ function manPlow(){
       if(a.dead)continue;
       const dx=a.wx-m.x,dy=a.wy-m.y;
       if(Math.abs(dx)>=cellReach||Math.abs(dy)>=cellReach||
-         Math.hypot(dx,dy)>=cellReach)continue;touched=true;hit=true;ax+=a.wx;ay+=a.wy;n++;const cost=a.h*K;
-      if(E>=cost){E-=cost;if(a.m===TNT)movedTntBoom(a);else{a.dead=true;const c=MAT[a.m].c;for(let k=0;k<2;k++)chip(a.wx,a.wy,c,m.vx*.25+(rnd()-.5)*200,m.vy*.25-rnd()*150)}}else{a.h-=E/K;E=0}}
+         Math.hypot(dx,dy)>=cellReach)continue;touched=true;hit=true;ax+=a.wx;ay+=a.wy;n++;const cost=a.h*costPerHP;
+      if(E>=cost){E-=cost;if(a.m===TNT)movedTntBoom(a);else{a.dead=true;const c=MAT[a.m].c;for(let k=0;k<2;k++)chip(a.wx,a.wy,c,m.vx*.25+(rnd()-.5)*200,m.vy*.25-rnd()*150)}}else{a.h-=E/costPerHP;E=0}}
     if(hit&&ch.hitCd<=0){ch.hitCd=.12;applyImpulse(ch,ax/n,ay/n,m.vx*mass*.9,m.vy*mass*.9)}}
   /* Man-target proximity is checked for every flight substep. Squared
      distance avoids a square root for each landlord without sacrificing
@@ -1599,9 +1626,20 @@ function manStep(dt){
   manPlow()}
 // The sling can be stretched on past a full pull when you drag toward the air valve (see pointermove); power never exceeds a full pull.
 function pullVec(){let dx=SX-man.x,dy=SY-man.y;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}return[dx,dy]}
-function launch(){const[dx,dy]=pullVec();if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}man.x=SX-dx;man.y=SY-dy;
+function launch(){if(state!=='play'||man.mode!=='aim'||man.stun>0||man.chug||man.seated||man.vlv)return;
+  const[dx,dy]=pullVec();if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}man.x=SX-dx;man.y=SY-dy;
   const sp0=1-.5*man.inf-.1*(man.bel||0);man.R=14*(1+.9*man.inf+.35*(man.bel||0));man.vx=dx*9.2*sp0;man.vy=dy*9.2*sp0;man.mode='fly';if(man.inf>.6){ST().inflated++;popText(man.x,man.y-60,'HOT AIR!','#9fd8ff',26)}
-  if(pw.sel){man.pwr=pw.sel;man.bm=pw.sel==='burp'?burpMult(man):1;pw.left[pw.sel]--;ST()['pw_'+pw.sel]++;pw.sel=null}
+  man.pwr=null;
+  if(pw.sel){
+    const id=pw.sel;
+    if((PWTOOLS.includes(id)||id==='burp')&&powerStock(id)>0){
+      man.pwr=id;man.bm=id==='burp'?burpMult(man):1;pw.left[id]--;
+      const key='pw_'+id;ST()[key]=(ST()[key]||0)+1;
+    }
+    pw.sel=null;
+  }
+  pw.tool='none';powerPickerOpen=false;
+  if(man.pwr==='breaker'){ring(man.x,man.y,35,'#90e6ff');popText(man.x,man.y-35,'BREAKER READY','#90e6ff',20)}
   if(man.pwr==='turbo'){
     man.vx*=1.35;man.vy*=1.35;
     if(man.jg){man.jg.bvx+=Math.sign(man.vx)*24;man.jg.bvy-=11;man.jg.sq=1;man.jg.st=0;}
@@ -1753,12 +1791,17 @@ function pwQuake(armed,spent){
   ctx.lineTo(cx-2,y-3);ctx.closePath();ctx.fill();
   txt('QUAKE',cx,y+27,10,'#ffd23f','center');ctx.restore();
 }
-function drawPwProp(){if(state!=='play')return;const t=OPT().tool||'none';if(!PWTOOLS.includes(t))return;const armed=pw.sel===t&&man.mode==='aim',spent=pw.left[t]<=0;
+function drawPwProp(){if(state!=='play')return;const t=pw.tool||'none';if(!PWTOOLS.includes(t))return;const armed=pw.sel===t&&man.mode==='aim',spent=pw.left[t]<=0;
+  if(t==='breaker'){
+    ctx.save();ctx.fillStyle='#253c51';ctx.fillRect(SX-58,GY-33,44,28);ctx.strokeStyle='#90e6ff';ctx.lineWidth=2;ctx.strokeRect(SX-58,GY-33,44,28);
+    txt('BRK',SX-36,GY-14,12,armed?'#90e6ff':'#ccd','center');ctx.restore();return;
+  }
   (t==='beans'?pwBeans:t==='towel'?pwTowel:t==='splat'?pwSplat:t==='turbo'?pwTurbo:pwQuake)(armed,spent)}
 // in flight: the towel cape, a goo trail, stink behind the beans, fizz around a loaded burp
 function pwFlightFX(m){const R=m.R||14,sp=Math.hypot(m.vx,m.vy)||1,ux=-m.vx/sp,uy=-m.vy/sp,t=time;
   if(m.mode!=='fly')return;
   if(m.pwr==='turbo'){for(let i=0;i<5;i++){const d=R+i*6,x=ux*d+Math.sin(t*13+i)*2,y=uy*d+Math.cos(t*11+i)*2;ctx.globalAlpha=.75-i*.12;ctx.fillStyle=i%2?'#fff':'#ffca59';ctx.fillRect(x-2,y-2,4,4)}ctx.globalAlpha=1}
+  if(m.pwr==='breaker'){ctx.strokeStyle='#90e6ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,R+3,-.85,.85);ctx.stroke()}
   if(m.pwr==='quake'&&!m.splatted){ctx.globalAlpha=.65+.2*Math.sin(t*7);ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,R+4,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1}
   if(m.pwr==='splat'&&!m.splatted){for(let i=0;i<7;i++){const d=R*.8+i*9+Math.sin(t*14+i*2)*2,x=ux*d+(pwQ(i)-.5)*10,y=uy*d+(pwQ(i+9)-.5)*10,r=Math.max(1.6,5.4-i*.55);ctx.globalAlpha=Math.max(.2,1-i*.11);ctx.fillStyle=pwVG(y-r,y+r,[0,'#b8ff7a',1,'#46a024']);ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle='#1c4a0c';ctx.stroke()}
     ctx.globalAlpha=1;for(const a of[.5,2.3,4.1]){const x=Math.cos(a)*R*.7,y=Math.sin(a)*R*.7;ctx.fillStyle='#8cf04a';ctx.beginPath();ctx.ellipse(x,y,4.4,3.2,a,0,7);ctx.fill();ctx.lineWidth=1.4;ctx.strokeStyle='#1c4a0c';ctx.stroke();ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(x-1.6,y-1.6,1.8,1)}}
@@ -2006,7 +2049,7 @@ function updTargets(dt){
 //  UPDATE
 // =====================================================================
 function update(dt){
-  if(state==='play')toolArm();
+  if(powerPickerOpen&&state==='play'&&man.mode==='aim')return;
   crackEv=0;time+=dt;for(const c of clouds){c.x+=c.v*dt;if(c.x>WW+140)c.x=-160}
   if(outfitCur.rainbow)applyOutfit(outfitCur,time);
   if(state==='cutscene'){cutTick(dt);titleTick(dt);return}
@@ -4039,7 +4082,9 @@ function draw(){
   if(camOn)ctx.restore();
   grade();
   if(flash>0){ctx.fillStyle=`rgba(255,240,200,${flash*.9})`;ctx.fillRect(0,0,W,H)}
-  drawHUD();drawObjectiveEdge();drawToasts(frameDt)}
+  drawHUD();drawObjectiveEdge();drawToasts(frameDt);
+  if(powerPickerOpen&&state==='play'&&man.mode==='aim')drawPowerPicker();
+}
 // Screen-space HUD cue; does not pan, collide with or change the final
 // landlord. Skip it entirely if the actor is already in the camera view.
 function drawObjectiveEdge(){
@@ -4110,7 +4155,7 @@ function drawHUD(){
   for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
   txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
   if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
-  if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
+  if(state==='play'){const tid=pw.tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
     if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
       btn(W-212,H-44,96,32,'< SLING',()=>goSling(slingK-1),{size:13,disabled:slingK<=0});btn(W-108,H-44,96,32,'SLING >',()=>goSling(slingK+1),{size:13,disabled:slingK>=CL.slings.length-1});void ny}
     // Separate immediate shot readiness from tool inventory. The
@@ -4125,15 +4170,42 @@ function drawHUD(){
            ready==='RELEASE TO LAUNCH'?'#7dff5a':'#ffe190','center');
       }
     }
-    if(man.mode!=='walk')btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
-    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
+    if(man.mode==='aim')btn(12,H-54,P?Math.min(W-24,238):260,42,'POWER: '+nameForTool(tid)+chg,()=>{
+      if(!dragging&&!man.chug&&!(man.stun>0)){powerPickerOpen=true;SFX.pop()}
+    },{size:14,on:tid!=='none',disabled:dragging||!!man.chug||man.stun>0});
+    if(pw.sel){const tip=TOOLS.find(t=>t.id===pw.sel);if(tip)txt(tip.desc,W/2,H-102,P?12:14,'#ffd23f','center')}
+  }
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
-  if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
+  else if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
   if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
   if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
   if(state==='play')btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
   if(state==='win'||state==='lose')drawEnd()}
+// Modal power inventory; clicking outside cannot start a drag or launch.
+function drawPowerPicker(){
+  hits=[];
+  const portrait=isPortrait(),margin=portrait?14:110,wide=W-2*margin;
+  const top=portrait?112:65,rows=5,gap=6,rowH=Math.min(87,Math.floor((H-top-88-(rows-1)*gap)/rows));
+  ctx.fillStyle='rgba(7,11,22,.93)';ctx.fillRect(0,0,W,H);
+  txt('POWER UPS',W/2,45,portrait?32:30,'#ffd23f','center');
+  txt('Select one for this shot. Stock is spent only on launch.',W/2,portrait?75:23,portrait?14:13,'#cfd','center');
+  const choices=[{id:'none',name:'NORMAL SHOT',desc:'No charge spent.'},...TOOLS];
+  const cw=(wide-gap)/2;
+  for(let k=0;k<choices.length;k++){
+    const t=choices[k],x=margin+(k%2)*(cw+gap),y=top+Math.floor(k/2)*(rowH+gap),stock=powerStock(t.id),selected=pw.tool===t.id;
+    btn(x,y,cw,rowH,'',()=>{if(selectShotTool(t.id)){powerPickerOpen=false;SFX.pop()}},
+      {on:selected,disabled:!stock});
+    txt(t.name,x+10,y+20,portrait?14:16,stock?'#fff':'#8993a5','left');
+    const label=t.id==='none'?'FREE':t.id==='valve'?(stock?'REUSABLE':'LOCKED'):(stock?'x'+stock:'USED');
+    txt(label,x+cw-9,y+20,12,stock?'#9debc1':'#ff9e9e','right');
+    // Fit descriptions into two readable lines, retaining the full action.
+    const max=portrait?30:46,words=t.desc.split(' ');let line='',ny=y+39;
+    for(const word of words){if(line.length&&line.length+word.length+1>max){txt(line,x+10,ny,portrait?11:13,'#c7d5e9','left');ny+=14;line=word}else line+=(line?' ':'')+word}
+    if(line)txt(line,x+10,ny,portrait?11:13,'#c7d5e9','left');
+  }
+  btn(margin,H-62,wide,46,'CLOSE / KEEP CURRENT',()=>{powerPickerOpen=false},{size:16});
+}
 function star(x,y,r,on){ctx.fillStyle=on?'#ffd23f':'#3a3f55';ctx.strokeStyle='#000';ctx.lineWidth=3;ctx.beginPath();for(let i=0;i<10;i++){const a=-1.5708+i*.6283,rr=i%2?r*.45:r;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.closePath();ctx.stroke();ctx.fill()}
 function drawEnd(){
   ctx.fillStyle='rgba(8,10,20,.72)';ctx.fillRect(0,0,W,H);const win=state==='win';
@@ -4183,9 +4255,10 @@ function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);end
   JIG={bo:[sw*4,Math.cos(ph)*1.5],ro:[sw*5,0],bs:[1,1]};drawManFrame(seg===0?(sw>0?'DANCE_A':'DANCE_B'):seg===1?(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C'):(Math.sin(time*3)>.4?'BK_B':sw>0?'POSE_A':'POSE_B'));JIG=null;ctx.restore();
   if(rnd()<.25)P({k:rnd()<.5?12:13,x:rnd()*W,y:H+10,vx:(rnd()-.5)*30,vy:-60-rnd()*60,l:3,l0:3,s:5+rnd()*5,ph:rnd()*6});if(rnd()<.3)P({k:13,x:rnd()*W,y:rnd()*H,vx:0,vy:0,l:.7,l0:1,s:5+rnd()*6,ph:0});
   drawParts();btn(W-150,H-56,130,40,'MENU',goMenu,{size:16,on:true})}
-function backFromPlay(){if(testing){openEditor(true);return}goSelect()}
+function backFromPlay(){powerPickerOpen=false;if(testing){openEditor(true);return}goSelect()}
 cv.addEventListener('pointerdown',e=>{
   audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
+  if(powerPickerOpen&&state==='play'){hitTest(x,y);return}
   if(state==='cutscene'){cutClick(x,y);return}
   if(state==='title'){goMenu();return}
   if(isPortrait()&&['menu','select','ach','outfit','options'].includes(state)){
@@ -4283,6 +4356,7 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
   if(state==='title')return;
   if(state==='play'&&CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){if(e.key==='[')goSling(slingK-1);if(e.key===']')goSling(slingK+1)}
+  if(e.key==='Escape'&&powerPickerOpen){powerPickerOpen=false;return}
   if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'&&E.starters){E.starters=false}else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending')goMenu();return}
   if(state==='select'&&(e.key==='u'||e.key==='U')){PD.unlockAll=!PD.unlockAll;pdTouch();toast('ach',PD.unlockAll?'All levels unlocked':'Levels locked again','');return}
   if(state==='edit'){const k=e.key.toLowerCase();
@@ -4305,7 +4379,7 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.
 //  META: save data, achievements, outfits, menus, level select, LEVEL CREATOR
 // =====================================================================
 const SAVE_KEY='mandex.save.v1';
-const ST0=()=>({kills:0,cells:0,booms:0,shots:0,flops:0,wins:0,oneShots:0,created:0,customWins:0,exported:0,maxChain:0,bestScore:0,inflated:0,pops:0,pw_beans:0,pw_towel:0,pw_splat:0,pw_burp:0,pw_turbo:0,pw_quake:0});
+const ST0=()=>({kills:0,cells:0,booms:0,shots:0,flops:0,wins:0,oneShots:0,created:0,customWins:0,exported:0,maxChain:0,bestScore:0,inflated:0,pops:0,pw_beans:0,pw_towel:0,pw_splat:0,pw_burp:0,pw_turbo:0,pw_quake:0,pw_breaker:0});
 let PD={stars:{},best:{},ach:{},outfit:'classic',own:{},custom:[],st:ST0(),unlockAll:false,opt:{collapse:false,tool:'none'}};
 function pdLoad(){try{const s=localStorage.getItem(SAVE_KEY);if(s){const o=JSON.parse(s);PD=Object.assign(PD,o);PD.st=Object.assign(ST0(),o.st||{})}}catch(e){}}
 let pdDirty=false;
@@ -5467,7 +5541,7 @@ function drawSettings(){
   const toggle=(key)=>{o[key]=!o[key]};
   if(page===0){
     add('COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF','Fallen rubble stays loose and can topple.',()=>toggle('collapse'),!!o.collapse);
-    add('START TOOL',toolName(),'Choose your first power or air valve.',toolCycle,toolName()!=='NONE');
+    add('START POWER',toolName(),'Pre-arm an available power on reload.',toolCycle,toolName()!=='NONE');
     add('AIM GUIDE',GUIDES[o.guide==null?2:o.guide],'Preview your launch trajectory.',()=>{o.guide=((o.guide==null?2:o.guide)+1)%3},(o.guide==null?2:o.guide)>0);
     add('BURP CHARGE',o.burpCharge?'ON':'OFF','Charge the soda-powered attack.',()=>toggle('burpCharge'),!!o.burpCharge);
     add('NO STOMACH BURST',o.noBurst?'ON':'OFF','Cheat: disable over-inflation bursts.',()=>toggle('noBurst'),!!o.noBurst);
