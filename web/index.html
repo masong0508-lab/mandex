@@ -796,10 +796,21 @@ function blast(cx,cy,r,power){let spent=0;const R=Math.ceil(r);
   for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){const d=Math.hypot(i,j);if(d>r)continue;spent+=damageCell(cx+i,cy+j,power*(1-d/r)+(d<1?power*.25:0))}return spent}
 function applyImpulse(ch,px,py,jx,jy){ch.vx+=jx/ch.m;ch.vy+=jy/ch.m;ch.w+=((px-ch.x)*jy-(py-ch.y)*jx)/ch.I;ch.sleep=0}
 function shockwave(px,py,rpx,power){
-  for(const ch of chunks){const dx=ch.x-px,dy=ch.y-py,d=Math.hypot(dx,dy)||1;if(d>rpx*1.9)continue;const f=(1-d/(rpx*1.9))*power;
+  const chunkReach=rpx*1.9,targetReach=rpx*1.05,partReach=rpx*1.6;
+  for(const ch of chunks){const dx=ch.x-px,dy=ch.y-py;
+    if(Math.abs(dx)>chunkReach||Math.abs(dy)>chunkReach)continue;
+    const d=Math.hypot(dx,dy)||1;if(d>chunkReach)continue;const f=(1-d/chunkReach)*power;
     applyImpulse(ch,ch.x-dx*.3,ch.y-dy*.3,dx/d*f,dy/d*f-f*.35)}
-  for(const t of targets)if(t.alive&&Math.hypot(t.x-px,t.y-py)<rpx*1.05)killTarget(t,true);
-  for(const p of parts){const dx=p.x-px,dy=p.y-py,d=Math.hypot(dx,dy)||1;if(d<rpx*1.6&&p.k!==5){p.vx+=dx/d*260;p.vy+=dy/d*260}}}
+  for(const t of targets)if(t.alive){
+    const dx=t.x-px,dy=t.y-py;
+    if(Math.abs(dx)>targetReach||Math.abs(dy)>targetReach)continue;
+    if(Math.hypot(dx,dy)<targetReach)killTarget(t,true);
+  }
+  for(const p of parts){if(p.k===5)continue;
+    const dx=p.x-px,dy=p.y-py;
+    if(Math.abs(dx)>partReach||Math.abs(dy)>partReach)continue;
+    const d=Math.hypot(dx,dy)||1;if(d<partReach){p.vx+=dx/d*260;p.vy+=dy/d*260}}
+}
 /* Match the console core's structural-shock reactions without a per-frame
    enemy/hazard scan.  Only real collapse events call this bounded loop.
    Nothing allocated; existing panic and dodge fields drive the animations. */
@@ -870,12 +881,18 @@ function updateMovingTnt(){
   }
   tntLiveFuses=live;
 }
-function processExpl(){let n=0;
-  while(explQ.length&&n++<80){const[x,y]=explQ.shift(),px=x*V+V/2,py=y*V+V/2;onBoom();
+function processExpl(){let head=0;
+  // New charges append to the same FIFO while blasts run. Consume by
+  // index, then compact once rather than shifting the entire queue up to
+  // eighty times during the most CPU-intensive moment of a demolition.
+  while(head<explQ.length&&head<80){const[x,y]=explQ[head++],px=x*V+V/2,py=y*V+V/2;onBoom();
     blast(x,y,7,95);blastMovingTnt(px,py);wobBlast(x,y,14,26);shockwave(px,py,7*V,5200);lordShock(px,py,14*V,.8);shake=Math.max(shake,9);slow=Math.max(slow,.35);freeze=Math.max(freeze,3);flash=.35;SFX.boom();
     ring(px,py,90,'#ffcf6b');
     for(let k=0;k<30;k++)P({k:2,x:px,y:py,vx:(rnd()-.5)*620,vy:-rnd()*520,l:.5+rnd()*.5,l0:1});
-    for(let k=0;k<8;k++)P({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}}
+    for(let k=0;k<8;k++)P({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}
+  if(head===explQ.length)explQ.length=0;
+  else if(head)explQ.splice(0,head);
+}
 
 // ---------- wobble lattice (mirrors core/mx.c): every voxel is a mass on springs to its 4 neighbours ----------
 // offsets ox/oy are in cells, velocities in cells/s.  Hits inject velocity that travels as a wave; a joint that
@@ -3288,14 +3305,24 @@ const MAN_FRAMES={
 function P(o){if(parts.length<fxLimit())parts.push(o)}
 function sweat(x,y){P({k:7,g:1,x:x+(rnd()-.5)*10,y:y+(rnd()-.5)*4,vx:(rnd()-.5)*6,vy:0,l:1.1,l0:1.1,s:1.6+rnd()*.9,c:'#bfe8ff'})}   // a bead forms on the skin, swells, then trickles down
 function updParts(dt){
-  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0){parts.splice(i,1);continue}
+  // Keep the original reverse update/audio order. Compact expired effects
+  // in a single stable forward pass; thousands of simultaneous deaths no
+  // longer repeatedly shift the surviving particle array.
+  let expired=false;
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0){expired=true;continue}
     if(p.k===1||p.k===6){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.98;p.vy*=.99;continue}
     if(p.k===5||(p.k===8&&p.sp))continue;
     if(p.k>=9){p.x+=p.vx*dt;p.y+=p.vy*dt;continue}
     p.vy+=(p.k===2?G*.4:p.g?G*.12:G)*dt;const ox=p.x,oy=p.y;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.k===4){p.vx*=.97;p.vy=Math.min(p.vy,90);p.r+=dt*6}
     if(p.y>GY-2){p.y=GY-2;p.vy*=-.3;p.vx*=.6;if(p.k===8&&!p.sp){p.sp=1;SFX.booger()}}
-    if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}}
-function updTexts(dt){for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=28*dt;if(t.t>t.l)texts.splice(i,1)}}
+    if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}
+  if(expired){let write=0;for(let i=0;i<parts.length;i++){const p=parts[i];if(p.l>0)parts[write++]=p;}parts.length=write;}
+}
+function updTexts(dt){
+  let write=0;
+  for(let i=0;i<texts.length;i++){const t=texts[i];t.t+=dt;t.y-=28*dt;if(!(t.t>t.l))texts[write++]=t;}
+  texts.length=write;
+}
 let endT=0;
 function drawParts(){
   for(const p of parts){const a=p.l/p.l0;
