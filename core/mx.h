@@ -129,7 +129,7 @@ enum {
   EV_TNT_SAFE  /* loose TNT survived a moderate impact without igniting */
 };
 /* power-ups: one use of each per level */
-enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT, PW_TURBO, PW_QUAKE, PW_COUNT }; /* appended: preserve legacy save IDs */
+enum { PW_NONE, PW_BEANS, PW_TOWEL, PW_SPLAT, PW_TURBO, PW_QUAKE, PW_BREAKER, PW_COUNT }; /* appended: preserve legacy save IDs */
 
 typedef struct { uint8_t type, m; real x, y, a, b; } MxEvent;
 
