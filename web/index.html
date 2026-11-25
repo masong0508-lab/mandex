@@ -725,7 +725,7 @@ function objectiveLabel(o){
 // Existing ecoFX saves migrate naturally into the manual FX override.
 const WEB_PROFILES=['auto','quality','balanced','low'];
 const WEB_FRAME_CAPS=[0,30,60],WEB_SCALES=[0,1,.75,.6];
-let webEcoFX=false,webPerfTier=0,webPerfBad=0,webPerfGood=0;
+let webEcoFX=false,webPerfTier=0,webPerfBad=0,webPerfGood=0,webFxCap=1400;
 function webProfile(o){return WEB_PROFILES.includes(o.performance)?o.performance:'auto'}
 function webEffectiveTier(o){
   const p=webProfile(o);return p==='quality'?0:p==='balanced'?1:p==='low'?2:webPerfTier;
@@ -733,7 +733,7 @@ function webEffectiveTier(o){
 function webRenderScale(o){const v=o.renderScale;return WEB_SCALES.includes(v)&&v>0?v:[1,.75,.6][webEffectiveTier(o)]}
 function webRenderCap(o){return o.renderCap===30||o.renderCap===60?o.renderCap:webEffectiveTier(o)>0?30:60}
 function webFxBudget(o){const t=webEffectiveTier(o);return o.ecoFX===false?1400:o.ecoFX===true?360:t===2?220:t===1?360:1400}
-function fxLimit(){return webFxBudget(OPT())}
+function fxLimit(){return webFxCap}
 function webPerfSample(o,elapsed,cpu,playing){
   if(webProfile(o)!=='auto'||!playing||!(elapsed>0)||elapsed>.25){
     webPerfBad=webPerfGood=0;return false;
@@ -754,7 +754,7 @@ function webFXLabel(o){return o.ecoFX===undefined?'AUTO':o.ecoFX?'ECO':'FULL'}
 function webProfileLabel(o){const p=webProfile(o);return p==='low'?'LOW END':p.toUpperCase()}
 function webCapLabel(o){return o.renderCap===30||o.renderCap===60?o.renderCap+' FPS':'AUTO'}
 function webScaleLabel(o){return o.renderScale>0&&WEB_SCALES.includes(o.renderScale)?Math.round(o.renderScale*100)+'%':'AUTO'}
-function chip(x,y,col,vx,vy){if(parts.length>fxLimit())return;P({k:0,x,y,vx,vy,l:1+rnd()*1.2,l0:2,c:col,s:2+rnd()*2})}
+function chip(x,y,col,vx,vy){if(parts.length>=fxLimit())return;P({k:0,x,y,vx,vy,l:1+rnd()*1.2,l0:2,c:col,s:2+rnd()*2})}
 function dust(x,y,n,sz){for(let i=0;i<n&&parts.length<fxLimit();i++)P({k:1,x:x+(rnd()-.5)*V,y:y+(rnd()-.5)*V,vx:(rnd()-.5)*60,vy:-rnd()*45-8,l:.7+rnd()*.8,l0:1.5,s:sz*(.6+rnd()*.8)})}
 function spark(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd()*6.28,s=rnd()*sp;P({k:2,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,l:.25+rnd()*.35,l0:.5})}}
 function goo(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd()*6.28,s=rnd()*sp;P({k:3,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-80,l:.8+rnd()*.6,l0:1.4,s:2+rnd()*3})}}
@@ -3352,7 +3352,15 @@ const MAN_FRAMES={
   NAV_A:_F(.36,[0,-44]),NAV_A2:_F(.36,[0,-44]),NAV_B:_F(.36,[0,-44]),NAV_C:_F(.36,[0,-44]),NAV_D:_F(.36,[0,-44]),NAV_E:_F(.36,[0,-44]),KISS_A:_F(.36,[0,-44]),KISS_A2:_F(.36,[0,-44]),KISS_B:_F(.36,[0,-44]),KISS_C:_F(.36,[0,-44]),
   SLEEP_A:_F(.36,[1.7,-40.9]),SLEEP_B:_F(.36,[2,-39.9]),SAD:_F(.36,[0,-39]),
   CAPE_A:_F(.36,[0,-44]),SPIN_0:_F(.36,[0,-44]),SPIN_1:_F(.36,[0,-44]),SPIN_2:_F(.36,[0,-44]),SPIN_3:_F(.36,[0,-44]),SPIN_4:_F(.36,[0,-44]),SPIN_5:_F(.36,[0,-44]),SPIN_6:_F(.36,[0,-44]),SPIN_7:_F(.36,[0,-44]),SPIN_8:_F(.36,[0,-44]),SPIN_9:_F(.36,[0,-44]),SPIN_10:_F(.36,[0,-44]),SPIN_11:_F(.36,[0,-44]),SPIN_12:_F(.36,[0,-44]),SPIN_R1:_F(.36,[0,-44]),SPIN_R2:_F(.36,[0,-44]),SPIN_R3:_F(.36,[0,-44]),SPIN_R4:_F(.36,[0,-44]),SPIN_R5:_F(.36,[0,-44]),SPIN_R6:_F(.36,[0,-44]),SPIN_R7:_F(.36,[0,-44]),SPIN_R8:_F(.36,[0,-44]),SPIN_R9:_F(.36,[0,-44]),SPIN_R10:_F(.36,[0,-44]),SPIN_R11:_F(.36,[0,-44]),SPIN_BL:_F(.36,[0,-44]),SPIN_BR:_F(.36,[0,-44]),OOPS_A:_F(.36,[0,-44]),OOPS_B:_F(.36,[0,-44]),OOPS_C:_F(.36,[0,-44]),OOPS_D:_F(.36,[0,-44]),OOPS_E:_F(.36,[0,-44]),OOPS_F:_F(.36,[0,-44]),OOPS_G:_F(.36,[0,-44]),OOPS_H:_F(.36,[0,-44]),BACK_C:_F(.36,null),BACK_L:_F(.36,null),BACK_R:_F(.36,null),FART_A:_F(.36,null),FART_B:_F(.36,null)};
-function P(o){if(parts.length<fxLimit())parts.push(o)}
+function P(o){
+  if(parts.length<fxLimit()){parts.push(o);return}
+  // In an effect-heavy scene, don't lose the blast/impact ring simply
+  // because decorative sparks and dust consumed the whole phone budget.
+  if(o.k===5)for(let i=0;i<parts.length;i++){
+    const k=parts[i].k;
+    if(k===0||k===1||k===2||k===3||k===6){parts[i]=o;return}
+  }
+}
 function sweat(x,y){P({k:7,g:1,x:x+(rnd()-.5)*10,y:y+(rnd()-.5)*4,vx:(rnd()-.5)*6,vy:0,l:1.1,l0:1.1,s:1.6+rnd()*.9,c:'#bfe8ff'})}   // a bead forms on the skin, swells, then trickles down
 function updParts(dt){
   // Keep the original reverse update/audio order. Compact expired effects
@@ -3375,12 +3383,14 @@ function updTexts(dt){
 }
 let endT=0;
 function drawParts(x0=-Infinity,x1=Infinity,y0=-Infinity,y1=Infinity){
+  const cull=x0!==-Infinity;
   for(const p of parts){const a=p.l/p.l0;
-    // Sparks are long lines; rings grow outwards. Other particles have
-    // bounded radii including their trailing highlights and small wiggles.
-    const pad=p.k===2?Math.max(Math.abs(p.vx),Math.abs(p.vy))*.035+3:
-      Math.max(40,(p.s||0)*3+8);
-    if(p.x+pad<x0||p.x-pad>x1||p.y+pad<y0||p.y-pad>y1)continue;
+    // Skip bounds math entirely for unzoomed screens.
+    if(cull){
+      const pad=p.k===2?Math.max(Math.abs(p.vx),Math.abs(p.vy))*.035+3:
+        Math.max(40,(p.s||0)*3+8);
+      if(p.x+pad<x0||p.x-pad>x1||p.y+pad<y0||p.y-pad>y1)continue;
+    }
     if(p.k===0){ctx.globalAlpha=Math.min(1,p.l);ctx.fillStyle=p.c;ctx.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s)}
     else if(p.k===1){ctx.globalAlpha=a*.5;ctx.fillStyle=p.c||'#e6e0d2';ctx.beginPath();ctx.arc(p.x,p.y,p.s*(1+(1-a)*1.4),0,7);ctx.fill()}
     else if(p.k===2){ctx.globalAlpha=Math.min(1,a*1.4);ctx.strokeStyle='#ffd36b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*.035,p.y-p.vy*.035);ctx.stroke()}
@@ -4237,6 +4247,7 @@ const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'none'});
 webEcoFX=!!OPT().ecoFX;             // load saved touch-friendly effects preference
 // A conservative starting hint; measured frame costs can override it.
 if(typeof navigator!=='undefined'&&navigator.deviceMemory>0&&navigator.deviceMemory<=2)webPerfTier=1;
+webFxCap=webFxBudget(OPT());
 muted=!!OPT().muted;
 const ST=()=>PD.st;
 const totalStars=()=>{let n=0;for(const k in PD.stars)if(+k>=0&&+k<CH1)n+=PD.stars[k]||0;return n};
@@ -6018,6 +6029,7 @@ function loop(t){
   const ticks=webSimSteps(raw);
   let sim=0,painted=false,started=performance.now();
   try{
+    webFxCap=webFxBudget(OPT()); // resolve preferences once, not for every particle
     layoutTick();
     for(let i=0;i<ticks;i++){
       const playing=state==='play';
@@ -6029,7 +6041,7 @@ function loop(t){
     const force=state!==webDrawState||mode!==webDrawMode||cv.width!==webDrawW||cv.height!==webDrawH||cap!==webDrawCap;
     if(force||t+1>=webNextDraw){
       frameDt=Math.min(.067,Math.max(0,(t-webLastDraw)/1000));
-      draw();if(frameMeterVisible)drawFrameMeter();painted=true;webLastDraw=t;
+      draw();if(frameMeterVisible&&state==='play')drawFrameMeter();painted=true;webLastDraw=t;
       webNextDraw=webNextPaint(t,cap,webNextDraw,force);webDrawCap=cap;
       webDrawState=state;webDrawMode=mode;webDrawW=cv.width;webDrawH=cv.height;
     }
