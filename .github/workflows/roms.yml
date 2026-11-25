@@ -133,6 +133,7 @@ jobs:
         with: { name: mandex-3ds, path: pack/3ds }
       - name: Zip all console builds and standalone browser game
         run: |
+          node tools/render_contract_music.js
           cp web/index.html pack/mandex.html
           cp -R web/audio pack/audio
           cd pack && ls -la && ls -la 3ds

@@ -62,7 +62,7 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #endif
 #define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    76
+#define MX_NUM_LEVELS    84
 #define MX_CONTRACT_START 60
 #define MX_CONTRACT_COUNT (MX_NUM_LEVELS-MX_CONTRACT_START)
 #define MX_CH2_START     20      /* chapter 2: levels 20-39 */

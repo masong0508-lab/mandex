@@ -19,12 +19,12 @@ for(const track of manifest.tracks){
  assert(!keys.has(hash),'distinct music, not duplicate padding');keys.add(hash);
  bytes+=b.length;seconds+=(b.length-44)/(22050*2);
 }
-assert(manifest.tracks.length===3&&bytes>=3000000&&seconds>70,'real new audio meets content target');
+assert(manifest.tracks.length===6&&bytes>=6500000&&seconds>150,'real new audio meets content target');
 const a=html.indexOf('function contractVolume(){'),b=html.indexOf('function noise(',a);
 assert(a>=0&&b>a,'actual soundtrack controller');
 const run=new Function('assert',`
  let level=0,o={},contractAudio=null,contractAudioKey='',contractAudioState='idle',volume=.8;
- const CONTRACT_TRACKS=['permit-panic','concrete-shuffle','final-notice-funk'];
+ const CONTRACT_TRACKS=['permit-panic','concrete-shuffle','final-notice-funk','overtime-drive','night-shift-shuffle','crown-finale'];
  const OPT=()=>o,optVol=()=>volume,created=[];
  class Audio{
   constructor(){this.pauseCount=0;this.reloads=0;this.events={};created.push(this)}
@@ -53,6 +53,10 @@ const run=new Function('assert',`
  stopContractAudio();fourth.yes();
  assert(contractAudio===null&&contractAudioState==='idle','stale play callback cannot resurrect stopped media');
  assert(!syncContractMusic(false)&&created.length===4,'hidden or muted state does not load');
+ o.contractMusic=true;level=76;syncContractMusic(true);created[4].yes();assert(syncContractMusic(true)&&created[4].src.includes('overtime-drive'),'overtime track');
+ level=79;syncContractMusic(true);created[5].yes();assert(syncContractMusic(true)&&created[5].src.includes('night-shift-shuffle'),'night track');
+ level=82;syncContractMusic(true);created[6].yes();assert(syncContractMusic(true)&&created[6].src.includes('crown-finale'),'finale track');
+ level=84;assert(!syncContractMusic(true)&&created[6].src==='','custom/noncampaign fallback');
  return created.length;
 `);
 const opens=run(assert);

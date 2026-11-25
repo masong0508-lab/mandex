@@ -2388,9 +2388,9 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   "Full Moon Rising", "Howling Heights", "Flea Market", "Fang Street", "Bad Moon Brick", "Wolf Pack Lofts", "Moonlit Mortgage", "Claw Foreclosure", "Growl Gardens", "Night Shift",
   "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord",
   /* chapter 4: Demolition Contracts */
-  "Glass Exchange", "Crane Yard", "Spring Freight", "Powder Dispatch", "Sinking Court", "Rooftop Relay", "Bailiff Barracks", "Vacuum Post", "Tenement Cascade", "Safe Landing Lab", "Clerk's Citadel", "Parry Platform", "Night Market", "Triple Rent Vault", "Skyline Reckoning", "Final Notice"};
-static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9, 6, 7, 6, 6, 7, 6, 7, 6, 7, 6, 8, 6, 7, 8, 8, 10};
-static const uint8_t CONTRACT_POWER[MX_CONTRACT_COUNT]={6, 4, 2, 3, 5, 1, 6, 4, 5, 2, 6, 3, 1, 4, 5, 6};
+  "Glass Exchange", "Crane Yard", "Spring Freight", "Powder Dispatch", "Sinking Court", "Rooftop Relay", "Bailiff Barracks", "Vacuum Post", "Tenement Cascade", "Safe Landing Lab", "Clerk's Citadel", "Parry Platform", "Night Market", "Triple Rent Vault", "Skyline Reckoning", "Final Notice", "Switchback Depot", "Claims Arcade", "Silt Exchange", "Express Returns", "The Paper Chain", "Air Rights", "Night Court Annex", "Crown of Concrete"};
+static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9, 6, 7, 6, 6, 7, 6, 7, 6, 7, 6, 8, 6, 7, 8, 8, 10, 7, 7, 7, 7, 8, 7, 8, 10};
+static const uint8_t CONTRACT_POWER[MX_CONTRACT_COUNT]={6, 4, 2, 3, 5, 1, 6, 4, 5, 2, 6, 3, 1, 4, 5, 6, 2, 6, 5, 4, 3, 1, 6, 5};
 const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
 /* Compact ROM-only guidance; each hint fits a 256-pixel DS banner. */
 const char *mx_level_tactic(int l){
@@ -2447,7 +2447,7 @@ const char *mx_level_tactic(int l){
   if(l<0 || l>=MX_NUM_LEVELS)return "EVICT EVERY LANDLORD";
   if(l<MX_CH3_START)return early[l];
   if(l>=MX_CONTRACT_START){
-    static const char *const tips[MX_CONTRACT_COUNT]={"BREAKER: SHATTER THE GLASS EXCHANGE", "TURBO: HIT THE CRANE'S WOODEN BRACE", "TOWEL: GLIDE OVER THE RUBBER WALL", "SPLAT: START A WIDE TNT CHAIN", "QUAKE: CRACK THE SAND FOUNDATIONS", "BEANS: BOOST BETWEEN THE HIGH ROOFS", "BREAKER: BREACH THE BARRACKS THEN WALK", "TURBO: ENTER THE FIRST POSTAL TUBE", "QUAKE: DROP THE LOW LINKED SUPPORTS", "TOWEL: USE THE RUBBER AND SAND BEDS", "BREAKER: FIND THE CITADEL'S WEAK DOORS", "SPLAT: LAND THEN PARRY THE BRIEFCASES", "BEANS: BOOST OVER THE MARKET CANOPIES", "TURBO: THREAD THE VAULT ENTRY LANES", "QUAKE: REMOVE THE SKYLINE'S KEY PIERS", "BREAKER: CRACK THE FINAL NOTICE TOWER"};
+    static const char *const tips[MX_CONTRACT_COUNT]={"BREAKER: SHATTER THE GLASS EXCHANGE", "TURBO: HIT THE CRANE'S WOODEN BRACE", "TOWEL: GLIDE OVER THE RUBBER WALL", "SPLAT: START A WIDE TNT CHAIN", "QUAKE: CRACK THE SAND FOUNDATIONS", "BEANS: BOOST BETWEEN THE HIGH ROOFS", "BREAKER: BREACH THE BARRACKS THEN WALK", "TURBO: ENTER THE FIRST POSTAL TUBE", "QUAKE: DROP THE LOW LINKED SUPPORTS", "TOWEL: USE THE RUBBER AND SAND BEDS", "BREAKER: FIND THE CITADEL'S WEAK DOORS", "SPLAT: LAND THEN PARRY THE BRIEFCASES", "BEANS: BOOST OVER THE MARKET CANOPIES", "TURBO: THREAD THE VAULT ENTRY LANES", "QUAKE: REMOVE THE SKYLINE'S KEY PIERS", "BREAKER: CRACK THE FINAL NOTICE TOWER", "TOWEL: CROSS THE STEPPED FREIGHT ROOFS", "BREAKER: OPEN THE ARCADE THEN WALK", "QUAKE: RELEASE THE SAND SUPPORTS", "TURBO: USE THE HIGH RETURN TUBE", "SPLAT: LINK THE POWDER STORES", "BEANS: BOOST TO THE TOP FLOOR", "BREAKER: BREACH THE SHIELD GUARD'S HALL", "QUAKE: DROP THE THREE TRANSFER PIERS"};
     return tips[l-MX_CONTRACT_START];
   }
   int i=l-MX_CH3_START;
@@ -2849,6 +2849,161 @@ static void build_contract(MxWorld *w,int i){
     tgtr(w,96,39,2,3);
     tgtr(w,85,29,6,3);
     tgtr(w,95,29,4,3);
+    break;
+  case 16: /* Switchback Depot */
+    house_ex(w,43,59,12,1,9,1,1,7,1,1,0,0);
+    house_ex(w,62,59,12,2,9,1,1,2,1,4,0,0);
+    house_ex(w,88,59,13,4,9,1,1,4,1,4,0,0);
+    rect_fill(w,55,58,6,2,8);
+    rect_fill(w,74,41,15,1,1);
+    tnt(w,63,59);
+    tnt(w,89,41);
+    tgtr(w,49,59,0,3);
+    tgtr(w,68,59,1,3);
+    tgtr(w,68,50,2,3);
+    tgtr(w,94,59,3,3);
+    tgtr(w,94,50,1,3);
+    tgtr(w,94,41,4,3);
+    tgtr(w,94,32,2,3);
+    break;
+  case 17: /* Claims Arcade */
+    w->walk=1;
+    house_ex(w,44,59,13,3,10,1,1,2,1,4,0,0);
+    rect_fill(w,44,53,1,6,0);
+    rect_fill(w,56,43,1,6,0);
+    rect_fill(w,52,49,3,1,0);
+    rect_fill(w,45,58,3,1,7);
+    pad(w,45,58,3);
+    rect_fill(w,52,48,3,1,7);
+    pad(w,52,48,3);
+    house_ex(w,75,59,12,2,10,1,1,4,1,4,0,0);
+    rect_fill(w,75,53,1,6,0);
+    house_ex(w,96,59,12,2,9,1,1,3,1,1,0,0);
+    tnt(w,97,50);
+    tgtr(w,50,59,1,3);
+    tgtr(w,49,49,2,3);
+    tgtr(w,50,39,3,3);
+    tgtr(w,81,59,1,3);
+    tgtr(w,81,49,2,3);
+    tgtr(w,102,59,4,3);
+    tgtr(w,102,50,7,3);
+    break;
+  case 18: /* Silt Exchange */
+    house_ex(w,39,59,11,1,9,1,1,7,1,1,0,0);
+    mound(w,55,26,6);
+    house_ex(w,62,53,12,2,9,1,1,2,1,4,0,0);
+    mound(w,84,30,7);
+    house_ex(w,92,52,13,3,9,1,1,1,1,1,0,0);
+    tnt(w,55,59);
+    tnt(w,84,59);
+    tgtr(w,44,59,0,3);
+    tgtr(w,68,53,1,3);
+    tgtr(w,68,44,2,3);
+    tgtr(w,98,52,4,3);
+    tgtr(w,98,43,7,3);
+    tgtr(w,98,34,3,3);
+    break;
+  case 19: /* Express Returns */
+    house_ex(w,65,59,13,3,10,2,1,6,1,4,0,0);
+    rect_fill(w,65,53,2,6,0);
+    rect_fill(w,65,33,2,6,0);
+    rect_fill(w,54,25,2,35,6);
+    tube(w,R(37.5),R(42.5),R(67.75),R(57));
+    tube(w,R(44.5),R(25.5),R(67.75),R(37));
+    house_ex(w,91,59,13,2,10,1,1,4,1,4,0,0);
+    tnt(w,66,49);
+    tnt(w,92,59);
+    tgtr(w,71,59,3,3);
+    tgtr(w,71,49,1,3);
+    tgtr(w,71,39,2,3);
+    tgtr(w,97,59,4,3);
+    tgtr(w,97,49,2,3);
+    break;
+  case 20: /* The Paper Chain */
+    house_ex(w,40,59,10,2,9,1,1,1,1,1,0,0);
+    house_ex(w,56,59,11,3,9,1,1,4,1,4,0,0);
+    house_ex(w,76,59,12,2,9,1,1,2,1,1,0,0);
+    house_ex(w,99,59,11,2,10,1,1,3,1,1,0,0);
+    rect_fill(w,49,50,8,1,1);
+    rect_fill(w,66,41,11,1,1);
+    tnt(w,41,59);
+    tnt(w,57,50);
+    tnt(w,77,59);
+    tnt(w,100,49);
+    tgtr(w,45,59,0,3);
+    tgtr(w,45,50,1,3);
+    tgtr(w,61,59,2,3);
+    tgtr(w,61,50,1,3);
+    tgtr(w,61,41,0,3);
+    tgtr(w,82,59,4,3);
+    tgtr(w,82,50,2,3);
+    tgtr(w,104,59,3,3);
+    tgtr(w,104,49,7,3);
+    break;
+  case 21: /* Air Rights */
+    house_ex(w,44,59,12,2,9,1,1,2,1,1,0,0);
+    rect_fill(w,59,42,2,18,7);
+    house_ex(w,67,59,13,3,9,1,1,1,1,1,0,0);
+    house_ex(w,91,59,13,5,9,1,1,4,1,4,0,0);
+    rect_fill(w,79,32,13,1,1);
+    tnt(w,68,50);
+    tnt(w,92,23);
+    tgtr(w,50,59,0,3);
+    tgtr(w,50,50,2,3);
+    tgtr(w,73,59,1,3);
+    tgtr(w,73,41,3,3);
+    tgtr(w,97,59,4,3);
+    tgtr(w,97,41,1,3);
+    tgtr(w,97,32,7,3);
+    tgtr(w,97,23,2,3);
+    break;
+  case 22: /* Night Court Annex */
+    w->walk=1;
+    house_ex(w,45,59,13,3,10,1,1,3,1,1,0,0);
+    rect_fill(w,45,53,1,6,0);
+    rect_fill(w,57,43,1,6,0);
+    rect_fill(w,53,49,3,1,0);
+    rect_fill(w,46,58,3,1,7);
+    pad(w,46,58,3);
+    rect_fill(w,53,48,3,1,7);
+    pad(w,53,48,3);
+    house_ex(w,73,59,12,2,10,1,1,2,1,1,0,0);
+    rect_fill(w,73,53,1,6,0);
+    house_ex(w,93,59,13,3,10,1,1,6,1,4,0,0);
+    rect_fill(w,93,53,1,6,4);
+    tnt(w,94,49);
+    tgtr(w,51,59,4,3);
+    tgtr(w,50,49,2,3);
+    tgtr(w,51,39,1,3);
+    tgtr(w,79,59,3,3);
+    tgtr(w,79,49,2,3);
+    tgtr(w,99,59,6,3);
+    tgtr(w,99,49,7,3);
+    tgtr(w,99,39,4,3);
+    break;
+  case 23: /* Crown of Concrete */
+    house_ex(w,39,59,11,2,9,1,1,7,1,1,0,0);
+    mound(w,53,23,5);
+    house_ex(w,58,54,13,3,9,1,1,2,1,4,0,0);
+    house_ex(w,84,59,22,4,10,2,2,6,1,3,0,0);
+    rect_fill(w,70,36,15,2,1);
+    rect_fill(w,84,53,2,6,4);
+    rect_fill(w,104,43,2,6,1);
+    tnt(w,40,59);
+    tnt(w,59,54);
+    tnt(w,85,39);
+    tnt(w,103,29);
+    tgtr(w,44,59,3,3);
+    tgtr(w,44,50,0,3);
+    tgtr(w,64,54,1,3);
+    tgtr(w,64,45,2,3);
+    tgtr(w,64,36,4,3);
+    tgtr(w,90,59,6,3);
+    tgtr(w,100,59,4,3);
+    tgtr(w,90,49,7,3);
+    tgtr(w,100,39,2,3);
+    tgtr(w,90,29,6,3);
+    tgtr(w,100,29,4,3);
     break;
   }
 }

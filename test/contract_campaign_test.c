@@ -13,9 +13,9 @@ static uint32_t fingerprint(void){
   return h;
 }
 int main(void){
-  static const uint32_t expected[16]={1978458262u,3881162397u,2234426049u,2234742033u,3701005221u,2662884443u,2340284964u,2409039517u,3635458059u,508532293u,489688324u,984490101u,3067476221u,989929033u,2740109274u,1882119693u};
-  static const int targets[16]={7,6,6,7,6,8,7,5,8,6,8,7,8,9,9,11},rooms[16]={7,5,6,7,4,9,7,5,10,6,8,7,8,9,13,9},cells[16]={325,412,348,364,594,402,325,332,421,300,531,314,369,582,621,754};
-  CHECK(MX_CONTRACT_START==60&&MX_NUM_LEVELS==76,60,"old IDs preserved and all contracts available");
+  static const uint32_t expected[24]={1978458262u,3881162397u,2234426049u,2234742033u,3701005221u,2662884443u,2340284964u,2409039517u,3635458059u,508532293u,489688324u,984490101u,3067476221u,989929033u,2740109274u,1882119693u,146916546u,4115339720u,1230557061u,4040211162u,2724363903u,1084635242u,651923874u,869133597u};
+  static const int targets[24]={7,6,6,7,6,8,7,5,8,6,8,7,8,9,9,11,7,7,6,5,9,8,8,11},rooms[24]={7,5,6,7,4,9,7,5,10,6,8,7,8,9,13,9,7,7,6,5,9,10,8,9},cells[24]={325,412,348,364,594,402,325,332,421,300,531,314,369,582,621,754,357,321,590,347,426,469,361,760};
+  CHECK(MX_CONTRACT_START==60&&MX_NUM_LEVELS==84,60,"old IDs preserved and all contracts available");
   init_tables();init_mats();
   for(int i=0;i<MX_CONTRACT_COUNT;i++){
     int l=MX_CONTRACT_START+i;
@@ -24,7 +24,7 @@ int main(void){
     CHECK(fingerprint()==expected[i],l,"raw native and browser voxel maps differ");
     CHECK(mx_cells_left(&W)==cells[i]&&W.ntargets==targets[i]&&W.nrooms==rooms[i],l,"wrong structure or encounter count");
     CHECK(W.nrooms<=MX_MAX_ROOMS&&W.ntargets<=MX_MAX_TARGETS&&W.ntubes<=MX_MAX_TUBES&&W.npads<=MX_MAX_PADS,l,"pool budget exceeded");
-    CHECK(W.walk==(i==6||i==11),l,"walking contract flag mismatch");
+    CHECK(W.walk==(i==6||i==11||i==17||i==22),l,"walking contract flag mismatch");
     for(int k=0;k<W.ntargets;k++){
       const MxTarget *t=&W.targets[k];
       int x=rfloor(t->x),y=rfloor(t->y+R(0.875));
@@ -44,6 +44,6 @@ int main(void){
     printf("CONTRACT %02d voxels=%d rooms=%d targets=%d hash=%08x\n",i+1,cells[i],rooms[i],targets[i],expected[i]);
   }
   if(fail)return 1;
-  puts("CONTRACT_CAMPAIGN_PASS 16 raw-map parity, clear spawns, bounded pools, power stock and idle physics");
+  puts("CONTRACT_CAMPAIGN_PASS 24 raw-map parity, clear spawns, bounded pools, power stock and idle physics");
   return 0;
 }

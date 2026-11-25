@@ -116,6 +116,8 @@ for mode in float fixed; do
 done
 if command -v node >/dev/null 2>&1;then
   node browser_contract_campaign_test.js
+  node browser_rect_fastpath_test.js
+  node ../tools/render_contract_music.js
   node browser_contract_music_test.js
 fi
 echo "--- Stage guidance: all console levels and 40 browser early-stage tactics ---"
