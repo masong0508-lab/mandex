@@ -814,21 +814,66 @@ function wakeAt(px,py,r){
   }
 }
 function markDmg(x,y){for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(inb(nx,ny))dmg[idx(nx,ny)]=1}}
+// Keep exactly the original weakest-80 rule, including stable scan-order
+// ties, without allocating an array/pair for every damaged voxel and sorting
+// the entire affected building. Heap storage is independent of world size.
+let AFTERSHOCK_ZONE=new Uint8Array(0);
+const CRUMBLE_LIMIT=80,CRUMBLE_ID=new Uint16Array(CRUMBLE_LIMIT),
+      CRUMBLE_RATIO=new Float64Array(CRUMBLE_LIMIT);
+function crumbleWorse(r,i,s,j){return r>s||(r===s&&i>j)}
+function crumbleOffer(n,r,i){
+  let k;
+  if(n<CRUMBLE_LIMIT){
+    k=n++;
+    while(k>0){
+      const p=(k-1)>>1;
+      if(!crumbleWorse(r,i,CRUMBLE_RATIO[p],CRUMBLE_ID[p]))break;
+      CRUMBLE_RATIO[k]=CRUMBLE_RATIO[p];CRUMBLE_ID[k]=CRUMBLE_ID[p];k=p;
+    }
+  }else{
+    if(!crumbleWorse(CRUMBLE_RATIO[0],CRUMBLE_ID[0],r,i))return n;
+    k=0;
+    for(;;){
+      let j=k*2+1;if(j>=n)break;
+      if(j+1<n&&crumbleWorse(CRUMBLE_RATIO[j+1],CRUMBLE_ID[j+1],CRUMBLE_RATIO[j],CRUMBLE_ID[j]))j++;
+      if(!crumbleWorse(CRUMBLE_RATIO[j],CRUMBLE_ID[j],r,i))break;
+      CRUMBLE_RATIO[k]=CRUMBLE_RATIO[j];CRUMBLE_ID[k]=CRUMBLE_ID[j];k=j;
+    }
+  }
+  CRUMBLE_RATIO[k]=r;CRUMBLE_ID[k]=i;return n;
+}
 function aftershock(){
-  const zone=new Uint8Array(COLS*ROWS);let any=false;
-  for(let i=0;i<dmg.length;i++)if(dmg[i]||brk[i]){const x=i%COLS,y=(i/COLS)|0;
-    for(let j=-2;j<=2;j++)for(let k=-2;k<=2;k++){if(Math.abs(j)+Math.abs(k)>3)continue;const X=x+k,Y=y+j;if(inb(X,Y)){zone[idx(X,Y)]=1;any=true}}}
-  dmg.fill(0);if(!any)return;
-  const weak=[];
-  for(let i=0;i<grid.length;i++){const m=grid[i];if(!zone[i]||!m||m===SAND)continue;
-    anch[i]=0;const r=hp[i]/MAT[m].hp;if(r<.7)weak.push([r,i])}
-  weak.sort((a,b)=>a[0]-b[0]);
-  let sx=0,sy=0,n=0;
-  for(const[,i]of weak.slice(0,80)){const x=i%COLS,y=(i/COLS)|0;
+  if(AFTERSHOCK_ZONE.length!==grid.length)AFTERSHOCK_ZONE=new Uint8Array(grid.length);
+  else AFTERSHOCK_ZONE.fill(0);
+  const zone=AFTERSHOCK_ZONE;let lo=grid.length,hi=-1;
+  for(let i=0;i<dmg.length;i++)if(dmg[i]||brk[i]){
+    const x=i%COLS,y=(i/COLS)|0;
+    for(let dy=-2;dy<=2;dy++){
+      const yy=y+dy;if(yy<0||yy>=ROWS)continue;
+      const reach=Math.min(2,3-Math.abs(dy)),x0=Math.max(0,x-reach),x1=Math.min(COLS-1,x+reach);
+      const first=idx(x0,yy),last=idx(x1,yy);
+      zone.fill(1,first,last+1);
+      if(first<lo)lo=first;if(last>hi)hi=last;
+    }
+  }
+  dmg.fill(0);if(hi<lo)return;
+  let n=0;
+  for(let i=lo;i<=hi;i++){
+    const m=grid[i];if(!zone[i]||!m||m===SAND)continue;
+    anch[i]=0;const r=hp[i]/MAT[m].hp;if(r<.7)n=crumbleOffer(n,r,i);
+  }
+  // Joint writes are bitwise OR and the centroid sums are integral:
+  // selecting the same members is sufficient; their order cannot change
+  // the result or the single CRUMBLE event.
+  let sx=0,sy=0;
+  for(let k=0;k<n;k++){
+    const i=CRUMBLE_ID[k],x=i%COLS,y=(i/COLS)|0;
     for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];brk[i]|=1<<d;if(inb(nx,ny))brk[idx(nx,ny)]|=1<<(d^1)}
-    sx+=x;sy+=y;n++}
+    sx+=x;sy+=y;
+  }
   needSupport=true;
-  if(n){shake=Math.max(shake,3);SFX.thud(.5);popText(sx/n*V+V/2,sy/n*V-30,'CRUMBLE!','#ffd23f',26)}}
+  if(n){shake=Math.max(shake,3);SFX.thud(.5);popText(sx/n*V+V/2,sy/n*V-30,'CRUMBLE!','#ffd23f',26)}
+}
 function damageCell(x,y,d){if(!inb(x,y))return 0;const i=idx(x,y);
   if(!grid[i]){if(paper[i]&&d>=4)paperHit(x,y);return 0}
   if(hp[i]<=d)return kill(x,y,0,0);hp[i]-=d;return d}
