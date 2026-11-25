@@ -89,6 +89,7 @@ echo "--- Browser walking camera: portrait focus, zoom bounds and world edges --
 if command -v node >/dev/null 2>&1;then node browser_walk_camera_test.js;fi
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
 if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
+if command -v node >/dev/null 2>&1;then node browser_phone_performance_test.js;fi
 echo "--- Browser custom levels: safe 360-column finale transition ---"
 if command -v node >/dev/null 2>&1;then node browser_custom_level_width_test.js;fi
 echo "--- Browser editor: real pointer events and touch cancellation ---"
