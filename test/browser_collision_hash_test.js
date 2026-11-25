@@ -37,6 +37,12 @@ function collide(){
 }
 const first=collide();
 check(first[0]>0&&first[1]>0,'adjacent rubble chunks collide');
+check(a.cells[0].wx!==a.x,'fixture exercises centre displacement after hash insertion');
+syncChunkPoses();
+check(a.cells[0].wx===a.x&&b.cells[0].wx===b.x&&a.cells[0].wy===a.y&&b.cells[0].wy===b.y,
+      'rubble hitboxes follow the corrected visible positions');
+syncChunkPoses();
+check(a.cells[0].wx===a.x&&b.cells[0].wx===b.x,'pose synchronization is idempotent');
 check(CHUNK_HASH.size===0,'spatial hash cleared after each physics step');
 check(CHUNK_BUCKET_POOL.length===2,'initial broadphase creates two buckets');
 const cached=CHUNK_BUCKET_POOL.slice();
