@@ -1460,6 +1460,9 @@ static MX_HOT void man_plow(MxWorld *w){
   bounce_rubber(w);
   MxMan *m = &w->man;
   real mass = rmul(m->dive ? R(2.6) : RI(1), RI(1) + rmul(m->inf, R(1.5)));
+  /* BREAKER: 35% less energy per HP on structural material. Same
+     radius, velocity, rebound rules and damage accounting. */
+  const real cost_per_hp=m->pwr==PW_BREAKER?rmul(KCOST,R(0.65)):KCOST;
   real s2 = rmul(m->vx, m->vx) + rmul(m->vy, m->vy);
   real E = rmul(R(0.5), rmul(mass, s2)), E0 = E;
   int touched = 0;
@@ -1481,13 +1484,13 @@ static MX_HOT void man_plow(MxWorld *w){
   for(int k = 0; k < n; k++){
     int i = IDX(list[k].x, list[k].y);
     if(!w->grid[i]) continue;
-    real cost = rmul(w->hp[i], KCOST);
+    real cost = rmul(w->hp[i], cost_per_hp);
     if(E >= cost){
       E -= cost;
       real h = kill(w, list[k].x, list[k].y, m->vx, m->vy);
       for(int d = 0; d < 4; d++) damage_cell(w, list[k].x + DX[d], list[k].y + DY[d], rmul(h, R(0.18)));
     } else {
-      w->hp[i] -= rdiv(E, KCOST); E = 0; break;
+      w->hp[i] -= rdiv(E, cost_per_hp); E = 0; break;
     }
   }
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
@@ -1506,12 +1509,12 @@ static MX_HOT void man_plow(MxWorld *w){
       if(rabs(ddx)>=MAN_R+RC||rabs(ddy)>=MAN_R+RC)continue;
       if(rmul(ddx, ddx) + rmul(ddy, ddy) >= lim) continue;
       touched = 1; hit = 1; ax += a->wx; ay += a->wy; cnt++;
-      real cost = rmul(a->h, KCOST);
+      real cost = rmul(a->h, cost_per_hp);
       if(E >= cost){ E -= cost;
         if(a->m==MX_TNT)destroy_moving_tnt(w,a);
         else {a->dead=1;ev(w,EV_CELL,a->wx,a->wy,a->m,rmul(m->vx,R(0.25)),rmul(m->vy,R(0.25)));}
       }
-      else { a->h -= rdiv(E, KCOST); E = 0; }
+      else { a->h -= rdiv(E, cost_per_hp); E = 0; }
     }
     if(hit && ch->hitCd <= 0){
       ch->hitCd = R(0.12);
@@ -1661,8 +1664,9 @@ void mx_release(MxWorld *w){
   ev(w, EV_LAUNCH, m->x, m->y, 0, 0, 0);
 }
 void mx_select_power(MxWorld *w, int pw){
-  if(w->man.mode != MAN_AIM || pw < PW_BEANS || pw >= PW_COUNT || w->pw_left[pw] <= 0) return;
-  w->pw_sel = (w->pw_sel == pw) ? 0 : pw;
+  if(w->state!=MX_PLAY||w->man.mode != MAN_AIM || pw < PW_NONE || pw >= PW_COUNT) return;
+  if(pw==PW_NONE || w->pw_sel==pw){w->pw_sel=PW_NONE;return;}
+  if(w->pw_left[pw]>0)w->pw_sel=pw;
 }
 void mx_dive(MxWorld *w){
   MxMan *m = &w->man;
@@ -2837,7 +2841,7 @@ static void load_level(MxWorld *w, int level, int district){
       }
     }
   }
-  w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = w->pw_left[PW_TURBO] = w->pw_left[PW_QUAKE] = 1;
+  w->pw_left[PW_BEANS] = w->pw_left[PW_TOWEL] = w->pw_left[PW_SPLAT] = w->pw_left[PW_TURBO] = w->pw_left[PW_QUAKE] = w->pw_left[PW_BREAKER] = 1;
   w->sand_on = 1;
   /* anything that wouldn't hold at spawn is welded in place, so levels never collapse on load */
   support_pass(w);
