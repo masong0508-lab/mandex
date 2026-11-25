@@ -82,6 +82,7 @@ if command -v node >/dev/null 2>&1;then
   node browser_wobble_parity_test.js
   node browser_standing_view_test.js
   node browser_blast_effects_test.js
+  node browser_collapse_hotpath_test.js
 fi
 echo "--- Browser: bounded collision hashing, repeated contacts and no stale rubble refs ---"
 if command -v node >/dev/null 2>&1;then node browser_collision_hash_test.js;fi
@@ -184,11 +185,15 @@ for mode in float fixed; do
   test "$mode" = fixed && defs="-DMX_FIXED"
   gcc -std=gnu99 -O2 -Wno-unused-function $defs -I../core chunk_contact_lifetime_test.c -lm -o chunk_contact_lifetime_$mode
   ./chunk_contact_lifetime_$mode
-  gcc -std=gnu99 -O2 -Wno-unused-function $defs -DMX_REFERENCE_CHUNK_HASH -I../core chunk_contact_lifetime_test.c -lm -o chunk_contact_reference_$mode
+  gcc -std=gnu99 -O2 -Wno-unused-function $defs -DMX_REFERENCE_CHUNK_HASH -DMX_REFERENCE_STATIC_CONTACTS -I../core chunk_contact_lifetime_test.c -lm -o chunk_contact_reference_$mode
   MX_SOLO_HASH_TRACE=1 ./chunk_contact_lifetime_$mode > "/tmp/mandex_solo_opt_$mode.txt"
   MX_SOLO_HASH_TRACE=1 ./chunk_contact_reference_$mode > "/tmp/mandex_solo_ref_$mode.txt"
   cmp "/tmp/mandex_solo_opt_$mode.txt" "/tmp/mandex_solo_ref_$mode.txt"
   cat "/tmp/mandex_solo_opt_$mode.txt"
+  MX_CONTACT_LIVE_TRACE=1 ./chunk_contact_lifetime_$mode > "/tmp/mandex_contact_opt_$mode.txt"
+  MX_CONTACT_LIVE_TRACE=1 ./chunk_contact_reference_$mode > "/tmp/mandex_contact_ref_$mode.txt"
+  cmp "/tmp/mandex_contact_opt_$mode.txt" "/tmp/mandex_contact_ref_$mode.txt"
+  cat "/tmp/mandex_contact_opt_$mode.txt"
 done
 if command -v node >/dev/null 2>&1;then node browser_dead_rubble_test.js;fi
 echo "--- BANK SHOT trick bonus: true rubber rebound, direct eviction only, 2s expiry (fixed/float) ---"
