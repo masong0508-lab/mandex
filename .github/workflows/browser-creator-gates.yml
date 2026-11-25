@@ -7,6 +7,7 @@ on:
       - "web/**"
       - "test/browser_*.js"
       - "test/browser_*.py"
+      - "tools/render_contract_music.js"
       - ".github/workflows/browser-creator-gates.yml"
   push:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - "web/**"
       - "test/browser_*.js"
       - "test/browser_*.py"
+      - "tools/render_contract_music.js"
       - ".github/workflows/browser-creator-gates.yml"
   workflow_dispatch:
 
@@ -59,8 +61,14 @@ jobs:
         run: node test/browser_collapse_hotpath_test.js
       - name: Contract campaign geometry, metadata, and roster
         run: node test/browser_contract_campaign_test.js
+      - name: Exact clipped rectangle spans and all contract menu pages
+        run: |
+          node test/browser_rect_fastpath_test.js
+          node test/browser_contract_pager_test.js
       - name: Original soundtrack files and lazy browser fallback
-        run: node test/browser_contract_music_test.js
+        run: |
+          node tools/render_contract_music.js
+          node test/browser_contract_music_test.js
 
   canvas:
     runs-on: ubuntu-latest
