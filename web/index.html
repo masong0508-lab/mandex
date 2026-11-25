@@ -5469,7 +5469,7 @@ function drawCutscene(){
 
 const ch2Unlocked=i=>PD.unlockAll||i===CH1||(PD.stars[i-1]||0)>0;
 const ch3Unlocked=i=>PD.unlockAll||(i===CH2?(PD.stars[CH2-1]||0)>0:(PD.stars[i-1]||0)>0);
-const contractUnlocked=i=>PD.unlockAll||i<CH3_END+3||(PD.stars[i-1]||0)>0;   // the first chapter 2 level is open; the rest unlock in order
+const contractUnlocked=i=>i>=CH3_END&&i<LEVELS.length&&(PD.unlockAll||i<CH3_END+3||i===CH3_END+16||(PD.stars[i-1]||0)>0); // first Overtime mission is a new entry point
 function storyUnlocked(i){return PD.unlockAll||i<3||(PD.stars[i-1]||0)>0}
 /* Portrait pages are deliberately drawn in the existing 2D canvas (and
    share the same btn()/hitTest(), game actions and save model). These are
@@ -5628,9 +5628,10 @@ function drawMobileSelect(){
     page=mobilePage('select',items.length,size),start=page*size;
   for(let j=start;j<Math.min(items.length,start+size);j++){
     const it=items[j],k=j-start,x=12+(k%2)*264,y=top+Math.floor(k/2)*(rh+rowGap);
-    const label=it.locked?'LOCKED':it.label;
+    const label=it.label;
     btn(x,y,252,rh,label,()=>{if(!it.locked)it.fn();else SFX.pop()},
         {size:it.label.length>19?12:15,on:!it.locked&&it.stars>=2});
+    if(it.locked)txt('LOCKED',x+126,y+rh-12,13,'#aab','center');
     if(!it.locked&&it.stars)txt('★'.repeat(it.stars),x+126,y+rh-8,15,'#ffd23f','center');
     if(it.contract&&!it.locked)txt('2x '+it.contract.bonusPower.toUpperCase(),x+126,y+rh-24,13,'#90e6ff','center');
     if(it.custom&&it.i!=null){
@@ -5890,14 +5891,15 @@ function drawSelect(){
   const tabs=[['STORY',0],['CHAPTER 2',2],['CHAPTER 3',3],['CONTRACTS',4],['MY LEVELS',1]];
   tabs.forEach(([label,id],i)=>btn(W/2-420+i*170,66,160,36,label,()=>{selTab=id},{on:selTab===id,size:15}));
   if(selTab===4){
-    txt('DEMOLITION CONTRACTS',W/2,134,24,'#90e6ff','center');
+    const count=LEVELS.length-CH3_END,page=mobilePager('contractGrid',count,16,H-62),start=page*16;
+    txt(page?'OVERTIME CONTRACTS':'DEMOLITION CONTRACTS',W/2,134,24,'#90e6ff','center');
     const cols=4,tw=206,th=70,gap=10,x0=(W-(cols*tw+(cols-1)*gap))/2;
-    for(let i=CH3_END;i<LEVELS.length;i++){
-      const k=i-CH3_END,x=x0+k%cols*(tw+gap),y=150+Math.floor(k/cols)*(th+gap),q=LEVELS[i],locked=!contractUnlocked(i);
+    for(let k=start;k<Math.min(count,start+16);k++){
+      const i=CH3_END+k,slot=k-start,x=x0+slot%cols*(tw+gap),y=150+Math.floor(slot/cols)*(th+gap),q=LEVELS[i],locked=!contractUnlocked(i);
       tile(x,y,tw,th,k+1,q.name,PD.stars[i]||0,locked,()=>openContract(i));
       if(!locked)txt('2x '+q.bonusPower.toUpperCase(),x+tw/2,y+39,12,'#90e6ff','center');
     }
-    txt('Each contract supplies a bonus power charge. First three are open.',W/2,H-16,14,'#cfd','center');
+    txt('Two recommended charges per contract. First Overtime mission open.',W/2,H-16,14,'#cfd','center');
   }else if(selTab===3){
     const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n3=CH3_END-CH2,th=60;
     txt('CHAPTER 3  -  THE WOLFMAN',W/2,134,24,'#9aa4d8','center','#10132a');
