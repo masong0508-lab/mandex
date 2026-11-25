@@ -1791,7 +1791,7 @@ int main(void){
           textc(&bot,230,183,mx_tool_effect(world.pw_sel),1,RGB(255,210,63));
         textc(&bot,160,204,"TAP TOOL  /  X CYCLE  /  R USE AIR",1,RGB(255,210,63));
       }
-      if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
+      {const char *action=mx_flight_action(&world);if(*action)textc(&bot,160,12,world.man.pwr==PW_BEANS&&!world.man.beaned?"TAP = FART JET":"TAP = BELLY FLOP",2,RGB(255,255,255));}
     } else if(app == ST_TITLE) textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));
     { unsigned long long end=osGetTime();
       n3_draw_ms_last=end>=n3_draw_begin?(unsigned)(end-n3_draw_begin):0;

@@ -1533,7 +1533,7 @@ static void bottom_overview(View *v){
   button(v->buf, 170, 170, 46, 16, "RESTART");
   button(v->buf, 220, 170, 32, 16, "MENU");
   }
-  if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) gfx_text_c(v->buf, 128, 6, "TAP = BELLY FLOP!", C_WHITE, C_BLACK, 1);
+  {const char *action=mx_flight_action(&world);if(*action)gfx_text_c(v->buf,128,6,world.man.pwr==PW_BEANS&&!world.man.beaned?"TAP = FART JET":"TAP = BELLY FLOP",C_WHITE,C_BLACK,1);}
 }
 
 /* Six real touch targets fit the 256x192 lower DS screen. The existing

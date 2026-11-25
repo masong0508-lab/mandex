@@ -1825,8 +1825,9 @@ function drawPwProp(){if(state!=='play')return;const t=pw.tool||'none';if(!PWTOO
   }
   (t==='beans'?pwBeans:t==='towel'?pwTowel:t==='splat'?pwSplat:t==='turbo'?pwTurbo:pwQuake)(armed,spent)}
 // in flight: the towel cape, a goo trail, stink behind the beans, fizz around a loaded burp
-function pwFlightFX(m){const R=m.R||14,sp=Math.hypot(m.vx,m.vy)||1,ux=-m.vx/sp,uy=-m.vy/sp,t=time;
-  if(m.mode!=='fly')return;
+function pwFlightFX(m){
+  if(m.mode!=='fly'||!m.pwr)return;
+  const R=m.R||14,sp=Math.hypot(m.vx,m.vy)||1,ux=-m.vx/sp,uy=-m.vy/sp,t=time;
   if(m.pwr==='turbo'){for(let i=0;i<5;i++){const d=R+i*6,x=ux*d+Math.sin(t*13+i)*2,y=uy*d+Math.cos(t*11+i)*2;ctx.globalAlpha=.75-i*.12;ctx.fillStyle=i%2?'#fff':'#ffca59';ctx.fillRect(x-2,y-2,4,4)}ctx.globalAlpha=1}
   if(m.pwr==='breaker'){ctx.strokeStyle='#90e6ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,R+3,-.85,.85);ctx.stroke()}
   if(m.pwr==='quake'&&!m.splatted){ctx.globalAlpha=.65+.2*Math.sin(t*7);ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,R+4,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1}
@@ -4012,6 +4013,7 @@ function draw(){
   // Settings is opaque. No sky, scenery, gradients or animated menu actors
   // need to be submitted behind it on a weak GPU.
   if(state==='options'){drawSettings();drawToasts(frameDt);return}
+  if(state==='select'&&contractReview>=CH3_END){drawContractReview();return}
   if(state==='play'&&powerPickerOpen&&man.mode==='aim'){drawPowerPicker();return}
   const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
   if(camOn){ctx.fillStyle='#3d8fe8';ctx.fillRect(0,0,W,H);ctx.save();ctx.scale(CAM.z,CAM.z);ctx.translate(-CAM.x,-CAM.y)}
@@ -4387,6 +4389,7 @@ addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
   if(state==='title')return;
   if(state==='play'&&CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){if(e.key==='[')goSling(slingK-1);if(e.key===']')goSling(slingK+1)}
+  if(e.key==='Escape'&&state==='select'&&contractReview>=CH3_END){contractReview=-1;contractPlan=null;hits=[];return}
   if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'&&E.starters){E.starters=false}else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending')goMenu();return}
   if(state==='select'&&(e.key==='u'||e.key==='U')){PD.unlockAll=!PD.unlockAll;pdTouch();toast('ach',PD.unlockAll?'All levels unlocked':'Levels locked again','');return}
   if(state==='edit'){const k=e.key.toLowerCase();
@@ -4545,10 +4548,10 @@ function drawToasts(dt){
 
 // ---------- screens ----------
 const UISTATES=['menu','select','ach','outfit','options','ending'];
-let selTab=0;
+let selTab=0,contractReview=-1,contractPlan=null;
 function goMenu(){state='menu';hits=[]}
-function goSelect(){state='select';hits=[]}
-function startStory(i){testing=false;selTab=i>=CH3_END?4:i>=CH2?3:i>=CH1?2:0;if(i===0){startCut();return}if(i===CH2){startCut3();return}load(i)}
+function goSelect(){state='select';hits=[];contractReview=-1;contractPlan=null}
+function startStory(i){contractReview=-1;contractPlan=null;testing=false;selTab=i>=CH3_END?4:i>=CH2?3:i>=CH1?2:0;if(i===0){startCut();return}if(i===CH2){startCut3();return}load(i)}
 // ---------- OPENING CUTSCENE: the origin of MANDEX (plays before story level 1; tap = next, SKIP or Esc = straight to the level) ----------
 let cutI=0,cutT=0,cutFx=0;
 let CUTS=null,cutDone=()=>load(0);
@@ -5491,14 +5494,75 @@ function drawMobileMenu(){
 function mobileSelectItems(){
   if(selTab===0)return LEVELS.slice(0,CH1).map((q,i)=>({label:(i+1)+'. '+q.name,stars:PD.stars[i]||0,locked:!storyUnlocked(i),fn:()=>startStory(i)}));
   if(selTab===2)return LEVELS.slice(CH1,CH2).map((q,i)=>({label:(CH1+i+1)+'. '+q.name,stars:PD.stars[CH1+i]||0,locked:!ch2Unlocked(CH1+i),fn:()=>startStory(CH1+i)}));
-  if(selTab===4)return LEVELS.slice(CH3_END).map((q,i)=>({label:(i+1)+'. '+q.name,stars:PD.stars[CH3_END+i]||0,locked:!contractUnlocked(CH3_END+i),fn:()=>startStory(CH3_END+i),contract:q}));
+  if(selTab===4)return LEVELS.slice(CH3_END).map((q,i)=>({label:(i+1)+'. '+q.name,stars:PD.stars[CH3_END+i]||0,locked:!contractUnlocked(CH3_END+i),fn:()=>openContract(CH3_END+i),contract:q}));
   if(selTab===3)return LEVELS.slice(CH2,CH3_END).map((q,i)=>({label:(CH2+i+1)+'. '+q.name,stars:PD.stars[CH2+i]||0,locked:!ch3Unlocked(CH2+i),fn:()=>startStory(CH2+i)}));
   const items=[{label:'+ CREATE NEW LEVEL',fn:()=>openEditor(false)},
     {label:'IMPORT LEVEL CODE',fn:importCode}];
   PD.custom.forEach((q,i)=>items.push({label:(i+1)+'. '+q.n,custom:true,i,fn:()=>startCustom(i)}));
   return items;
 }
+// Lightweight pre-mission site plan. The plan never writes to the live
+// world and is cached for the selected contract only. Every operation is
+// displayed as a structural schematic, not a fake prediction of physics.
+function makeContractPlan(data){
+  const image=mkCanvas(480,240),c=image.getContext('2d'),scale=4;
+  c.fillStyle='#0d1828';c.fillRect(0,0,480,240);
+  c.strokeStyle='#22364b';c.lineWidth=1;
+  c.beginPath();for(let x=0;x<=120;x+=10){c.moveTo(x*scale,0);c.lineTo(x*scale,240)}
+  for(let y=0;y<=60;y+=10){c.moveTo(0,y*scale);c.lineTo(480,y*scale)}c.stroke();
+  function block(x,y,w,h,m){c.fillStyle=m?MAT[m].c:'#0d1828';c.fillRect(x*scale,y*scale,w*scale,h*scale)}
+  const targets=[],pipes=[],springs=[];
+  for(const [op,...a] of data.ops){
+    if(op==='h'){
+      const[x,g,w,fl,fh,wt,ft,wall,floor,roof,gable,crenel]=a,top=g-fl*fh;
+      for(let k=0;k<=fl;k++)block(x,g-k*fh,w,k?ft:1,floor);
+      for(let k=0;k<fl;k++){const row=g-k*fh,y=row-fh+ft;block(x,y,wt,row-y,wall);block(x+w-wt,y,wt,row-y,wall);if(w>13)block(x+(w>>1),y,1,row-y,wall===6?6:1)}
+      if(gable){for(let k=0;k<7&&w+2-2*k>1;k++)block(x-1+k,top-1-k,w+2-2*k,1,roof)}
+      else block(x-1,top-2,w+2,2,roof);
+      if(crenel)for(let k=0;k<w+2;k+=2)block(x-1+k,top-3,1,1,roof);
+    }else if(op==='r')block(...a);
+    else if(op==='n')block(a[0],a[1]-2,2,2,5);
+    else if(op==='m'){for(let k=0;k<a[2]&&a[1]-2*k>0;k++)block(a[0]+k,59-k,a[1]-2*k,1,8)}
+    else if(op==='t')targets.push(a);
+    else if(op==='u')pipes.push(a);
+    else if(op==='p')springs.push(a);
+  }
+  c.strokeStyle='#ffd486';c.lineWidth=2;c.setLineDash([4,3]);
+  for(const [ax,ay,bx,by]of pipes){c.beginPath();c.moveTo(ax*scale,ay*scale);c.lineTo(bx*scale,by*scale);c.stroke()}
+  c.setLineDash([]);
+  for(const [x,y,w] of springs){c.fillStyle='#ff83ba';c.fillRect(x*scale,y*scale,w*scale,3)}
+  c.fillStyle='#7dffaf';c.fillRect(16*scale-2,45.25*scale-2,5,5);
+  for(const [x,y,k] of targets){c.fillStyle=k===6?'#ffe28a':'#ff8b9d';c.beginPath();c.arc((x+.5)*scale,(y-1.2)*scale,k===6?4.2:3.2,0,Math.PI*2);c.fill();c.strokeStyle='#111827';c.lineWidth=1;c.stroke()}
+  return image;
+}
+function openContract(i){
+  if(!contractUnlocked(i)||i<CH3_END||i>=LEVELS.length)return;
+  contractReview=i;contractPlan=makeContractPlan(CONTRACT_DATA[i-CH3_END]);hits=[];
+}
+function drawContractReview(){
+  const i=contractReview,q=LEVELS[i],d=CONTRACT_DATA[i-CH3_END],p=isPortrait(),margin=p?18:32;
+  ctx.fillStyle='#101826';ctx.fillRect(0,0,W,H);
+  txt('CONTRACT '+(i-CH3_END+1)+' / '+CONTRACT_DATA.length,W/2,p?45:35,16,'#90e6ff','center');
+  txt(q.name.toUpperCase(),W/2,p?85:75,p?28:35,'#fff','center');
+  const mapW=p?W-2*margin:510,mapH=mapW/2,mapX=p?margin:32,mapY=p?108:101;
+  if(contractPlan)ctx.drawImage(contractPlan,mapX,mapY,mapW,mapH);
+  const tx=p?margin:568,ty=p?mapY+mapH+27:123,tw=p?W-2*margin:W-tx-24;
+  txt('MISSION BRIEF',tx,ty,17,'#90e6ff','left');
+  let line='',yy=ty+28;const max=p?60:40;
+  for(const word of d.brief.split(' ')){
+    if(line.length&&line.length+word.length+1>max){txt(line,tx,yy,p?14:15,'#d3deec','left');yy+=22;line=word}
+    else line+=(line?' ':'')+word;
+  }
+  if(line){txt(line,tx,yy,p?14:15,'#d3deec','left');yy+=24}
+  txt(d.ops.filter(a=>a[0]==='t').length+' LANDLORDS  /  '+q.men+' MEN',tx,yy+5,16,'#fff','left');
+  txt('BONUS: 2x '+q.bonusPower.toUpperCase(),tx,yy+31,18,'#90e6ff','left');
+  txt('BEST '+(PD.best[i]||0)+'   /   '+(PD.stars[i]||0)+' STARS',tx,yy+56,14,'#ffd23f','left');
+  const y=H-68,bw=(W-2*margin-10)/2;
+  btn(margin,y,bw,48,'< CONTRACTS',()=>{contractReview=-1;contractPlan=null;hits=[]},{size:16});
+  btn(margin+bw+10,y,bw,48,'START MISSION',()=>startStory(i),{size:17,on:true,col:'#90e6ff'});
+}
 function drawMobileSelect(){
+  if(contractReview>=CH3_END){drawContractReview();return}
   mobileHeader('SELECT LEVEL',selTab===1?'YOUR CUSTOM LEVELS':selTab===4?'DEMOLITION CONTRACTS':'CHOOSE A DISTRICT',goMenu);
   const labels=['STORY','CHAPTER 2','CHAPTER 3','CONTRACTS','MY LEVELS'],tabs=[0,2,3,4,1];
   for(let i=0;i<5;i++){
@@ -5764,6 +5828,7 @@ function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
   ctx.font='bold 13px "Trebuchet MS",sans-serif';let s=name;while(ctx.measureText(s).width>w-16&&s.length>3)s=s.slice(0,-2);if(s!==name)s+='…';
   txt(s,x+w/2,y+h-12,13,locked?'#778':'#fff','center');ctx.restore()}
 function drawSelect(){
+  if(contractReview>=CH3_END){drawContractReview();return}
   ctx.fillStyle='rgba(10,14,30,.55)';ctx.fillRect(0,0,W,H);
   txt('SELECT LEVEL',W/2,52,40,'#ffd23f','center','#7a1a1a');
   btn(16,14,90,36,'< MENU',goMenu,{size:16});
@@ -5774,7 +5839,7 @@ function drawSelect(){
     const cols=4,tw=206,th=70,gap=10,x0=(W-(cols*tw+(cols-1)*gap))/2;
     for(let i=CH3_END;i<LEVELS.length;i++){
       const k=i-CH3_END,x=x0+k%cols*(tw+gap),y=150+Math.floor(k/cols)*(th+gap),q=LEVELS[i],locked=!contractUnlocked(i);
-      tile(x,y,tw,th,k+1,q.name,PD.stars[i]||0,locked,()=>startStory(i));
+      tile(x,y,tw,th,k+1,q.name,PD.stars[i]||0,locked,()=>openContract(i));
       if(!locked)txt('2x '+q.bonusPower.toUpperCase(),x+tw/2,y+39,12,'#90e6ff','center');
     }
     txt('Each contract supplies a bonus power charge. First three are open.',W/2,H-16,14,'#cfd','center');

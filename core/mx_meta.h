@@ -71,6 +71,11 @@ int mx_tool_power(int tool);                             /* the PW_* a start too
    still loads (missing levels read as 0, extra ones are dropped); any other layout change must bump the version byte. */
 #define MX_SAVE_VERSION 2
 #define MX_SAVE_MAX (66 + MX_NUM_LEVELS + 4 + 1 + 4 * MX_NUM_LEVELS + 1 + 4)
+/* 76-level payload = 456 bytes; journal header is 12, so a Dreamcast
+   512-byte VMU sector and existing DS/3DS journal slots still fit. */
+#if MX_SAVE_MAX + 12 > 512
+#error "Progress journal exceeds existing single-sector save budget"
+#endif
 uint32_t mx_crc32(const uint8_t *p, int n);
 /* returns the number of bytes written, or 0 if cap is too small */
 int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap);                                  /* = mx_meta_pack_opt with the default options */

@@ -107,7 +107,15 @@ echo "--- Browser creator: bounded MX1 imports, Unicode share names and legacy c
 if command -v node >/dev/null 2>&1;then node browser_creator_codec_test.js;fi
 echo "--- Web: touch capture, landscape/portrait two-thumb controls, safe camera pan ---"
 if command -v node >/dev/null 2>&1;then node browser_multitouch_test.js;fi
-echo "--- Stage guidance: all 60 console levels and 40 browser early-stage tactics ---"
+echo "--- Authored contract campaign: native fixed/float geometry, web parity and power stock ---"
+for mode in float fixed; do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core contract_campaign_test.c -lm -o contract_campaign_$mode
+  ./contract_campaign_$mode
+done
+if command -v node >/dev/null 2>&1;then node browser_contract_campaign_test.js;fi
+echo "--- Stage guidance: all console levels and 40 browser early-stage tactics ---"
 for mode in float fixed;do
   flags=''
   if test "$mode" = fixed;then flags="-DMX_FIXED";fi

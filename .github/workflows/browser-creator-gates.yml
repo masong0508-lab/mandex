@@ -57,6 +57,8 @@ jobs:
         run: node test/browser_dead_rubble_test.js
       - name: Exact static collision bounds and bounded aftershock selection
         run: node test/browser_collapse_hotpath_test.js
+      - name: Contract campaign geometry, metadata, and roster
+        run: node test/browser_contract_campaign_test.js
 
   canvas:
     runs-on: ubuntu-latest

@@ -93,7 +93,7 @@ const env={
   OUTFITS:Array.from({length:16},(_,i)=>({id:'look'+i,n:'Outfit '+i})),
   outfitCur:{n:'Classic Red'},PD:{stars:{},ach:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
   LEVELS:Array.from({length:76},(_,i)=>({name:'District Building '+i,bonusPower:'breaker'})),
-  CH1:20,CH2:40,CH3_END:60,selTab:0,contractUnlocked:()=>true,
+  CH1:20,CH2:40,CH3_END:60,selTab:0,contractReview:-1,contractUnlocked:()=>true,openContract:()=>{},
   GUIDES:['OFF','SHORT','FULL'],SHAKES:[['OFF',0],['LOW',.5],['FULL',1]],
   OPT:()=>({}),optVol:()=>.8,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
   btn:(x,y,w,h,label,fn,o)=>records.push({x,y,w,h,label,fn}),
