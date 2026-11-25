@@ -1099,7 +1099,21 @@ static int ds_objective_probe(void){
          many,last,secure,marked);
   return 0;
 }
+static int ring_angle_probe(void){
+  unsigned checks=0;
+  for(int n=8;n<=64;n++){
+    DsRingAngle a=ds_ring_angles(n);
+    for(int k=0;k<n;k++){
+      const real old=rdiv(RI(k)*6283/n,RI(1000)),now=ds_ring_next(&a);
+      if(old!=now){fprintf(stderr,"DS_RING_ANGLE_FAIL n=%d k=%d old=%d new=%d\n",n,k,(int)old,(int)now);return 1;}
+      checks++;
+    }
+  }
+  printf("DS_RING_ANGLE_PASS exact_angles=%u\n",checks);
+  return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("DS_RING_ANGLE_PROBE"))return ring_angle_probe();
   if(getenv("DS_OBJECTIVE_PROBE"))return ds_objective_probe();
   if(getenv("DS_PARTICLE_EDGE_PROBE"))return particle_edge_probe();
   if(getenv("DS_RUBBLE_DAMAGE_PROBE"))return chunk_damage_probe();
