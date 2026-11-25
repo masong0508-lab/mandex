@@ -84,6 +84,7 @@ const ctx=new Proxy({measureText:s=>({width:String(s).length*10})},{
 const env={
   W:540,H:960,ctx,WEB_UI:{portrait:true,page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0},
   state:'menu',time:1,frameDt:.016,muted:false,webEcoFX:false,frameMeterVisible:false,armReset:0,armProg:0,
+  isPortrait:()=>true,
   webRenderCap:()=>30,webRenderScale:()=>.75,webFxBudget:()=>360,webEffectiveTier:()=>1,
   webProfileLabel:()=>'AUTO',webProfile:()=>'auto',webCapLabel:()=>'AUTO',webScaleLabel:()=>'AUTO',webFXLabel:()=>'AUTO',
   cycleWebProfile:()=>{},cycleWebCap:()=>{},cycleWebScale:()=>{},cycleWebFX:()=>{},
