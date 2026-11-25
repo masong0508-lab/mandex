@@ -86,6 +86,27 @@ int main(void){
   b=body(1,R(20.8),R(20.5),1);
   a->vx=RI(2);step_chunks(&W,0);
   CHECK(b->rest,"gentle pile contact woke a sleeper and may cause jitter");
+  /* A full rubble pool must not chew through the entire disconnected
+     region or leave it hanging after a slot becomes available. */
+  scene();
+  for(int k=0;k<MX_MAX_CHUNKS;k++)body(k,RI(8+k*2),RI(15),0);
+  for(int y=27;y<30;y++)for(int x=45;x<50;x++)put(x,y,MX_WOOD);
+  support_pass(&W);
+  CHECK(W.retry_cd==20&&W.grid[IDX(45,27)]==MX_WOOD&&active()==MX_MAX_CHUNKS,
+        "full pool lost unsupported cells or failed to schedule retry");
+  W.chunks[0].cells[0].dead=1;
+  W.man.mode=MAN_AIM;W.men=1;
+  mx_update(&W,R(1.0/60.0));
+  CHECK(W.retry_cd==0&&!W.grid[IDX(45,27)]&&W.chunks[0].active&&W.chunks[0].count==15,
+        "freed rubble slot did not trigger the next eligible support pass");
+  /* Exact maximum-distance radius using the original per-voxel sqrt. */
+  real rad=0;
+  for(int k=0;k<W.chunks[0].count;k++){
+    MxCell *cell=&W.chunks[0].cells[k];
+    real rr=rsqrt(rmul(cell->lx,cell->lx)+rmul(cell->ly,cell->ly));
+    if(rr>rad)rad=rr;
+  }
+  CHECK(W.chunks[0].rad==rad+RI(1),"single final sqrt changed the slab bound");
   if(bad){fprintf(stderr,"COLLAPSE_RESPONSE_FAIL failures=%d\n",bad);return 1;}
   puts("COLLAPSE_RESPONSE_PASS first_512=1 remainder=1 progressive_joints=1 hard_wake=1 gentle_rest=1");
   return 0;
