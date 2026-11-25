@@ -88,6 +88,7 @@ const env={
   webRenderCap:()=>30,webRenderScale:()=>.75,webFxBudget:()=>360,webEffectiveTier:()=>1,
   webProfileLabel:()=>'AUTO',webProfile:()=>'auto',webCapLabel:()=>'AUTO',webScaleLabel:()=>'AUTO',webFXLabel:()=>'AUTO',
   cycleWebProfile:()=>{},cycleWebCap:()=>{},cycleWebScale:()=>{},cycleWebFX:()=>{},
+  webLightingLabel:()=>'AUTO',cycleWebLighting:()=>{},
   hits:records,ACH:Array.from({length:17},(_,i)=>({id:'a'+i,n:'Achievement '+i,d:'Earn '+i})),
   OUTFITS:Array.from({length:16},(_,i)=>({id:'look'+i,n:'Outfit '+i})),
   outfitCur:{n:'Classic Red'},PD:{stars:{},ach:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
