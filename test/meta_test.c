@@ -11,6 +11,9 @@ int main(void){
 #ifdef MX_LEVEL_LOCKS
   CHECK(mx_level_unlocked(&S, 0) && mx_level_unlocked(&S, 1) && mx_level_unlocked(&S, 2), "fresh stats: levels 1-3 open");
   CHECK(!mx_level_unlocked(&S, 3), "fresh stats: level 4 locked");
+   CHECK(mx_level_unlocked(&S,MX_CONTRACT_START)&&mx_level_unlocked(&S,MX_CONTRACT_START+2)&&!mx_level_unlocked(&S,MX_CONTRACT_START+3),"first three contracts are available separately from story");
+   S.stars[MX_CONTRACT_START+2]=1;
+   CHECK(mx_level_unlocked(&S,MX_CONTRACT_START+3),"contract progression follows saved stars");
   S.stars[2] = 1; CHECK(mx_level_unlocked(&S, 3), "beating level 3 opens level 4");
   CHECK(!mx_level_unlocked(&S, 4), "level 5 still locked");
   { MxStats U; mx_meta_init(&U); U.bestScore = 99999; CHECK(!mx_level_unlocked(&U, 3), "bestScore alone does not unlock"); }

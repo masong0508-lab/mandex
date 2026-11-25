@@ -103,11 +103,14 @@ int main(void){
     CHECK(mx_meta_unpack(&T, &of, b2, MX_SAVE_MAX) == 1 && T.kills == 0 && T.pw[1] == 0 && of == 0, "negative counters and a negative outfit pack as 0"); }
 
   /* saves written by a build with a different number of levels */
-  { uint8_t c[400]; int cn = craft(c, MX_NUM_LEVELS); mx_meta_init(&T);
+  { uint8_t c[MX_SAVE_MAX]; int cn = craft(c, MX_NUM_LEVELS); mx_meta_init(&T);
     CHECK(cn == MX_SAVE_MAX - 1 && mx_meta_unpack(&T, &of, c, cn) == 1, "the independent writer's 20-level version 1 blob is accepted (layout agrees with the documentation)");
     CHECK(T.kills == 1000 && T.pops == 1010 && T.pw[3] == 23 && T.ach == 0x15 && of == 2 && T.stars[0] == 1 && T.stars[1] == 2 && T.stars[2] == 3 && T.best[19] == 519, "...and every field lands where the layout says"); }
-  { uint8_t c[400]; int cn = craft(c, 5); mx_meta_init(&T); for(int i = 0; i < MX_NUM_LEVELS; i++){ T.stars[i] = 3; T.best[i] = 99; }
+  { uint8_t c[MX_SAVE_MAX]; int cn = craft(c, 5); mx_meta_init(&T); for(int i = 0; i < MX_NUM_LEVELS; i++){ T.stars[i] = 3; T.best[i] = 99; }
     CHECK(mx_meta_unpack(&T, &of, c, cn) == 1 && T.stars[4] == 2 && T.best[4] == 504 && T.stars[5] == 0 && T.best[5] == 0 && T.best[19] == 0, "a save from a 5-level build loads: the new levels read as not played"); }
+  { uint8_t c[MX_SAVE_MAX]; int cn=craft(c,60); mx_meta_init(&T);
+    CHECK(mx_meta_unpack(&T,&of,c,cn)==1 && T.best[59]==559u && T.best[60]==0 && T.stars[60]==0,
+          "existing 60-level saves retain original progress and initialize contracts"); }
   { uint8_t c[600]; int cn = craft(c, MX_NUM_LEVELS + 5); mx_meta_init(&T);
     CHECK(cn <= (int)sizeof c && mx_meta_unpack(&T, &of, c, cn) == 1 && T.best[MX_NUM_LEVELS - 1] == 500u + MX_NUM_LEVELS - 1 && of == 2, "a save from a 25-level build loads: the extra levels are dropped"); }
 

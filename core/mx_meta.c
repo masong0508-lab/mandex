@@ -150,7 +150,9 @@ int mx_level_unlocked(const MxStats *s, int level){
    * or the default all-open configuration. */
   if(level < 0 || level >= MX_NUM_LEVELS) return 0;
 #ifdef MX_LEVEL_LOCKS
-  return s->unlock_all || level < 3 || (level < MX_NUM_LEVELS && s->stars[level - 1] > 0);
+  return s->unlock_all || level < 3 ||
+         (level>=MX_CONTRACT_START&&level<MX_CONTRACT_START+3) ||
+         s->stars[level - 1] > 0;
 #else
   (void)s; (void)level; return 1;
 #endif

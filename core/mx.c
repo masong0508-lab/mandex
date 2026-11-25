@@ -2671,8 +2671,8 @@ static void build_contract(MxWorld *w,int i){
     house_ex(w,72,59,12,2,10,1,1,1,1,1,0,0);
     rect_fill(w,72,53,1,6,0);
     house_ex(w,94,59,12,2,10,1,1,3,1,1,0,0);
-    tgtr(w,49,59,1,3);
-    tgtr(w,49,49,3,3);
+    tgtr(w,48,59,1,3);
+    tgtr(w,52,49,3,3);
     tgtr(w,49,39,2,3);
     tgtr(w,78,59,1,3);
     tgtr(w,78,49,2,3);
@@ -2762,8 +2762,8 @@ static void build_contract(MxWorld *w,int i){
     house_ex(w,91,59,12,2,9,1,1,4,1,4,0,0);
     tgtr(w,49,59,1,3);
     tgtr(w,49,49,2,3);
-    tgtr(w,72,59,2,3);
-    tgtr(w,72,50,3,3);
+    tgtr(w,74,59,2,3);
+    tgtr(w,70,50,3,3);
     tgtr(w,72,41,2,3);
     tgtr(w,97,59,4,3);
     tgtr(w,97,50,1,3);
@@ -2790,7 +2790,7 @@ static void build_contract(MxWorld *w,int i){
   case 13: /* Triple Rent Vault */
     house_ex(w,45,59,12,2,9,2,1,3,1,1,0,0);
     house_ex(w,64,59,12,3,9,2,1,6,1,1,0,0);
-    house_ex(w,87,59,14,4,9,2,1,6,1,4,0,0);
+    house_ex(w,87,59,16,4,9,2,1,6,1,4,0,0);
     rect_fill(w,45,53,2,6,4);
     rect_fill(w,64,53,2,6,1);
     rect_fill(w,87,44,2,6,4);
@@ -2803,9 +2803,9 @@ static void build_contract(MxWorld *w,int i){
     tgtr(w,70,50,2,3);
     tgtr(w,70,41,0,3);
     tgtr(w,91,59,6,3);
-    tgtr(w,97,50,7,3);
+    tgtr(w,98,50,7,3);
     tgtr(w,91,41,4,3);
-    tgtr(w,97,32,2,3);
+    tgtr(w,98,32,2,3);
     break;
   case 14: /* Skyline Reckoning */
     house_ex(w,44,59,11,4,9,1,1,1,1,1,0,0);
@@ -2848,7 +2848,7 @@ static void build_contract(MxWorld *w,int i){
     tgtr(w,85,49,7,3);
     tgtr(w,96,39,2,3);
     tgtr(w,85,29,6,3);
-    tgtr(w,96,29,4,3);
+    tgtr(w,95,29,4,3);
     break;
   }
 }

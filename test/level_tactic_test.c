@@ -26,6 +26,6 @@ int main(void){
   ok(strcmp(mx_level_tactic(-1),"EVICT EVERY LANDLORD")==0,0,
      "out-of-range callers receive a safe fallback");
   if(faults)return 1;
-  puts("PASS: all 60 native level tactics, early-chapter mechanisms and DS text bounds");
+  puts("PASS: all native level tactics, early-chapter mechanisms and DS text bounds");
   return 0;
 }
