@@ -725,7 +725,7 @@ function objectiveLabel(o){
 // Existing ecoFX saves migrate naturally into the manual FX override.
 const WEB_PROFILES=['auto','quality','balanced','low'];
 const WEB_FRAME_CAPS=[0,30,60],WEB_SCALES=[0,1,.75,.6];
-let webEcoFX=false,webPerfTier=0,webPerfBad=0,webPerfGood=0,webFxCap=1400;
+let webEcoFX=false,webPerfTier=0,webPerfBad=0,webPerfGood=0,webFxCap=1400,webDetailedLighting=true;
 function webProfile(o){return WEB_PROFILES.includes(o.performance)?o.performance:'auto'}
 function webEffectiveTier(o){
   const p=webProfile(o);return p==='quality'?0:p==='balanced'?1:p==='low'?2:webPerfTier;
@@ -733,6 +733,9 @@ function webEffectiveTier(o){
 function webRenderScale(o){const v=o.renderScale;return WEB_SCALES.includes(v)&&v>0?v:[1,.75,.6][webEffectiveTier(o)]}
 function webRenderCap(o){return o.renderCap===30||o.renderCap===60?o.renderCap:webEffectiveTier(o)>0?30:60}
 function webFxBudget(o){const t=webEffectiveTier(o);return o.ecoFX===false?1400:o.ecoFX===true?360:t===2?220:t===1?360:1400}
+function webLightingDetail(o){return o.lighting==='full'||(o.lighting!=='lite'&&webEffectiveTier(o)<2)}
+function webLightingLabel(o){return o.lighting==='full'?'FULL':o.lighting==='lite'?'LITE':'AUTO'}
+function cycleWebLighting(o){o.lighting=o.lighting==='full'?'lite':o.lighting==='lite'?'auto':'full'}
 function fxLimit(){return webFxCap}
 function webPerfSample(o,elapsed,cpu,playing){
   if(webProfile(o)!=='auto'||!playing||!(elapsed>0)||elapsed>.25){
@@ -2053,12 +2056,14 @@ function bellyDetail(f){const cy=-2+f*14,rx=22+f*16,ry=17+f*20;ctx.save();
   ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-nw*.5,ny-nh*.5,nw*.35,nh*.3,0,0,6.3);ctx.fill();
   ctx.fillStyle='rgba(90,30,30,.4)';ctx.beginPath();ctx.ellipse(0,cy+ry*1.02,rx*.92,ry*.12,0,0,3.1416);ctx.fill();   // the overhang's shadow on the waistband
   ctx.restore()}
-function blob(parts,o){o=o||{};const m=ctx.getTransform(),sc=Math.hypot(m.a,m.b)||1,ow=o.ow==null?1.7:o.ow;
+function blob(parts,o){o=o||{};const ow=o.ow==null?1.7:o.ow;
   ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=OUT;ctx.fillStyle=OUT;ctx.lineWidth=ow*2;
   if(o.clip)ctx.clip(o.clip);
   if(ow>0)for(const q of parts){if(q.noout)continue;if(q.o)ctx.stroke(q.o);else{ctx.fill(q.p);ctx.stroke(q.p)}}
   for(const q of parts){ctx.fillStyle=q.fill||o.fill||SK;ctx.fill(q.p)}
-  if(o.sh!==0)blobShade(parts,m,sc,o);
+  // Full mode keeps the original rim light and shadow compositor.
+  // Lite mode retains all contours, poses, fills and hand-drawn detail.
+  if(o.sh!==0&&webDetailedLighting){const m=ctx.getTransform();blobShade(parts,m,Math.hypot(m.a,m.b)||1,o);}
   ctx.restore()}
 // soft cloth: a curved ribbon (waistband, cuff) along y=yc(x) from xa to xb, half-height hw (thinner toward both ends), with a slight ripple; stitched stripes on top
 function ribbonPoly(xa,xb,yc,hw,n,fill,rip){if(THONG){hw=Math.max(.9,hw*.3);fill=TG}const T=[],B=[];for(let i=0;i<=n;i++){const x=xa+(xb-xa)*i/n,u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u),r=(rip||0)*Math.sin(x*.85+1);T.push([x,yc(x)-h+r]);B.push([x,yc(x)+h+r*.7])}return pPoly(T.concat(B.reverse()),fill)}
@@ -3759,7 +3764,7 @@ function layoutTick(){
     for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
     CAM.reset=true;CAM.snap=true;hits=[];
   }
-  const scale=typeof webRenderScale==='function'&&typeof OPT==='function'?webRenderScale(OPT()):1;
+  const scale=state!=='options'&&typeof webRenderScale==='function'&&typeof OPT==='function'?webRenderScale(OPT()):1;
   const bw=Math.max(1,Math.round(w*scale)),bh=Math.max(1,Math.round(h*scale));
   if(w!==W||h!==H){W=w;H=h;CAM.snap=true;}
   // Keep logical coordinates for camera, UI and pointer conversion.
@@ -4247,7 +4252,7 @@ const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'none'});
 webEcoFX=!!OPT().ecoFX;             // load saved touch-friendly effects preference
 // A conservative starting hint; measured frame costs can override it.
 if(typeof navigator!=='undefined'&&navigator.deviceMemory>0&&navigator.deviceMemory<=2)webPerfTier=1;
-webFxCap=webFxBudget(OPT());
+webFxCap=webFxBudget(OPT());webDetailedLighting=webLightingDetail(OPT());
 muted=!!OPT().muted;
 const ST=()=>PD.st;
 const totalStars=()=>{let n=0;for(const k in PD.stars)if(+k>=0&&+k<CH1)n+=PD.stars[k]||0;return n};
@@ -5407,6 +5412,7 @@ function drawSettings(){
     add('DECORATIVE EFFECTS',webFXLabel(o),'Fewer sparks and dust, same destruction.',()=>cycleWebFX(o),o.ecoFX===true);
     add('SCREEN SHAKE',shakeName,'Reduce motion during impacts.',shakeCycle,shakeName!=='FULL');
     add('FPS / SIM MONITOR',frameMeterVisible?'ON':'OFF','Show measured FPS and simulation speed.',()=>{frameMeterVisible=!frameMeterVisible;o.showPerf=frameMeterVisible},frameMeterVisible);
+    add('CHARACTER LIGHTING',webLightingLabel(o),'Lite skips costly shadow masks.',()=>cycleWebLighting(o),o.lighting==='lite');
   }else if(page===2){
     const v=Math.round(optVol()*100);
     add('MASTER SOUND',muted?'OFF':'ON','Music, voices and impact effects.',()=>{audioInit();setMuted(!muted)},!muted);
@@ -5421,7 +5427,7 @@ function drawSettings(){
   const nRows=Math.ceil(rows.length/columns),foot=portrait?86:74;
   const rh=Math.min(portrait?69:90,Math.floor((H-top-foot-(nRows-1)*rowGap)/Math.max(1,nRows)));
   const rw=(W-2*margin-(columns-1)*gap)/columns;
-  txt(page===1?tier+'  /  '+cap+' FPS CAP  /  '+Math.round(scale*100)+'% PIXELS':page===0?'PLAY YOUR WAY':page===2?'SOUND & VOLUME':'YOUR SAVE FILE',
+  txt(page===1?tier+'  /  '+cap+' FPS CAP  /  '+Math.round(scale*100)+'% RESOLUTION':page===0?'PLAY YOUR WAY':page===2?'SOUND & VOLUME':'YOUR SAVE FILE',
     W/2,portrait?151:135,portrait?15:17,'#b7d5e9','center');
   rows.forEach((row,k)=>{
     const x=margin+(k%columns)*(rw+gap),y=top+Math.floor(k/columns)*(rh+rowGap);
@@ -5570,7 +5576,7 @@ function drawMenu(){
 let sliderDrag=false,sliX=0,sliW=1,armReset=0,armProg=0;
 function setVolFromX(x){const o=OPT();o.vol=clamp(Math.round((x-sliX)/sliW*20)/20,0,1);applyVol();pdTouch()}
 const GUIDES=['OFF','SHORT','FULL'],SHAKES=[['OFF',0],['LOW',.5],['FULL',1]];
-function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX','performance','renderCap','renderScale','showPerf'])delete o[k];o.tool='none';muted=false;webEcoFX=false;frameMeterVisible=false;webPerfBad=webPerfGood=0;applyVol();pdTouch();pdSave()}
+function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX','performance','renderCap','renderScale','showPerf','lighting'])delete o[k];o.tool='none';muted=false;webEcoFX=false;frameMeterVisible=false;webPerfBad=webPerfGood=0;applyVol();pdTouch();pdSave()}
 function progReset(){PD.stars={};PD.best={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
 function drawOptions(){drawSettings()}
 function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
@@ -6029,7 +6035,7 @@ function loop(t){
   const ticks=webSimSteps(raw);
   let sim=0,painted=false,started=performance.now();
   try{
-    webFxCap=webFxBudget(OPT()); // resolve preferences once, not for every particle
+    webFxCap=webFxBudget(OPT());webDetailedLighting=webLightingDetail(OPT()); // resolve preferences once, not for every particle
     layoutTick();
     for(let i=0;i<ticks;i++){
       const playing=state==='play';
