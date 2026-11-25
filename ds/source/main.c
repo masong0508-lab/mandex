@@ -1201,6 +1201,25 @@ static void draw_man(const View *v){
 #ifndef MX_DS_PARTICLE_VIEW_CULL
 #define MX_DS_PARTICLE_VIEW_CULL 1
 #endif
+/* Exact integer DDA for the ring's original angle formula:
+   floor(floor(k*4096*6283/n)/1000) == floor(k*4096*6283/(n*1000)).
+   Two divisions per RING instead of two per DOT; no table or extra RAM. */
+typedef struct { int angle,carry,step,rem,den; } DsRingAngle;
+static inline DsRingAngle ds_ring_angles(int n){
+  const int den=n*1000,num=4096*6283;
+  const DsRingAngle a={0,0,num/den,num%den,den};
+  return a;
+}
+static inline real ds_ring_next(DsRingAngle *a){
+  const real old=a->angle;
+  a->angle+=a->step;
+  a->carry+=a->rem;
+  if(a->carry>=a->den){a->carry-=a->den;a->angle++;}
+  return old;
+}
+#ifndef MX_DS_RING_ANGLE_STEP
+#define MX_DS_RING_ANGLE_STEP 1
+#endif
 static void draw_parts(const View *v){
   for(int i = 0; i < (MX_DS_PARTICLE_BOUNDS ? part_high_water : NPART); i++){
     const Part *p = &parts[i];
@@ -1257,8 +1276,15 @@ static void draw_parts(const View *v){
       if(age * 3 > p->max * 2 && (frame & 1)) break;
       int u = 256 - (256 - age * 256 / p->max) * (256 - age * 256 / p->max) / 256;
       int rad = (p->r * v->ppc >> 6) * u >> 8, n = 8 + rad * 2; if(n > 64) n = 64;                /* about a dot every 3 px */
+#if MX_DS_RING_ANGLE_STEP
+      DsRingAngle angles=ds_ring_angles(n);
+#endif
       for(int k = 0; k < n; k++){
+#if MX_DS_RING_ANGLE_STEP
+        real a=ds_ring_next(&angles);
+#else
         real a = rdiv(RI(k) * 6283 / n, RI(1000));
+#endif
         gfx_px(v->buf, px + (int)((rcos(a) * rad) >> 12), py + (int)((rsin(a) * rad) >> 12), p->col);
       }
       break; }
