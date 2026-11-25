@@ -146,8 +146,13 @@ for mode in float fixed;do
   test "$mode" = fixed && flags="-DMX_FIXED"
   gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core tool_feedback_test.c ../core/mx.c ../core/cloth.c -lm -o tool_feedback_$mode
   ./tool_feedback_$mode
+  gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core breaker_power_test.c -lm -o breaker_power_$mode
+  ./breaker_power_$mode
 done
-if command -v node >/dev/null 2>&1;then node browser_tool_feedback_test.js;fi
+if command -v node >/dev/null 2>&1;then
+  node browser_tool_feedback_test.js
+  node browser_power_picker_test.js
+fi
 echo "--- Browser side -> rear -> side pose coherence at 60Hz ---"
 if command -v node >/dev/null 2>&1;then node browser_turn_pose_test.js;fi
 echo "--- Browser walking gait: actual contacts, 4-cell stride, and reusable pose ---"
