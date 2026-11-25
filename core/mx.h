@@ -62,7 +62,12 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #endif
 #define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    60
+#define MX_NUM_LEVELS    60      /* campaign only: keep existing indices */
+#define MX_CONTRACT_COUNT 72
+#define MX_TOTAL_LEVELS   (MX_NUM_LEVELS + MX_CONTRACT_COUNT)
+static inline int mx_is_contract(int l){ return l>=MX_NUM_LEVELS && l<MX_TOTAL_LEVELS; }
+/* Jump between the three chapters and each four-contract district. */
+int mx_level_section_step(int level, int dir);
 #define MX_CH2_START     20      /* chapter 2: levels 20-39 */
 #define MX_CH3_START     40      /* chapter 3 (the Wolfman): levels 40-59 */
 #define MX_STORY_LEVELS  20      /* chapter 1: the story achievements and outfits count only these, so adding levels never moves earned goalposts */

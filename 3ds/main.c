@@ -694,7 +694,7 @@ static void snowcap_prepare(void){
 }
 static void draw_sky(const View *v){
   Scr *s=v->s;int gy=VY(v,MX_ROWS);float k=v->ppc/8.0f;
-  int night=world.level>=MX_CH3_START;
+  int night=world.level>=MX_CH3_START&&!mx_is_contract(world.level);
   snowcap_prepare();
   for(int y = 0; y < gy; y += 2){ float t = (float)y / (gy > 1 ? gy : 1), r, g, b;           /* #3d8fe8 -> #8ccaf7 -> #ffeccb: the web's warm horizon */
     if(night){r=11+30*t;g=16+28*t;b=41+42*t;}
@@ -965,7 +965,7 @@ static void draw_facades(const View *v){
       int ww=(rm->w>=10 ? 4 : 3)*p, hh=(rm->h>=7 ? 4 : 3)*p;
       int x=VX(v,(float)wx)-ww/2, y=VY(v,(float)wy)-hh/2;
       if(x+ww<-3 || x>v->s->w+3 || y+hh<-3 || y>v->s->h+3) continue;
-      int lit=((r+k+world.level)%5)==0, night=world.level>=MX_CH3_START;
+      int lit=((r+k+world.level)%5)==0, night=world.level>=MX_CH3_START&&!mx_is_contract(world.level);
       u32 glass=lit ? RGB(255,209,116) : night ? RGB(100,140,193) : GLASS[(r+k)&3];
       rect(v->s,x-2,y-2,ww+4,hh+4,RGB(25,27,42));
       rect(v->s,x-1,y-1,ww+2,hh+2,RGB(230,222,200));
@@ -1361,8 +1361,8 @@ static void draw_hud(const View *camera){
   }
   rect(&top, 0, 0, 400, 24, RGB(15, 18, 30)); rect(&top, 0, 0, 400, 12, RGB(24, 28, 46)); rect(&top, 0, 23, 400, 1, RGB(255, 210, 63));
   char b[48];
-  text(&top, 6, 8, "LV", 2, RGB(255, 210, 63)); itoa_(world.level + 1, b); text(&top, 30, 8, b, 2, RGB(255, 210, 63));
-  text(&top, 56, 8, mx_level_name(world.level), 2, RGB(255, 255, 255));
+  text(&top,6,8,mx_is_contract(world.level)?"CT":"LV",2,RGB(255,210,63)); itoa_(mx_is_contract(world.level)?world.level-MX_NUM_LEVELS+1:world.level+1,b); text(&top, 30, 8, b, 2, RGB(255, 210, 63));
+  text(&top,56,8,mx_level_name(world.level),mx_is_contract(world.level)?1:2,RGB(255,255,255));
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                               /* walk levels: the clock */
     int k = (int)(RTOF(world.man.wt) * 100.0f / MX_WALK_T); if(k < 0) k = 0; if(k > 100) k = 100;
     rect(&top, 250, 6, 142, 12, RGB(255, 255, 255)); rect(&top, 251, 7, 140, 10, RGB(40, 40, 50)); rect(&top, 251, 7, k * 140 / 100, 10, k > 30 ? RGB(125, 255, 90) : RGB(255, 74, 74));
@@ -1546,8 +1546,9 @@ int main(void){
       continue;
     }
     if(app == ST_TITLE){
-      if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
-      if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
+      if(down & (KEY_UP|KEY_DOWN)){sel=mx_level_section_step(sel,(down&KEY_DOWN)?1:-1);load_level(sel);}
+      else if(down & KEY_RIGHT){ sel = (sel + 1) % MX_TOTAL_LEVELS; load_level(sel); }
+      else if(down & KEY_LEFT){ sel = (sel + MX_TOTAL_LEVELS - 1) % MX_TOTAL_LEVELS; load_level(sel); }
       if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } apply_outfit(outfit_sel); n3_save_sync(); }
       if(down & KEY_Y){ nofight = !nofight; mx_set_fight(&world, !nofight); n3_save_sync(); }
       if(down & (KEY_A | KEY_START | KEY_TOUCH)){
@@ -1597,7 +1598,7 @@ int main(void){
           int next = world.state == MX_WIN ? world.level + 1 : world.level;
           int ce = (world.state == MX_WIN && next == MX_CH2_START) ? 1 : (world.state == MX_WIN && next == MX_CH3_START) ? 2 : 0;   /* the closing cutscene of the chapter just finished */
           if(ce && !(end_seen & (1 << ce))){ end_seen |= 1 << ce; sel = next; intro_level = next; app = ST_INTRO; intro_start_end(ce); }
-          else if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel = 0; load_level(0); } else { sel = next; load_level(next); }
+          else if((next==MX_NUM_LEVELS&&world.level<MX_NUM_LEVELS)||next>=MX_TOTAL_LEVELS){ app = ST_TITLE; sel = 0; load_level(0); } else { sel = next; load_level(next); }
         }
       } else if(m->mode == MAN_AIM){
         /* The dedicated bottom toolbar is separate from the aiming view. */
@@ -1702,10 +1703,10 @@ int main(void){
       rect(&top, 70, 128, 260, 2, RGB(124, 49, 70));
       textc(&top, 200, 52, "MANDEX", 6, RGB(255, 210, 63));
       textc(&top, 200, 100, "THE LANDLORD SMASHER", 2, RGB(255, 255, 255));
-      char b[48]; sprintf(b, "< LEVEL %d  %s >", sel + 1, mx_level_name(sel)); textc(&top, 200, 150, b, 2, RGB(255, 255, 255));
+      char b[64]; snprintf(b,sizeof b,"< %s %d  %s >",mx_is_contract(sel)?"CONTRACT":"LEVEL",mx_is_contract(sel)?sel-MX_NUM_LEVELS+1:sel+1,mx_level_name(sel)); textc(&top,200,150,b,strlen(b)>32?1:2,RGB(255,255,255));
       rect(&top, 140, 161, 120, 9, RGB(15, 18, 30));
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
-      textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
+      textc(&top,200,176,"A: PLAY    UP/DOWN: DISTRICT",1,RGB(125,255,90));
       if(!snd_ok){ char sb[48]; sprintf(sb, "NO SOUND (ndsp %08X) - NEEDS dspfirm.cdc", (unsigned)snd_err); textc(&top, 200, 212, sb, 1, RGB(255, 90, 90)); }
 #if defined(__3DS__) && !MX_N3DS_NO_SAVE
       else if(n3_save_status < 0) textc(&top, 200, 212, "SD SAVE FAILED - CHECK CARD", 1, RGB(255, 90, 90));

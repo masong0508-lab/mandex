@@ -2329,6 +2329,209 @@ static void pad(MxWorld *w, int x, int y, int ww){
   MxPad *p = &w->pads[w->npads++]; p->x = (uint8_t)x; p->y = (uint8_t)y; p->w = (uint8_t)ww;
 }
 
+/* Contract geometry mirrors the browser descriptors. Fixed-size tables
+ * only; no per-level heap allocation or larger physics grid. */
+typedef struct {
+  uint8_t count, h[3][7], sand[3], extras, extra[2][5];
+} ContractDistrict;
+static const ContractDistrict CONTRACT_DISTRICTS[MX_CONTRACT_COUNT/4]={
+  {2,{{43,22,2,9,2,1,1},{78,28,2,9,1,1,2}},{0,0,0},0,{{0}}},
+  {1,{{61,38,4,10,2,1,3}},{0,0,0},0,{{0}}},
+  {2,{{44,28,1,13,1,1,1},{78,30,1,12,2,1,1}},{0,0,0},0,{{0}}},
+  {2,{{43,25,4,9,2,1,2},{82,28,3,11,2,2,3}},{0,0,0},0,{{0}}},
+  {1,{{49,58,2,13,1,1,2}},{0,0,0},0,{{0}}},
+  {1,{{56,43,3,11,4,1,2}},{0,0,0},0,{{0}}},
+  {2,{{44,26,2,10,2,1,6},{79,31,1,13,1,2,6}},{0,0,0},0,{{0}}},
+  {2,{{39,22,2,9,1,1,1},{91,22,2,10,2,1,1}},{0,0,0},0,{{0}}},
+  {2,{{45,23,2,10,2,1,2},{84,27,2,11,1,1,1}},{71,10,5},0,{{0}}},
+  {1,{{71,34,5,9,2,1,3}},{0,0,0},0,{{0}}},
+  {3,{{39,20,1,9,1,1,1},{64,24,2,10,2,1,2},{94,21,3,10,2,1,2}},{0,0,0},0,{{0}}},
+  {2,{{39,24,3,10,2,1,3},{70,44,2,12,2,1,6}},{0,0,0},0,{{0}}},
+  {2,{{40,20,2,10,2,1,1},{94,20,2,10,2,1,1}},{0,0,0},2,{{59,39,36,2,1},{75,41,3,19,3}}},
+  {2,{{49,25,3,10,2,1,3},{89,25,2,11,2,1,6}},{0,0,0},2,{{78,43,4,17,6},{77,41,6,2,7}}},
+  {2,{{45,26,1,12,2,1,1},{86,26,3,10,2,1,2}},{73,10,5},0,{{0}}},
+  {2,{{43,24,3,9,1,1,2},{84,28,3,10,2,1,3}},{0,0,0},2,{{72,47,4,13,6},{71,45,6,2,7}}},
+  {3,{{40,20,1,11,1,1,1},{63,23,3,9,2,1,2},{90,26,4,10,2,1,3}},{0,0,0},0,{{0}}},
+  {2,{{49,22,2,10,2,1,3},{83,30,3,10,2,1,2}},{0,0,0},2,{{71,55,11,5,3},{75,51,7,4,1}}},
+};
+static const char *const CONTRACT_NAMES[MX_CONTRACT_COUNT]={
+  "Rowhouse Alley / Open",
+  "Rowhouse Alley / Bank",
+  "Rowhouse Alley / Chain",
+  "Rowhouse Alley / Guard",
+  "Brick Stacks / Open",
+  "Brick Stacks / Bank",
+  "Brick Stacks / Chain",
+  "Brick Stacks / Guard",
+  "Market Hall / Open",
+  "Market Hall / Bank",
+  "Market Hall / Chain",
+  "Market Hall / Guard",
+  "Twin Towers / Open",
+  "Twin Towers / Bank",
+  "Twin Towers / Chain",
+  "Twin Towers / Guard",
+  "Freight Warehouse / Open",
+  "Freight Warehouse / Bank",
+  "Freight Warehouse / Chain",
+  "Freight Warehouse / Guard",
+  "Glass Apartments / Open",
+  "Glass Apartments / Bank",
+  "Glass Apartments / Chain",
+  "Glass Apartments / Guard",
+  "Rail Depot / Open",
+  "Rail Depot / Bank",
+  "Rail Depot / Chain",
+  "Rail Depot / Guard",
+  "Garden Court / Open",
+  "Garden Court / Bank",
+  "Garden Court / Chain",
+  "Garden Court / Guard",
+  "Sandworks / Open",
+  "Sandworks / Bank",
+  "Sandworks / Chain",
+  "Sandworks / Guard",
+  "High Rise / Open",
+  "High Rise / Bank",
+  "High Rise / Chain",
+  "High Rise / Guard",
+  "Terrace Steps / Open",
+  "Terrace Steps / Bank",
+  "Terrace Steps / Chain",
+  "Terrace Steps / Guard",
+  "Industrial Yard / Open",
+  "Industrial Yard / Bank",
+  "Industrial Yard / Chain",
+  "Industrial Yard / Guard",
+  "Pier Crossing / Open",
+  "Pier Crossing / Bank",
+  "Pier Crossing / Chain",
+  "Pier Crossing / Guard",
+  "Furnace Row / Open",
+  "Furnace Row / Bank",
+  "Furnace Row / Chain",
+  "Furnace Row / Guard",
+  "Sand Quarry / Open",
+  "Sand Quarry / Bank",
+  "Sand Quarry / Chain",
+  "Sand Quarry / Guard",
+  "Signal Station / Open",
+  "Signal Station / Bank",
+  "Signal Station / Chain",
+  "Signal Station / Guard",
+  "Skyline Court / Open",
+  "Skyline Court / Bank",
+  "Skyline Court / Chain",
+  "Skyline Court / Guard",
+  "Breakwater Works / Open",
+  "Breakwater Works / Bank",
+  "Breakwater Works / Chain",
+  "Breakwater Works / Guard"
+};
+static const char *const CONTRACT_TIPS[MX_CONTRACT_COUNT]={
+  "BREAK THE NEAR HOUSE FIRST",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "CUT THE MIDDLE FLOOR SUPPORTS",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "USE THE LONG WOODEN ROOF",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "BREAK ONE TOWER AT A TIME",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "AIM ALONG THE LOWER FLOOR",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "SHATTER THE GLASS BAYS",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "AVOID THE STEEL ROOF",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "LOB ACROSS THE OPEN COURTYARD",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "BREAK THE SAND BANKS",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "HIT THE LOW FLOORS FIRST",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "WORK UPWARDS FROM THE SMALL HOUSE",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "SEPARATE THE TWO STRUCTURES",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "BREAK THE CENTRAL BRIDGE PIER",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "BANK OVER THE STEEL FURNACE",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "SHIFT THE SAND AND HIT THE TOWER",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "LOB OVER THE SIGNAL BARRIER",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "TOPPLE THE RISING SKYLINE",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK",
+  "CLEAR THE STEPPED EMBANKMENT",
+  "USE THE RUBBER BANK; FIVE SHOTS",
+  "TRIGGER THE RED SUPPORT CHARGES",
+  "BREAK THE SHELL; GUARDS FIGHT BACK"
+};
+static const uint8_t CONTRACT_MEN[4]={8,5,6,9};
+int mx_level_section_step(int level,int dir){
+  if(level<0||level>=MX_TOTAL_LEVELS)level=0;
+  if(!dir)return level;
+  int group=mx_is_contract(level)?3+(level-MX_NUM_LEVELS)/4:level/20;
+  const int groups=3+MX_CONTRACT_COUNT/4;
+  group=(group+(dir>0?1:groups-1))%groups;
+  return group<3?group*20:MX_NUM_LEVELS+(group-3)*4;
+}
+static void build_contract(MxWorld *w,int id){
+  const ContractDistrict *f=&CONTRACT_DISTRICTS[id/4];
+  const int mode=id%4;
+  if(f->sand[1])mound(w,f->sand[0],f->sand[1],f->sand[2]);
+  for(int k=0;k<f->extras;k++){const uint8_t *a=f->extra[k];rect_fill(w,a[0],a[1],a[2],a[3],a[4]);}
+  if(mode==1)rect_fill(w,30,56,5,4,MX_RUBBER);
+  for(int k=0;k<f->count;k++){
+    const uint8_t *a=f->h[k];
+    const int x=a[0],ww=a[1],floors=a[2],fh=a[3],wt=mode==3?2:1;
+    const int wall=mode==3&&a[4]!=MX_GLASS?MX_STONE:a[4];
+    house_ex(w,x,MX_ROWS-1,ww,floors,fh,wt,2,wall,a[5],a[6],0,0);
+    if(mode==2){rect_fill(w,x,57,2,2,MX_TNT);rect_fill(w,x+ww-2,57,2,2,MX_TNT);}
+    if(mode==3){rect_fill(w,x,55,wt,4,MX_STEEL);rect_fill(w,x+ww-wt,55,wt,4,MX_STEEL);}
+    const int upper=floors-1;
+    tgtk(w,x+5,59,mode==3?LK_WALKER:LK_NONE);
+    tgtk(w,x+ww-6,59-upper*fh,mode==3?LK_SHIELD:LK_NONE);
+    if(mode==2&&floors>=3)tgt(w,x+5,59-fh);
+    if(mode==3&&floors>=3)tgtk(w,x+5,59-(upper-1)*fh,LK_THROWER);
+  }
+}
+
 static const char *NAMES[MX_NUM_LEVELS] = {
   "Suburban Eviction", "Duplex Dilemma", "Tower Block Tussle", "Castle Foreclosure", "Corporate Takeover",
   "Bouncy Castle", "Sandcastle Shakedown",
@@ -2341,7 +2544,10 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   "Full Moon Rising", "Howling Heights", "Flea Market", "Fang Street", "Bad Moon Brick", "Wolf Pack Lofts", "Moonlit Mortgage", "Claw Foreclosure", "Growl Gardens", "Night Shift",
   "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord"};
 static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
-const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
+const char *mx_level_name(int l){
+  if(mx_is_contract(l))return CONTRACT_NAMES[l-MX_NUM_LEVELS];
+  return l>=0&&l<MX_NUM_LEVELS?NAMES[l]:"UNKNOWN LEVEL";
+}
 /* Compact ROM-only guidance; each hint fits a 256-pixel DS banner. */
 const char *mx_level_tactic(int l){
   static const char *const early[MX_CH3_START]={
@@ -2394,6 +2600,7 @@ const char *mx_level_tactic(int l){
     "NIGHT ALLEY: SHATTER THE SIGNAL", "NIGHT ALLEY: BANK OFF THE RUBBER",
     "NIGHT ALLEY: DUMP THE SANDBAGS", "NIGHT ALLEY: CRACK THE GLASS ROOF"
   };
+  if(mx_is_contract(l))return CONTRACT_TIPS[l-MX_NUM_LEVELS];
   if(l<0 || l>=MX_NUM_LEVELS)return "EVICT EVERY LANDLORD";
   if(l<MX_CH3_START)return early[l];
   int i=l-MX_CH3_START;
@@ -2506,6 +2713,7 @@ static void build_ch3(MxWorld *w, int i){
 }
 
 static void build(MxWorld *w, int l){
+  if(mx_is_contract(l)){build_contract(w,l-MX_NUM_LEVELS);return;}
   if(l >= MX_CH3_START){ build_ch3(w, l - MX_CH3_START); return; }
   const int W_ = MX_WOOD, B = MX_BRICK, S = MX_STONE, ST = MX_STEEL, RU = MX_RUBBER;
   switch(l){
@@ -2775,10 +2983,11 @@ static void load_level(MxWorld *w, int level, int district){
   w->dz_lo = MX_ROWS * MX_COLS; w->dz_hi = -1;
   w->bh_lo = 0; w->bh_hi = MX_ROWS + 3;               /* bhead starts zeroed, not -1: the first step clears all of it */
   w->valve_ok = keep_valve; w->collapse = keep_collapse;
-  level %= MX_NUM_LEVELS;
+  level %= MX_TOTAL_LEVELS;
+  if(level<0)level+=MX_TOTAL_LEVELS;
   w->substeps = first ? SUBSTEPS : keep_sub;
   w->wob_enabled = first ? 1 : keep_wob;
-  w->level = level; w->district = district; w->state = MX_PLAY; w->men = MEN[level]; w->banner = R(2.4);
+  w->level = level; w->district = district; w->state = MX_PLAY; w->men = mx_is_contract(level)?CONTRACT_MEN[(level-MX_NUM_LEVELS)%4]:MEN[level]; w->banner = R(2.4);
   build(w, level);
   for(int r = 0; r < w->nrooms; r++){ const MxRoom *rm = &w->rooms[r]; for(int y = rm->y; y < rm->y + rm->h; y++) for(int x = rm->x; x < rm->x + rm->w; x++) w->paper[IDX(x, y)] = (uint8_t)(rm->pal + 1); }
   unclip_targets(w);

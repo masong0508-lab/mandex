@@ -17,9 +17,9 @@ const build=new Function(`
  return {CONTRACTS,contractStars,PD,run(id){grid.fill(0);targets=[];interiors=[];let q=buildContract(id);q.build();
  return {q,grid:grid.slice(),targets,interiors,clear:targets.every(t=>bodyClear(t.x,t.y))}}}
 `)();
-assert.strictEqual(build.CONTRACTS.length,48);
+assert.strictEqual(build.CONTRACTS.length,72);
 const signatures=new Set();
-for(let id=0;id<48;id++){
+for(let id=0;id<72;id++){
  const a=build.run(id),b=build.run(id);
  assert.deepStrictEqual(a.grid,b.grid,'deterministic contract '+id);
  assert.deepStrictEqual(a.targets,b.targets);
@@ -34,7 +34,7 @@ for(let id=0;id<48;id++){
  if(id%4===2)assert(a.grid.includes(5),'TNT supports');
  if(id%4===3)assert(a.targets.some(t=>t.kind==='shield'),'guard');
 }
-assert.strictEqual(signatures.size,48,'all contracts have distinct grids');
+assert.strictEqual(signatures.size,72,'all contracts have distinct grids');
 assert.strictEqual(build.contractStars(0),0);
 build.PD.contracts[0]=2;assert.strictEqual(build.contractStars(0),2);
 build.PD.contracts[0]=99;assert.strictEqual(build.contractStars(0),0);
@@ -69,4 +69,4 @@ for(const [x,y] of [[0,0],[119,59],[-2,30],[121,40],[60,25],[10,59]])
  }
 const i=html.indexOf('<script>'),j=html.indexOf('</script>',i);
 new Function(html.slice(i+8,j));
-console.log('CONTRACTS_PASS maps=48 distinct=48 blast_cases=90 syntax=1');
+console.log('CONTRACTS_PASS maps=72 distinct=72 blast_cases=90 syntax=1');

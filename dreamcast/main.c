@@ -579,7 +579,8 @@ static void draw_title(void){
     text("THE LANDLORD SMASHER",320,225,29,WHITE,1,Z_HUD);
   }
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
-  { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD);
+  { char tb[80]; snprintf(tb,sizeof tb,"< %s %d  %s >",mx_is_contract(title_lv)?"CONTRACT":"LEVEL",mx_is_contract(title_lv)?title_lv-MX_NUM_LEVELS+1:title_lv+1,mx_level_name(title_lv)); text(tb,320,466,16,argb(255,126,176,255),1,Z_HUD);
+    snprintf(tb,sizeof tb,"UP/DOWN: DISTRICT   L/R: OUTFIT - %s",mx_outfit(outfit_sel)->name);text(tb,320,396,14,WHITE,1,Z_HUD);
     snprintf(tb, sizeof tb, "Y: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(tb, 320, 418, 16, argb(255, 255, 255, 220), 1, Z_HUD); }
 }
 
@@ -980,7 +981,7 @@ static void draw_all(void){
   char buf[64], nm[40]; int n = 0;
   for(const char *q = mx_level_name(world.level); *q && n < 38; q++) nm[n++] = (*q >= 'a' && *q <= 'z') ? *q - 32 : *q;
   nm[n] = 0;
-  snprintf(buf, sizeof buf, "LV %d  %s", world.level + 1, nm);
+  snprintf(buf,sizeof buf,"%s %d  %s",mx_is_contract(world.level)?"CT":"LV",mx_is_contract(world.level)?world.level-MX_NUM_LEVELS+1:world.level+1,nm);
   text(buf, 12, 26, 16, argb(255, 210, 63, 255), 0, Z_HUD + 0.1f);
   MxObjective objective=mx_objective_snapshot(&world);
   int alive=objective.remaining;
@@ -1168,7 +1169,7 @@ static void gfx_init(void){
    intact. Re-upload it ONLY when returning to the menu (not every frame),
    and recompile the header to point to the new VRAM allocation. */
 static void dc_return_to_title(int selected_level){
-  if(selected_level < 0 || selected_level >= MX_NUM_LEVELS) selected_level=0;
+  if(selected_level < 0 || selected_level >= MX_TOTAL_LEVELS) selected_level=0;
   on_title=1;paused=0;in_intro=0;title_lv=selected_level;title_t=0;
   if(!tx_ttl){
     tx_ttl=load_tex(DCT_TTL_RLE,DCT_TTL_RLE_LEN,DCT_TTL_W,DCT_TTL_H);
@@ -1178,7 +1179,7 @@ static void dc_return_to_title(int selected_level){
 static void dc_advance_after_end(void){
   const int next=world.state==MX_WIN?world.level+1:world.level;
   /* Final chapter must return to a real title, never load level #61. */
-  if(next >= MX_NUM_LEVELS){ dc_return_to_title(0);return; }
+  if((next==MX_NUM_LEVELS&&world.level<MX_NUM_LEVELS)||next>=MX_TOTAL_LEVELS){ dc_return_to_title(0);return; }
   const int ce=(world.state==MX_WIN && next==MX_CH2_START)?1:
                (world.state==MX_WIN && next==MX_CH3_START)?2:0;
   if(ce && !(end_seen & (1<<ce)) && tx_ic_top && tx_ic_bot){
@@ -1216,7 +1217,8 @@ int main(int argc, char **argv){
           if(intro_mode() == 3 && intro_level == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_start_wolf(); }       /* the chapter 2 closer hands over to the wolfman cutscene */
           else { in_intro = 0; load_level(intro_level); } }
       } else if(on_title){
-        if(pressed & (CONT_DPAD_RIGHT | CONT_DPAD_LEFT)) title_lv = (title_lv + ((pressed & CONT_DPAD_RIGHT) ? 1 : MX_NUM_LEVELS - 1)) % MX_NUM_LEVELS;
+        if(pressed&(CONT_DPAD_UP|CONT_DPAD_DOWN))title_lv=mx_level_section_step(title_lv,(pressed&CONT_DPAD_DOWN)?1:-1);
+        else if(pressed & (CONT_DPAD_RIGHT | CONT_DPAD_LEFT)) title_lv = (title_lv + ((pressed & CONT_DPAD_RIGHT) ? 1 : MX_TOTAL_LEVELS - 1)) % MX_TOTAL_LEVELS;
         { int tl = (st->ltrig > 128 && !(prev_trig & 1)), tr = (st->rtrig > 128 && !(prev_trig & 2)); prev_trig = (st->ltrig > 128) | ((st->rtrig > 128) << 1);
         if(tl || tr){
           for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + (tr ? k : MX_NUM_OUTFITS - k)) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }

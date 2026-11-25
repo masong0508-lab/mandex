@@ -1,12 +1,25 @@
 name: Demolition contract layouts
 on:
   push:
-    paths: ['web/index.html','test/browser_contracts_test.js','.github/workflows/browser-contracts.yml']
+    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
   pull_request:
-    paths: ['web/index.html','test/browser_contracts_test.js','.github/workflows/browser-contracts.yml']
+    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: node test/browser_contracts_test.js
+      - name: Native layouts, migration and VMU recovery
+        run: |
+          set -eu
+          for mode in float fixed; do
+            flags=""
+            if [ "$mode" = fixed ]; then flags="-DMX_FIXED"; fi
+            gcc -std=c99 -O2 -Wall $flags -Icore test/native_contracts_test.c -lm -o /tmp/native_contracts
+            /tmp/native_contracts
+            for test in save_test meta_test journal_test vmu_save_test; do
+              gcc -std=gnu99 -O2 -Wall -Wno-unused-function $flags -Icore core/mx.c core/mx_meta.c test/$test.c -lm -o /tmp/native_meta
+              /tmp/native_meta
+            done
+          done

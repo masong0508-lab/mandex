@@ -8,10 +8,10 @@
 
 typedef struct {
   int kills, cells, booms, maxChain, shots, flops, wins, oneShots, bestScore, inflated, pops, pw[4];
-  uint8_t stars[MX_NUM_LEVELS];     /* best stars per level, 0 = not beaten */
+  uint8_t stars[MX_TOTAL_LEVELS];     /* best stars per level, 0 = not beaten */
   int unlock_all;                   /* cheat, session only: every level open (never saved) */
   uint32_t ach;                     /* bit i = achievement i unlocked */
-  uint32_t best[MX_NUM_LEVELS];     /* best score per level, 0 = not played; updated by mx_meta_win (the front-ends no longer keep their own) */
+  uint32_t best[MX_TOTAL_LEVELS];     /* best score per level, 0 = not played; updated by mx_meta_win (the front-ends no longer keep their own) */
   /* per-level, reset by mx_meta_level_start */
   int lv_booms, lv_shots;
   int seen_st_inflated, seen_st_pops, seen_pw[4];   /* last values read from the world */
@@ -70,7 +70,10 @@ int mx_tool_power(int tool);                             /* the PW_* a start too
    20 levels = 176 bytes (175 for a version 1 blob).  Not saved: unlock_all and the per-level transients (lv_*, seen_*).  A save with fewer or more levels than this build
    still loads (missing levels read as 0, extra ones are dropped); any other layout change must bump the version byte. */
 #define MX_SAVE_VERSION 2
-#define MX_SAVE_MAX (66 + MX_NUM_LEVELS + 4 + 1 + 4 * MX_NUM_LEVELS + 1 + 4)
+#define MX_SAVE_MAX (76 + 5 * MX_TOTAL_LEVELS) /* nlev remains a u8; older shorter saves still load */
+#if MX_TOTAL_LEVELS > 255
+#error "Save format level count exceeds one byte"
+#endif
 uint32_t mx_crc32(const uint8_t *p, int n);
 /* returns the number of bytes written, or 0 if cap is too small */
 int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap);                                  /* = mx_meta_pack_opt with the default options */
