@@ -73,6 +73,14 @@ static inline MxToolFeedback mx_tool_feedback(const MxWorld *w){
   u.phase=d2>=R(3)?MX_SHOT_PULL:MX_SHOT_IDLE;
   return u;
 }
+/* The next button press must name the actual action, not always a dive.
+   Beans consume their one mid-air activation before normal dive is available. */
+static inline const char *mx_flight_action(const MxWorld *w){
+  const MxMan *m=&w->man;
+  if(w->state!=MX_PLAY||m->mode!=MAN_FLY)return "";
+  if(m->pwr==PW_BEANS&&!m->beaned)return "FART JET";
+  return m->dive?"":"BELLY FLOP";
+}
 static inline const char *mx_tool_status_label(int phase){
   switch(phase){
     case MX_SHOT_PULL:return "RELEASE TO LAUNCH";
