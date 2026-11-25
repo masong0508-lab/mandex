@@ -82,6 +82,11 @@ int main(void){
   MxChunk *b=body(1,R(20.8),R(20.5),1);
   a->vx=RI(8);step_chunks(&W,0);
   CHECK(!b->rest,"substantive chunk impact failed to wake settled debris");
+  CHECK(a->cells[0].wx!=a->x,"fixture must have a real penetration correction");
+  sync_chunk_poses(&W);
+  CHECK(a->cells[0].wx==a->x&&a->cells[0].wy==a->y&&
+        b->cells[0].wx==b->x&&b->cells[0].wy==b->y,
+        "final corrected rubble transforms and hitboxes must agree");
   scene();a=body(0,R(20.3),R(20.5),0);
   b=body(1,R(20.8),R(20.5),1);
   a->vx=RI(2);step_chunks(&W,0);
