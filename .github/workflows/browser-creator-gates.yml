@@ -55,6 +55,8 @@ jobs:
         run: node test/browser_rubble_draw_test.js
       - name: Shattered debris stops contacting during its solver step
         run: node test/browser_dead_rubble_test.js
+      - name: Exact static collision bounds and bounded aftershock selection
+        run: node test/browser_collapse_hotpath_test.js
 
   canvas:
     runs-on: ubuntu-latest
