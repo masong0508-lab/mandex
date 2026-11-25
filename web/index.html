@@ -6018,7 +6018,7 @@ function webSimSteps(elapsed){
   return steps;
 }
 let last=performance.now(),frameDt=.016,webLastDraw=-Infinity,webNextDraw=-Infinity,webDrawCap=0,webDrawState='',webDrawMode='',webDrawW=0,webDrawH=0;
-function webNextPaint(t,cap,next,force){const period=1000/cap;return force?t+period:Math.max(t-period*.5,next)+period}
+function webNextPaint(t,cap,next,force){const period=1000/cap;return force?t+period:Math.max(t-period,next)+period}
 document.addEventListener('visibilitychange',()=>{
   last=performance.now();webLastDraw=webNextDraw=-Infinity;webSimCarry=0;webPerfBad=webPerfGood=0;
 });
