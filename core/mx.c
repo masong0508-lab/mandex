@@ -1028,9 +1028,18 @@ static MX_HOT void resolve_static(MxWorld *w, MxChunk *ch, MxCell *a, real nx, r
 }
 
 static MX_HOT void step_chunks(MxWorld *w, real dt){
-  int any = 0;
-  for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active){ any = 1; break; }
-  if(!any) return;
+  /* A single falling slab still needs gravity, rotation and static-wall
+     contacts, but cannot collide with another rigid body. Do not populate
+     or query the spatial hash in that common early-collapse case. */
+  int bodies = 0;
+  for(int c = 0; c < MX_MAX_CHUNKS; c++)
+    if(w->chunks[c].active && ++bodies == 2) break;
+  if(!bodies) return;
+#ifdef MX_REFERENCE_CHUNK_HASH
+  const int pair_contacts = 1;  /* test-only A/B oracle */
+#else
+  const int pair_contacts = bodies > 1;
+#endif
   if(w->bh_hi >= w->bh_lo) memset(&w->bhead[w->bh_lo * (MX_COLS + 4)], 0xff, (size_t)(w->bh_hi - w->bh_lo + 1) * (MX_COLS + 4) * sizeof w->bhead[0]);
   int blo = MX_ROWS + 4, bhi = -1;
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
@@ -1050,7 +1059,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         a->wx = ch->x + rmul(ch->cs, a->lx) - rmul(ch->sn, a->ly);
         a->wy = ch->y + rmul(ch->sn, a->lx) + rmul(ch->cs, a->ly);
       }
-      if(!a->edge) continue;
+      if(!a->edge || !pair_contacts) continue;
       int gx = rfloor(a->wx) + 2, gy = rfloor(a->wy) + 2;
       if(gx < 0) gx = 0;
       if(gx > MX_COLS + 3) gx = MX_COLS + 3;
@@ -1094,7 +1103,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         if(pen > RI(4)) pen = RI(4);
         resolve_static(w, ch, a, nx, ny, pen, k, j);
       }
-      if(a->dead) continue;
+      if(a->dead || !pair_contacts) continue;
       /* chunk vs chunk: circle-circle through the spatial buckets */
       int bx0 = gx + 1, by0 = gy + 1;
       for(int by = by0; by <= by0 + 2 && !a->dead; by++) for(int bx = bx0; bx <= bx0 + 2 && !a->dead; bx++){
@@ -1106,7 +1115,12 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
           if(oc < c && !och->rest) continue;     /* moving pairs are tested once (from the lower index); a sleeper is tested from whichever moving body reaches it */
           MxCell *o = &och->cells[id % MX_CHUNK_CELLS];
           if(o->dead) continue;
-          real dx = a->wx - o->wx, dy = a->wy - o->wy, d2 = rmul(dx, dx) + rmul(dy, dy);
+          real dx = a->wx - o->wx, dy = a->wy - o->wy;
+          /* Clamped edge buckets can contain very distant off-map debris.
+             Reject impossible contacts before fixed-point squaring, which
+             could otherwise wrap and produce phantom collisions. */
+          if(dx <= -RI(1) || dx >= RI(1) || dy <= -RI(1) || dy >= RI(1)) continue;
+          real d2 = rmul(dx, dx) + rmul(dy, dy);
           if(d2 >= RI(1) || d2 < R(0.0005)) continue;
           real d = rsqrt(d2), nx = rdiv(dx, d), ny = rdiv(dy, d), pen = RI(1) - d;
           real rax = a->wx - ch->x, ray = a->wy - ch->y, rbx = o->wx - och->x, rby = o->wy - och->y;
