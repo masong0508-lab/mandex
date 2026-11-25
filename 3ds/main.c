@@ -1601,7 +1601,7 @@ int main(void){
         }
       } else if(m->mode == MAN_AIM){
         /* The dedicated bottom toolbar is separate from the aiming view. */
-        int tool_hit=(down&KEY_TOUCH)&&t.py>=216 ? (t.px>=265?5:t.px/53) : -1;
+        int tool_hit=(down&KEY_TOUCH)&&t.py>=216 ? (t.px>=270?6:t.px/45) : -1;
         if(tool_hit>=0){
           if(tool_hit==0){
             if(mx_valve_unlocked(&stats)){
@@ -1772,9 +1772,9 @@ int main(void){
         rect(&bot,45,185,power*106/100,7,
              power>84?RGB(255,92,92):
              power>49?RGB(255,210,63):RGB(125,255,90));
-        static const char *const names[6]={"AIR","BEANS","TOWEL","SPLAT","TURBO","QUAKE"};
-        for(int k=0;k<6;k++){
-          int x=k*53,w=k==5?55:53;
+        static const char *const names[7]={"AIR","BEANS","TOWEL","SPLAT","TURBO","QUAKE","BREAK"};
+        for(int k=0;k<7;k++){
+          int x=k*45,w=k==6?50:45;
           int available=k==0?mx_valve_unlocked(&stats):world.pw_left[k]>0;
           int selected=k==0?world.valve_ok:world.pw_sel==k;
           rect(&bot,x+1,216,w-2,24,selected?RGB(255,210,63):RGB(22,29,51));
