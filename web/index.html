@@ -49,11 +49,13 @@ let combo=0,comboPeak=0,comboLeft=0,bankLeft=0;  // streak and optional rubber b
 //  AUDIO (tiny synth)
 // =====================================================================
 let AC=null,master=null,muted=false;const lastSnd={};
+let contractAudio=null,contractAudioKey='',contractAudioState='idle';
+const CONTRACT_TRACKS=['permit-panic','concrete-shuffle','final-notice-funk'];
 function optVol(){const v=OPT().vol;return v==null?1:v}   // OPTIONS: master volume 0..1
-function applyVol(){if(master)master.gain.value=.55*optVol()}
-function setMuted(b){muted=!!b;OPT().muted=muted;pdTouch();pdSave()}
+function applyVol(){if(master)master.gain.value=.55*optVol();if(contractAudio)contractAudio.volume=contractVolume()}
+function setMuted(b){muted=!!b;OPT().muted=muted;if(muted)stopContractAudio();pdTouch();pdSave()}
 const shakeScale=()=>{const v=OPT().shake;return v==null?1:v};   // OPTIONS: screen shake 0 / .5 / 1
-function audioInit(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.55*optVol();master.connect(AC.destination);setTimeout(crackLoad,0)}catch(e){AC=null}}
+function audioInit(){if(AC){if(AC.state==='suspended')AC.resume().catch(()=>{});return}try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.55*optVol();master.connect(AC.destination);setTimeout(crackLoad,0)}catch(e){AC=null}}
 function can(k,ms){const n=performance.now();if(lastSnd[k]&&n-lastSnd[k]<ms)return false;lastSnd[k]=n;return true}
 // ---- music: the same 8-bar theme as the consoles (A minor, melody + bass, plucked decay), scheduled ahead on the WebAudio clock
 const MUS_T=[12,-1,15,-1,19,-1,17,15, 17,-1,15,-1,12,-1,-1,-1, 15,-1,19,-1,22,-1,19,15, 17,-1,14,-1,10,-1,-1,-1, 12,-1,15,-1,19,-1,20,19, 17,-1,20,-1,24,-1,20,17, 22,-1,19,-1,17,-1,14,-1, 12,-1,15,-1,12,-1,-1,-1];
@@ -66,9 +68,53 @@ function musPump(){if(!musOn||!AC)return;if(document.hidden||musNext<AC.currentT
     if(n>=0){let k=1;while(musStep+k<64&&MUS_T[musStep+k]<0)k++;musNote(220*Math.pow(2,n/12),musNext,k*MUS_STEP,.2)}
     if((musStep&3)===0)musNote(MUS_B[musStep>>3][(musStep>>2)&1],musNext,4*MUS_STEP,.17);
     musNext+=MUS_STEP;musStep=(musStep+1)%64}}
-function musUpdate(){const want=!!AC&&!muted&&state==='play';
-  if(want&&!musOn){musOn=true;musStep=0;musNext=AC.currentTime+.1;musTimer=setInterval(musPump,80);musPump()}
-  else if(!want&&musOn){musOn=false;clearInterval(musTimer)}}
+// Optional authored soundtrack: one lazily streamed HTML media element.
+ // Missing files, disabled recording, blocked autoplay, or standalone HTML
+ // automatically use the original low-memory oscillator score instead.
+function contractVolume(){return Math.max(0,Math.min(1,.70*optVol()))}
+function contractTrack(l){
+  if(l<60||l>=76)return '';
+  return CONTRACT_TRACKS[l<66?0:l<72?1:2];
+}
+function disposeContractAudio(a){
+  if(!a)return;
+  try{a.pause();a.removeAttribute('src');a.load()}catch(_){}
+}
+function stopContractAudio(){
+  const a=contractAudio;contractAudio=null;contractAudioKey='';contractAudioState='idle';
+  disposeContractAudio(a);
+}
+function syncContractMusic(want){
+  const key=want&&typeof Audio==='function'&&OPT().contractMusic!==false?contractTrack(level):'';
+  if(!key){if(contractAudioKey)stopContractAudio();return false}
+  if(key!==contractAudioKey){
+    stopContractAudio();contractAudioKey=key;contractAudioState='loading';
+    let a;
+    function fail(){
+      if(contractAudio!==a||contractAudioKey!==key)return;
+      contractAudio=null;contractAudioState='fallback';disposeContractAudio(a);
+    }
+    try{
+      a=new Audio();contractAudio=a;
+      a.preload='none';a.loop=true;a.volume=contractVolume();
+      a.addEventListener('error',fail,{once:true});
+      a.src='audio/'+key+'.wav';
+      const started=a.play();
+      if(started&&typeof started.then==='function')started.then(()=>{
+        if(contractAudio===a&&contractAudioKey===key)contractAudioState='playing';
+      },fail);
+      else contractAudioState='playing';
+    }catch(e){if(a)fail();else contractAudioState='fallback'}
+  }
+  return contractAudioState==='playing';
+}
+function musUpdate(){
+  const want=!!AC&&!muted&&!document.hidden&&state==='play';
+  const synth=want&&!syncContractMusic(want);
+  if(!want)syncContractMusic(false);
+  if(synth&&!musOn){musOn=true;musStep=0;musNext=AC.currentTime+.1;musTimer=setInterval(musPump,80);musPump()}
+  else if(!synth&&musOn){musOn=false;clearInterval(musTimer)}
+}
 function noise(dur,f0,f1,g,type){if(!AC||muted)return;const n=(AC.sampleRate*dur)|0,b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);
   for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);const s=AC.createBufferSource();s.buffer=b;const f=AC.createBiquadFilter();f.type=type||'lowpass';
   f.frequency.setValueAtTime(f0,AC.currentTime);f.frequency.exponentialRampToValueAtTime(Math.max(30,f1),AC.currentTime+dur);
@@ -4551,7 +4597,7 @@ const UISTATES=['menu','select','ach','outfit','options','ending'];
 let selTab=0,contractReview=-1,contractPlan=null;
 function goMenu(){state='menu';hits=[]}
 function goSelect(){state='select';hits=[];contractReview=-1;contractPlan=null}
-function startStory(i){contractReview=-1;contractPlan=null;testing=false;selTab=i>=CH3_END?4:i>=CH2?3:i>=CH1?2:0;if(i===0){startCut();return}if(i===CH2){startCut3();return}load(i)}
+function startStory(i){contractReview=-1;contractPlan=null;testing=false;selTab=i>=CH3_END?4:i>=CH2?3:i>=CH1?2:0;if(i===0){startCut();return}if(i===CH2){startCut3();return}load(i);if(i>=CH3_END)musUpdate()}
 // ---------- OPENING CUTSCENE: the origin of MANDEX (plays before story level 1; tap = next, SKIP or Esc = straight to the level) ----------
 let cutI=0,cutT=0,cutFx=0;
 let CUTS=null,cutDone=()=>load(0);
@@ -5658,6 +5704,7 @@ function drawSettings(){
     add('MASTER SOUND',muted?'OFF':'ON','Music, voices and impact effects.',()=>{audioInit();setMuted(!muted)},!muted);
     add('VOLUME UP',v+'%','Increase master volume by 10%.',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol()});
     add('VOLUME DOWN',v+'%','Decrease master volume by 10%.',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol()});
+    add('CONTRACT MUSIC',o.contractMusic===false?'SYNTH':'ORIGINAL','Stream music if the optional audio pack is present.',()=>{o.contractMusic=o.contractMusic===false;},o.contractMusic!==false);
   }else{
     const reset=now<armReset,erase=now<armProg;
     add('RESET SETTINGS',reset?'CONFIRM':'DEFAULT','Restore settings; keep progress and levels.',()=>{if(reset){optsReset();armReset=0;toast('ach','Options reset','')}else{armReset=performance.now()+3000;armProg=0}},reset);
@@ -5816,7 +5863,7 @@ function drawMenu(){
 let sliderDrag=false,sliX=0,sliW=1,armReset=0,armProg=0;
 function setVolFromX(x){const o=OPT();o.vol=clamp(Math.round((x-sliX)/sliW*20)/20,0,1);applyVol();pdTouch()}
 const GUIDES=['OFF','SHORT','FULL'],SHAKES=[['OFF',0],['LOW',.5],['FULL',1]];
-function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX','performance','renderCap','renderScale','showPerf','lighting'])delete o[k];o.tool='none';muted=false;webEcoFX=false;frameMeterVisible=false;webPerfBad=webPerfGood=0;applyVol();pdTouch();pdSave()}
+function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX','performance','renderCap','renderScale','showPerf','lighting','contractMusic'])delete o[k];o.tool='none';muted=false;webEcoFX=false;frameMeterVisible=false;webPerfBad=webPerfGood=0;applyVol();pdTouch();pdSave()}
 function progReset(){PD.stars={};PD.best={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
 function drawOptions(){drawSettings()}
 function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
@@ -6275,6 +6322,7 @@ let last=performance.now(),frameDt=.016,webLastDraw=-Infinity,webNextDraw=-Infin
 function webNextPaint(t,cap,next,force){const period=1000/cap;return force?t+period:Math.max(t-period,next)+period}
 document.addEventListener('visibilitychange',()=>{
   last=performance.now();webLastDraw=webNextDraw=-Infinity;webSimCarry=0;webPerfBad=webPerfGood=0;
+  if(document.hidden)musUpdate();
 });
 function loop(t){
   const raw=Math.min(.5,Math.max(0,(t-last)/1000));

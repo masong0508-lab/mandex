@@ -134,13 +134,17 @@ jobs:
       - name: Zip all console builds and standalone browser game
         run: |
           cp web/index.html pack/mandex.html
+          cp -R web/audio pack/audio
           cd pack && ls -la && ls -la 3ds
-          printf 'MANDEX ALL-PORT BUILDS (commit %s, hardware FPS not verified)\n\nPLAYABLE FILES:\n  mandex.nds             Nintendo DS: DraStic / melonDS / DeSmuME / flashcart\n  mandex_nosound.nds     Nintendo DS: same game with sound disabled\n  mandex.cdi             Dreamcast disc image: Flycast / redream\n  3ds/mandex.3dsx        Nintendo 3DS homebrew launcher (not a .3ds cartridge ROM)\n  mandex.html            Browser: open directly as a local standalone web page\n\nDEVELOPER / DIAGNOSTIC FILES:\n  mandex.elf             Dreamcast developer loader\n  3ds/mandex.elf         3DS developer binary\n  stage0_red_crt.nds     Early-boot diagnostic ROM\n  stage1_red.nds         Early-boot diagnostic ROM\n  stage2_green.nds       Early-boot diagnostic ROM\n  stage4_yellow.nds      Early-boot diagnostic ROM\n\nConsole binaries are automated builds, not guaranteed hardware-validated.\n' "${{ github.sha }}" > README.txt
-          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound.nds stage0_red_crt.nds stage1_red.nds stage2_green.nds stage4_yellow.nds mandex.cdi mandex.elf 3ds/mandex.3dsx 3ds/mandex.elf mandex.html README.txt
+          printf 'MANDEX ALL-PORT BUILDS (commit %s, hardware FPS not verified)\n\nPLAYABLE FILES:\n  mandex.nds             Nintendo DS: DraStic / melonDS / DeSmuME / flashcart\n  mandex_nosound.nds     Nintendo DS: same game with sound disabled\n  mandex.cdi             Dreamcast disc image: Flycast / redream\n  3ds/mandex.3dsx        Nintendo 3DS homebrew launcher (not a .3ds cartridge ROM)\n  mandex.html            Browser: open directly as a local standalone web page\n  audio/                 Optional original Contract soundtrack (keep beside HTML)\n\nDEVELOPER / DIAGNOSTIC FILES:\n  mandex.elf             Dreamcast developer loader\n  3ds/mandex.elf         3DS developer binary\n  stage0_red_crt.nds     Early-boot diagnostic ROM\n  stage1_red.nds         Early-boot diagnostic ROM\n  stage2_green.nds       Early-boot diagnostic ROM\n  stage4_yellow.nds      Early-boot diagnostic ROM\n\nConsole binaries are automated builds, not guaranteed hardware-validated.\n' "${{ github.sha }}" > README.txt
+          zip -9 -r ../mandex-roms.zip mandex.nds mandex_nosound.nds stage0_red_crt.nds stage1_red.nds stage2_green.nds stage4_yellow.nds mandex.cdi mandex.elf 3ds/mandex.3dsx 3ds/mandex.elf mandex.html README.txt audio/
+          zip -9 -r ../mandex-web-full.zip mandex.html audio/ README.txt
       - uses: actions/upload-artifact@v4
         with: { name: mandex-roms, path: mandex-roms.zip }
       - uses: actions/upload-artifact@v4
         with: { name: mandex-web, path: pack/mandex.html }
+      - uses: actions/upload-artifact@v4
+        with: { name: mandex-web-full, path: mandex-web-full.zip }
 
   n3ds:
     runs-on: ubuntu-latest

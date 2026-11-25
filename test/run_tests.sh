@@ -114,7 +114,10 @@ for mode in float fixed; do
   gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core contract_campaign_test.c -lm -o contract_campaign_$mode
   ./contract_campaign_$mode
 done
-if command -v node >/dev/null 2>&1;then node browser_contract_campaign_test.js;fi
+if command -v node >/dev/null 2>&1;then
+  node browser_contract_campaign_test.js
+  node browser_contract_music_test.js
+fi
 echo "--- Stage guidance: all console levels and 40 browser early-stage tactics ---"
 for mode in float fixed;do
   flags=''

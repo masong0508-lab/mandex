@@ -59,6 +59,8 @@ jobs:
         run: node test/browser_collapse_hotpath_test.js
       - name: Contract campaign geometry, metadata, and roster
         run: node test/browser_contract_campaign_test.js
+      - name: Original soundtrack files and lazy browser fallback
+        run: node test/browser_contract_music_test.js
 
   canvas:
     runs-on: ubuntu-latest
