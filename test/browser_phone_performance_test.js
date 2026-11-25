@@ -9,7 +9,7 @@ const fixed=section('const WEB_SIM_DT=','let last=performance.now()');
 const controls=section('function P(o){','function sweat(');
 const f=new Function(perf+scheduler+fixed+controls+`
   let parts=[];
-  return {webProfile,webEffectiveTier,webRenderScale,webRenderCap,webFxBudget,webPerfSample,cycleWebProfile,cycleWebCap,cycleWebScale,cycleWebFX,
+  return {webProfile,webEffectiveTier,webRenderScale,webRenderCap,webFxBudget,webLightingDetail,cycleWebLighting,webPerfSample,cycleWebProfile,cycleWebCap,cycleWebScale,cycleWebFX,
     next:webNextPaint,tick:webSimSteps,resetSim:()=>{webSimCarry=0},
     tier:()=>webPerfTier,partCap:n=>{webFxCap=n;parts=[]},parts:()=>parts,particle:P};
 `)(),o={};
@@ -18,6 +18,7 @@ for(let i=0;i<20;i++)f.webPerfSample(o,.05,32,true);
 assert(f.tier()===1,'sustained overload reduces tier');
 for(let i=0;i<20;i++)f.webPerfSample(o,.05,32,true);
 assert(f.tier()===2&&f.webRenderScale(o)===.6&&f.webRenderCap(o)===30&&f.webFxBudget(o)===220,'second tier');
+assert(!f.webLightingDetail(o),'low tier uses lite lighting');o.lighting='full';assert(f.webLightingDetail(o),'full lighting override');delete o.lighting;
 for(let i=0;i<350;i++)f.webPerfSample(o,.016,5,true);
 assert(f.tier()===2,'brief recovery does not raise quality');
 for(let i=0;i<40;i++)f.webPerfSample(o,.016,5,true);
@@ -94,8 +95,8 @@ const screens=new Function('assert',perf+settings+`
   }
   WEB_UI.page.options=1;hits=[];drawSettings();hits[5].fn();
   assert(o.performance==='quality'&&saved>0,'profile persists');
-  hits=[];drawSettings();hits[6].fn();hits[7].fn();hits[8].fn();hits[10].fn();
-  assert(o.renderCap===30&&o.renderScale===1&&o.ecoFX===true&&o.showPerf===true,'manual settings wired');
+  hits=[];drawSettings();hits[6].fn();hits[7].fn();hits[8].fn();hits[10].fn();hits[11].fn();
+  assert(o.renderCap===30&&o.renderScale===1&&o.ecoFX===true&&o.showPerf===true&&o.lighting==='full','manual settings wired');
   WEB_UI.page.options=3;hits=[];drawSettings();hits[5].fn();
   assert(resetCount===0&&eraseCount===0,'reset requires confirmation');
   hits=[];drawSettings();hits[5].fn();assert(resetCount===1&&eraseCount===0,'confirmed settings reset');
