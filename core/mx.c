@@ -1083,7 +1083,18 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
       int gx = rfloor(a->wx), gy = rfloor(a->wy);
       /* Cleanup follows all substeps. Keep the fatal contact's response,
        * but stop this cell's scan as soon as that response shatters it. */
-      for(int j = gy - 1; j <= gy + 1 && !a->dead; j++) for(int k = gx - 1; k <= gx + 1 && !a->dead; k++){
+      /* A radius-half-cell circle cannot reach both adjacent tiles on
+         one axis. Exclude exact tangencies (the narrow phase rejects
+         them) before reading static geometry. The contact order remains
+         top-to-bottom, left-to-right in float and DS fixed point. */
+#ifdef MX_REFERENCE_STATIC_CONTACTS
+      const int left=gx-1,right=gx+1,top=gy-1,bottom=gy+1;
+#else
+      const real fx=a->wx-RI(gx),fy=a->wy-RI(gy);
+      const int left=gx-(fx<RC),right=gx+(RI(1)-fx<RC);
+      const int top=gy-(fy<RC),bottom=gy+(RI(1)-fy<RC);
+#endif
+      for(int j = top; j <= bottom && !a->dead; j++) for(int k = left; k <= right && !a->dead; k++){
         if(!solid_cell(w, k, j)) continue;
         real qx = rclamp(a->wx, RI(k), RI(k + 1)), qy = rclamp(a->wy, RI(j), RI(j + 1));
         real dx = a->wx - qx, dy = a->wy - qy, d2 = rmul(dx, dx) + rmul(dy, dy);
