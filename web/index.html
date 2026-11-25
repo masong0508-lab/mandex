@@ -721,8 +721,39 @@ function objectiveLabel(o){
    reducing ONLY decorative particle overdraw.  Extra particle objects are
    created transiently but not retained, so random-number consumption and
    gameplay difficulty remain independent of this graphics-only setting. */
-let webEcoFX=false;
-function fxLimit(){return webEcoFX?360:1400}
+// Rendering preferences never change simulation rate or structural limits.
+// Existing ecoFX saves migrate naturally into the manual FX override.
+const WEB_PROFILES=['auto','quality','balanced','low'];
+const WEB_FRAME_CAPS=[0,30,60],WEB_SCALES=[0,1,.75,.6];
+let webEcoFX=false,webPerfTier=0,webPerfBad=0,webPerfGood=0;
+function webProfile(o){return WEB_PROFILES.includes(o.performance)?o.performance:'auto'}
+function webEffectiveTier(o){
+  const p=webProfile(o);return p==='quality'?0:p==='balanced'?1:p==='low'?2:webPerfTier;
+}
+function webRenderScale(o){const v=o.renderScale;return WEB_SCALES.includes(v)&&v>0?v:[1,.75,.6][webEffectiveTier(o)]}
+function webRenderCap(o){return o.renderCap===30||o.renderCap===60?o.renderCap:webEffectiveTier(o)>0?30:60}
+function webFxBudget(o){const t=webEffectiveTier(o);return o.ecoFX===false?1400:o.ecoFX===true?360:t===2?220:t===1?360:1400}
+function fxLimit(){return webFxBudget(OPT())}
+function webPerfSample(o,elapsed,cpu,playing){
+  if(webProfile(o)!=='auto'||!playing||!(elapsed>0)||elapsed>.25){
+    webPerfBad=webPerfGood=0;return false;
+  }
+  // Sustained CPU overload or delayed RAFs, with recovery hysteresis.
+  const bad=cpu>23||elapsed>.043,good=cpu<10&&elapsed<.025;
+  webPerfBad=bad?webPerfBad+elapsed:Math.max(0,webPerfBad-elapsed*.5);
+  webPerfGood=good?webPerfGood+elapsed:0;
+  if(webPerfBad>=.75&&webPerfTier<2){webPerfTier++;webPerfBad=webPerfGood=0;return true}
+  if(webPerfGood>=6&&webPerfTier>0){webPerfTier--;webPerfBad=webPerfGood=0;return true}
+  return false;
+}
+function cycleWebProfile(o){o.performance=WEB_PROFILES[(WEB_PROFILES.indexOf(webProfile(o))+1)%WEB_PROFILES.length];webPerfBad=webPerfGood=0}
+function cycleWebCap(o){o.renderCap=WEB_FRAME_CAPS[(WEB_FRAME_CAPS.indexOf(o.renderCap||0)+1)%WEB_FRAME_CAPS.length]}
+function cycleWebScale(o){o.renderScale=WEB_SCALES[(WEB_SCALES.indexOf(o.renderScale||0)+1)%WEB_SCALES.length]}
+function cycleWebFX(o){if(o.ecoFX===undefined)o.ecoFX=true;else if(o.ecoFX===true)o.ecoFX=false;else delete o.ecoFX;webEcoFX=o.ecoFX===true}
+function webFXLabel(o){return o.ecoFX===undefined?'AUTO':o.ecoFX?'ECO':'FULL'}
+function webProfileLabel(o){return webProfile(o).toUpperCase()}
+function webCapLabel(o){return o.renderCap===30||o.renderCap===60?o.renderCap+' FPS':'AUTO'}
+function webScaleLabel(o){return o.renderScale>0&&WEB_SCALES.includes(o.renderScale)?Math.round(o.renderScale*100)+'%':'AUTO'}
 function chip(x,y,col,vx,vy){if(parts.length>fxLimit())return;P({k:0,x,y,vx,vy,l:1+rnd()*1.2,l0:2,c:col,s:2+rnd()*2})}
 function dust(x,y,n,sz){for(let i=0;i<n&&parts.length<fxLimit();i++)P({k:1,x:x+(rnd()-.5)*V,y:y+(rnd()-.5)*V,vx:(rnd()-.5)*60,vy:-rnd()*45-8,l:.7+rnd()*.8,l0:1.5,s:sz*(.6+rnd()*.8)})}
 function spark(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd()*6.28,s=rnd()*sp;P({k:2,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,l:.25+rnd()*.35,l0:.5})}}
@@ -3718,7 +3749,11 @@ function layoutTick(){
     for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
     CAM.reset=true;CAM.snap=true;hits=[];
   }
-  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
+  const scale=typeof webRenderScale==='function'&&typeof OPT==='function'?webRenderScale(OPT()):1;
+  const bw=Math.max(1,Math.round(w*scale)),bh=Math.max(1,Math.round(h*scale));
+  if(w!==W||h!==H){W=w;H=h;CAM.snap=true;}
+  // Keep logical coordinates for camera, UI and pointer conversion.
+  if(cv.width!==bw||cv.height!==bh){cv.width=bw;cv.height=bh;_vig=null;}
   if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed){
     WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
     const rect=document.body.getBoundingClientRect(),
@@ -3770,17 +3805,18 @@ function camTick(dt){
   // behind the mission HUD or the feet behind the timer/control strip.
   if(walking)CAM.y=clamp(CAM.y,m.y-(H-174-22*z)/z,m.y-(138+40*z)/z);
 }
+function webScreenTransform(){ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0)}
 const toWorld=(sx,sy)=>CAM.on?[sx/CAM.z+CAM.x,sy/CAM.z+CAM.y]:[sx,sy];
 const toScreen=(x,y)=>CAM.on?[(x-CAM.x)*CAM.z,(y-CAM.y)*CAM.z]:[x,y];
 let AIM0={sx:0,sy:0,wx:0,wy:0};
 
 // the last pass over the picture: a warm key light from the sun's corner, cooler shadows, a soft vignette and a hint of bloom, so the flat flash-game colours sit together
 let _vig=null;
-function grade(){ctx.save();ctx.setTransform(1,0,0,1,0,0);
-  if(!_vig||_vig.w!==W||_vig.h!==H){const c=mkCanvas(W,H),x=c.getContext('2d');let g=x.createRadialGradient(W*.5,H*.46,H*.35,W*.5,H*.5,H*.98);g.addColorStop(0,'rgba(20,30,70,0)');g.addColorStop(1,'rgba(15,20,55,.42)');x.fillStyle=g;x.fillRect(0,0,W,H);
+function grade(){ctx.save();webScreenTransform();
+  if(!_vig||_vig.width!==cv.width||_vig.height!==cv.height){const c=mkCanvas(cv.width,cv.height),x=c.getContext('2d');x.scale(cv.width/W,cv.height/H);let g=x.createRadialGradient(W*.5,H*.46,H*.35,W*.5,H*.5,H*.98);g.addColorStop(0,'rgba(20,30,70,0)');g.addColorStop(1,'rgba(15,20,55,.42)');x.fillStyle=g;x.fillRect(0,0,W,H);
     g=x.createLinearGradient(W,0,0,H*.9);g.addColorStop(0,'rgba(255,214,150,.34)');g.addColorStop(.5,'rgba(255,214,150,0)');x.globalCompositeOperation='soft-light';x.fillStyle=g;x.fillRect(0,0,W,H);
     g=x.createLinearGradient(0,H*.55,0,H);g.addColorStop(0,'rgba(60,70,140,0)');g.addColorStop(1,'rgba(60,70,140,.35)');x.fillStyle=g;x.fillRect(0,0,W,H);_vig=c;_vig.w=W;_vig.h=H}
-  ctx.drawImage(_vig,0,0);ctx.restore()}
+  ctx.drawImage(_vig,0,0,W,H);ctx.restore()}
 // Interior silhouettes and glazing are attached to the actual wallpaper
 // cells, not to the camera. The voxel pass still occludes these details and
 // collapses remove them with their supporting room paper. No image assets.
@@ -3820,7 +3856,7 @@ function drawRoomDetails(xlo,xhi,ylo,yhi){
 }
 function draw(){
   hits=[];
-  ctx.setTransform(1,0,0,1,0,0);const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
+  webScreenTransform();const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
   if(camOn){ctx.fillStyle='#3d8fe8';ctx.fillRect(0,0,W,H);ctx.save();ctx.scale(CAM.z,CAM.z);ctx.translate(-CAM.x,-CAM.y)}
   if(camOn&&CAM.y<0){ctx.drawImage(bgA,0,0,WW,GY,0,CAM.y,WW,GY-CAM.y);ctx.drawImage(bgA,0,GY,WW,WH-GY,0,GY,WW,WH-GY)}else ctx.drawImage(bgA,0,0);
   if(camOn){const dh=Math.max(0,(CAM.y+H/CAM.z)-WH);if(dh>0){const g=ctx.createLinearGradient(0,WH,0,WH+dh);g.addColorStop(0,'#4d311d');g.addColorStop(1,'#2a1a10');ctx.fillStyle=g;ctx.fillRect(CAM.x-2,WH-1,W/CAM.z+4,dh+2)}}   // portrait: the earth continues below the ground line   // sky stretches up so the sun is never cut off
@@ -4035,7 +4071,7 @@ function drawEnd(){
   else{btn(cx-125,by,120,bh,'RETRY',retry,{size:16,on:true});btn(cx+5,by,120,bh,testing?'EDITOR':'LEVELS',backFromPlay,{size:16})}}
 // the WHOLE title picture (the full backdrop, no text but the logo) for the consoles: tools/gen_title.py draws it into a w x h canvas and the small screens pan across it; words = bake the logo in (the Dreamcast has no font)
 function drawTitlePicture(w,h,t,words){
-  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);const k=h/WH;ctx.save();ctx.scale(k,k);
+  webScreenTransform();ctx.clearRect(0,0,w,h);const k=h/WH;ctx.save();ctx.scale(k,k);
   ctx.drawImage(bgA,0,0);for(const c of clouds)drawCloud(c);ctx.drawImage(bgB,0,0);ctx.fillStyle='rgba(10,14,30,.35)';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate(700,GY-4);ctx.scale(2.2,2.2);drawSlamScene(t);ctx.restore();
   if(words){ctx.save();ctx.translate(270,170);ctx.rotate(-.03);txt('MANDEX',0,0,96,'#ffd23f','center','#7a1a1a');ctx.restore()}
@@ -4195,6 +4231,8 @@ function pdTouch(){pdDirty=true}
 pdLoad();
 const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'none'});
 webEcoFX=!!OPT().ecoFX;             // load saved touch-friendly effects preference
+// A conservative starting hint; measured frame costs can override it.
+if(typeof navigator!=='undefined'&&navigator.deviceMemory>0&&navigator.deviceMemory<=2)webPerfTier=1;
 muted=!!OPT().muted;
 const ST=()=>PD.st;
 const totalStars=()=>{let n=0;for(const k in PD.stars)if(+k>=0&&+k<CH1)n+=PD.stars[k]||0;return n};
@@ -5882,7 +5920,7 @@ function drawBrushPanel(){
   btn(8,392,100,40,'ERASE',()=>{E.tool='erase'},{size:14,on:E.tool==='erase'});
   btn(116,392,100,40,'LANDLORD',()=>{E.tool='lord'},{size:13,on:E.tool==='lord',col:'#ff8a8a'})}
 function drawEditor(){
-  ctx.setTransform(1,0,0,1,0,0);
+  webScreenTransform();
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const m=E.g[idx(x,y)];if(m)ctx.drawImage(SPR[m][hsh(x,y)&3][0],x*V,y*V)}
   ctx.fillStyle='rgba(255,60,60,.14)';ctx.fillRect(0,0,EMIN*V,GY);ctx.strokeStyle='rgba(255,90,90,.7)';ctx.setLineDash([6,5]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(EMIN*V,0);ctx.lineTo(EMIN*V,GY);ctx.stroke();ctx.setLineDash([]);
   txt('SLING AREA',EMIN*V/2,34,14,'#ffb0b0','center');drawBrushPanel();
@@ -5936,15 +5974,15 @@ let frameMeterVisible=false,frameMeterClock=0,frameMeterDraws=0,frameMeterSims=0
 let frameMeterFps=0,frameMeterSps=0,frameMeterSpeed=0;
 addEventListener('keydown',e=>{
   if(e.code==='F3'&&!e.repeat){frameMeterVisible=!frameMeterVisible;e.preventDefault()}
-  if(e.code==='F4'&&!e.repeat){webEcoFX=!webEcoFX;OPT().ecoFX=webEcoFX;pdTouch();pdSave();e.preventDefault()}
+  if(e.code==='F4'&&!e.repeat){cycleWebFX(OPT());pdTouch();pdSave();e.preventDefault()}
 });
 function drawFrameMeter(){
-  ctx.save();ctx.setTransform(1,0,0,1,0,0);
+  ctx.save();webScreenTransform();
   ctx.fillStyle='rgba(8,12,27,.9)';ctx.fillRect(8,8,277,48);
   ctx.font='bold 13px monospace';ctx.textAlign='left';ctx.fillStyle='#ffdc81';
   ctx.fillText('RENDER '+frameMeterFps+' FPS   SIM '+frameMeterSps+' SPS',16,27);
   ctx.fillStyle='#eee';
-  ctx.fillText('GAME TIME '+frameMeterSpeed+'%  FX '+(webEcoFX?'ECO':'FULL')+' [F4]',16,46);
+  ctx.fillText('GAME TIME '+frameMeterSpeed+'%  FX '+webFXLabel(OPT())+' [F4]',16,46);
   ctx.restore();
 }
 /* Physics and game logic must not run once per monitor refresh: at 120/144 Hz
@@ -5960,12 +5998,17 @@ function webSimSteps(elapsed){
   webSimCarry=Math.max(0,webSimCarry-steps*WEB_SIM_DT);
   return steps;
 }
-let last=performance.now(),frameDt=.016;
+let last=performance.now(),frameDt=.016,webLastDraw=-Infinity,webNextDraw=-Infinity,webDrawCap=0,webDrawState='',webDrawMode='',webDrawW=0,webDrawH=0;
+function webNextPaint(t,cap,next,force){const period=1000/cap;return force?t+period:Math.max(t-period*.5,next)+period}
+document.addEventListener('visibilitychange',()=>{
+  last=performance.now();webLastDraw=webNextDraw=-Infinity;webSimCarry=0;webPerfBad=webPerfGood=0;
+});
 function loop(t){
   const raw=Math.min(.5,Math.max(0,(t-last)/1000));
-  last=t;frameDt=Math.min(.033,raw);
+  last=t;
+  if(document.hidden){webSimCarry=0;requestAnimationFrame(loop);return}
   const ticks=webSimSteps(raw);
-  let sim=0;
+  let sim=0,painted=false,started=performance.now();
   try{
     layoutTick();
     for(let i=0;i<ticks;i++){
@@ -5973,16 +6016,24 @@ function loop(t){
       update(WEB_SIM_DT);
       if(playing)sim++;
     }
-    camTick(Math.min(.067,raw));musUpdate();draw();
+    camTick(Math.min(.067,raw));musUpdate();
+    const mode=man&&man.mode||'',cap=webRenderCap(OPT());
+    const force=state!==webDrawState||mode!==webDrawMode||cv.width!==webDrawW||cv.height!==webDrawH||cap!==webDrawCap;
+    if(force||t+1>=webNextDraw){
+      frameDt=Math.min(.067,Math.max(0,(t-webLastDraw)/1000));
+      draw();if(frameMeterVisible)drawFrameMeter();painted=true;webLastDraw=t;
+      webNextDraw=webNextPaint(t,cap,webNextDraw,force);webDrawCap=cap;
+      webDrawState=state;webDrawMode=mode;webDrawW=cv.width;webDrawH=cv.height;
+    }
+    webPerfSample(OPT(),raw,performance.now()-started,state==='play');
   }catch(e){console.error(e)}
-  frameMeterClock+=raw;frameMeterDraws++;frameMeterSims+=sim;frameMeterGameTime+=sim*WEB_SIM_DT;
+  frameMeterClock+=raw;frameMeterDraws+=painted?1:0;frameMeterSims+=sim;frameMeterGameTime+=sim*WEB_SIM_DT;
   if(frameMeterClock>=2){
     frameMeterFps=Math.round(frameMeterDraws/frameMeterClock);
     frameMeterSps=Math.round(frameMeterSims/frameMeterClock);
     frameMeterSpeed=Math.round(100*frameMeterGameTime/frameMeterClock);
     frameMeterClock=0;frameMeterDraws=0;frameMeterSims=0;frameMeterGameTime=0;
   }
-  if(frameMeterVisible)drawFrameMeter();
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
