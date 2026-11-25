@@ -903,11 +903,18 @@ function jointBreakLimit(i,j,m,mj){
   if(hp[i]*2<=MAT[m].hp||hp[j]*2<=MAT[mj].hp)return lim*.85;
   return lim;
 }
+// One row-major occupied list replaces the second and third full-grid
+// sweeps. Rebuild on each substep so edited/destroyed cells cannot go stale.
+// The scratch resizes only on a world-width change, not during collapse.
+let WOB_OCCUPIED=new Uint16Array(0);
+const WOB_NEIGHBORS=[0,0,0,0];
 function wobStep(dt){
   for(let m=1;m<MAT.length;m++)FD[m]=Math.max(0,1-MAT[m].damp*dt);
-  const NB=[0,0,0,0];
+  if(WOB_OCCUPIED.length!==grid.length)WOB_OCCUPIED=new Uint16Array(grid.length);
+  const NB=WOB_NEIGHBORS,occupied=WOB_OCCUPIED;let count=0;
   for(let y=0;y<ROWS-1;y++){const lean=LEANK*(ROWS-1-y);
     for(let x=0;x<COLS;x++){const i=y*COLS+x,m=grid[i];if(!m)continue;
+      occupied[count++]=i;
       const bk=brk[i],Ki=MAT[m].K;let ax=0,ay=0;
       NB[0]=x+1<COLS?i+1:-1;NB[1]=x>0?i-1:-1;NB[2]=i+COLS;NB[3]=y>0?i-COLS:-1;
       for(let d=0;d<4;d++){const j=NB[d];if(j<0||((bk>>d)&1))continue;const mj=grid[j];if(!mj)continue;
@@ -917,10 +924,10 @@ function wobStep(dt){
       ovx[i]=clamp((ovx[i]+(ax*a+(lean-HOMEK)*ox[i])*dt)*f,-WOB_VMAX,WOB_VMAX);
       ovy[i]=clamp((ovy[i]+(ay*a-HOMEK*oy[i])*dt)*f,-WOB_VMAX,WOB_VMAX)}}
   let maxv=0,maxo=0;
-  for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS;x++){const i=y*COLS+x;if(!grid[i])continue;
+  for(let k=0;k<count;k++){const i=occupied[k];
     ox[i]=clamp(ox[i]+ovx[i]*dt,-WOB_OMAX,WOB_OMAX);oy[i]=clamp(oy[i]+ovy[i]*dt,-WOB_OMAX,WOB_OMAX);
     const sv=Math.abs(ovx[i])+Math.abs(ovy[i]),so=Math.abs(ox[i])+Math.abs(oy[i]);if(sv>maxv)maxv=sv;if(so>maxo)maxo=so}
-  for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS;x++){const i=y*COLS+x,m=grid[i];if(!m)continue;
+  for(let k=0;k<count;k++){const i=occupied[k],x=i%COLS,y=(i/COLS)|0,m=grid[i];
     for(let d=0;d<3;d+=2){const j=d===0?(x+1<COLS?i+1:-1):i+COLS;if(j<0||((brk[i]>>d)&1))continue;const mj=grid[j];if(!mj)continue;
       const s=Math.abs(ox[j]-ox[i])+Math.abs(oy[j]-oy[i]),lim=jointBreakLimit(i,j,m,mj);
       if(s>lim){brk[i]|=1<<d;brk[j]|=1<<(d^1);needSupport=true;if(crackEv<4){crackEv++;crackFx(x,y,m,d)}}}}
@@ -3796,8 +3803,14 @@ function draw(){
     x=x2}}
   drawRoomDetails(paperX0,paperX1,paperY0,paperY1);
   drawSling(true);drawValve();drawBurpStand();drawPwProp();
-  const cx0=Math.max(0,Math.floor(CAM.x/V)-2),cx1=Math.min(COLS,Math.ceil((CAM.x+W/CAM.z)/V)+2);   // only the columns on screen
-  for(let y=0;y<ROWS;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
+  // Restrict both axes at zoom. Allow the full wobble displacement and
+  // shake excursion so swaying tiles entering the viewport never vanish.
+  const voxelPad=(wobOn?WOB_OMAX+1:1)*V+paperShake;
+  const cx0=camOn?Math.max(0,Math.floor((CAM.x-voxelPad)/V)):0;
+  const cx1=camOn?Math.min(COLS,Math.ceil((CAM.x+W/CAM.z+voxelPad)/V)):COLS;
+  const cy0=camOn?Math.max(0,Math.floor((CAM.y-voxelPad)/V)):0;
+  const cy1=camOn?Math.min(ROWS,Math.ceil((CAM.y+H/CAM.z+voxelPad)/V)):ROWS;
+  for(let y=cy0;y<cy1;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
     if(wobOn){px=Math.round(px+ox[i]*V);py=Math.round(py+oy[i]*V)}   // swaying with the wobble
     ctx.drawImage(SPR[m][hsh(x,y)&3][r>.66?0:r>.33?1:2],px,py);
     if(brk[i]){ctx.fillStyle=m===GLASS?'rgba(255,255,255,.95)':'rgba(15,8,4,.8)';const b=brk[i];   // snapped joints show as cracks
