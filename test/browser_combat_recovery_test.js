@@ -9,7 +9,7 @@ function section(first,last){
   return source.slice(a,b);
 }
 const code=section('function solidAt(', 'function updCases(')+
-  section('function wBlocked(', '/* Match the console sprite turnaround:');
+  section('function wBlocked(', '/* Match the console sprite turnaround:')+section('function walkAnimTick(', 'function walkFootSample(');
 const setup=String.raw`
 const V=8,RC=4,WHW=7,WHH=19,WALK_T=45,G=900,WW=960,ROWS=60,COLS=120,RUBBER=7;
 const SX=128,SY=362,KEYS={},chunks=[],targets=[],cases=[],events=[];

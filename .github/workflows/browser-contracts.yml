@@ -1,15 +1,16 @@
 name: Demolition contract layouts
 on:
   push:
-    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
+    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/browser_animation_continuity_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
   pull_request:
-    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
+    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/browser_animation_continuity_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: node test/browser_contracts_test.js
+      - run: node test/browser_animation_continuity_test.js
       - name: Native layouts, migration and VMU recovery
         run: |
           set -eu
