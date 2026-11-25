@@ -5,14 +5,29 @@
 html,body{margin:0;background:#0d0d14;width:100%;height:100%;height:100dvh;overflow:hidden}
 body{display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
 canvas{display:block;max-width:100%;max-height:100%;touch-action:none;border-radius:10px;box-shadow:0 0 60px rgba(0,0,0,.7);cursor:crosshair;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+canvas.lowfx{box-shadow:none;border-radius:0}
+#settings[hidden]{display:none!important}
+#settings{position:fixed;inset:0;z-index:5;display:flex;justify-content:center;align-items:stretch;background:#0f1522;color:#f4f5f9;font:15px system-ui,-apple-system,sans-serif;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);box-sizing:border-box;touch-action:pan-y}
+.settings-panel{width:min(100%,760px);height:100%;display:flex;flex-direction:column;box-sizing:border-box;background:#141d2b;border-inline:1px solid #2a394b;min-height:0}
+.settings-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;gap:12px;border-bottom:1px solid #2e4056}.settings-head h1{font-size:22px;margin:0;letter-spacing:-.4px}.settings-head p{font-size:12px;color:#a6b7cc;margin:2px 0 0}
+#settings button,#settings select{font:600 14px system-ui,sans-serif;color:#f2f6fa;background:#273447;border:1px solid #46566b;border-radius:8px;padding:10px 12px;min-height:44px;box-sizing:border-box;touch-action:manipulation}
+#settings button.chosen{background:#284d39;color:#c9f5d7;border-color:#6fbf84}#settings button.danger{background:#482a32;color:#ffd0d2;border-color:#9b5259}#settings button:focus-visible,#settings select:focus-visible{outline:2px solid #ffd23f;outline-offset:2px}
+#settings-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:10px 12px;border-bottom:1px solid #2e4056}#settings-tabs button{font-size:12px;padding:8px 3px}
+#settings-content{overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;padding:12px 16px 22px;box-sizing:border-box;-webkit-overflow-scrolling:touch}#settings-content h2{font-size:17px;margin:14px 0 5px}#settings-content h2:first-child{margin-top:0}.sub{color:#b3c0d1;font-size:13px;line-height:1.4;margin:5px 0 12px}
+.preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.preset-grid button{text-align:left;display:block}.preset-grid button:first-child{grid-column:1/-1}.preset-grid small{display:block;font-size:12px;font-weight:400;color:#c2cfdd;margin-top:3px}
+.perf-readout{display:flex;flex-direction:column;gap:3px;background:#182b35;padding:10px 12px;margin:10px 0;color:#d4eae9;border-radius:8px;font-size:13px}.perf-readout span{font-size:12px;color:#a9c5c5}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #2a394a;padding:11px 0;min-height:45px}.setting-label{flex:1;min-width:0}.setting-label strong{display:block;font-size:14px}.setting-label small{display:block;font-size:12px;line-height:1.35;color:#adbed1;margin-top:3px}.setting-row select{max-width:43%;min-width:92px}.setting-row button{min-width:66px}.setting-row input{width:min(32%,180px);accent-color:#7dce91}.setting-row .value{font-size:12px;min-width:32px}#settings-content>button{display:block;width:100%;margin:10px 0}
+@media(min-width:650px){.preset-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.preset-grid button:first-child{grid-column:auto}.settings-head{padding:14px 22px}#settings-content{padding:16px 24px}}
 </style></head><body>
 <canvas id="c" width="960" height="540"></canvas>
+<div id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title"><div class="settings-panel"><header class="settings-head"><div><h1 id="settings-title">Options</h1><p>MANDEX · Performance and gameplay</p></div><button type="button" id="settings-close">Done</button></header><nav id="settings-tabs" aria-label="Settings sections"></nav><div id="settings-content"></div></div></div>
 <script>
 'use strict';
 // =====================================================================
 //  MANDEX  -  sticky dad-bod demolition.  Voxel world + rigid-body chunks
 // =====================================================================
-const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const cv=document.getElementById('c');let ctx=cv.getContext('2d',{alpha:false});
+let outputScale=1;
 const V=8,ROWS=60,GY=ROWS*V,G=900,K=1100,RC=V*.5;let COLS=120;   // COLS: 120 for every level except the wide finale (see setWorld)
 let W=960,H=540,WW=960;const WH=540;   // W,H = the screen (960x540, or a tall 540xN in portrait play); WW,WH = the world (WW = COLS*V: 960, or 2880 for the wide finale)
 let SX=128,SY=GY-118,VX=36,VY=SY+58;const PULL=92,VGRAB=40,VKEEP=44,VPULL=76;   // VX,VY: the air valve, tucked in the far lower-left corner: a full pull-back stops ~15px short of it
@@ -54,7 +69,7 @@ function applyVol(){if(master)master.gain.value=.55*optVol()}
 function setMuted(b){muted=!!b;OPT().muted=muted;pdTouch();pdSave()}
 const shakeScale=()=>{const v=OPT().shake;return v==null?1:v};   // OPTIONS: screen shake 0 / .5 / 1
 function audioInit(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.55*optVol();master.connect(AC.destination);setTimeout(crackLoad,0)}catch(e){AC=null}}
-function can(k,ms){const n=performance.now();if(lastSnd[k]&&n-lastSnd[k]<ms)return false;lastSnd[k]=n;return true}
+function can(k,ms){if(!perf.audio)ms=Math.max(ms,160);const n=performance.now();if(lastSnd[k]&&n-lastSnd[k]<ms)return false;lastSnd[k]=n;return true}
 // ---- music: the same 8-bar theme as the consoles (A minor, melody + bass, plucked decay), scheduled ahead on the WebAudio clock
 const MUS_T=[12,-1,15,-1,19,-1,17,15, 17,-1,15,-1,12,-1,-1,-1, 15,-1,19,-1,22,-1,19,15, 17,-1,14,-1,10,-1,-1,-1, 12,-1,15,-1,19,-1,20,19, 17,-1,20,-1,24,-1,20,17, 22,-1,19,-1,17,-1,14,-1, 12,-1,15,-1,12,-1,-1,-1];
 const MUS_B=[[110,165],[87,131],[131,196],[98,147],[110,165],[87,131],[98,147],[110,165]],MUS_STEP=.2;
@@ -66,7 +81,7 @@ function musPump(){if(!musOn||!AC)return;if(document.hidden||musNext<AC.currentT
     if(n>=0){let k=1;while(musStep+k<64&&MUS_T[musStep+k]<0)k++;musNote(220*Math.pow(2,n/12),musNext,k*MUS_STEP,.2)}
     if((musStep&3)===0)musNote(MUS_B[musStep>>3][(musStep>>2)&1],musNext,4*MUS_STEP,.17);
     musNext+=MUS_STEP;musStep=(musStep+1)%64}}
-function musUpdate(){const want=!!AC&&!muted&&state==='play';
+function musUpdate(){const want=!!AC&&!muted&&state==='play'&&!settingsOpen&&!document.hidden&&OPT().music!==false;
   if(want&&!musOn){musOn=true;musStep=0;musNext=AC.currentTime+.1;musTimer=setInterval(musPump,80);musPump()}
   else if(!want&&musOn){musOn=false;clearInterval(musTimer)}}
 function noise(dur,f0,f1,g,type){if(!AC||muted)return;const n=(AC.sampleRate*dur)|0,b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);
@@ -722,7 +737,38 @@ function objectiveLabel(o){
    created transiently but not retained, so random-number consumption and
    gameplay difficulty remain independent of this graphics-only setting. */
 let webEcoFX=false;
-function fxLimit(){return webEcoFX?360:1400}
+const PERF_LEVELS=[
+  {name:'Ultra low',fps:30,res:.55,fx:90,detail:0,shade:0,back:0,cache:1,audio:0},
+  {name:'Low',fps:30,res:.72,fx:180,detail:0,shade:0,back:1,cache:1,audio:1},
+  {name:'Balanced',fps:45,res:.85,fx:360,detail:1,shade:0,back:1,cache:1,audio:1},
+  {name:'High',fps:60,res:1,fx:1400,detail:2,shade:1,back:2,cache:0,audio:1}
+];
+let perfTier=1,perfAuto=true,perfSlow=0,perfFast=0,perfSampleT=0,perfWork=0,perfRaw=0,perfSamples=0;
+let perf=Object.assign({},PERF_LEVELS[1]);
+function perfDefault(){const touch=matchMedia('(pointer: coarse)').matches||navigator.maxTouchPoints>0;
+ return touch?(navigator.deviceMemory&&navigator.deviceMemory<=2?0:1):3;}
+function perfRead(){const o=OPT(),p=o.perf&&typeof o.perf==='object'?o.perf:{};
+ perfAuto=p.preset==null||p.preset==='auto';
+ const tier=Number.isInteger(p.preset)?clamp(p.preset,0,3):perfAuto?perfDefault():clamp(Number.isInteger(p.base)?p.base:perfDefault(),0,3);
+ perfTier=tier;perfSlow=perfFast=0;perfSampleT=perfWork=perfRaw=perfSamples=0;perfApply();}
+function perfApply(){const p=OPT().perf||{};perf=Object.assign({},PERF_LEVELS[perfTier]);
+ if(!perfAuto&&p.preset==='custom')for(const k of ['fps','res','fx','detail','shade','back','cache','audio']){
+  const vals={fps:[30,45,60],res:[.55,.72,.85,1],fx:[90,180,360,1400],detail:[0,1,2],shade:[0,1],back:[0,1,2],cache:[0,1],audio:[0,1]}[k];
+  if(vals.includes(p[k]))perf[k]=p[k];
+ }
+ webEcoFX=perf.fx<1400;cv.classList.toggle('lowfx',perfTier<3||perf.cache===1);}
+function perfObserve(raw,work){if(!perfAuto||state!=='play'||settingsOpen)return;
+ perfSampleT+=raw;perfRaw+=raw;perfWork+=work;perfSamples++;
+ if(perfSampleT<2)return;
+ const ms=perfWork/Math.max(1,perfSampleT*perf.fps),cadence=perfRaw/Math.max(1,perfSamples)*1000;
+ const slow=ms>1000/perf.fps*.86||cadence>45||frameMeterSpeed>0&&frameMeterSpeed<87;
+ perfSlow=slow?perfSlow+1:0;perfFast=!slow&&ms<1000/perf.fps*.4?perfFast+1:0;
+ if(perfSlow>=2&&perfTier>0){perfTier--;perfApply();perfSlow=perfFast=0;}
+ // Upgrade only after sustained headroom, never immediately after a collapse.
+ else if(perfFast>=8&&perfTier<perfDefault()){perfTier++;perfApply();perfSlow=perfFast=0;}
+ perfSampleT=perfWork=perfRaw=perfSamples=0;
+}
+function fxLimit(){return perf.fx}
 function chip(x,y,col,vx,vy){if(parts.length>fxLimit())return;P({k:0,x,y,vx,vy,l:1+rnd()*1.2,l0:2,c:col,s:2+rnd()*2})}
 function dust(x,y,n,sz){for(let i=0;i<n&&parts.length<fxLimit();i++)P({k:1,x:x+(rnd()-.5)*V,y:y+(rnd()-.5)*V,vx:(rnd()-.5)*60,vy:-rnd()*45-8,l:.7+rnd()*.8,l0:1.5,s:sz*(.6+rnd()*.8)})}
 function spark(x,y,n,sp){for(let i=0;i<n&&parts.length<fxLimit();i++){const a=rnd()*6.28,s=rnd()*sp;P({k:2,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,l:.25+rnd()*.35,l0:.5})}}
@@ -1025,9 +1071,9 @@ const CHUNK_HASH=new Map(),CHUNK_BUCKET_POOL=[];
 const CHUNK_BUCKET_CACHE_MAX=2048;
 function stepChunks(dt){
   if(!chunks.length)return;
-  const map=CHUNK_HASH;map.clear();let bucketCount=0;
+  const map=CHUNK_HASH;map.clear();let bucketCount=0;const pairWork=chunks.length>1;
   for(const ch of chunks){if(!ch.rest){ch.vy+=G*dt;ch.vx*=.9995;ch.w*=.998;ch.x+=ch.vx*dt;ch.y+=ch.vy*dt;ch.ang+=ch.w*dt;ch.cs=Math.cos(ch.ang);ch.sn=Math.sin(ch.ang)}ch.cx=ch.cy=0;ch.cn=0;
-    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
+    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}if(!pairWork)continue;const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
       b=bucketCount<CHUNK_BUCKET_CACHE_MAX?(CHUNK_BUCKET_POOL[bucketCount]||(CHUNK_BUCKET_POOL[bucketCount]=[])):[];
       bucketCount++;map.set(k,b)
     }b.push(a)}}
@@ -1045,7 +1091,7 @@ function stepChunks(dt){
         resolveStatic(ch,a,nx,ny,Math.min(pen,4),i,j)}
       // A fatal contact keeps its impulse, then the shattered cell stops
       // colliding immediately. Cleanup/mass updates still happen once later.
-      if(a.dead)continue;
+      if(a.dead||!pairWork)continue;
       for(let j=gy-1;j<=gy+1&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){const b=map.get((i+4)*1024+(j+4));if(!b)continue;
         for(const o of b){if(a.dead)break;if(o.dead)continue;const oc=o.ch;if(oc.id<=ch.id)continue;const dx=a.wx-o.wx,dy=a.wy-o.wy,d2=dx*dx+dy*dy;if(d2>=V*V||d2<1e-6)continue;
           const d=Math.sqrt(d2),nx=dx/d,ny=dy/d,pen=V-d,rax=a.wx-ch.x,ray=a.wy-ch.y,rbx=o.wx-oc.x,rby=o.wy-oc.y;
@@ -1885,7 +1931,7 @@ function update(dt){
     for(let i=0;i<8&&man.mode==='fly';i++)manStep(dt/8);
     if(man.mode==='fly'){const m=man;m.face=flightFaceFor(m.vx,m.face);
       m.ang+=(m.dive?0:(flightPitch(m.vx,m.vy)-m.ang)*.15);if(m.dive)m.spin+=dt*14;
-      m.gooT+=dt;if(m.gooT>.04){m.gooT=0;if(parts.length<1200)parts.push({k:3,x:m.x-m.vx*.01,y:m.y-m.vy*.01,vx:-m.vx*.05+(rnd()-.5)*40,vy:(rnd()-.5)*40,l:.7,l0:.7,s:2+rnd()*2})}
+      m.gooT+=dt;if(m.gooT>.04){m.gooT=0;if(parts.length<fxLimit())parts.push({k:3,x:m.x-m.vx*.01,y:m.y-m.vy*.01,vx:-m.vx*.05+(rnd()-.5)*40,vy:(rnd()-.5)*40,l:.7,l0:.7,s:2+rnd()*2})}
       m.stT+=dt;if(m.stT>.2){m.stT=0;const c=Math.cos(m.ang),sn=Math.sin(m.ang);   // stink trail
         P({k:6,x:m.x+(-30*c-8*sn),y:m.y+(-30*sn+8*c),vx:-m.vx*.04+(rnd()-.5)*20,vy:-12-rnd()*16,l:.9+rnd()*.4,l0:1.3,s:5+rnd()*3,c:'#a6d63c'})}
       if(m.x>WW+100||m.x<-100||m.gt>9)m.mode='done'}
@@ -1893,7 +1939,7 @@ function update(dt){
     const by=Math.floor((m.y+m.R+2)/V),gx=Math.floor(m.x/V);
     if(m.t<1.8&&m.y+m.R<GY-2&&!(inb(gx,by)&&grid[idx(gx,by)]))m.y+=16*dt;
     if(m.gooT>.35){m.gooT=0;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);for(let j=-2;j<=2;j++)for(let i=-2;i<=2;i++)damageCell(cx+i,cy+j,5);
-      if(parts.length<1200)parts.push({k:3,x:m.x+(rnd()-.5)*24,y:m.y+10,vx:0,vy:20,l:.9,l0:.9,s:3})}
+      if(parts.length<fxLimit())parts.push({k:3,x:m.x+(rnd()-.5)*24,y:m.y+10,vx:0,vy:20,l:.9,l0:.9,s:3})}
     for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<m.R+t.r+6)killTarget(t);
     m.a=m.t>2?Math.max(0,1-(m.t-2)/.6):1;if(m.t>2.6){goo(m.x,m.y,20,240);SFX.pop();m.mode='done'}}
   if(man.mode==='walk')walkStep(dt);
@@ -1981,7 +2027,7 @@ function blob(parts,o){o=o||{};const m=ctx.getTransform(),sc=Math.hypot(m.a,m.b)
   if(o.clip)ctx.clip(o.clip);
   if(ow>0)for(const q of parts){if(q.noout)continue;if(q.o)ctx.stroke(q.o);else{ctx.fill(q.p);ctx.stroke(q.p)}}
   for(const q of parts){ctx.fillStyle=q.fill||o.fill||SK;ctx.fill(q.p)}
-  if(o.sh!==0)blobShade(parts,m,sc,o);
+  if(o.sh!==0&&perf.shade)blobShade(parts,m,sc,o);
   ctx.restore()}
 // soft cloth: a curved ribbon (waistband, cuff) along y=yc(x) from xa to xb, half-height hw (thinner toward both ends), with a slight ripple; stitched stripes on top
 function ribbonPoly(xa,xb,yc,hw,n,fill,rip){if(THONG){hw=Math.max(.9,hw*.3);fill=TG}const T=[],B=[];for(let i=0;i<=n;i++){const x=xa+(xb-xa)*i/n,u=(x-(xa+xb)/2)/((xb-xa)/2),h=hw*(1-.22*u*u*u*u),r=(rip||0)*Math.sin(x*.85+1);T.push([x,yc(x)-h+r]);B.push([x,yc(x)+h+r*.7])}return pPoly(T.concat(B.reverse()),fill)}
@@ -3278,13 +3324,14 @@ const MAN_FRAMES={
 function P(o){if(parts.length<fxLimit())parts.push(o)}
 function sweat(x,y){P({k:7,g:1,x:x+(rnd()-.5)*10,y:y+(rnd()-.5)*4,vx:(rnd()-.5)*6,vy:0,l:1.1,l0:1.1,s:1.6+rnd()*.9,c:'#bfe8ff'})}   // a bead forms on the skin, swells, then trickles down
 function updParts(dt){
-  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0){parts.splice(i,1);continue}
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0)continue;
     if(p.k===1||p.k===6){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.98;p.vy*=.99;continue}
     if(p.k===5||(p.k===8&&p.sp))continue;
     if(p.k>=9){p.x+=p.vx*dt;p.y+=p.vy*dt;continue}
     p.vy+=(p.k===2?G*.4:p.g?G*.12:G)*dt;const ox=p.x,oy=p.y;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.k===4){p.vx*=.97;p.vy=Math.min(p.vy,90);p.r+=dt*6}
     if(p.y>GY-2){p.y=GY-2;p.vy*=-.3;p.vx*=.6;if(p.k===8&&!p.sp){p.sp=1;SFX.booger()}}
-    if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}}
+    if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}
+  let n=0;for(let i=0;i<parts.length;i++)if(parts[i].l>0)parts[n++]=parts[i];parts.length=n;}
 function updTexts(dt){for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=28*dt;if(t.t>t.l)texts.splice(i,1)}}
 let endT=0;
 function drawParts(){
@@ -3559,6 +3606,18 @@ function renderMan(){
     JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=bgrow(stom(m));drawSide(time,'scream');INF=0;JIG=null}
   ctx.restore()}
 const LORD_NEW=true;
+const LORD_SPRITES=new Map();
+function drawCachedLord(t,kind,pan,wind,sw){
+ const phase=t.mv?Math.floor(((t.wk||0)*2.2%(Math.PI*2)+Math.PI*2)%(Math.PI*2)*4/Math.PI):0;
+ const pose=[kind,phase,!!t.mv,pan,wind,sw,t.stun>0,t.blink<0].join('|');
+ let c=LORD_SPRITES.get(pose);if(!c){
+  c=mkCanvas(112,144);const old=ctx;ctx=c.getContext('2d');
+  try{ctx.translate(56,105);ctx.scale(-.54,.54);LWM=2.8;cgLordBig(phase*.3,{game:1,kind,mv:t.mv,wk:phase*Math.PI/4/2.2,pan,wind,swing:sw?.15:0,stun:t.stun>0,blink:t.blink<0?-1:1});}
+  finally{LWM=1;ctx=old;}
+  if(LORD_SPRITES.size>=96)LORD_SPRITES.delete(LORD_SPRITES.keys().next().value);LORD_SPRITES.set(pose,c);
+ }
+ ctx.drawImage(c,-28,15-52.5,56,72);
+}
 /* Offline-style caching: a single 56x56 halo replaces a radial gradient
    allocation for every live landlord on every render tick. */
 const LORD_GLOW=mkCanvas(56,56);
@@ -3569,7 +3628,8 @@ function drawLandlord(t){
   const kind=t.kind||'',pan=t.pan>0,wind=t.wind>0,sw=t.swing>0,hop=pan?-Math.abs(Math.sin(t.t*18))*3:0,bob=pan||t.mv?0:Math.sin(t.t*5)*.8,fc=t.face||1;
   const step=t.mv?Math.sin(t.wk*2.2)*(t.mv>1?3.4:2.4):0,lean=t.mv>1?.12*fc:0;
   ctx.save();ctx.translate(t.x,t.y+bob+hop);const SZ=kind==='boss'?1.38:1.14;ctx.scale(SZ*fc,SZ);if(lean)ctx.rotate(lean);
-  if(LORD_NEW){ctx.save();ctx.drawImage(LORD_GLOW,-28,-32);   // cached glow, no per-actor gradient allocation
+  if(LORD_NEW&&perf.cache){if(perf.detail)ctx.drawImage(LORD_GLOW,-28,-32);drawCachedLord(t,kind,pan,wind,sw);}
+  else if(LORD_NEW){ctx.save();ctx.drawImage(LORD_GLOW,-28,-32);   // cached glow, no per-actor gradient allocation
   ctx.translate(0,15);ctx.scale(-.27,.27);LWM=2.8;try{cgLordBig(t.t||0,{game:1,kind,mv:t.mv,wk:t.wk,pan,wind,swing:sw?Math.max(t.swing,.001):0,stun:t.stun>0,blink:t.blink})}finally{LWM=1}ctx.restore()}
   else{
   // little shoes (they only show when he is on the move)
@@ -3637,6 +3697,7 @@ const WEB_UI={portrait:false,viewportW:0,viewportH:0,
   page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0,editorScale:1,
   editorHeight:480,gesture:null};
 const isPortrait=()=>WEB_UI.portrait;
+let layoutDirty=true;
 const mobilePage=(kind,n,size)=>Math.max(0,Math.min(Math.max(0,Math.ceil(n/size)-1),WEB_UI.page[kind]||0));
 function layoutTick(){
   const vp=window.visualViewport;
@@ -3657,8 +3718,13 @@ function layoutTick(){
     for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
     CAM.reset=true;CAM.snap=true;hits=[];
   }
-  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
-  if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed){
+  const logicalChanged=w!==W||h!==H;
+  if(logicalChanged){W=w;H=h;CAM.snap=true;_vig=null;}
+  const bw=Math.max(1,Math.round(W*perf.res)),bh=Math.max(1,Math.round(H*perf.res));
+  if(cv.width!==bw||cv.height!==bh){cv.width=bw;cv.height=bh;outputScale=bw/W;}
+  if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||logicalChanged)layoutDirty=true;
+  if(layoutDirty||changed){
+    layoutDirty=false;
     WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
     const rect=document.body.getBoundingClientRect(),
       css=window.getComputedStyle?window.getComputedStyle(document.body):null,
@@ -3715,7 +3781,7 @@ let AIM0={sx:0,sy:0,wx:0,wy:0};
 
 // the last pass over the picture: a warm key light from the sun's corner, cooler shadows, a soft vignette and a hint of bloom, so the flat flash-game colours sit together
 let _vig=null;
-function grade(){ctx.save();ctx.setTransform(1,0,0,1,0,0);
+function grade(){ctx.save();ctx.setTransform(outputScale,0,0,cv.height/H,0,0);
   if(!_vig||_vig.w!==W||_vig.h!==H){const c=mkCanvas(W,H),x=c.getContext('2d');let g=x.createRadialGradient(W*.5,H*.46,H*.35,W*.5,H*.5,H*.98);g.addColorStop(0,'rgba(20,30,70,0)');g.addColorStop(1,'rgba(15,20,55,.42)');x.fillStyle=g;x.fillRect(0,0,W,H);
     g=x.createLinearGradient(W,0,0,H*.9);g.addColorStop(0,'rgba(255,214,150,.34)');g.addColorStop(.5,'rgba(255,214,150,0)');x.globalCompositeOperation='soft-light';x.fillStyle=g;x.fillRect(0,0,W,H);
     g=x.createLinearGradient(0,H*.55,0,H);g.addColorStop(0,'rgba(60,70,140,0)');g.addColorStop(1,'rgba(60,70,140,.35)');x.fillStyle=g;x.fillRect(0,0,W,H);_vig=c;_vig.w=W;_vig.h=H}
@@ -3757,13 +3823,47 @@ function drawRoomDetails(xlo,xhi,ylo,yhi){
     }
   }
 }
+let terrainCanvas=null,terrainKey=null,terrainGrid=null,terrainDetail=-1;
+function drawTerrainCached(){
+ if(!terrainCanvas||terrainCanvas.width!==WW||terrainGrid!==grid||terrainDetail!==perf.detail){
+   terrainCanvas=mkCanvas(WW,GY);terrainKey=new Uint16Array(grid.length);terrainKey.fill(65535);terrainGrid=grid;terrainDetail=perf.detail;
+ }
+ const c=terrainCanvas.getContext('2d');
+ for(let i=0;i<grid.length;i++){
+   const m=grid[i],d=m?(hp[i]/MAT[m].hp>.66?0:hp[i]/MAT[m].hp>.33?1:2):0;
+   const br=m?brk[i]:0,key=m|(d<<4)|(br<<6);if(terrainKey[i]===key)continue;
+   const old=terrainKey[i];terrainKey[i]=key;const x=i%COLS,y=(i/COLS)|0,px=x*V,py=y*V;
+   if(old!==65535&&(old&15))c.clearRect(px,py,V,V);
+   if(!m)continue;c.drawImage(SPR[m][hsh(x,y)&3][d],px,py);
+   if(br){c.fillStyle=m===GLASS?'rgba(255,255,255,.95)':'rgba(15,8,4,.8)';
+    if(br&1)c.fillRect(px+6,py+1,2,3);if(br&2)c.fillRect(px,py+4,2,3);if(br&4)c.fillRect(px+3,py+6,4,2);if(br&8)c.fillRect(px+1,py,4,2);}
+ }
+ ctx.drawImage(terrainCanvas,0,0);
+}
+const rubbleCache=new WeakMap();
+function drawRubbleCached(ch){
+ if(!perf.cache||ch.cells.length<20)return false;
+ let hash=2166136261,minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+ for(const a of ch.cells){if(a.dead)continue;const d=a.h/MAT[a.m].hp>.66?0:a.h/MAT[a.m].hp>.33?1:2;
+  hash=Math.imul(hash^(a.m|(d<<4)),16777619);hash=Math.imul(hash^Math.round(a.lx*256),16777619);hash=Math.imul(hash^Math.round(a.ly*256),16777619);
+  minx=Math.min(minx,a.lx-V/2);miny=Math.min(miny,a.ly-V/2);maxx=Math.max(maxx,a.lx+V/2);maxy=Math.max(maxy,a.ly+V/2);
+ }
+ const x=Math.floor(minx),y=Math.floor(miny),w=Math.ceil(maxx)-x,h=Math.ceil(maxy)-y;
+ if(!(w>0&&h>0)||w*h>120000)return false;
+ let q=rubbleCache.get(ch);if(!q||q.hash!==hash||q.cells!==ch.cells){
+  const canvas=mkCanvas(w,h),c=canvas.getContext('2d');
+  for(const a of ch.cells)if(!a.dead){const f=a.h/MAT[a.m].hp;c.drawImage(SPR[a.m][(a.lx*7+a.ly*3|0)&3][f>.66?0:f>.33?1:2],a.lx-V/2-x,a.ly-V/2-y)}
+  q={hash,cells:ch.cells,canvas,x,y};rubbleCache.set(ch,q);
+ }
+ ctx.drawImage(q.canvas,q.x,q.y);return true;
+}
 function draw(){
   hits=[];
-  ctx.setTransform(1,0,0,1,0,0);const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
+  ctx.setTransform(outputScale,0,0,cv.height/H,0,0);const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
   if(camOn){ctx.fillStyle='#3d8fe8';ctx.fillRect(0,0,W,H);ctx.save();ctx.scale(CAM.z,CAM.z);ctx.translate(-CAM.x,-CAM.y)}
   if(camOn&&CAM.y<0){ctx.drawImage(bgA,0,0,WW,GY,0,CAM.y,WW,GY-CAM.y);ctx.drawImage(bgA,0,GY,WW,WH-GY,0,GY,WW,WH-GY)}else ctx.drawImage(bgA,0,0);
-  if(camOn){const dh=Math.max(0,(CAM.y+H/CAM.z)-WH);if(dh>0){const g=ctx.createLinearGradient(0,WH,0,WH+dh);g.addColorStop(0,'#4d311d');g.addColorStop(1,'#2a1a10');ctx.fillStyle=g;ctx.fillRect(CAM.x-2,WH-1,W/CAM.z+4,dh+2)}}   // portrait: the earth continues below the ground line   // sky stretches up so the sun is never cut off
-  for(const c of clouds)drawCloud(c);ctx.drawImage(bgB,0,0);
+  if(camOn){const dh=Math.max(0,(CAM.y+H/CAM.z)-WH);if(dh>0){let g='#4d311d';if(perf.back===2){g=ctx.createLinearGradient(0,WH,0,WH+dh);g.addColorStop(0,'#4d311d');g.addColorStop(1,'#2a1a10')}ctx.fillStyle=g;ctx.fillRect(CAM.x-2,WH-1,W/CAM.z+4,dh+2)}}   // portrait: the earth continues below the ground line   // sky stretches up so the sun is never cut off
+  if(perf.back===2)for(const c of clouds)drawCloud(c);if(perf.back>0)ctx.drawImage(bgB,0,0);else{ctx.fillStyle='#4f9c3b';ctx.fillRect(0,GY,WW,7);ctx.fillStyle='#4d311d';ctx.fillRect(0,GY+7,WW,WH-GY-7)}
   if(state==='cutscene'){if(isPortrait())drawMobileCutscene();else drawCutscene();return}
   if(state==='title'){if(isPortrait())drawMobileTitle();else drawTitle();return}
   if(state==='ending'){drawEnding();drawToasts(frameDt);return}
@@ -3783,18 +3883,18 @@ function draw(){
   const paperY1=paperCull?Math.min(ROWS,Math.ceil((CAM.y+H/CAM.z+paperShake)/V)+2):ROWS;
   for(let y=paperY0;y<paperY1;y++){let x=0;while(x<COLS){const n=paper[idx(x,y)];if(!n||grid[idx(x,y)]){x++;continue}let x2=x;while(x2<COLS&&paper[idx(x2,y)]===n&&!grid[idx(x2,y)])x2++;
     if(x2<=paperX0||x>=paperX1){x=x2;continue}
-    ctx.fillStyle=interiors[n-1].p;ctx.fillRect(x*V,y*V,(x2-x)*V,V);ctx.fillStyle='rgba(0,0,0,.07)';for(let k=0;k<(x2-x)*V;k+=16)ctx.fillRect(x*V+k,y*V,8,V);
+    ctx.fillStyle=interiors[n-1].p;ctx.fillRect(x*V,y*V,(x2-x)*V,V);if(perf.detail){ctx.fillStyle='rgba(0,0,0,.07)';for(let k=0;k<(x2-x)*V;k+=16)ctx.fillRect(x*V+k,y*V,8,V);}
     if(!paper[idx(x,y+1)]||y+1>=ROWS){ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x*V,(y+1)*V-5,(x2-x)*V,5)}
     // Two short plaster cracks per broken wallpaper run; no extra scan.
-    if(paperTorn){ctx.fillStyle='rgba(70,47,40,.48)';
+    if(paperTorn&&perf.detail){ctx.fillStyle='rgba(70,47,40,.48)';
       if(x>0&&!paper[idx(x-1,y)])ctx.fillRect(x*V,y*V,2,V);
       if(x2<COLS&&!paper[idx(x2,y)])ctx.fillRect(x2*V-2,y*V,2,V);
     }
     x=x2}}
-  drawRoomDetails(paperX0,paperX1,paperY0,paperY1);
+  if(perf.detail)drawRoomDetails(paperX0,paperX1,paperY0,paperY1);
   drawSling(true);drawValve();drawBurpStand();drawPwProp();
   const cx0=Math.max(0,Math.floor(CAM.x/V)-2),cx1=Math.min(COLS,Math.ceil((CAM.x+W/CAM.z)/V)+2);   // only the columns on screen
-  for(let y=0;y<ROWS;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
+  if(perf.cache&&(!wobOn||perf.detail===0))drawTerrainCached();else for(let y=paperY0;y<paperY1;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
     if(wobOn){px=Math.round(px+ox[i]*V);py=Math.round(py+oy[i]*V)}   // swaying with the wobble
     ctx.drawImage(SPR[m][hsh(x,y)&3][r>.66?0:r>.33?1:2],px,py);
     if(brk[i]){ctx.fillStyle=m===GLASS?'rgba(255,255,255,.95)':'rgba(15,8,4,.8)';const b=brk[i];   // snapped joints show as cracks
@@ -3810,6 +3910,7 @@ function draw(){
     if(rubbleCull&&(ch.x+ch.rad+V<rubbleX0||ch.x-ch.rad-V>rubbleX1||
                     ch.y+ch.rad+V<rubbleY0||ch.y-ch.rad-V>rubbleY1))continue;
     ctx.save();ctx.translate(ch.x,ch.y);ctx.rotate(ch.ang);
+    if(drawRubbleCached(ch)){ctx.restore();continue;}
     for(const a of ch.cells){
       if(a.dead)continue; // shattered fragments are neither visible nor collidable
       if(rubbleCull&&(a.wx<rubbleX0-V||a.wx>rubbleX1+V||
@@ -3821,6 +3922,7 @@ function draw(){
   }
   const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';
   for(const t of targets)if(t.alive){
+    if(camOn&&(t.x<rubbleX0-70||t.x>rubbleX1+70||t.y<rubbleY0-80||t.y>rubbleY1+80))continue;
     const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);
     // A compact locator above the surviving actor, positioned in the same
     // transformed world coordinate system as the actual landlord artwork.
@@ -3841,7 +3943,7 @@ function draw(){
   drawParts();drawTexts();
   ctx.restore();
   if(camOn)ctx.restore();
-  grade();
+  if(perf.shade)grade();
   if(flash>0){ctx.fillStyle=`rgba(255,240,200,${flash*.9})`;ctx.fillRect(0,0,W,H)}
   drawHUD();drawObjectiveEdge();drawToasts(frameDt)}
 // Screen-space HUD cue; does not pan, collide with or change the final
@@ -3936,7 +4038,7 @@ function drawHUD(){
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
   if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
   if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
-  if(state==='play')btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
+  if(state==='play'){btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});btn(W-145,3,42,28,'SET',openSettings,{size:12});}
   if(state==='win'||state==='lose')drawEnd()}
 function star(x,y,r,on){ctx.fillStyle=on?'#ffd23f':'#3a3f55';ctx.strokeStyle='#000';ctx.lineWidth=3;ctx.beginPath();for(let i=0;i<10;i++){const a=-1.5708+i*.6283,rr=i%2?r*.45:r;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.closePath();ctx.stroke();ctx.fill()}
 function drawEnd(){
@@ -4081,7 +4183,7 @@ cv.addEventListener('lostpointercapture',e=>{
   releaseWalkTouch(e.pointerId);
   if(state==='edit')eEndStroke(e.pointerId,true);
 });
-addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
+addEventListener('keydown',e=>{if(settingsOpen)return;audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
   if(e.code==='Space'){dive();e.preventDefault()}
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
@@ -4120,7 +4222,7 @@ function pdSave(){
 function pdTouch(){pdDirty=true}
 pdLoad();
 const OPT=()=>PD.opt||(PD.opt={collapse:false,tool:'none'});
-webEcoFX=!!OPT().ecoFX;             // load saved touch-friendly effects preference
+perfRead(); // load saved performance profile
 muted=!!OPT().muted;
 const ST=()=>PD.st;
 const totalStars=()=>{let n=0;for(const k in PD.stars)if(+k>=0&&+k<CH1)n+=PD.stars[k]||0;return n};
@@ -5180,7 +5282,7 @@ function drawMobileMenu(){
   btn(x,y+(h+g),w,h,'LEVEL CREATOR',()=>openEditor(false),{size:24});
   btn(x,y+2*(h+g),w,h,'ACHIEVEMENTS '+achCount()+'/'+ACH.length,()=>{state='ach';WEB_UI.page.ach=0},{size:19});
   btn(x,y+3*(h+g),w,h,'OUTFITS '+ownedCount()+'/'+OUTFITS.length,()=>{state='outfit';WEB_UI.page.outfit=0},{size:21});
-  btn(x,y+4*(h+g),w,h,'OPTIONS',()=>{state='options';WEB_UI.page.options=0},{size:21});
+  btn(x,y+4*(h+g),w,h,'OPTIONS',openSettings,{size:21});
   btn(x,H-130,w,52,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();setMuted(!muted)},{size:18});
   txt(totalStars()+' ★ EARNED',W/2,H-28,18,'#ffd23f','center');
 }
@@ -5246,38 +5348,7 @@ function drawMobileOutfits(){
   });
   mobilePager('outfit',OUTFITS.length,size);
 }
-function drawMobileOptions(){
-  const page=WEB_UI.page.options?1:0,o=OPT();
-  mobileHeader('OPTIONS',page?'SOUND, SCREEN & DATA':'GAMEPLAY',goMenu);
-  mobileTab(12,108,252,'GAMEPLAY',()=>{WEB_UI.page.options=0},page===0);
-  mobileTab(276,108,252,'SOUND & DATA',()=>{WEB_UI.page.options=1},page===1);
-  let y=169;const rh=58,gap=8;
-  function row(label,value,fn,on){
-    btn(20,y,W-40,rh,label+': '+value,()=>{fn();pdTouch();pdSave();SFX.pop()},
-        {size:label.length>20?15:17,on:!!on});
-    y+=rh+gap;
-  }
-  if(!page){
-    row('COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',()=>{o.collapse=!o.collapse},o.collapse);
-    row('START TOOL',toolName(),toolCycle,toolName()!=='NONE');
-    row('AIM GUIDE',GUIDES[o.guide==null?2:o.guide],()=>{o.guide=((o.guide==null?2:o.guide)+1)%3},(o.guide==null?2:o.guide)>0);
-    row('BURP CHARGE',o.burpCharge?'ON':'OFF',()=>{o.burpCharge=!o.burpCharge},o.burpCharge);
-    row('STOMACH NEVER BURSTS',o.noBurst?'ON':'OFF',()=>{o.noBurst=!o.noBurst},o.noBurst);
-    row('LANDLORDS FIGHT BACK',o.fight===false?'OFF':'ON',()=>{o.fight=o.fight===false?true:false},o.fight!==false);
-  }else{
-    row('SOUND',muted?'OFF':'ON',()=>{audioInit();setMuted(!muted)},!muted);
-    const val=Math.round(optVol()*100);
-    row('VOLUME',val+'%',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol()},val>0);
-    row('VOLUME DOWN',val+'%',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol()},false);
-    row('SCREEN SHAKE',SHAKES.find(s=>s[1]===(o.shake==null?1:o.shake))?.[0]||'FULL',()=>{let i=SHAKES.findIndex(s=>s[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1]},(o.shake==null?1:o.shake)>0);
-    row('DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX},!webEcoFX);
-    if(y+rh<H-72)row('RESET OPTIONS','DEFAULT',()=>{if(performance.now()<armReset){optsReset();armReset=0}else armReset=performance.now()+3000},false);
-    if(y+rh<H-68)row('ERASE PROGRESS','CONFIRM',()=>{if(performance.now()<armProg){progReset();armProg=0}else armProg=performance.now()+3000},false);
-  }
-  if(!page)txt('TNT CAN SURVIVE FALLS. HARD HITS LIGHT A FUSE.',W/2,H-95,13,'#ffe190','center');
-  if(page===0)btn(42,H-67,W-84,50,'SOUND, SCREEN & DATA >',()=>{WEB_UI.page.options=1},{size:18});
-  else btn(42,H-67,W-84,50,'< GAMEPLAY',()=>{WEB_UI.page.options=0},{size:18});
-}
+function drawMobileOptions(){openSettings();}
 /* Portrait creator: a genuine 120-column editing surface with horizontal
    panning, unclipped world-cell touch mapping and a separate tool/action tray.
    No copy of E.g, no second offscreen canvas and no changed save encoding. */
@@ -5401,48 +5472,74 @@ function drawMenu(){
   btn(bx,y,bw,bh,`ACHIEVEMENTS  ${achCount()}/${ACH.length}`,()=>{state='ach';hits=[]},{size:20});y+=62;
   btn(bx,y,bw,bh,`OUTFITS  ${ownedCount()}/${OUTFITS.length}`,()=>{state='outfit';hits=[]},{size:20});y+=62;
   btn(bx,y,bw,40,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();setMuted(!muted)},{size:16});y+=48;
-  btn(bx,y,bw,40,'OPTIONS',()=>{state='options';hits=[]},{size:16});
+  btn(bx,y,bw,40,'OPTIONS',openSettings,{size:16});
   txt(`${totalStars()} ★ earned`,290,H-28,16,'#fff','center')}
 // ---- OPTIONS screen: two columns (GAMEPLAY | SOUND & SCREEN), everything saved in PD.opt ----
 let sliderDrag=false,sliX=0,sliW=1,armReset=0,armProg=0;
 function setVolFromX(x){const o=OPT();o.vol=clamp(Math.round((x-sliX)/sliW*20)/20,0,1);applyVol();pdTouch()}
 const GUIDES=['OFF','SHORT','FULL'],SHAKES=[['OFF',0],['LOW',.5],['FULL',1]];
-function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX'])delete o[k];o.tool='none';muted=false;webEcoFX=false;applyVol();pdTouch();pdSave()}
+function optsReset(){const o=OPT();for(const k of['collapse','noBurst','burpCharge','vol','shake','guide','muted','fight','ecoFX','perf','music'])delete o[k];o.tool='none';muted=false;perfRead();applyVol();pdTouch();pdSave()}
 function progReset(){PD.stars={};PD.best={};PD.contracts={};PD.ach={};PD.own={classic:1,workman:1};PD.outfit='classic';PD.st=ST0();outfitCur=OUTFITS[0];applyOutfit(outfitCur,time);pdTouch();pdSave()}
-function drawOptions(){
-  ctx.fillStyle='rgba(10,14,30,.62)';ctx.fillRect(0,0,W,H);
-  txt('OPTIONS',W/2,56,40,'#ffd23f','center','#7a1a1a');btn(16,14,90,36,'< MENU',goMenu,{size:16});
-  const o=OPT(),now=performance.now(),cw=430,lx=40,rx=W-40-cw,rh=46,gap=8;let y=98,ry=98;
-  const head=(x,yy,t)=>{txt(t,x+cw/2,yy+14,15,'#ffb03a','center','#5a2a00')};
-  const row=(x,yy,label,val,fn,col,on)=>{btn(x,yy,cw,rh,label+(val!=null?':  '+val:''),fn,{size:17,on:on,col:col||'#7dff5a'})};
-  // ---- left: gameplay ----
-  head(lx,y,'GAMEPLAY');y+=26;
-  row(lx,y,'COLLAPSIBLE BUILDINGS',o.collapse?'ON':'OFF',()=>{o.collapse=!o.collapse;pdTouch();pdSave();SFX.pop()},null,!!o.collapse);y+=rh+2;
-  txt(o.collapse?'Rubble can topple. TNT: soft falls safe; hard hits may light a fuse.':'Rubble settles and locks. TNT can survive a soft landing.',lx+cw/2,y+12,13,'#cfd','center');y+=gap+14;
-  row(lx,y,'START TOOL',toolName(),()=>{toolCycle();pdTouch();pdSave();SFX.pop()},'#ffd23f',true);y+=rh+gap;
-  row(lx,y,'AIM GUIDE (DOTS)',GUIDES[o.guide==null?2:o.guide],()=>{o.guide=((o.guide==null?2:o.guide)+1)%3;pdTouch();pdSave();SFX.pop()},'#9fd8ff',(o.guide==null?2:o.guide)>0);y+=rh+gap;
-  row(lx,y,'BURP CHARGE',o.burpCharge?'ON':'OFF',()=>{o.burpCharge=!o.burpCharge;pdTouch();pdSave();SFX.pop()},null,!!o.burpCharge);y+=rh+gap;
-  row(lx,y,'CHEAT: STOMACH NEVER BURSTS',o.noBurst?'ON':'OFF',()=>{o.noBurst=!o.noBurst;pdTouch();pdSave();SFX.pop()},'#ff9ec8',!!o.noBurst);y+=rh+gap;
-  row(lx,y,'LANDLORDS FIGHT BACK',o.fight===false?'OFF':'ON',()=>{o.fight=o.fight===false?true:false;pdTouch();pdSave();SFX.pop()},'#ffb03a',o.fight!==false);
-  // ---- right: sound & screen ----
-  head(rx,ry,'SOUND & SCREEN');ry+=26;
-  row(rx,ry,'SOUND',muted?'OFF':'ON',()=>{audioInit();setMuted(!muted);if(!muted)SFX.boing()},null,!muted);ry+=rh+gap;
-  // volume slider: a track you can drag, with - / + buttons
-  const v=optVol(),bw2=40;sliX=rx+bw2+14;sliW=cw-2*(bw2+14);
-  txt('VOLUME  '+Math.round(v*100)+'%',rx+cw/2,ry+11,14,muted?'#889':'#fff','center');
-  const ty=ry+rh-14;ctx.save();ctx.globalAlpha=muted?.45:1;ctx.fillStyle='rgba(15,18,30,.85)';rrect(sliX,ty-5,sliW,10,5);ctx.fill();ctx.fillStyle='#7dff5a';rrect(sliX,ty-5,Math.max(10,sliW*v),10,5);ctx.fill();
-  ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sliX+sliW*v,ty,11,0,7);ctx.fill();ctx.stroke();ctx.restore();
-  hits.push({x:sliX-12,y:ry+14,w:sliW+24,h:rh-10,fn:()=>{audioInit();sliderDrag=true;setVolFromX(mouseX)}});
-  btn(rx,ry+8,bw2,rh-8,'-',()=>{o.vol=clamp(Math.round((optVol()-.1)*10)/10,0,1);applyVol();pdTouch();pdSave();SFX.boing()},{size:22});
-  btn(rx+cw-bw2,ry+8,bw2,rh-8,'+',()=>{o.vol=clamp(Math.round((optVol()+.1)*10)/10,0,1);applyVol();pdTouch();pdSave();SFX.boing()},{size:22});
-  ry+=rh+gap+4;
-  row(rx,ry,'SCREEN SHAKE',(SHAKES.find(a=>a[1]===(o.shake==null?1:o.shake))||SHAKES[2])[0],()=>{const i=SHAKES.findIndex(a=>a[1]===(o.shake==null?1:o.shake));o.shake=SHAKES[(i+1)%3][1];shake=Math.max(shake,8);pdTouch();pdSave();SFX.pop()},'#9fd8ff',(o.shake==null?1:o.shake)>0);ry+=rh+gap;
-  row(rx,ry,'DECORATIVE EFFECTS',webEcoFX?'ECO':'FULL',()=>{webEcoFX=!webEcoFX;o.ecoFX=webEcoFX;pdTouch();pdSave();SFX.pop()},'#9fd8ff',!webEcoFX);ry+=rh+gap+10;
-  head(rx,ry,'DATA');ry+=26;
-  const a1=now<armReset,a2=now<armProg;
-  btn(rx,ry,cw,rh-6,a1?'TAP AGAIN: RESET ALL OPTIONS':'RESET OPTIONS TO DEFAULT',()=>{if(a1){optsReset();armReset=0;toast('ach','Options reset','')}else{armReset=performance.now()+3000;armProg=0}},{size:15,on:a1,col:'#ffb03a'});ry+=rh-6+gap;
-  btn(rx,ry,cw,rh-6,a2?'TAP AGAIN: ERASE STARS, ACHIEVEMENTS, OUTFITS':'RESET PROGRESS',()=>{if(a2){progReset();armProg=0;toast('ach','Progress erased','')}else{armProg=performance.now()+3000;armReset=0}},{size:15,on:a2,col:'#ff5a5a'});
-  txt('Levels you made in the creator are never erased.   Esc = back,  M = mute',W/2,H-14,13,'#cfd','center')}
+function drawOptions(){openSettings();}
+let settingsOpen=false,settingsTab='performance';
+function saveSettings(){pdTouch();pdSave();}
+function setPerfPreset(preset){const o=OPT();o.perf={preset};perfRead();saveSettings();if(settingsOpen)drawSettings();}
+function setPerfCustom(k,v){const o=OPT();o.perf=Object.assign({preset:'custom',base:perfTier},perf,{preset:'custom',base:perfTier,[k]:v});perfRead();saveSettings();drawSettings();}
+function openSettings(){if(settingsOpen)return;releaseAllWalkTouches();for(const k in KEYS)KEYS[k]=false;
+ settingsOpen=true;settingsTab='performance';document.getElementById('settings').hidden=false;drawSettings();musUpdate();document.getElementById('settings-close').focus();}
+function closeSettings(){settingsOpen=false;document.getElementById('settings').hidden=true;if(state==='options')goMenu();last=performance.now();webSimCarry=0;drawCarry=1;saveSettings();}
+function drawSettings(){
+ const o=OPT(),root=document.getElementById('settings-content'),tabs=document.getElementById('settings-tabs');
+ tabs.replaceChildren();root.replaceChildren();
+ const tabList=[['performance','Performance'],['gameplay','Gameplay'],['audio','Audio & display'],['data','Save data']];
+ function el(tag,cl,text){const e=document.createElement(tag);if(cl)e.className=cl;if(text!=null)e.textContent=text;return e;}
+ function button(text,fn,selected){const b=el('button',selected?'chosen':'',text);b.type='button';b.onclick=fn;return b;}
+ for(const [id,label] of tabList)tabs.append(button(label,()=>{settingsTab=id;drawSettings()},settingsTab===id));
+ function section(title,detail){root.append(el('h2','',title));if(detail)root.append(el('p','sub',detail));}
+ function row(label,desc){const r=el('div','setting-row'),l=el('div','setting-label');l.append(el('strong','',label),el('small','',desc));r.append(l);root.append(r);return r;}
+ function select(label,desc,vals,value,fn){const r=row(label,desc),sel=el('select');sel.setAttribute('aria-label',label);for(const [v,n] of vals){const opt=el('option','',n);opt.value=String(v);sel.append(opt)}sel.value=String(value);sel.onchange=()=>{const found=vals.find(a=>String(a[0])===sel.value);if(found)fn(found[0]);};r.append(sel);}
+ function opt(key,v){o[key]=v;if(key==='tool'&&state==='play'&&man&&man.mode==='aim'){if(v!=='valve'&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY;}toolArm()}saveSettings();drawSettings();}
+ function toggle(label,desc,value,fn){const r=row(label,desc);const b=button(value?'On':'Off',()=>fn(!value),value);b.setAttribute('role','switch');b.setAttribute('aria-checked',String(!!value));b.setAttribute('aria-label',label);r.append(b);}
+ if(settingsTab==='performance'){
+  section('Performance profile','Choose a preset or tune individual settings. Simulation remains at 60 updates per second when the device can keep up.');
+  const p=o.perf||{},selected=p.preset==null?'auto':p.preset;
+  const cards=el('div','preset-grid');
+  for(const [id,label,desc] of [['auto','Auto','Adapts to device load'],[0,'Ultra low','30 FPS · 55% resolution'],[1,'Low','30 FPS · 72% resolution'],[2,'Balanced','45 FPS · 85% resolution'],[3,'High','60 FPS · full resolution']]){const b=button(label,()=>setPerfPreset(id),selected===id);b.append(el('small','',desc));cards.append(b);}root.append(cards);
+  const info=el('div','perf-readout');info.append(el('strong','',`Active: ${PERF_LEVELS[perfTier].name}${selected==='custom'?' (custom)':''}`),el('span','',`Last measured: ${frameMeterFps||'—'} FPS · ${frameMeterSps||'—'} sim/s · ${frameMeterSpeed||'—'}% speed`));root.append(info);
+  section('Advanced graphics','Changes below switch to Custom. Lower graphics never disable TNT, damage, collision checks or landlord AI.');
+  select('Frame cap','30 is recommended for older phones.',[[30,'30 FPS'],[45,'45 FPS'],[60,'60 FPS']],perf.fps,v=>setPerfCustom('fps',v));
+  select('Render resolution','HUD and touch controls retain their logical size.',[[.55,'55%'],[.72,'72%'],[.85,'85%'],[1,'100%']],perf.res,v=>setPerfCustom('res',v));
+  select('Particles','Limits decorative debris, smoke and spark effects.',[[90,'Minimal'],[180,'Low'],[360,'Medium'],[1400,'Full']],perf.fx,v=>setPerfCustom('fx',v));
+  select('Building detail','Low preserves damage textures but simplifies wallpaper and visible sway.',[[0,'Low'],[1,'Medium'],[2,'High']],perf.detail,v=>setPerfCustom('detail',v));
+  select('Background','Removes expensive sky and parallax layers.',[[0,'Simple'],[1,'Static'],[2,'Animated']],perf.back,v=>setPerfCustom('back',v));
+  toggle('Advanced lighting','Soft highlights, shadows and full-screen color grading.',!!perf.shade,v=>setPerfCustom('shade',+v));
+  toggle('Cached sprites & rubble','Reuse existing artwork rather than redrawing complex shapes.',!!perf.cache,v=>setPerfCustom('cache',+v));
+  toggle('Full effect audio','Off reduces overlapping sound effects during collapses.',!!perf.audio,v=>setPerfCustom('audio',+v));
+  toggle('Show FPS and simulation','Displays render rate and game speed while playing.',frameMeterVisible,v=>{frameMeterVisible=v;opt('meter',v)});
+ }else if(settingsTab==='gameplay'){
+  section('Gameplay','These options affect how the game plays, not the graphics preset.');
+  toggle('Collapsible buildings','On keeps fallen debris physical longer; off lets it settle.',!!o.collapse,v=>opt('collapse',v));
+  select('Start tool','Choose a tool for the next shot.',[['none','None'],...toolList().map(t=>[t.id,t.name])],o.tool||'none',v=>opt('tool',v));
+  select('Aim guide','Trajectory guide length.',[[0,'Off'],[1,'Short'],[2,'Full']],o.guide==null?2:o.guide,v=>opt('guide',v));
+  toggle('Burp charge','Enable the charge behavior.',!!o.burpCharge,v=>opt('burpCharge',v));
+  toggle('Landlords fight back','Keep enemy attacks active.',o.fight!==false,v=>opt('fight',v));
+  toggle('Stomach never bursts','Optional cheat.',!!o.noBurst,v=>opt('noBurst',v));
+ }else if(settingsTab==='audio'){
+  section('Audio & display','Adjust sound, visual comfort and accessibility.');
+  toggle('Sound effects & music','Master mute.',!muted,v=>{audioInit();setMuted(!v);saveSettings();drawSettings()});
+  toggle('Music','Turn the soundtrack off without muting effects.',o.music!==false,v=>opt('music',v));
+  const r=row('Master volume','Drag to set volume.');const range=el('input');range.type='range';range.min='0';range.max='100';range.value=Math.round(optVol()*100);range.setAttribute('aria-label','Master volume');const label=el('span','value',range.value+'%');range.oninput=()=>{o.vol=Number(range.value)/100;label.textContent=range.value+'%';applyVol();pdTouch()};range.onchange=saveSettings;r.append(range,label);
+  select('Screen shake','Reduce motion without changing impact physics.',[[0,'Off'],[.5,'Low'],[1,'Full']],o.shake==null?1:o.shake,v=>opt('shake',v));
+ }else{
+  section('Save data','Your custom buildings and campaign progress remain on this device.');
+  root.append(button('Restore default settings',()=>{if(confirm('Restore default settings? Your progress and created levels will not be erased.')){optsReset();drawSettings()}}));
+  const danger=button('Reset campaign and contract progress',()=>{if(confirm('Erase campaign and contract stars, scores, achievements and outfits? Created levels will be kept.')){progReset();drawSettings()}});danger.classList.add('danger');root.append(danger);
+  root.append(el('p','sub','Your creator levels are not erased by either action.'));
+ }
+}
+document.getElementById('settings-close').addEventListener('click',closeSettings);
+document.addEventListener('keydown',e=>{if(settingsOpen&&e.key==='Escape'){e.preventDefault();e.stopPropagation();closeSettings();}},true);
+
 function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
   hits.push({x,y,w,h,fn:locked?()=>SFX.pop():fn});const hov=mouseX>=x&&mouseX<x+w&&mouseY>=y&&mouseY<y+h;
   ctx.save();rrect(x,y,w,h,10);ctx.fillStyle=locked?'rgba(30,34,48,.8)':hov?'rgba(255,255,255,.3)':'rgba(15,18,30,.78)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=hov&&!locked?'#fff':'rgba(255,255,255,.3)';ctx.stroke();
@@ -5885,7 +5982,7 @@ function drawBrushPanel(){
   btn(8,392,100,40,'ERASE',()=>{E.tool='erase'},{size:14,on:E.tool==='erase'});
   btn(116,392,100,40,'LANDLORD',()=>{E.tool='lord'},{size:13,on:E.tool==='lord',col:'#ff8a8a'})}
 function drawEditor(){
-  ctx.setTransform(1,0,0,1,0,0);
+  ctx.setTransform(outputScale,0,0,cv.height/H,0,0);
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const m=E.g[idx(x,y)];if(m)ctx.drawImage(SPR[m][hsh(x,y)&3][0],x*V,y*V)}
   ctx.fillStyle='rgba(255,60,60,.14)';ctx.fillRect(0,0,EMIN*V,GY);ctx.strokeStyle='rgba(255,90,90,.7)';ctx.setLineDash([6,5]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(EMIN*V,0);ctx.lineTo(EMIN*V,GY);ctx.stroke();ctx.setLineDash([]);
   txt('SLING AREA',EMIN*V/2,34,14,'#ffb0b0','center');drawBrushPanel();
@@ -5938,14 +6035,14 @@ setInterval(()=>{if(pdDirty)pdSave();if(state==='play'||state==='win')achCheck()
 buildSprites();buildBG();
 // Same measured definitions as the console HUDs: submitted images per real
 // second vs physics update calls per real second. F3 turns the overlay on.
-let frameMeterVisible=false,frameMeterClock=0,frameMeterDraws=0,frameMeterSims=0,frameMeterGameTime=0;
+let frameMeterVisible=!!OPT().meter,frameMeterClock=0,frameMeterDraws=0,frameMeterSims=0,frameMeterGameTime=0;
 let frameMeterFps=0,frameMeterSps=0,frameMeterSpeed=0;
 addEventListener('keydown',e=>{
   if(e.code==='F3'&&!e.repeat){frameMeterVisible=!frameMeterVisible;e.preventDefault()}
-  if(e.code==='F4'&&!e.repeat){webEcoFX=!webEcoFX;OPT().ecoFX=webEcoFX;pdTouch();pdSave();e.preventDefault()}
+  if(e.code==='F4'&&!e.repeat&&!settingsOpen){setPerfPreset(perfTier===0?1:0);e.preventDefault()}
 });
 function drawFrameMeter(){
-  ctx.save();ctx.setTransform(1,0,0,1,0,0);
+  ctx.save();ctx.setTransform(outputScale,0,0,cv.height/H,0,0);
   ctx.fillStyle='rgba(8,12,27,.9)';ctx.fillRect(8,8,277,48);
   ctx.font='bold 13px monospace';ctx.textAlign='left';ctx.fillStyle='#ffdc81';
   ctx.fillText('RENDER '+frameMeterFps+' FPS   SIM '+frameMeterSps+' SPS',16,27);
@@ -5966,30 +6063,29 @@ function webSimSteps(elapsed){
   webSimCarry=Math.max(0,webSimCarry-steps*WEB_SIM_DT);
   return steps;
 }
-let last=performance.now(),frameDt=.016;
+let last=performance.now(),frameDt=.016,drawCarry=1,drawElapsed=0,lastRenderedState='',lastFrameTier=-1;
 function loop(t){
-  const raw=Math.min(.5,Math.max(0,(t-last)/1000));
-  last=t;frameDt=Math.min(.033,raw);
-  const ticks=webSimSteps(raw);
-  let sim=0;
+  const raw=Math.min(.5,Math.max(0,(t-last)/1000));last=t;
+  if(document.hidden||settingsOpen){webSimCarry=0;drawCarry=1;drawElapsed=0;musUpdate();requestAnimationFrame(loop);return;}
+  const start=performance.now(),ticks=webSimSteps(raw);let sim=0,rendered=false;
   try{
     layoutTick();
-    for(let i=0;i<ticks;i++){
-      const playing=state==='play';
-      update(WEB_SIM_DT);
-      if(playing)sim++;
+    for(let i=0;i<ticks;i++){const playing=state==='play';update(WEB_SIM_DT);if(playing)sim++;}
+    camTick(Math.min(.067,raw));musUpdate();
+    const cap=state==='play'||state==='win'||state==='lose'?perf.fps:Math.min(perf.fps,30),period=1/cap;
+    drawCarry+=raw;drawElapsed+=raw;
+    if(drawCarry+0.001>=period||state!==lastRenderedState||perfTier!==lastFrameTier){
+      drawCarry=Math.max(0,drawCarry-period);if(drawCarry>period)drawCarry=0;
+      frameDt=Math.min(.1,drawElapsed);drawElapsed=0;draw();if(frameMeterVisible)drawFrameMeter();
+      rendered=true;lastRenderedState=state;lastFrameTier=perfTier;
     }
-    camTick(Math.min(.067,raw));musUpdate();draw();
   }catch(e){console.error(e)}
-  frameMeterClock+=raw;frameMeterDraws++;frameMeterSims+=sim;frameMeterGameTime+=sim*WEB_SIM_DT;
-  if(frameMeterClock>=2){
-    frameMeterFps=Math.round(frameMeterDraws/frameMeterClock);
-    frameMeterSps=Math.round(frameMeterSims/frameMeterClock);
-    frameMeterSpeed=Math.round(100*frameMeterGameTime/frameMeterClock);
-    frameMeterClock=0;frameMeterDraws=0;frameMeterSims=0;frameMeterGameTime=0;
-  }
-  if(frameMeterVisible)drawFrameMeter();
+  frameMeterClock+=raw;frameMeterDraws+=rendered?1:0;frameMeterSims+=sim;frameMeterGameTime+=sim*WEB_SIM_DT;
+  if(frameMeterClock>=2){frameMeterFps=Math.round(frameMeterDraws/frameMeterClock);frameMeterSps=Math.round(frameMeterSims/frameMeterClock);frameMeterSpeed=Math.round(100*frameMeterGameTime/frameMeterClock);frameMeterClock=0;frameMeterDraws=0;frameMeterSims=0;frameMeterGameTime=0;}
+  // Estimate work per presented frame, rather than mistaking 120-Hz callback cadence for poor performance.
+  perfObserve(raw,performance.now()-start);
   requestAnimationFrame(loop);
 }
+
 requestAnimationFrame(loop);
 </script></body></html>
