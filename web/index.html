@@ -1020,9 +1020,14 @@ const CHUNK_HASH=new Map(),CHUNK_BUCKET_POOL=[];
 const CHUNK_BUCKET_CACHE_MAX=2048;
 function stepChunks(dt){
   if(!chunks.length)return;
+  const pairContacts=chunks.length>1;
   const map=CHUNK_HASH;map.clear();let bucketCount=0;
   for(const ch of chunks){if(!ch.rest){ch.vy+=G*dt;ch.vx*=.9995;ch.w*=.998;ch.x+=ch.vx*dt;ch.y+=ch.vy*dt;ch.ang+=ch.w*dt;ch.cs=Math.cos(ch.ang);ch.sn=Math.sin(ch.ang)}ch.cx=ch.cy=0;ch.cn=0;
-    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
+    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}
+      // A lone slab cannot collide with another rubble body. Keep the
+      // transforms and static contacts, but skip all spatial-hash work.
+      if(!pairContacts)continue;
+      const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
       b=bucketCount<CHUNK_BUCKET_CACHE_MAX?(CHUNK_BUCKET_POOL[bucketCount]||(CHUNK_BUCKET_POOL[bucketCount]=[])):[];
       bucketCount++;map.set(k,b)
     }b.push(a)}}
@@ -1040,8 +1045,12 @@ function stepChunks(dt){
         resolveStatic(ch,a,nx,ny,Math.min(pen,4),i,j)}
       // A fatal contact keeps its impulse, then the shattered cell stops
       // colliding immediately. Cleanup/mass updates still happen once later.
-      if(a.dead)continue;
+      if(a.dead||!pairContacts)continue;
       for(let j=gy-1;j<=gy+1&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){const b=map.get((i+4)*1024+(j+4));if(!b)continue;
+        // Each body inserts its cells contiguously. If the first and last
+        // entries share an owner, this bucket has no other owner between.
+        // The existing ID rule rejects every candidate in an older/self bucket.
+        if(b[0].ch===b[b.length-1].ch&&b[0].ch.id<=ch.id)continue;
         for(const o of b){if(a.dead)break;if(o.dead)continue;const oc=o.ch;if(oc.id<=ch.id)continue;const dx=a.wx-o.wx,dy=a.wy-o.wy,d2=dx*dx+dy*dy;if(d2>=V*V||d2<1e-6)continue;
           const d=Math.sqrt(d2),nx=dx/d,ny=dy/d,pen=V-d,rax=a.wx-ch.x,ray=a.wy-ch.y,rbx=o.wx-oc.x,rby=o.wy-oc.y;
           const vax=ch.vx-ch.w*ray,vay=ch.vy+ch.w*rax,vbx=oc.vx-oc.w*rby,vby=oc.vy+oc.w*rbx,vn=(vax-vbx)*nx+(vay-vby)*ny;
