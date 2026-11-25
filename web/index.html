@@ -4071,7 +4071,7 @@ function draw(){
   if(pads.length)drawPads();
   // sling band behind man
   if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX+13,SY+24);ctx.lineTo(man.x+4,man.y+6);ctx.stroke()}
-  if(man.mode==='aim'&&dragging){const pv=pullVec(),vx=pv[0]*9.2,vy=pv[1]*9.2;const gd=OPT().guide==null?2:OPT().guide;for(let t=.06,i=0;t<[0,.55,1.7][gd];t+=.075,i++){ctx.fillStyle=`rgba(255,255,255,${.9-i*.035})`;ctx.beginPath();ctx.arc(man.x+vx*t,man.y+vy*t+450*t*t,3.4-i*.07,0,7);ctx.fill()}}
+  if(man.mode==='aim'&&dragging){const pv=pullVec(),id=powerStock(pw.sel)>0?pw.sel:null,sp=(1-.5*man.inf-.1*(man.bel||0))*(id==='turbo'?1.35:1),vx=pv[0]*9.2*sp,vy=pv[1]*9.2*sp;const gd=OPT().guide==null?2:OPT().guide;for(let t=.06,i=0;t<[0,.55,1.7][gd];t+=.075,i++){ctx.fillStyle=`rgba(255,255,255,${.9-i*.035})`;ctx.beginPath();ctx.arc(man.x+vx*t,man.y+vy*t+(id==='towel'?135:450)*t*t,3.4-i*.07,0,7);ctx.fill()}}
   renderMan();if(man.mode==='aim'||man.mode==='fly')drawInfFX(man);
   if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX-12,SY+22);ctx.lineTo(man.x-2,man.y+6);ctx.stroke()}
   drawSling(false);
@@ -4352,11 +4352,11 @@ cv.addEventListener('lostpointercapture',e=>{
 });
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
+  if(powerPickerOpen&&state==='play'){if(e.key==='Escape')powerPickerOpen=false;e.preventDefault();return}
   if(e.code==='Space'){dive();e.preventDefault()}
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
   if(state==='title')return;
   if(state==='play'&&CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){if(e.key==='[')goSling(slingK-1);if(e.key===']')goSling(slingK+1)}
-  if(e.key==='Escape'&&powerPickerOpen){powerPickerOpen=false;return}
   if(e.key==='Escape'){if(state==='play'||state==='win'||state==='lose')backFromPlay();else if(state==='edit'&&E.starters){E.starters=false}else if(state==='edit'){selTab=1;goSelect()}else if(state==='select'||state==='ach'||state==='outfit'||state==='options'||state==='ending')goMenu();return}
   if(state==='select'&&(e.key==='u'||e.key==='U')){PD.unlockAll=!PD.unlockAll;pdTouch();toast('ach',PD.unlockAll?'All levels unlocked':'Levels locked again','');return}
   if(state==='edit'){const k=e.key.toLowerCase();
