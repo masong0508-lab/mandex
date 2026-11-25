@@ -83,7 +83,10 @@ const ctx=new Proxy({measureText:s=>({width:String(s).length*10})},{
 });
 const env={
   W:540,H:960,ctx,WEB_UI:{portrait:true,page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0},
-  state:'menu',time:1,frameDt:.016,muted:false,webEcoFX:false,
+  state:'menu',time:1,frameDt:.016,muted:false,webEcoFX:false,frameMeterVisible:false,armReset:0,armProg:0,
+  webRenderCap:()=>30,webRenderScale:()=>.75,webFxBudget:()=>360,webEffectiveTier:()=>1,
+  webProfileLabel:()=>'AUTO',webProfile:()=>'auto',webCapLabel:()=>'AUTO',webScaleLabel:()=>'AUTO',webFXLabel:()=>'AUTO',
+  cycleWebProfile:()=>{},cycleWebCap:()=>{},cycleWebScale:()=>{},cycleWebFX:()=>{},
   hits:records,ACH:Array.from({length:17},(_,i)=>({id:'a'+i,n:'Achievement '+i,d:'Earn '+i})),
   OUTFITS:Array.from({length:16},(_,i)=>({id:'look'+i,n:'Outfit '+i})),
   outfitCur:{n:'Classic Red'},PD:{stars:{},ach:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
@@ -120,7 +123,7 @@ for(const height of [760,960,1170]){
   inspect('menu');
   for(const tab of [0,1,2,3]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
   inspect('ach');inspect('outfit');
-  for(const page of [0,1]){env.WEB_UI.page.options=page;inspect('options')}
+  for(const page of [0,1,2,3]){env.WEB_UI.page.options=page;inspect('options')}
 }
 assert(html.includes('WEB_UI.gesture={id:e.pointerId,x,y,screen:state}'),
  'portrait menu activation must defer to pointerup so swipes do not fire buttons');
