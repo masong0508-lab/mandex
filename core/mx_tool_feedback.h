@@ -18,7 +18,7 @@ typedef struct {
    in mx_meta.h (whose mx_tool_name has a different index mapping). */
 static inline const char *mx_power_name(int id){
   static const char *const names[PW_COUNT] = {
-    "NONE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE"
+    "NONE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE", "BREAKER"
   };
   return (unsigned)id<PW_COUNT?names[id]:"NONE";
 }
@@ -31,6 +31,7 @@ static inline const char *mx_tool_effect(int id){
     case PW_SPLAT:return "GOO ON IMPACT";
     case PW_TURBO:return "FASTER LAUNCH";
     case PW_QUAKE:return "LANDING SHOCKWAVE";
+    case PW_BREAKER:return "35% LESS WALL ENERGY";
     default:return "";
   }
 }
