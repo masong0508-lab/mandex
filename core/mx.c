@@ -2869,9 +2869,18 @@ void mx_set_wobble_budget(MxWorld *w, int cells){ w->wob_budget = cells < 0 ? 0 
 void mx_set_substeps(MxWorld *w, int n){ w->substeps = n < 2 ? 2 : n > 4 ? 4 : n; }
 void mx_preview_point(const MxWorld *w, real t, real *ox, real *oy){
   const MxMan *m = &w->man;
-  real vx = rmul(MX_ANCHOR_X - m->x, R(9.2)), vy = rmul(MX_ANCHOR_Y - m->y, R(9.2));
-  *ox = m->x + rmul(vx, t);
-  *oy = m->y + rmul(vy, t) + rmul(rmul(GRAV, R(0.5)), rmul(t, t));
+  const int pw=w->pw_sel>PW_NONE&&w->pw_sel<PW_COUNT&&w->pw_left[w->pw_sel]>0?w->pw_sel:PW_NONE;
+  const real sp=RI(1)-rmul(m->inf,R(0.5));
+  real vx=rmul(rmul(MX_ANCHOR_X-m->x,R(9.2)),sp),vy=rmul(rmul(MX_ANCHOR_Y-m->y,R(9.2)),sp);
+  if(pw==PW_TURBO){vx=rmul(vx,R(1.35));vy=rmul(vy,R(1.35));}
+  real fall=rmul(rmul(GRAV,R(0.5)),rmul(t,t));
+  if(pw==PW_TOWEL){
+    real a=t<R(1.8)?t:R(1.8),b=t-a;
+    real g=rmul(GRAV,R(0.3));
+    fall=rmul(rmul(g,R(0.5)),rmul(a,a))+rmul(rmul(g,a),b)+rmul(rmul(GRAV,R(0.5)),rmul(b,b));
+  }
+  *ox=m->x+rmul(vx,t);
+  *oy=m->y+rmul(vy,t)+fall;
 }
 int mx_targets_alive(const MxWorld *w){ int n = 0; for(int i = 0; i < w->ntargets; i++) n += w->targets[i].alive; return n; }
 int mx_cells_left(const MxWorld *w){ int n = 0; for(int i = 0; i < MX_ROWS * MX_COLS; i++) n += w->grid[i] != 0; return n; }
