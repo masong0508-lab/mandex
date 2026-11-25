@@ -868,6 +868,7 @@ static MxChunk *chunk_slot(MxWorld *w){
 
 static MX_HOT void support_pass(MxWorld *w){
   w->need_support = 0;
+  w->retry_cd = 0;
   memset(w->hb, 255, sizeof w->hb);
   unsigned head = 0, tail = 0;
   const unsigned QM = 8191;
@@ -893,19 +894,20 @@ static MX_HOT void support_pass(MxWorld *w){
   for(int i = 0; i < MX_ROWS * MX_COLS; i++){
     if(!w->grid[i] || w->grid[i] == MX_SAND || w->hb[i] != 255 || w->vis[i]) continue;
     MxChunk *ch = chunk_slot(w);
-    if(!ch) w->retry_cd = 20;            /* no free body right now: stay standing, but look again in a third of a second (a slab must not hang in the air for good) */
+    /* No free slot and no recyclable sleeper: nothing else in this pass
+       can allocate a body. Leave the remaining islands untouched; retry
+       as soon as cleanup frees a slot, with the old timeout as a fallback. */
+    if(!ch){w->retry_cd = 20;return;}
     int sp = 0, n = 0, oversized = 0;
     w->stack[sp++] = (uint16_t)i; w->vis[i] = 1;
     while(sp){
       int a = w->stack[--sp], x = a % MX_COLS, y = a / MX_COLS;
       /* Detach the first contiguous 512 voxels; let the rest fall on
          later support passes instead of leaving a giant wall hanging. */
-      if(ch){
-        if(n < MX_CHUNK_CELLS){
-          MxCell *c = &ch->cells[n++];
-          c->lx = RI(x); c->ly = RI(y); c->m = w->grid[a]; c->h = w->hp[a]; c->dead = 0;
-        } else oversized = 1;
-      }
+      if(n < MX_CHUNK_CELLS){
+        MxCell *c = &ch->cells[n++];
+        c->lx = RI(x); c->ly = RI(y); c->m = w->grid[a]; c->h = w->hp[a]; c->dead = 0;
+      } else oversized = 1;
       for(int d = 0; d < 4; d++){
         int nx = x + DX[d], ny = y + DY[d];
         if(!INB(nx, ny)) continue;
@@ -913,7 +915,6 @@ static MX_HOT void support_pass(MxWorld *w){
         if(w->grid[j] && w->grid[j] != MX_SAND && w->hb[j] == 255 && !w->vis[j] && !((w->brk[a] >> d) & 1)){ w->vis[j] = 1; w->stack[sp++] = (uint16_t)j; }
       }
     }
-    if(!ch) continue;                   /* no slot: retry when a sleeper settles */
     if(oversized) w->need_support = 1;  /* unsupported remainder falls next pass */
     /* The existing visited byte already marks the whole disconnected
        region as 1. Temporarily mark the selected <=512 cells as 2 so the
@@ -951,20 +952,20 @@ static MX_HOT void support_pass(MxWorld *w){
       wob_zero(w, gi); clear_links(w, gi);
     }
     cx = rdiv(cx, M); cy = rdiv(cy, M);
-    real rad = 0, tq = 0, ti = 0, cvx = rdiv(mvx, M), cvy = rdiv(mvy, M);
+    real rad2 = 0, tq = 0, ti = 0, cvx = rdiv(mvx, M), cvy = rdiv(mvy, M);
     for(int k = 0; k < n; k++){
       MxCell *c = &ch->cells[k];
       real d = MATS[c->m].d, rx = c->lx + R(0.5) - cx, ry = c->ly + R(0.5) - cy;
-      tq += rmul(d, rmul(rx, c->wy - cvy) - rmul(ry, c->wx - cvx)); ti += rmul(d, rmul(rx, rx) + rmul(ry, ry));
+      const real dist2 = rmul(rx, rx) + rmul(ry, ry);
+      tq += rmul(d, rmul(rx, c->wy - cvy) - rmul(ry, c->wx - cvx)); ti += rmul(d, dist2);
       c->lx = rx; c->ly = ry; c->wx = c->lx + cx; c->wy = c->ly + cy;
-      real r = rsqrt(rmul(c->lx, c->lx) + rmul(c->ly, c->ly));
-      if(r > rad) rad = r;
+      if(dist2 > rad2) rad2 = dist2;
     }
     ch->rest = 0; ch->restT = 0;
     ch->active = 1; ch->count = n; ch->x = cx; ch->y = cy; ch->ang = 0;
     ch->vx = rclamp(cvx, -WOB_VMAX, WOB_VMAX); ch->vy = rclamp(cvy, -WOB_VMAX, WOB_VMAX);
     ch->w = ti > R(1) ? rclamp(rdiv(tq, ti), -RI(6), RI(6)) : 0;   /* the sway becomes a topple */
-    ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rad + R(1); ch->cs = RI(1); ch->sn = 0;
+    ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rsqrt(rad2) + R(1); ch->cs = RI(1); ch->sn = 0;
     ch->px = cx; ch->py = cy; ch->pa = 0;
     ch->tnt_hit=-1;
     recompute(ch);
@@ -2967,6 +2968,12 @@ void mx_update(MxWorld *w, real dt){
   update_moving_tnt(w);
   process_expl(w); /* collisions can light TNT AFTER the initial explosion pass */
   clean_chunks(w, dt);
+  /* A saturated pool used to leave unsupported slabs hovering for up to
+     twenty updates after a slot became free. Respect the support budget,
+     but schedule the next permitted pass immediately. */
+  if(w->retry_cd > 0)for(int c=0;c<MX_MAX_CHUNKS;c++)if(!w->chunks[c].active){
+    w->retry_cd=0;w->need_support=1;break;
+  }
   MX_PH_MARK(3);
   if(w->wob_on){
     MX_WOB_MARK(0);
