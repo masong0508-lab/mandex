@@ -314,6 +314,7 @@ for L in 0 9 20 21 29 39 50 59; do
 done
 echo "--- DS landlord walking phase: exhaustively match 1,966,080 fixed-point values to original float phase ---"
 DS_WALK_PHASE_PROBE=1 ./ds_render
+DS_RING_ANGLE_PROBE=1 ./ds_render
 echo "--- DS walking phase fastpath: sampled complete gameplay frame hashes vs original for 5 levels ---"
 for mode in 0 1; do
   gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST -DMX_DS_INTEGER_WALK_PHASE=$mode \
