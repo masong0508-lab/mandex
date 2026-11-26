@@ -612,11 +612,32 @@ function tubeStep(m,dt){
     ring(tb.ax,tb.ay,50,tb.col);SFX.whoosh();popText(tb.ax,tb.ay-34,'FWOOMP!',tb.col,24);
     m.x=tb.bx;m.y=tb.by;m.vx=Math.cos(tb.ang)*tb.sp;m.vy=Math.sin(tb.ang)*tb.sp;
     m.face=flightFaceFor(m.vx,m.face);m.ang=0; // blend into the new tube direction without a one-frame flip
-    m.tubeT=.55;m.tubeCd=.35;ring(tb.bx,tb.by,50,tb.col);SFX.pop();shake=Math.max(shake,3);break}}
-function drawPads(){for(const p of pads){const cx=p.x+p.w/2,bob=Math.sin(time*5)*3;ctx.save();ctx.strokeStyle='#fff';ctx.lineWidth=3;for(let k=0;k<3;k++){ctx.globalAlpha=.9-k*.25;const y=p.y-16-k*14-bob;ctx.beginPath();ctx.moveTo(cx-10,y+6);ctx.lineTo(cx,y-6);ctx.lineTo(cx+10,y+6);ctx.stroke()}ctx.restore()}}
+    m.tubeT=.55;m.tubeCd=.35;tb.pulseAt=time;ring(tb.bx,tb.by,50,tb.col);SFX.pop();shake=Math.max(shake,3);break}}
+function tubePulse(tb){
+  const age=time-tb.pulseAt;
+  if(!Number.isFinite(age)||age<0||age>=.45)return 0;
+  const q=1-age/.45;return q*q;
+}
+// Animated guidance must follow surviving rubber rather than a deleted pad.
+function drawPads(){
+  for(const p of pads){
+    const row=Math.floor(p.y/V),start=Math.floor(p.x/V),end=Math.ceil((p.x+p.w)/V);
+    let first=-1,last=-1;
+    for(let x=start;x<end;x++)if(inb(x,row)&&grid[idx(x,row)]===RUBBER){if(first<0)first=x;last=x}
+    if(first<0)continue;
+    const cx=(first+last+1)*V/2;
+    ctx.save();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.lineCap='round';
+    for(let k=0;k<3;k++){
+      const phase=(time*1.25+k/3)%1,y=p.y-12-phase*48;
+      ctx.globalAlpha=.12+.78*Math.sin(Math.PI*phase);
+      ctx.beginPath();ctx.moveTo(cx-10,y+6);ctx.lineTo(cx,y-6);ctx.lineTo(cx+10,y+6);ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
 function drawTubes(){
   tubes.forEach((tb,i)=>{
-    const sw=Math.sin(time*1.3+i*2)*3,bx=tb.ax+sw,by=tb.ay-62+Math.sin(time*1.9+i)*3;
+    const sw=Math.sin(time*1.3+i*2)*3,bx=tb.ax+sw,by=tb.ay-62+Math.sin(time*1.9+i)*3,pulse=tubePulse(tb);
     ctx.save();
     // rope from the balloon down to the mouth
     ctx.strokeStyle='#3a2a1a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(bx-9,by+26);ctx.lineTo(tb.ax-12,tb.ay-24);ctx.moveTo(bx+9,by+26);ctx.lineTo(tb.ax+12,tb.ay-24);ctx.stroke();
@@ -630,12 +651,15 @@ function drawTubes(){
     ctx.strokeStyle='#c89a3a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(tb.ax,tb.ay,30,0,7);ctx.stroke();
     ctx.strokeStyle=tb.col;ctx.lineWidth=2.4;ctx.beginPath();
     for(let k=0;k<=60;k++){const a=k*.3+time*5,r=k*.37;const x=tb.ax+Math.cos(a)*r,y=tb.ay+Math.sin(a)*r;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}
-    ctx.stroke();ctx.restore();
+    ctx.stroke();
+    if(pulse>0){ctx.globalAlpha=pulse*.85;ctx.strokeStyle='#fff8d7';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(tb.ax,tb.ay,31+(1-pulse)*12,0,Math.PI*2);ctx.stroke()}
+    ctx.restore();
     // brass nozzle stub on the wall of the room, with a coloured collar
     ctx.save();ctx.translate(tb.bx,tb.by);
     ctx.fillStyle='#c8963a';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.fillRect(-38,-11,32,22);ctx.strokeRect(-38,-11,32,22);
     ctx.fillStyle='#ffe08a';ctx.fillRect(-36,-9,28,5);
     ctx.fillStyle=tb.col;ctx.fillRect(-6,-13,11,26);ctx.strokeRect(-6,-13,11,26);
+    if(pulse>0){ctx.globalAlpha=pulse*.9;ctx.strokeStyle='#fff8d7';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(8+(1-pulse)*25,0,3+(1-pulse)*5,15+(1-pulse)*7,0,0,Math.PI*2);ctx.stroke()}
     ctx.restore()})}
 
 // a landlord's body is about five cells wide and six tall: one whose box touches a wall, pillar or slab is moved sideways to the nearest clear spot (core/mx.c does the same), so nobody stands half inside the masonry
@@ -3315,7 +3339,7 @@ function drawParts(x0,x1,y0,y1){
     else if(p.k===2){ctx.globalAlpha=Math.min(1,a*1.4);ctx.strokeStyle='#ffd36b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*.035,p.y-p.vy*.035);ctx.stroke()}
     else if(p.k===3){ctx.globalAlpha=Math.min(1,a*1.5);ctx.fillStyle='#7dff5a';ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,7);ctx.fill();ctx.fillStyle='rgba(255,255,255,.6)';ctx.fillRect(p.x-1,p.y-1.5,1.4,1.4)}
     else if(p.k===4){ctx.globalAlpha=Math.min(1,a*1.5);ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle='#fff';ctx.fillRect(-p.s,-p.s*.7,p.s*2,p.s*1.4);ctx.fillStyle='#2a8a2a';ctx.fillRect(-p.s*.4,-1,p.s*.8,1.2);ctx.restore()}
-    else if(p.k===5){ctx.globalAlpha=a;ctx.strokeStyle=p.c;ctx.lineWidth=4*a+1;ctx.beginPath();ctx.arc(p.x,p.y,p.s*(1-a),0,7);ctx.stroke()}
+    else if(p.k===5){const q=Math.max(0,Math.min(1,a));ctx.globalAlpha=q*q;ctx.strokeStyle=p.c;ctx.lineWidth=4*q+1;ctx.beginPath();ctx.arc(p.x,p.y,p.s*(1-q*q*q),0,7);ctx.stroke()}
     else if(p.k===6){ctx.globalAlpha=a*.5;const r=p.s*(1+(1-a)*1.7);ctx.fillStyle=p.c||'#a6d63c';ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fill();
       ctx.globalAlpha=a*.35;ctx.fillStyle='#d6f27a';ctx.beginPath();ctx.arc(p.x-r*.25,p.y-r*.25,r*.5,0,7);ctx.fill()}
     else if(p.k===7){const gr=p.g?Math.min(1,(p.l0-p.l)*2.2):1,sz=p.s*gr;ctx.globalAlpha=Math.min(1,a*2)*.9;ctx.fillStyle=p.c||'#bfe8ff';ctx.beginPath();ctx.arc(p.x,p.y,sz,0,7);if(!p.g){ctx.moveTo(p.x-sz*.8,p.y-sz*.4);ctx.lineTo(p.x,p.y-sz*2.3);ctx.lineTo(p.x+sz*.8,p.y-sz*.4)}ctx.fill();if(p.g){ctx.fillStyle='rgba(255,255,255,.8)';ctx.beginPath();ctx.arc(p.x-sz*.3,p.y-sz*.3,sz*.3,0,7);ctx.fill()}
@@ -3860,6 +3884,17 @@ function drawRoomDetails(xlo,xhi,ylo,yhi){
     }
   }
 }
+// Fuse illumination is tied to live moving TNT only, with no new particles.
+function fuseGlow(ticks){
+  if(!(ticks>0))return 0;
+  const q=Math.max(0,Math.min(1,1-ticks/24));
+  return Math.min(1,.22+.62*q+.14*(.5+.5*Math.cos(ticks*.85)));
+}
+function drawFuseGlow(a){
+  const q=fuseGlow(a.fuse);if(!q)return;
+  ctx.save();ctx.globalAlpha=q;ctx.fillStyle='#ffb342';ctx.fillRect(a.lx-3,a.ly-3,6,6);
+  ctx.fillStyle='#fff5c4';ctx.fillRect(a.lx-1,a.ly-1,2,2);ctx.restore();
+}
 function draw(){
   hits=[];
   ctx.setTransform(1,0,0,1,0,0);const camOn=CAM.on&&(state==='play'||state==='win'||state==='lose');
@@ -3919,6 +3954,7 @@ function draw(){
                       a.wy<rubbleY0-V||a.wy>rubbleY1+V))continue;
       const r=a.h/MAT[a.m].hp;
       ctx.drawImage(SPR[a.m][(a.lx*7+a.ly*3|0)&3][r>.66?0:r>.33?1:2],-V/2+a.lx,-V/2+a.ly);
+      if(a.fuse>0&&a.m===TNT)drawFuseGlow(a);
     }
     ctx.restore();
   }
