@@ -99,7 +99,7 @@ for mode in float fixed;do
   "./native_prop_animation_$mode"
 done
 echo "--- Trial expansion: raw asset, native table and browser decoder parity ---"
-if command -v node >/dev/null 2>&1;then node trial_pack_test.js;node browser_options_parity_test.js;fi
+if command -v node >/dev/null 2>&1;then node trial_pack_test.js;node browser_options_parity_test.js;node browser_blast_effects_test.js;node browser_collapse_hotpath_test.js;fi
 for opts_flags in '' '-DMX_FIXED'; do
   gcc -std=gnu99 -O2 $opts_flags -I../core native_options_test.c ../core/mx_meta.c -lm -o /tmp/mx_native_opts
   /tmp/mx_native_opts

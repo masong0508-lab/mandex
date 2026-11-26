@@ -1,3 +1,5 @@
 # Mega Districts expansion
 
 18 new districts, 360 deterministic generated layouts, 600 total stages and 27 trial districts. Four structural archetypes with five tiers per district, mixed materials, roof rebound pads, pneumatic crossings, sand banks and explosive supports. 96 added walking trials. Existing IDs and 180 previous trial maps retained. 3,102,731 bytes of new editable JSON geometry before compression; 134,976 added packed command bytes. New v4 native save uses a 16-bit level count, reads v1-v3, fits 8KB DS backup and 7 VMU sectors per journal slot. Optimized native static tile broadphase, single-body collision and slab radius. Full compilation and physical playthrough pending.
+
+Browser: direct district directory with progress for all 27 districts, one-tap trial navigation, optimized base64 decoding, single-body/static contact broadphase, stable particle and text cleanup, bounded aftershock heap, indexed TNT queue and early axis rejection. Frozen-reference browser parity checks imported.

@@ -868,21 +868,63 @@ function busy(){for(const c of chunks)if(!c.rest)return true;return false}
 function wake(ch){ch.rest=false;ch.sleep=0;ch.restT=0;ch.age=Math.max(ch.age,.2)}
 function wakeAt(px,py,r){for(const c of chunks)if(c.rest&&Math.hypot(c.x-px,c.y-py)<c.rad+r)wake(c)}
 function markDmg(x,y){for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(inb(nx,ny))dmg[idx(nx,ny)]=1}}
+let AFTERSHOCK_ZONE=new Uint8Array(0);
+const CRUMBLE_LIMIT=80,CRUMBLE_ID=new Uint16Array(CRUMBLE_LIMIT),
+      CRUMBLE_RATIO=new Float64Array(CRUMBLE_LIMIT);
+function crumbleWorse(r,i,s,j){return r>s||(r===s&&i>j)}
+function crumbleOffer(n,r,i){
+  let k;
+  if(n<CRUMBLE_LIMIT){
+    k=n++;
+    while(k>0){
+      const p=(k-1)>>1;
+      if(!crumbleWorse(r,i,CRUMBLE_RATIO[p],CRUMBLE_ID[p]))break;
+      CRUMBLE_RATIO[k]=CRUMBLE_RATIO[p];CRUMBLE_ID[k]=CRUMBLE_ID[p];k=p;
+    }
+  }else{
+    if(!crumbleWorse(CRUMBLE_RATIO[0],CRUMBLE_ID[0],r,i))return n;
+    k=0;
+    for(;;){
+      let j=k*2+1;if(j>=n)break;
+      if(j+1<n&&crumbleWorse(CRUMBLE_RATIO[j+1],CRUMBLE_ID[j+1],CRUMBLE_RATIO[j],CRUMBLE_ID[j]))j++;
+      if(!crumbleWorse(CRUMBLE_RATIO[j],CRUMBLE_ID[j],r,i))break;
+      CRUMBLE_RATIO[k]=CRUMBLE_RATIO[j];CRUMBLE_ID[k]=CRUMBLE_ID[j];k=j;
+    }
+  }
+  CRUMBLE_RATIO[k]=r;CRUMBLE_ID[k]=i;return n;
+}
 function aftershock(){
-  const zone=new Uint8Array(COLS*ROWS);let any=false;
-  for(let i=0;i<dmg.length;i++)if(dmg[i]||brk[i]){const x=i%COLS,y=(i/COLS)|0;
-    for(let j=-2;j<=2;j++)for(let k=-2;k<=2;k++){if(Math.abs(j)+Math.abs(k)>3)continue;const X=x+k,Y=y+j;if(inb(X,Y)){zone[idx(X,Y)]=1;any=true}}}
-  dmg.fill(0);if(!any)return;
-  const weak=[];
-  for(let i=0;i<grid.length;i++){const m=grid[i];if(!zone[i]||!m||m===SAND)continue;
-    anch[i]=0;const r=hp[i]/MAT[m].hp;if(r<.7)weak.push([r,i])}
-  weak.sort((a,b)=>a[0]-b[0]);
-  let sx=0,sy=0,n=0;
-  for(const[,i]of weak.slice(0,80)){const x=i%COLS,y=(i/COLS)|0;
+  if(AFTERSHOCK_ZONE.length!==grid.length)AFTERSHOCK_ZONE=new Uint8Array(grid.length);
+  else AFTERSHOCK_ZONE.fill(0);
+  const zone=AFTERSHOCK_ZONE;let lo=grid.length,hi=-1;
+  for(let i=0;i<dmg.length;i++)if(dmg[i]||brk[i]){
+    const x=i%COLS,y=(i/COLS)|0;
+    for(let dy=-2;dy<=2;dy++){
+      const yy=y+dy;if(yy<0||yy>=ROWS)continue;
+      const reach=Math.min(2,3-Math.abs(dy)),x0=Math.max(0,x-reach),x1=Math.min(COLS-1,x+reach);
+      const first=idx(x0,yy),last=idx(x1,yy);
+      zone.fill(1,first,last+1);
+      if(first<lo)lo=first;if(last>hi)hi=last;
+    }
+  }
+  dmg.fill(0);if(hi<lo)return;
+  let n=0;
+  for(let i=lo;i<=hi;i++){
+    const m=grid[i];if(!zone[i]||!m||m===SAND)continue;
+    anch[i]=0;const r=hp[i]/MAT[m].hp;if(r<.7)n=crumbleOffer(n,r,i);
+  }
+  // Joint writes are bitwise OR and the centroid sums are integral:
+  // selecting the same members is sufficient; their order cannot change
+  // the result or the single CRUMBLE event.
+  let sx=0,sy=0;
+  for(let k=0;k<n;k++){
+    const i=CRUMBLE_ID[k],x=i%COLS,y=(i/COLS)|0;
     for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];brk[i]|=1<<d;if(inb(nx,ny))brk[idx(nx,ny)]|=1<<(d^1)}
-    sx+=x;sy+=y;n++}
+    sx+=x;sy+=y;
+  }
   needSupport=true;
-  if(n){shake=Math.max(shake,3);SFX.thud(.5);popText(sx/n*V+V/2,sy/n*V-30,'CRUMBLE!','#ffd23f',26)}}
+  if(n){shake=Math.max(shake,3);SFX.thud(.5);popText(sx/n*V+V/2,sy/n*V-30,'CRUMBLE!','#ffd23f',26)}
+}
 function damageCell(x,y,d){if(!inb(x,y))return 0;const i=idx(x,y);
   if(!grid[i]){if(paper[i]&&d>=4)paperHit(x,y);return 0}
   if(hp[i]<=d)return kill(x,y,0,0);hp[i]-=d;return d}
@@ -890,10 +932,21 @@ function blast(cx,cy,r,power){let spent=0;const R=Math.ceil(r);
   for(let j=-R;j<=R;j++)for(let i=-R;i<=R;i++){const d=Math.hypot(i,j);if(d>r)continue;spent+=damageCell(cx+i,cy+j,power*(1-d/r)+(d<1?power*.25:0))}return spent}
 function applyImpulse(ch,px,py,jx,jy){ch.vx+=jx/ch.m;ch.vy+=jy/ch.m;ch.w+=((px-ch.x)*jy-(py-ch.y)*jx)/ch.I;ch.sleep=0}
 function shockwave(px,py,rpx,power){
-  for(const ch of chunks){const dx=ch.x-px,dy=ch.y-py,d=Math.hypot(dx,dy)||1;if(d>rpx*1.9)continue;const f=(1-d/(rpx*1.9))*power;
+  const chunkReach=rpx*1.9,targetReach=rpx*1.05,partReach=rpx*1.6;
+  for(const ch of chunks){const dx=ch.x-px,dy=ch.y-py;
+    if(Math.abs(dx)>chunkReach||Math.abs(dy)>chunkReach)continue;
+    const d=Math.hypot(dx,dy)||1;if(d>chunkReach)continue;const f=(1-d/chunkReach)*power;
     applyImpulse(ch,ch.x-dx*.3,ch.y-dy*.3,dx/d*f,dy/d*f-f*.35)}
-  for(const t of targets)if(t.alive&&Math.hypot(t.x-px,t.y-py)<rpx*1.05)killTarget(t,true);
-  for(const p of parts){const dx=p.x-px,dy=p.y-py,d=Math.hypot(dx,dy)||1;if(d<rpx*1.6&&p.k!==5){p.vx+=dx/d*260;p.vy+=dy/d*260}}}
+  for(const t of targets)if(t.alive){
+    const dx=t.x-px,dy=t.y-py;
+    if(Math.abs(dx)>targetReach||Math.abs(dy)>targetReach)continue;
+    if(Math.hypot(dx,dy)<targetReach)killTarget(t,true);
+  }
+  for(const p of parts){if(p.k===5)continue;
+    const dx=p.x-px,dy=p.y-py;
+    if(Math.abs(dx)>partReach||Math.abs(dy)>partReach)continue;
+    const d=Math.hypot(dx,dy)||1;if(d<partReach){p.vx+=dx/d*260;p.vy+=dy/d*260}}
+}
 /* Match the console core's structural-shock reactions without a per-frame
    enemy/hazard scan.  Only real collapse events call this bounded loop.
    Nothing allocated; existing panic and dodge fields drive the animations. */
@@ -964,12 +1017,18 @@ function updateMovingTnt(){
   }
   tntLiveFuses=live;
 }
-function processExpl(){let n=0;
-  while(explQ.length&&n++<80){const[x,y]=explQ.shift(),px=x*V+V/2,py=y*V+V/2;onBoom();
+function processExpl(){let head=0;
+  // New charges append to the same FIFO while blasts run. Consume by
+  // index, then compact once rather than shifting the entire queue up to
+  // eighty times during the most CPU-intensive moment of a demolition.
+  while(head<explQ.length&&head<80){const[x,y]=explQ[head++],px=x*V+V/2,py=y*V+V/2;onBoom();
     blast(x,y,7,95);blastMovingTnt(px,py);wobBlast(x,y,14,26);shockwave(px,py,7*V,5200);lordShock(px,py,14*V,.8);shake=Math.max(shake,9);slow=Math.max(slow,.35);freeze=Math.max(freeze,3);flash=.35;SFX.boom();
     ring(px,py,90,'#ffcf6b');
     for(let k=0;k<30;k++)P({k:2,x:px,y:py,vx:(rnd()-.5)*620,vy:-rnd()*520,l:.5+rnd()*.5,l0:1});
-    for(let k=0;k<8;k++)P({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}}
+    for(let k=0;k<8;k++)P({k:1,x:px+(rnd()-.5)*30,y:py+(rnd()-.5)*30,vx:(rnd()-.5)*160,vy:-rnd()*120,l:1+rnd(),l0:2,s:16+rnd()*14,c:'#555'});}
+  if(head===explQ.length)explQ.length=0;
+  else if(head){explQ.copyWithin(0,head);explQ.length-=head;}
+}
 
 // ---------- wobble lattice (mirrors core/mx.c): every voxel is a mass on springs to its 4 neighbours ----------
 // offsets ox/oy are in cells, velocities in cells/s.  Hits inject velocity that travels as a wave; a joint that
@@ -1114,9 +1173,14 @@ const CHUNK_HASH=new Map(),CHUNK_BUCKET_POOL=[];
 const CHUNK_BUCKET_CACHE_MAX=2048;
 function stepChunks(dt){
   if(!chunks.length)return;
+  const pairContacts=chunks.length>1;
   const map=CHUNK_HASH;map.clear();let bucketCount=0;
   for(const ch of chunks){if(!ch.rest){ch.vy+=G*dt;ch.vx*=.9995;ch.w*=.998;ch.x+=ch.vx*dt;ch.y+=ch.vy*dt;ch.ang+=ch.w*dt;ch.cs=Math.cos(ch.ang);ch.sn=Math.sin(ch.ang)}ch.cx=ch.cy=0;ch.cn=0;
-    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
+    for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}
+      // A lone slab cannot collide with another rubble body. Keep the
+      // transforms and static contacts, but skip all spatial-hash work.
+      if(!pairContacts)continue;
+      const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
       b=bucketCount<CHUNK_BUCKET_CACHE_MAX?(CHUNK_BUCKET_POOL[bucketCount]||(CHUNK_BUCKET_POOL[bucketCount]=[])):[];
       bucketCount++;map.set(k,b)
     }b.push(a)}}
@@ -1124,7 +1188,13 @@ function stepChunks(dt){
     for(const a of ch.cells){
       if(a.dead)continue;
       const gx=Math.floor(a.wx/V),gy=Math.floor(a.wy/V);
-      for(let j=gy-1;j<=(ch.rest?gy-2:gy+1)&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){
+      // A half-cell circle can touch only its containing tile and the
+      // neighbor on either side of the local midpoint, never both sides.
+      // Preserve row/column order and the exact narrow-phase test below.
+      const fx=a.wx-gx*V,fy=a.wy-gy*V;
+      const left=gx-(fx<RC?1:0),right=gx+(V-fx<RC?1:0);
+      const top=gy-(fy<RC?1:0),bottom=gy+(V-fy<RC?1:0);
+      for(let j=top;j<=bottom&&!ch.rest&&!a.dead;j++)for(let i=left;i<=right&&!a.dead;i++){
         if(!(j>=ROWS||(inb(i,j)&&grid[idx(i,j)])))continue;
         const bx=i*V,by=j*V,qx=clamp(a.wx,bx,bx+V),qy=clamp(a.wy,by,by+V),dx=a.wx-qx,dy=a.wy-qy,d2=dx*dx+dy*dy;
         if(d2>=RC*RC)continue;let nx,ny,pen;
@@ -1134,8 +1204,12 @@ function stepChunks(dt){
         resolveStatic(ch,a,nx,ny,Math.min(pen,4),i,j)}
       // A fatal contact keeps its impulse, then the shattered cell stops
       // colliding immediately. Cleanup/mass updates still happen once later.
-      if(a.dead)continue;
+      if(a.dead||!pairContacts)continue;
       for(let j=gy-1;j<=gy+1&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){const b=map.get((i+4)*1024+(j+4));if(!b)continue;
+        // Each body inserts its cells contiguously. If the first and last
+        // entries share an owner, this bucket has no other owner between.
+        // The existing ID rule rejects every candidate in an older/self bucket.
+        if(b[0].ch===b[b.length-1].ch&&b[0].ch.id<=ch.id)continue;
         for(const o of b){if(a.dead)break;if(o.dead)continue;const oc=o.ch;if(oc.id<=ch.id)continue;const dx=a.wx-o.wx,dy=a.wy-o.wy,d2=dx*dx+dy*dy;if(d2>=V*V||d2<1e-6)continue;
           const d=Math.sqrt(d2),nx=dx/d,ny=dy/d,pen=V-d,rax=a.wx-ch.x,ray=a.wy-ch.y,rbx=o.wx-oc.x,rby=o.wy-oc.y;
           const vax=ch.vx-ch.w*ray,vay=ch.vy+ch.w*rax,vbx=oc.vx-oc.w*rby,vby=oc.vy+oc.w*rbx,vn=(vax-vbx)*nx+(vay-vby)*ny;
@@ -1160,17 +1234,40 @@ function stepChunks(dt){
   for(let i=0,n=Math.min(bucketCount,CHUNK_BUCKET_CACHE_MAX);i<n;i++)CHUNK_BUCKET_POOL[i].length=0;
   map.clear();
 }
+// Match the visible rotated slab and its world-space hitboxes after the
+// final penetration correction, before moving TNT is tested. Translate
+// cached cells only when needed; never redo their per-cell rotation.
+function syncChunkPoses(){
+  for(const ch of chunks){
+    let k=0;while(k<ch.cells.length&&ch.cells[k].dead)k++;
+    if(k===ch.cells.length)continue;
+    const a=ch.cells[k],dx=ch.x+ch.cs*a.lx-ch.sn*a.ly-a.wx,
+                        dy=ch.y+ch.sn*a.lx+ch.cs*a.ly-a.wy;
+    if(!dx&&!dy)continue;
+    for(;k<ch.cells.length;k++){const cell=ch.cells[k];if(!cell.dead){cell.wx+=dx;cell.wy+=dy}}
+  }
+}
 function cleanChunks(dt){
   for(let k=chunks.length-1;k>=0;k--){const ch=chunks[k];let lost=false;
     for(const a of ch.cells)if(a.dead){lost=true;score+=5}
-    if(lost){ch.cells=ch.cells.filter(a=>!a.dead);if(!ch.cells.length){chunks.splice(k,1);continue}recompute(ch)}
+    if(lost){
+      // Preserve live fragment identity and order without allocating a
+      // replacement array on each impact-heavy frame.
+      let n=0;for(const a of ch.cells)if(!a.dead)ch.cells[n++]=a;
+      ch.cells.length=n;
+      if(!n){chunks.splice(k,1);continue}recompute(ch)
+    }
     if(ch.hitCd>0)ch.hitCd-=dt;
     if(ch.tntFused){ch.sleep=0;continue} // the fuse cannot vanish when rubble welds
     if(ch.x<-250||ch.x>WW+250||ch.y>WH+300){chunks.splice(k,1);continue}
     const sp=Math.hypot(ch.vx,ch.vy)+Math.abs(ch.w)*18;
     if(ch.rest){
       if(!live()||sp>30||(ch.restT+=dt)>2.4+(ch.id%7)*.3)wake(ch);else{ch.vx=ch.vy=ch.w=0;continue}}
-    if(sp>40&&live())for(const o of chunks)if(o.rest&&Math.hypot(o.x-ch.x,o.y-ch.y)<o.rad+ch.rad+V*2)wake(o);
+    if(sp>40&&live())for(const o of chunks)if(o.rest){
+      const dx=o.x-ch.x,dy=o.y-ch.y,reach=o.rad+ch.rad+V*2;
+      if(Math.abs(dx)>=reach||Math.abs(dy)>=reach)continue;
+      if(Math.hypot(dx,dy)<reach)wake(o);
+    }
     if(sp<8&&ch.age>.15){ch.sleep+=dt;if(ch.sleep>.5){
       if(live()){ch.rest=true;ch.restT=0;ch.vx=ch.vy=ch.w=0}else{settleRaw(ch,false);chunks.splice(k,1)}}}else ch.sleep=0}
   if(chunks.length>140&&live()){
@@ -3389,14 +3486,24 @@ const MAN_FRAMES={
 function P(o){if(parts.length<fxLimit())parts.push(o)}
 function sweat(x,y){P({k:7,g:1,x:x+(rnd()-.5)*10,y:y+(rnd()-.5)*4,vx:(rnd()-.5)*6,vy:0,l:1.1,l0:1.1,s:1.6+rnd()*.9,c:'#bfe8ff'})}   // a bead forms on the skin, swells, then trickles down
 function updParts(dt){
-  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0){parts.splice(i,1);continue}
+  // Keep the original reverse update/audio order. Compact expired effects
+  // in a single stable forward pass; thousands of simultaneous deaths no
+  // longer repeatedly shift the surviving particle array.
+  let expired=false;
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0){expired=true;continue}
     if(p.k===1||p.k===6){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.98;p.vy*=.99;continue}
     if(p.k===5||(p.k===8&&p.sp))continue;
     if(p.k>=9){p.x+=p.vx*dt;p.y+=p.vy*dt;continue}
     p.vy+=(p.k===2?G*.4:p.g?G*.12:G)*dt;const ox=p.x,oy=p.y;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.k===4){p.vx*=.97;p.vy=Math.min(p.vy,90);p.r+=dt*6}
     if(p.y>GY-2){p.y=GY-2;p.vy*=-.3;p.vx*=.6;if(p.k===8&&!p.sp){p.sp=1;SFX.booger()}}
-    if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}}
-function updTexts(dt){for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=28*dt;if(t.t>t.l)texts.splice(i,1)}}
+    if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}
+  if(expired){let write=0;for(let i=0;i<parts.length;i++){const p=parts[i];if(!(p.l<=0))parts[write++]=p;}parts.length=write;}
+}
+function updTexts(dt){
+  let write=0;
+  for(let i=0;i<texts.length;i++){const t=texts[i];t.t+=dt;t.y-=28*dt;if(!(t.t>t.l))texts[write++]=t;}
+  texts.length=write;
+}
 let endT=0;
 function drawParts(x0,x1,y0,y1){
   // Paint culling only: the simulation still updates every effect. The
@@ -4505,6 +4612,18 @@ function drawToasts(dt){
 const UISTATES=['menu','select','ach','outfit','options','ending'];
 let selTab=0,trialDistrict=0;
 // The district summary is derived from existing saves; no new save fields.
+function drawDistrictDirectory(portrait){
+  const count=TRIAL_DISTRICTS.length,cols=portrait?3:5,margin=portrait?12:28,gap=8;
+  const rows=Math.ceil(count/cols),top=portrait?203:112,foot=60;
+  const w=(W-margin*2-gap*(cols-1))/cols,h=Math.min(portrait?61:62,Math.floor((H-top-foot-gap*(rows-1))/rows));
+  for(let i=0;i<count;i++){
+    const x=margin+i%cols*(w+gap),y=top+Math.floor(i/cols)*(h+gap),p=trialDistrictProgress(i);
+    btn(x,y,w,h,'',()=>{trialDistrict=i;WEB_UI.districtPicker=false;WEB_UI.page.select=0},{on:i===trialDistrict});
+    trialTextFit(TRIAL_DISTRICTS[i],x+w/2,y+Math.min(23,h*.43),w-12,portrait?14:16,'#fff');
+    txt(p.cleared+'/20  |  '+p.earned+'/60 ★',x+w/2,y+h-9,12,'#cfd','center');
+  }
+  btn(W/2-110,H-52,220,40,'BACK TO TRIALS',()=>{WEB_UI.districtPicker=false},{size:15});
+}
 function trialDistrictProgress(d,stars=PD.stars){
   const first=TRIAL_START+d*20;let cleared=0,earned=0,next=-1;
   for(let i=first;i<Math.min(first+20,LEVELS.length);i++){
@@ -4527,8 +4646,8 @@ function trialTextFit(s,x,y,maxWidth,size,color){
   while(size>10&&ctx.measureText(s).width>maxWidth){size--;ctx.font='bold '+size+'px "Trebuchet MS",Impact,sans-serif';}
   txt(s,x,y,size,color,'center');
 }
-function goMenu(){state='menu';hits=[]}
-function goSelect(){state='select';hits=[]}
+function goMenu(){WEB_UI.districtPicker=false;state='menu';hits=[]}
+function goSelect(){WEB_UI.districtPicker=false;state='select';hits=[]}
 function startStory(i){testing=false;if(i>=TRIAL_START){selTab=4;trialDistrict=Math.floor((i-TRIAL_START)/20);load(i);return}selTab=i>=CH2?3:i>=CH1?2:0;if(i===0){startCut();return}if(i===CH2){startCut3();return}load(i)}
 // ---------- OPENING CUTSCENE: the origin of MANDEX (plays before story level 1; tap = next, SKIP or Esc = straight to the level) ----------
 let cutI=0,cutT=0,cutFx=0;
@@ -5512,13 +5631,16 @@ function drawMobileSelect(){
   mobileHeader('SELECT LEVEL',selTab===1?'YOUR CUSTOM LEVELS':'CHOOSE A DISTRICT',goMenu);
   const labels=['STORY','MY LEVELS','CHAPTER 2','CHAPTER 3','TRIALS'],tabs=[0,1,2,3,4];
   for(let i=0;i<5;i++)mobileTab(12+(i%3)*174,101+Math.floor(i/3)*48,168,labels[i],
-    ()=>{selTab=tabs[i];WEB_UI.page.select=0},selTab===tabs[i]);
+    ()=>{selTab=tabs[i];WEB_UI.districtPicker=false;WEB_UI.page.select=0},selTab===tabs[i]);
   if(selTab===4){
+    if(WEB_UI.districtPicker){drawDistrictDirectory(true);return}
     btn(12,201,82,43,'<',()=>{trialDistrict=(trialDistrict+TRIAL_DISTRICTS.length-1)%TRIAL_DISTRICTS.length;WEB_UI.page.select=0},{size:18});
-    txt(TRIAL_DISTRICTS[trialDistrict].toUpperCase(),W/2,220,18,'#ffd23f','center');
+    btn(100,201,W-200,43,'',()=>{WEB_UI.districtPicker=true},{size:14});
+    trialTextFit(TRIAL_DISTRICTS[trialDistrict].toUpperCase(),W/2,217,W-216,16,'#ffd23f');
+    txt('TAP FOR DISTRICTS',W/2,232,11,'#cfd','center');
     const p=trialDistrictProgress(trialDistrict);
-    txt((trialDistrict+1)+'/'+TRIAL_DISTRICTS.length+'  |  '+p.cleared+'/20 CLEARED  |  '+p.earned+'/60 ★',W/2,239,12,'#fff','center');
-    btn(12,250,W-24,38,p.next<0?'DISTRICT COMPLETE':'PLAY NEXT UNCLEARED TRIAL',()=>trialNextUnfinished(trialDistrict),{size:16,on:p.next>=0,disabled:p.next<0,col:'#7dff5a'});
+    txt((trialDistrict+1)+'/'+TRIAL_DISTRICTS.length+'  |  '+p.cleared+'/20 CLEARED  |  '+p.earned+'/60 ★',W/2,247,11,'#fff','center');
+    btn(12,254,W-24,38,p.next<0?'DISTRICT COMPLETE':'PLAY NEXT UNCLEARED TRIAL',()=>trialNextUnfinished(trialDistrict),{size:16,on:p.next>=0,disabled:p.next<0,col:'#7dff5a'});
     btn(W-94,201,82,43,'>',()=>{trialDistrict=(trialDistrict+1)%TRIAL_DISTRICTS.length;WEB_UI.page.select=0},{size:18});
   }
   const items=mobileSelectItems(),top=selTab===4?298:208,rh=94,rowGap=8,cols=2,
@@ -5791,12 +5913,14 @@ function drawSelect(){
   txt('SELECT LEVEL',W/2,52,40,'#ffd23f','center','#7a1a1a');
   btn(16,14,90,36,'< MENU',goMenu,{size:16});
   const tabs=[0,2,3,4,1],labels=['STORY','CHAPTER 2','CHAPTER 3','TRIALS','MY LEVELS'];
-  for(let i=0;i<tabs.length;i++)btn(W/2-415+i*168,66,158,34,labels[i],()=>{selTab=tabs[i];WEB_UI.page.select=0},{on:selTab===tabs[i],size:15,col:i===3?'#7dff5a':undefined});
+  for(let i=0;i<tabs.length;i++)btn(W/2-415+i*168,66,158,34,labels[i],()=>{selTab=tabs[i];WEB_UI.districtPicker=false;WEB_UI.page.select=0},{on:selTab===tabs[i],size:15,col:i===3?'#7dff5a':undefined});
   if(selTab===4){
+    if(WEB_UI.districtPicker){drawDistrictDirectory(false);return}
     const first=TRIAL_START+trialDistrict*20;
     btn(62,112,120,30,'< DISTRICT',()=>{trialDistrict=(trialDistrict+TRIAL_DISTRICTS.length-1)%TRIAL_DISTRICTS.length},{size:13});
     btn(W-182,112,120,30,'DISTRICT >',()=>{trialDistrict=(trialDistrict+1)%TRIAL_DISTRICTS.length},{size:13});
-    txt(TRIAL_DISTRICTS[trialDistrict].toUpperCase()+'  '+(trialDistrict+1)+'/'+TRIAL_DISTRICTS.length,W/2,133,23,'#ffd23f','center');
+    btn(190,112,W-380,30,'',()=>{WEB_UI.districtPicker=true},{size:15});
+    trialTextFit(TRIAL_DISTRICTS[trialDistrict].toUpperCase()+'  '+(trialDistrict+1)+'/'+TRIAL_DISTRICTS.length+'  ·  CHOOSE',W/2,133,W-410,18,'#ffd23f');
     const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2;
     for(let k=0;k<20;k++){const i=first+k;tile(x0+(k%cols)*(tw+gx),151+Math.floor(k/cols)*70,tw,60,k+1,LEVELS[i].name,PD.stars[i]||0,false,()=>startStory(i))}
     const p=trialDistrictProgress(trialDistrict);

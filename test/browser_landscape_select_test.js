@@ -15,7 +15,7 @@ function checkLandscape(html){
  function bounds(x,y,w,h){assert([x,y,w,h].every(Number.isFinite),'all tile and button hitboxes must have finite coordinates');assert(x>=0&&y>=0&&w>0&&h>0&&x+w<=env.W&&y+h<=env.H,'control within landscape canvas')}
  env.btn=(x,y,w,h,label,fn)=>{bounds(x,y,w,h);env.buttons.push({label,fn,x,y,w,h})};
  env.tile=(x,y,w,h,label,name,stars,locked,fn)=>{bounds(x,y,w,h);assert(typeof name==='string');assert(typeof fn==='function');env.tiles.push({name,fn,x,y,w,h})};
- const helpers=html.slice(html.indexOf('function trialDistrictProgress('),html.indexOf('function goMenu()'));
+ const helpers=html.slice(html.indexOf('function drawDistrictDirectory('),html.indexOf('function goMenu()'));
  const draw=new Function('env','with(env){'+helpers+html.slice(pa,pb)+html.slice(p,q)+html.slice(a,b)+';return drawSelect;}')(env);
  const paint=()=>{env.tiles.length=env.buttons.length=0;draw()};
  const click=label=>{const b=env.buttons.find(b=>b.label===label);assert(b,'missing button '+label);b.fn()};
@@ -25,6 +25,7 @@ function checkLandscape(html){
  click('NEW LEVEL');assert.deepStrictEqual(env.actions.pop(),['edit',-1]);click('IMPORT LEVEL');assert.deepStrictEqual(env.actions.pop(),['import']);
  click('TRIALS');paint();assert.strictEqual(env.tiles.length,20);env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',60]);
  click('< DISTRICT');paint();env.tiles.at(-1).fn();assert.deepStrictEqual(env.actions.pop(),['story',599]);
+ env.WEB_UI.districtPicker=true;paint();assert.strictEqual(env.tiles.length,0);assert.strictEqual(env.buttons.filter(b=>b.label==='').length,27);env.buttons.filter(b=>b.label==='')[18].fn();paint();env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',420]);
  return 'WEB_LANDSCAPE_SELECT_PASS all_custom_pages=1 actions=1 delete_clamp=1 trial_wrap=1';
 }
 if(require.main===module)console.log(checkLandscape(fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8')));

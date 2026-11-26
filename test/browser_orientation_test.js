@@ -101,7 +101,7 @@ const env={
   storyUnlocked:()=>true,ch2Unlocked:()=>true,ch3Unlocked:()=>true,
   SFX:{pop:()=>{},ding:()=>{}},performance:{now:()=>0}
 };
-const trialHelpers=extract('function trialDistrictProgress(', 'function goMenu()');
+const trialHelpers=extract('function drawDistrictDirectory(', 'function goMenu()');
 const perfHelpers=extract('const WEB_PROFILES=', 'function chip(');
 const methods=new Function('env','with(env){'+perfHelpers+trialHelpers+mobile+
   'return {menu:drawMobileMenu,select:drawMobileSelect,ach:drawMobileAchievements,'+
@@ -121,6 +121,7 @@ for(const height of [760,960,1170]){
   env.H=height;env.W=540;
   inspect('menu');
   for(const tab of [0,1,2,3,4]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
+  env.selTab=4;env.WEB_UI.districtPicker=true;inspect('select');env.WEB_UI.districtPicker=false;
   inspect('ach');inspect('outfit');
   for(const page of [0,1,2,3]){env.WEB_UI.page.options=page;inspect('options')}
 }
