@@ -8,7 +8,8 @@ const find=(a,b)=>{const i=html.indexOf(a),j=html.indexOf(b,i+a.length);
 const code=find('function encodeCells(','function decodeCells(');
 const levels=find('function decodeCells(','// Shared-code validation');
 const scene=new Function(`
- const ROWS=60;let COLS=120,testing=true,lastWidth=null;
+ const ROWS=60;let COLS=120,testing=true,lastWidth=null,selTab=-1,selectCustomItem=null;
+ function selectRoute(tab,district,item){selTab=tab;selectCustomItem=item}
  const PD={custom:[]},placed=[],targets=[];
  const set=(x,y,m)=>placed.push([x,y,m]),tgt=(x,y)=>targets.push([x,y]);
  const load=(i,level)=>{lastWidth=level.cols;COLS=level.cols||120;level.build()};
@@ -16,7 +17,7 @@ const scene=new Function(`
  ${levels}
  return {PD,placed,targets,encodeCells,decodeCells,levelFromData,startCustom,
    setCols(n){COLS=n},get cols(){return COLS},get loadWidth(){return lastWidth},
-   get testing(){return testing},reset(){placed.length=0;targets.length=0}};
+   get testing(){return testing},get selected(){return selectCustomItem},reset(){placed.length=0;targets.length=0}};
 `)();
 const cells=new Uint8Array(120*60);
 for(let i=0;i<10;i++)cells[30*120+50+i]=i%2?2:1;
@@ -35,6 +36,7 @@ assert.strictEqual(scene.cols,120,'loading custom level resets world geometry');
 assert.deepStrictEqual(scene.placed,expected,'all custom cells placed at correct coordinates');
 assert.deepStrictEqual(scene.targets,L.t,'landlord targets retain their coordinates');
 assert.strictEqual(scene.testing,false,'custom play exits creator playtest mode');
+assert.strictEqual(scene.selected,L,'selection retains the actual saved design');
 scene.reset();scene.setCols(120);scene.startCustom(0);
 assert.deepStrictEqual(scene.placed,expected,'normal-width custom play remains unchanged');
 assert.strictEqual(scene.decodeCells(L.c,120).length,7200);

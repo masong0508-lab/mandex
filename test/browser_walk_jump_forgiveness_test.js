@@ -6,7 +6,7 @@ const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 const a=html.indexOf('function wBlocked('),b=html.indexOf('function walkStep(');
 const end=html.indexOf('/* Match the console sprite turnaround:',b);
 assert(a>=0&&b>a&&end>b,'production walking functions missing');
-const source=html.slice(a,end);
+const source=html.slice(a,end)+html.slice(html.indexOf('function walkAnimTick('),html.indexOf('function walkFootSample('));
 const DT=1/60;
 function make({ground=true,mat=6}={}){
   const e={WHW:7,WHH:19,WALK_T:45,V:8,RC:4,COLS:120,ROWS:60,

@@ -7,7 +7,7 @@ const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 const sharedStart=html.indexOf('function wBlocked('),stepStart=html.indexOf('function walkStep(');
 const stepEnd=html.indexOf('/* Match the console sprite turnaround:',stepStart);
 assert(sharedStart>=0&&stepStart>sharedStart&&stepEnd>stepStart,'production walking functions exist');
-const shared=html.slice(sharedStart,stepStart),production=html.slice(stepStart,stepEnd);
+const shared=html.slice(sharedStart,stepStart),production=html.slice(stepStart,stepEnd)+html.slice(html.indexOf('function walkAnimTick('),html.indexOf('function walkFootSample('));
 const reference=String.raw`function walkStep(dt){const m=man;
   m.wt-=dt;if(m.wt<=0){popText(m.x,m.y-40,'TIME!','#ff6b6b',26);walkQuit();return}
   if(wBlocked(m.x,m.y)){let f=false;for(let u=2;u<=80&&!f;u+=2)for(const sg of[0,-1,1])if(!wBlocked(m.x+sg*u,m.y-u)){m.x+=sg*u;m.y-=u;f=true;break}}   // rubble fell on him: pop him out
@@ -76,7 +76,7 @@ function make(source,initial={}){
     if(keys!==undefined){for(const key of Object.keys(e.KEYS))delete e.KEYS[key];Object.assign(e.KEYS,keys)}
     const before=e.events.length;e.time+=1/60;step(1/60);
     return {man:{...e.man},events:e.events.slice(before)};
-  },snapshot(){const {ledgeGrace,jumpHold,gait,...man}=e.man;return {man,grid:Array.from(e.grid),hp:Array.from(e.hp),
+  },snapshot(){const {ledgeGrace,jumpHold,gait,animStride,animAir,animLand,animStomp,...man}=e.man;return {man,grid:Array.from(e.grid),hp:Array.from(e.hp),
     events:e.events.slice(),shake:e.shake,time:e.time}}};
 }
 const count=(row,event)=>row.events.filter(e=>e[0]===event).length;

@@ -1,0 +1,5 @@
+# Browser level library and motion refinement
+
+Play opens a three-category library, with a direct Continue campaign action. Chapters contain their original 20 levels; contracts are grouped into 18 districts, each with four modes; all saved designs are paginated, with Play/Edit/Share/Delete on a dedicated management card. Locked stages retain names. Both orientations share the same view; the selector skips drawing the game background. Back returns one level, and the current district/custom design is retained after a play session.
+
+Render-only player position interpolation applies to continuous flight and ordinary walking; aim, attack contact, teleports, and mode changes retain exact positions. Jump ascent/descent and cape motion have different poses. The signed flight trail follows the mirrored sprite. Restored transparent canvas context for the native sprite baking tools, and preserved landscape camera response. The dense rubble-cache fixture now exercises multiple bodies and independently asserts single-body allocation avoidance. No native menu or sprite data changes in this pass.

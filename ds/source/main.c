@@ -1391,7 +1391,7 @@ static void draw_objective_edge(const View *v){
 static void top_hud(u8 *b){
   const char *nm = mx_level_name(world.level);
   gfx_rect(b, 0, 0, 256, 11, C_UIBG); gfx_rect(b, 0, 11, 256, 1, C_UILINE);
-  gfx_text(b, 4, 3, "LV", C_GOLD, 1); gfx_text(b, 14, 3, gfx_int(world.level + 1), C_GOLD, 1);
+  gfx_text(b,4,3,mx_is_contract(world.level)?"CT":"LV",C_GOLD,1); gfx_text(b,14,3,gfx_int(mx_is_contract(world.level)?world.level-MX_NUM_LEVELS+1:world.level+1),C_GOLD,1);
   gfx_text(b, 24, 3, nm, C_WHITE, 1);
   const char *sc = gfx_int(disp_score);
   gfx_text(b, 252 - gfx_text_w(sc, 1), 3, sc, C_GOLD, 1);
@@ -1463,8 +1463,8 @@ static void banner(u8 *b){
   gfx_rect(b, 0, 70, 256, 44, C_UIBG);
   gfx_rect(b, 0, 69, 256, 1, C_UILINE); gfx_rect(b, 0, 114, 256, 1, C_UILINE);
   { static const char *const DN[MX_HQ_DISTRICTS] = { "DISTRICT 1 OF 3", "DISTRICT 2 OF 3", "DISTRICT 3 OF 3" };
-    gfx_text_c(b, 128 - slide, 76, world.level == MX_HQ_LEVEL ? DN[world.district % MX_HQ_DISTRICTS] : "LEVEL", C_GOLD, C_BLACK, 1); }
-  gfx_text_c(b, 128 + slide, 84, mx_level_name(world.level), C_WHITE, C_BLACK, 2);
+    gfx_text_c(b, 128 - slide, 76, world.level == MX_HQ_LEVEL ? DN[world.district % MX_HQ_DISTRICTS] : mx_is_contract(world.level)?"CONTRACT":"LEVEL", C_GOLD, C_BLACK, 1); }
+  {const char *nm=mx_level_name(world.level);gfx_text_c(b,128+slide,84,nm,C_WHITE,C_BLACK,gfx_text_w(nm,2)>240?1:2);}
   gfx_text_c(b, 128 - slide, 102, mx_level_tactic(world.level), C_PINK, C_BLACK, 1);
 }
 
@@ -1830,9 +1830,9 @@ static void title_bottom(View *v){
   if(out_open){ outfits_bottom(v->buf); return; }
   draw_world(v, 0);
   panel(v->buf, 8, 6, 240, 38);
-  gfx_text_c(v->buf, 128, 11, "SELECT LEVEL", C_UILINE, C_UIBG, 1);
+  gfx_text_c(v->buf, 128, 11, mx_is_contract(sel_level)?"CONTRACTS - UP/DOWN: DISTRICT":"LEVELS - UP/DOWN: CHAPTER", C_UILINE, C_UIBG, 1);
   const char *nm = mx_level_name(sel_level);
-  gfx_text_c(v->buf, 128, 21, nm, C_GOLD, C_BLACK, 2);
+  gfx_text_c(v->buf, 128, 21, nm, C_GOLD, C_BLACK, gfx_text_w(nm,2)>196?1:2);
   gfx_text(v->buf, 14, 20, "<", C_WHITE, 2);
   gfx_text(v->buf, 232, 20, ">", C_WHITE, 2);
   if(!mx_level_unlocked(&stats, sel_level)){ gfx_text_c(v->buf, 128, 36, "LOCKED - BEAT THE LEVEL BEFORE", C_GRAY, C_UIBG, 1); }
@@ -1914,7 +1914,7 @@ int main(void){
   load_level(sel_level);
 #ifdef MX_FPS_DEMO_LEVEL
   /* Test-only automatic scenario; normal release builds never define it. */
-  if(MX_FPS_DEMO_LEVEL>=0&&MX_FPS_DEMO_LEVEL<MX_NUM_LEVELS){
+  if(MX_FPS_DEMO_LEVEL>=0&&MX_FPS_DEMO_LEVEL<MX_TOTAL_LEVELS){
     sel_level=MX_FPS_DEMO_LEVEL;load_level(sel_level);
     app=ST_PLAY;intro_seen=wolf_seen=1;end_seen=6;debug_on=1;
   }
@@ -2000,7 +2000,8 @@ int main(void){
         for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
         apply_outfit(outfit_sel); sfx_play(SFX_CLICK, 64);
       }
-      if(ch){ sel_level = (sel_level + ch + MX_NUM_LEVELS) % MX_NUM_LEVELS; load_level(sel_level); sfx_play(SFX_CLICK, 64); }
+      int jump=(down&KEY_UP)?-1:(down&KEY_DOWN)?1:0;
+      if(jump||ch){ sel_level=jump?mx_level_section_step(sel_level,jump):(sel_level+ch+MX_TOTAL_LEVELS)%MX_TOTAL_LEVELS; load_level(sel_level); sfx_play(SFX_CLICK,64); }
       else if(((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)) && !mx_level_unlocked(&stats, sel_level)) sfx_play(SFX_CLICK, 24);
       else if((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)){
         save_sync();                                               /* an outfit chosen on the title is kept */
@@ -2031,7 +2032,7 @@ int main(void){
         int next = world.state == MX_WIN ? world.level + 1 : world.level;
         int ce = (world.state == MX_WIN && next == MX_CH2_START) ? 1 : (world.state == MX_WIN && next == MX_CH3_START) ? 2 : 0;   /* the closing cutscene of the chapter just finished */
         if(ce && !(end_seen & (1 << ce))){ end_seen |= 1 << ce; intro_level = next; app = ST_INTRO; intro_start_end(ce); apply_outfit(0); }
-        else if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel_level = 0; load_level(0); }
+        else if((next==MX_NUM_LEVELS&&world.level<MX_NUM_LEVELS)||next>=MX_TOTAL_LEVELS){ app = ST_TITLE; sel_level = 0; load_level(0); }
         else { load_level(next); music_set(music_pref); }
         sfx_play(SFX_CLICK, 64);
       }

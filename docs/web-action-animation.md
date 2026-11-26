@@ -1,0 +1,5 @@
+# Browser action animation pass
+
+Three new fully articulated victory sequences (salute, overhead cheer and two-sided heroic flourish) and a defeat-to-ready recovery replace abrupt result-screen pose cuts. They run from the actual result transition and share the existing character art and two-bone rig. The feet remain planted, while the upper body and arms ease continuously through authored poses. Credits reuse the celebration clips. Knockback now adds a distinct head, shoulder and arm reaction, and an active punch retains priority. The inverse-kinematics solver handles coincident/too-close endpoints and parallel knee poles without collapsing bone lengths. No collision, damage, level count, input rules, or quality presets change. Browser-only clips do not expand the existing console sprite atlas.
+
+Tests sample all result clips at 120 Hz, check endpoint and bone lengths through degenerate IK cases, verify attack precedence, and render actual result poses in Chromium on the two extreme performance profiles. Live-device performance and native animation remain separate work.

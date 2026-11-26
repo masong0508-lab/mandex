@@ -13,7 +13,7 @@ static void fill(MxStats *s){
   mx_meta_init(s);
   s->kills = 101; s->cells = 2222; s->booms = 33; s->maxChain = 6; s->shots = 144; s->flops = 5; s->wins = 17; s->oneShots = 2; s->bestScore = 61234; s->inflated = 8; s->pops = 3;
   for(int i = 0; i < 4; i++) s->pw[i] = 10 + i;
-  for(int i = 0; i < MX_NUM_LEVELS; i++){ s->stars[i] = (uint8_t)(i % 4); s->best[i] = (uint32_t)(i * 1000 + 7); }
+  for(int i = 0; i < MX_TOTAL_LEVELS; i++){ s->stars[i] = (uint8_t)(i % 4); s->best[i] = (uint32_t)(i * 1000 + 7); }
   s->ach = 0x1A5A5A5u & ((1u << MX_NUM_ACH) - 1u);
   s->unlock_all = 1; s->lv_booms = 7; s->lv_shots = 8; s->seen_st_inflated = 9; s->seen_st_pops = 10; for(int i = 0; i < 4; i++) s->seen_pw[i] = 11 + i;
 }
@@ -21,7 +21,7 @@ static int same_saved(const MxStats *a, const MxStats *b){
   if(a->kills != b->kills || a->cells != b->cells || a->booms != b->booms || a->maxChain != b->maxChain || a->shots != b->shots || a->flops != b->flops) return 0;
   if(a->wins != b->wins || a->oneShots != b->oneShots || a->bestScore != b->bestScore || a->inflated != b->inflated || a->pops != b->pops || a->ach != b->ach) return 0;
   for(int i = 0; i < 4; i++) if(a->pw[i] != b->pw[i]) return 0;
-  for(int i = 0; i < MX_NUM_LEVELS; i++) if(a->stars[i] != b->stars[i] || a->best[i] != b->best[i]) return 0;
+  for(int i = 0; i < MX_TOTAL_LEVELS; i++) if(a->stars[i] != b->stars[i] || a->best[i] != b->best[i]) return 0;
   return 1;
 }
 static void w32(uint8_t *p, uint32_t v){ p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
@@ -45,14 +45,14 @@ int main(void){
   fill(&S);
   CHECK(mx_meta_pack(&S, 5, buf, MX_SAVE_MAX - 1) == 0, "pack into a too-small buffer returns 0");
   int n = mx_meta_pack(&S, 5, buf, (int)sizeof buf);
-  CHECK(n == MX_SAVE_MAX && n == 76 + 5 * MX_NUM_LEVELS, "the levels pack to 76 + 5 per level bytes (version 2: one options byte)");
+  CHECK(n == MX_SAVE_MAX && n == 76 + 5 * MX_TOTAL_LEVELS, "the levels pack to 76 + 5 per level bytes (version 2: one options byte)");
 
   /* the documented layout, byte by byte */
-  CHECK(memcmp(buf, "MXS1", 4) == 0 && buf[4] == 2 && buf[5] == MX_NUM_LEVELS, "header: magic, version 2, level count");
+  CHECK(memcmp(buf, "MXS1", 4) == 0 && buf[4] == 2 && buf[5] == MX_TOTAL_LEVELS, "header: magic, version 2, level count");
   CHECK(buf[6] == (101 & 255) && buf[7] == 0 && buf[8] == 0 && buf[9] == 0, "first counter (kills) is little-endian at offset 6");
   CHECK(buf[6 + 4 * 8] == (61234 & 255) && buf[7 + 4 * 8] == ((61234 >> 8) & 255) && buf[8 + 4 * 8] == 0, "bestScore is the 9th counter");
   CHECK(buf[50] == 10 && buf[66] == S.stars[0] && buf[66 + 3] == S.stars[3], "pw[] at 50, stars[] at 66");
-  CHECK(buf[66 + MX_NUM_LEVELS + 4] == 5, "outfit index byte follows stars and ach");
+  CHECK(buf[66 + MX_TOTAL_LEVELS + 4] == 5, "outfit index byte follows stars and ach");
   CHECK(buf[n - 5] == (0 | (MX_TOOL_NONE << 1)), "options byte (default: collapse off, air valve) sits just before the CRC");
   { uint32_t crc = mx_crc32(buf, n - 4); CHECK(buf[n - 4] == (uint8_t)crc && buf[n - 1] == (uint8_t)(crc >> 24), "CRC is the last four bytes, little-endian"); }
 
@@ -66,7 +66,7 @@ int main(void){
   { MxStats U = S; U.unlock_all = 1; int o2 = 0; mx_meta_unpack(&U, &o2, buf, n); CHECK(U.unlock_all == 1, "unpack leaves a session unlock_all cheat alone"); }
 
   /* a chip read is longer than the blob: padding is ignored */
-  { uint8_t big[512]; memset(big, 0xFF, sizeof big); memcpy(big, buf, n); mx_meta_init(&T);
+  { uint8_t big[1024]; memset(big, 0xFF, sizeof big); memcpy(big, buf, n); mx_meta_init(&T);
     CHECK(mx_meta_unpack(&T, &of, big, (int)sizeof big) == 1 && same_saved(&S, &T), "trailing 0xFF padding after the blob is ignored"); }
 
   /* failures leave everything untouched */
@@ -93,7 +93,7 @@ int main(void){
   }
 
   /* values that pass the CRC but make no sense are clamped, not trusted */
-  { uint8_t b2[MX_SAVE_MAX]; memcpy(b2, buf, n); b2[66 + MX_NUM_LEVELS + 4] = 200; b2[66] = 9; w32(b2 + 66 + MX_NUM_LEVELS, 0xFFFFFFFFu); w32(b2 + 6, 0xFFFFFFF0u); reseal(b2, n);
+  { uint8_t b2[MX_SAVE_MAX]; memcpy(b2, buf, n); b2[66 + MX_TOTAL_LEVELS + 4] = 200; b2[66] = 9; w32(b2 + 66 + MX_TOTAL_LEVELS, 0xFFFFFFFFu); w32(b2 + 6, 0xFFFFFFF0u); reseal(b2, n);
     mx_meta_init(&T); int ok = mx_meta_unpack(&T, &of, b2, n);
     CHECK(ok && of == 0, "an outfit index this build does not have becomes 0");
     CHECK(T.stars[0] == 3, "stars above 3 clamp to 3");
@@ -103,20 +103,23 @@ int main(void){
     CHECK(mx_meta_unpack(&T, &of, b2, MX_SAVE_MAX) == 1 && T.kills == 0 && T.pw[1] == 0 && of == 0, "negative counters and a negative outfit pack as 0"); }
 
   /* saves written by a build with a different number of levels */
-  { uint8_t c[400]; int cn = craft(c, MX_NUM_LEVELS); mx_meta_init(&T);
+  { uint8_t c[MX_SAVE_MAX]; int cn = craft(c, MX_TOTAL_LEVELS); mx_meta_init(&T);
     CHECK(cn == MX_SAVE_MAX - 1 && mx_meta_unpack(&T, &of, c, cn) == 1, "the independent writer's 20-level version 1 blob is accepted (layout agrees with the documentation)");
     CHECK(T.kills == 1000 && T.pops == 1010 && T.pw[3] == 23 && T.ach == 0x15 && of == 2 && T.stars[0] == 1 && T.stars[1] == 2 && T.stars[2] == 3 && T.best[19] == 519, "...and every field lands where the layout says"); }
-  { uint8_t c[400]; int cn = craft(c, 5); mx_meta_init(&T); for(int i = 0; i < MX_NUM_LEVELS; i++){ T.stars[i] = 3; T.best[i] = 99; }
+  { uint8_t c[400]; int cn = craft(c, 5); mx_meta_init(&T); for(int i = 0; i < MX_TOTAL_LEVELS; i++){ T.stars[i] = 3; T.best[i] = 99; }
     CHECK(mx_meta_unpack(&T, &of, c, cn) == 1 && T.stars[4] == 2 && T.best[4] == 504 && T.stars[5] == 0 && T.best[5] == 0 && T.best[19] == 0, "a save from a 5-level build loads: the new levels read as not played"); }
-  { uint8_t c[600]; int cn = craft(c, MX_NUM_LEVELS + 5); mx_meta_init(&T);
-    CHECK(cn <= (int)sizeof c && mx_meta_unpack(&T, &of, c, cn) == 1 && T.best[MX_NUM_LEVELS - 1] == 500u + MX_NUM_LEVELS - 1 && of == 2, "a save from a 25-level build loads: the extra levels are dropped"); }
+  { uint8_t c[MX_SAVE_MAX+32]; int cn = craft(c, MX_TOTAL_LEVELS + 5); mx_meta_init(&T);
+    CHECK(cn <= (int)sizeof c && mx_meta_unpack(&T, &of, c, cn) == 1 && T.best[MX_TOTAL_LEVELS - 1] == 500u + MX_TOTAL_LEVELS - 1 && of == 2, "a save from a 25-level build loads: the extra levels are dropped"); }
 
+  { uint8_t c[400]; int cn=craft(c,MX_NUM_LEVELS); mx_meta_init(&T);
+    CHECK(mx_meta_unpack(&T,&of,c,cn)&&T.best[59]==559&&T.stars[60]==0&&T.best[MX_TOTAL_LEVELS-1]==0,"legacy 60-level save preserves campaign and initializes contracts"); }
   /* best score now lives in the core */
   { MxStats B; mx_meta_init(&B); memset(&W, 0, sizeof W); W.level = 3; W.men = 2; W.score = 500; mx_meta_win(&B, &W);
     CHECK(B.best[3] == 500 && B.best[2] == 0 && B.best[4] == 0, "a win records the score as that level's best");
     W.score = 300; mx_meta_win(&B, &W); CHECK(B.best[3] == 500, "a lower score does not replace it");
     W.score = 900; mx_meta_win(&B, &W); CHECK(B.best[3] == 900 && B.bestScore == 900, "a higher one does");
-    W.level = MX_NUM_LEVELS; W.score = 5; mx_meta_win(&B, &W); CHECK(B.best[3] == 900, "an out-of-range level is ignored, not written"); }
+    W.level = MX_NUM_LEVELS; W.score=123; int wins=B.wins; mx_meta_win(&B,&W); CHECK(B.best[MX_NUM_LEVELS]==123&&B.stars[MX_NUM_LEVELS]==3&&B.wins==wins,"contract best and stars saved separately from campaign wins");
+    W.level = MX_TOTAL_LEVELS; W.score = 5; mx_meta_win(&B, &W); CHECK(B.best[3] == 900, "an out-of-range level is ignored, not written"); }
 
   /* ---- options (port 13): saved in version 2, version 1 blobs still load with the defaults ---- */
   { MxOptions d; mx_options_default(&d); CHECK(d.collapse == 0 && d.tool == MX_TOOL_NONE, "default options: collapse off, no gadget selected"); }
@@ -139,7 +142,7 @@ int main(void){
     { MxOptions f = { 0, MX_TOOL_VALVE, 1 }, g = { 0, 0, 0 }; uint8_t bb[MX_SAVE_MAX]; int nn = mx_meta_pack_opt(&A, 0, &f, bb, (int)sizeof bb);
       CHECK(bb[nn - 5] == (0 | (MX_TOOL_VALVE << 1) | 16) && mx_meta_unpack_opt(&B, &of2, &g, bb, nn) == 1 && g.nofight == 1 && g.collapse == 0 && g.tool == MX_TOOL_VALVE, "landlords-fight-back OFF is bit 4 of the options byte and round trips");
       MxOptions d; mx_options_default(&d); CHECK(d.nofight == 0, "default: landlords fight back"); } }
-  { uint8_t c[MX_SAVE_MAX + 8]; int cn = craft(c, MX_NUM_LEVELS); MxOptions r = { 1, MX_TOOL_SPLAT }; MxStats B; mx_meta_init(&B); int of2 = -1;
+  { uint8_t c[MX_SAVE_MAX + 8]; int cn = craft(c, MX_TOTAL_LEVELS); MxOptions r = { 1, MX_TOOL_SPLAT }; MxStats B; mx_meta_init(&B); int of2 = -1;
     CHECK(cn == MX_SAVE_MAX - 1 && c[4] == 1, "(the independent writer still produces a 175-byte version 1 blob)");
     CHECK(mx_meta_unpack_opt(&B, &of2, &r, c, cn) == 1 && r.collapse == 0 && r.tool == MX_TOOL_NONE && B.best[4] == 504 && of2 == 2, "a version 1 save still loads: progress kept, options = defaults");
     CHECK(mx_meta_unpack(&B, &of2, c, cn) == 1, "...also through the old entry point");

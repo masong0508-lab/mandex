@@ -1,0 +1,5 @@
+# Mobile performance and settings overhaul
+
+The standalone browser build now has a responsive, scrollable settings dialog from the main menu and gameplay, five presets including Auto, independent render FPS and resolution, graphics, particle and audio controls, and a fixed 60 Hz physics clock. The lowest profiles cache terrain, falling rubble and original vector landlord art; disable full-frame lighting and expensive compositing; reduce decorative particles; and reduce backing pixels. Single-body rubble no longer builds or queries a self-only collision hash. A paused settings dialog preserves world state.
+
+Local Chromium headless CPU-throttled (4x, portrait 390x780) smoke results: contract 72 average draw-call CPU time 48.8 ms before versus 5.3 ms Ultra Low after. 420-cell falling slab draw 45.1 ms versus 6.2 ms; per collision substep 2.19 ms versus 1.15 ms, identical sampled position and velocity. These are local CPU timings, not physical-phone FPS or full playthrough claims. Settings navigation, persistence through the settings model, pause/resume, JS syntax and console-error checks passed. The device/browser still needs real-world testing.

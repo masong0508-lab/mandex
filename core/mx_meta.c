@@ -148,7 +148,8 @@ void mx_meta_events(MxStats *s, const MxWorld *w){
 int mx_level_unlocked(const MxStats *s, int level){
   /* Never advertise an invalid level as playable, even with the unlock cheat
    * or the default all-open configuration. */
-  if(level < 0 || level >= MX_NUM_LEVELS) return 0;
+  if(level < 0 || level >= MX_TOTAL_LEVELS) return 0;
+  if(mx_is_contract(level))return 1;
 #ifdef MX_LEVEL_LOCKS
   return s->unlock_all || level < 3 || (level < MX_NUM_LEVELS && s->stars[level - 1] > 0);
 #else
@@ -158,10 +159,11 @@ int mx_level_unlocked(const MxStats *s, int level){
 int mx_stars_for(const MxWorld *w){ return w->men >= 2 ? 3 : w->men >= 1 ? 2 : 1; }
 void mx_meta_win(MxStats *s, const MxWorld *w){
   int st = mx_stars_for(w);
-  if(w->level >= 0 && w->level < MX_NUM_LEVELS && st > s->stars[w->level]) s->stars[w->level] = (uint8_t)st;
-  s->wins = count_plus(s->wins, 1); if(s->lv_shots == 1) s->oneShots = count_plus(s->oneShots, 1);
+  if(w->level >= 0 && w->level < MX_TOTAL_LEVELS && st > s->stars[w->level]) s->stars[w->level] = (uint8_t)st;
+  if(!mx_is_contract(w->level))s->wins = count_plus(s->wins, 1);
+  if(s->lv_shots == 1) s->oneShots = count_plus(s->oneShots, 1);
   if(w->score > s->bestScore) s->bestScore = w->score;
-  if(w->level >= 0 && w->level < MX_NUM_LEVELS && w->score > 0 && (uint32_t)w->score > s->best[w->level]) s->best[w->level] = (uint32_t)w->score;
+  if(w->level >= 0 && w->level < MX_TOTAL_LEVELS && w->score > 0 && (uint32_t)w->score > s->best[w->level]) s->best[w->level] = (uint32_t)w->score;
 }
 
 static uint8_t lift(int v, int to, int pct){ int r = v + (to - v) * pct / 100; return (uint8_t)(r < 0 ? 0 : r > 255 ? 255 : r); }
@@ -204,17 +206,17 @@ int mx_tool_power(int t){ return t == MX_TOOL_BEANS ? PW_BEANS : t == MX_TOOL_TO
 
 int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap){ return mx_meta_pack_opt(s, outfit, 0, out, cap); }
 int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t *out, int cap){
-  const int n = save_size(MX_NUM_LEVELS, MX_SAVE_VERSION);
+  const int n = save_size(MX_TOTAL_LEVELS, MX_SAVE_VERSION);
   if(!s || !out || cap < n) return 0;
   const int *cnt[SAVE_NCOUNT] = { &s->kills, &s->cells, &s->booms, &s->maxChain, &s->shots, &s->flops, &s->wins, &s->oneShots, &s->bestScore, &s->inflated, &s->pops };
-  memcpy(out, "MXS1", 4); out[4] = MX_SAVE_VERSION; out[5] = (uint8_t)MX_NUM_LEVELS;
+  memcpy(out, "MXS1", 4); out[4] = MX_SAVE_VERSION; out[5] = (uint8_t)MX_TOTAL_LEVELS;
   for(int i = 0; i < SAVE_NCOUNT; i++) put32(out + SAVE_HDR + 4 * i, *cnt[i] < 0 ? 0u : (uint32_t)*cnt[i]);
   for(int i = 0; i < 4; i++) put32(out + SAVE_PW + 4 * i, s->pw[i] < 0 ? 0u : (uint32_t)s->pw[i]);
   uint8_t *p = out + SAVE_STARS;
-  for(int i = 0; i < MX_NUM_LEVELS; i++) *p++ = s->stars[i];
+  for(int i = 0; i < MX_TOTAL_LEVELS; i++) *p++ = s->stars[i];
   put32(p, s->ach); p += 4;
   *p++ = (uint8_t)(outfit >= 0 && outfit < MX_NUM_OUTFITS ? outfit : 0);
-  for(int i = 0; i < MX_NUM_LEVELS; i++){ put32(p, s->best[i]); p += 4; }
+  for(int i = 0; i < MX_TOTAL_LEVELS; i++){ put32(p, s->best[i]); p += 4; }
   { MxOptions o; mx_options_default(&o); if(opt) o = *opt;
     *p++ = (uint8_t)((o.collapse ? 1 : 0) | ((o.tool < MX_NUM_TOOLS ? o.tool : MX_TOOL_NONE) << 1) | (o.nofight ? 16 : 0)); }
   put32(p, mx_crc32(out, (int)(p - out)));
@@ -233,10 +235,10 @@ int mx_meta_unpack_opt(MxStats *s, int *outfit, MxOptions *opt, const uint8_t *i
   for(int i = 0; i < SAVE_NCOUNT; i++){ uint32_t v = get32(in + SAVE_HDR + 4 * i); *cnt[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
   for(int i = 0; i < 4; i++){ uint32_t v = get32(in + SAVE_PW + 4 * i); s->pw[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
   const uint8_t *st = in + SAVE_STARS, *p = st + nl;
-  for(int i = 0; i < MX_NUM_LEVELS; i++) s->stars[i] = i < nl ? (uint8_t)(st[i] > 3 ? 3 : st[i]) : 0;
+  for(int i = 0; i < MX_TOTAL_LEVELS; i++) s->stars[i] = i < nl ? (uint8_t)(st[i] > 3 ? 3 : st[i]) : 0;
   s->ach = get32(p) & ((1u << MX_NUM_ACH) - 1u); p += 4;
   *outfit = *p < MX_NUM_OUTFITS ? *p : 0; p++;
-  for(int i = 0; i < MX_NUM_LEVELS; i++){ uint32_t v = i < nl ? get32(p + 4 * i) : 0; s->best[i] = v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v; }
+  for(int i = 0; i < MX_TOTAL_LEVELS; i++){ uint32_t v = i < nl ? get32(p + 4 * i) : 0; s->best[i] = v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v; }
   p += 4 * nl;
   if(opt){
     mx_options_default(opt);

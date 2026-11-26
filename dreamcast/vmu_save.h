@@ -1,6 +1,6 @@
 /* Dreamcast: recoverable VMU progress in slot A1.
    Embedded once after the front-end's stats/outfit/nofight declarations.
-   Two independent 512-byte files alternate after wins and menu changes,
+   Two independent 1024-byte files alternate (legacy 512-byte slots are read) after wins and menu changes,
    so an interrupted VMU write cannot overwrite the last valid slot.
    No per-frame write or heap allocation.  No VMU = no save, never no game. */
 #ifndef MX_DC_VMU_SAVE_H
@@ -11,13 +11,17 @@
 static const char *const dc_save_paths[2] = {
   "/vmu/a1/MANDEX_A", "/vmu/a1/MANDEX_B"
 };
+#define MX_DC_SLOT_BYTES 1024
+#if MX_JOURNAL_MAX > MX_DC_SLOT_BYTES
+#error "VMU journal exceeds two blocks"
+#endif
 static uint32_t dc_save_generation;
 static int dc_save_slot = -1, dc_save_status;
 static uint8_t dc_saved_payload[MX_SAVE_MAX];
 static int dc_saved_len;
 
 static void dc_save_load(void){
-  uint8_t record[MX_JOURNAL_MAX];
+  uint8_t record[MX_DC_SLOT_BYTES];
   /* Track the newest VALID record separately from the generation high-water
      mark. An interrupted replacement of an older, corrupt slot must never
      reuse its generation: a short write could otherwise accidentally repair
@@ -29,9 +33,9 @@ static void dc_save_load(void){
     file_t fd=fs_open(dc_save_paths[i],O_RDONLY);
     if(fd == FILEHND_INVALID)continue;
     int sz=fs_total(fd);
-    int got=sz >= MX_JOURNAL_MAX ? fs_read(fd,record,sizeof record) : 0;
+    int got=sz>=14&&sz<=MX_DC_SLOT_BYTES?fs_read(fd,record,sz):0;
     fs_close(fd);
-    if(got != (int)sizeof record)continue;
+    if(got!=sz||got<14)continue;
     if(record[0]=='M' && record[1]=='X' && record[2]=='J' && record[3]=='1'){
       uint32_t g=mx_journal_get32(record+4);
       if(!any_seen || mx_journal_newer(g,seen_generation)){
@@ -40,7 +44,13 @@ static void dc_save_load(void){
     }
     MxStats trial; mx_meta_init(&trial);
     MxOptions opt; int outf=0; uint32_t generation=0;
-    if(!mx_journal_unpack(&trial,&outf,&opt,&generation,record,sizeof record))
+    /* Determine the original payload length before checking its outer CRC;
+       old one-block saves contain fewer levels and zero padding. */
+    int ver=record[12],nl=record[13];
+    if(ver<1||ver>MX_SAVE_VERSION)continue;
+    int rn=12+75+5*nl+(ver>=2?1:0);
+    if(rn>got||rn>MX_JOURNAL_MAX)continue;
+    if(!mx_journal_unpack(&trial,&outf,&opt,&generation,record,rn))
       continue;
     if(dc_save_slot>=0 && !mx_journal_newer(generation,valid_generation))
       continue;
@@ -55,7 +65,7 @@ static void dc_save_load(void){
   }
 }
 static void dc_save_sync(void){
-  uint8_t payload[MX_SAVE_MAX],disk[512];
+  uint8_t payload[MX_SAVE_MAX],disk[MX_DC_SLOT_BYTES];
   MxOptions opt;mx_options_default(&opt);opt.nofight=(uint8_t)nofight;
   int n=mx_meta_pack_opt(&stats,outfit_sel,&opt,payload,sizeof payload);
   if(!n || (dc_saved_len==n && !memcmp(payload,dc_saved_payload,n)))return;
