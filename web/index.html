@@ -640,15 +640,21 @@ function tubePulse(tb){
 function drawPads(){
   for(const p of pads){
     const row=Math.floor(p.y/V),start=Math.floor(p.x/V),end=Math.ceil((p.x+p.w)/V);
-    let first=-1,last=-1;
-    for(let x=start;x<end;x++)if(inb(x,row)&&grid[idx(x,row)]===RUBBER){if(first<0)first=x;last=x}
-    if(first<0)continue;
-    const cx=(first+last+1)*V/2;
+    // Select the widest contiguous surviving run, leftmost on ties.
+    // Averaging the two ends of a broken pad can point into empty space.
+    let first=start,best=0,run=0;
+    for(let x=start;x<end;x++){
+      if(inb(x,row)&&grid[idx(x,row)]===RUBBER){
+        if(++run>best){best=run;first=x-run+1}
+      }else run=0;
+    }
+    if(!best)continue;
+    const cx=(first+best/2)*V,half=Math.min(10,best*V/2);
     ctx.save();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.lineCap='round';
     for(let k=0;k<3;k++){
       const phase=(time*1.25+k/3)%1,y=p.y-12-phase*48;
       ctx.globalAlpha=.12+.78*Math.sin(Math.PI*phase);
-      ctx.beginPath();ctx.moveTo(cx-10,y+6);ctx.lineTo(cx,y-6);ctx.lineTo(cx+10,y+6);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx-half,y+6);ctx.lineTo(cx,y-6);ctx.lineTo(cx+half,y+6);ctx.stroke();
     }
     ctx.restore();
   }
