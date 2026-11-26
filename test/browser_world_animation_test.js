@@ -8,15 +8,22 @@ function worldAnimationRegression(html,assert,section){
    const V=8,RUBBER=7,COLS=120,ROWS=60,grid=new Uint8Array(7200),pads=[{x:80,y:160,w:32}];
    const idx=(x,y)=>y*COLS+x,inb=(x,y)=>x>=0&&x<COLS&&y>=0&&y<ROWS;
    let time=0,man={mode:'aim'},draws=0,points=[];
-   const ctx={save(){},restore(){},beginPath(){},moveTo(x,y){points.push([x,y])},lineTo(){},stroke(){draws++}};
+   const ctx={save(){},restore(){},beginPath(){},moveTo(x,y){points.push([x,y])},lineTo(x,y){points.push([x,y])},stroke(){draws++}};
    ${cut('function drawPads(){','function drawTubes(){')}
    return {grid,idx,pads,draw:()=>{draws=0;points=[];drawPads();return {draws,points}},time:v=>{time=v}};
   `)();
   assert(h.draw().draws===0,'destroyed rubber pad must not advertise bounce');
   h.grid[h.idx(10,20)]=7;h.grid[h.idx(11,20)]=7;
   const first=h.draw();assert(first.draws===3,'live pad gets three moving chevrons');
-  assert(first.points.every(p=>p[0]>=70&&p[0]<=96),'remaining rubber determines marker center');
+  assert(first.points.filter((_,i)=>i%3===1).every(p=>p[0]===88),'remaining rubber determines marker center');
   h.time(.15);const second=h.draw();assert(JSON.stringify(second.points)!==JSON.stringify(first.points),'live chevrons travel upward');
+  h.grid[h.idx(11,20)]=0;h.grid[h.idx(13,20)]=7;
+  const split=h.draw();
+  assert(split.points.filter((_,i)=>i%3===1).every(p=>p[0]===84),'split pad must point to an actual surviving run, not the hole');
+  h.grid[h.idx(12,20)]=7;
+  const widest=h.draw();
+  assert(widest.points.filter((_,i)=>i%3===1).every(p=>p[0]===104),'widest surviving run takes priority');
+  assert(widest.points.every(p=>p[0]>=96&&p[0]<=112),'narrowed marker stays within surviving rubber width');
  }
  if(!section||section==='tube'){
   assert(html.includes('function tubePulse('),'tube transfer pulse exists');
