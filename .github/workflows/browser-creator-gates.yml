@@ -49,6 +49,8 @@ jobs:
         run: node test/browser_world_animation_test.js
       - name: Landscape creator selection, pagination and trial navigation
         run: node test/browser_landscape_select_test.js
+      - name: Touch-only end of walking life and remaining-time display
+        run: node test/browser_walk_finish_test.js
       - name: Complete trial pack generation and decoder parity
         run: node test/trial_pack_test.js
       - name: Counterpunch interrupts and multi-hit recovery
