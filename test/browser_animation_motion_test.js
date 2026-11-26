@@ -12,7 +12,7 @@ function animationRegression(html,assert,section){
     const ctx={save(){},restore(){},translate(){},rotate(){},scale(){}};
     const drawBall=()=>{painted=INF},drawSide=()=>{};
     ${cut('function flightFaceFor(','function tubeStep(')}
-    ${cut('function dive(){','// =====================================================================\\n//  TARGETS:'.replace('\\\\n','\n'))}
+    ${cut('function dive(){','function solidAt(')}
     ${cut('function renderMan(){','const LORD_NEW=true;')}
     return {man,dive,render:renderMan,painted:()=>painted,step:dt=>advanceDivePose(man,dt)};
   `)();
