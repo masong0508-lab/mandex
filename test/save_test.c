@@ -66,7 +66,7 @@ int main(void){
   { MxStats U = S; U.unlock_all = 1; int o2 = 0; mx_meta_unpack(&U, &o2, buf, n); CHECK(U.unlock_all == 1, "unpack leaves a session unlock_all cheat alone"); }
 
   /* a chip read is longer than the blob: padding is ignored */
-  { uint8_t big[512]; memset(big, 0xFF, sizeof big); memcpy(big, buf, n); mx_meta_init(&T);
+  { uint8_t big[MX_SAVE_MAX + 128]; memset(big, 0xFF, sizeof big); memcpy(big, buf, n); mx_meta_init(&T);
     CHECK(mx_meta_unpack(&T, &of, big, (int)sizeof big) == 1 && same_saved(&S, &T), "trailing 0xFF padding after the blob is ignored"); }
 
   /* failures leave everything untouched */
@@ -103,13 +103,13 @@ int main(void){
     CHECK(mx_meta_unpack(&T, &of, b2, MX_SAVE_MAX) == 1 && T.kills == 0 && T.pw[1] == 0 && of == 0, "negative counters and a negative outfit pack as 0"); }
 
   /* saves written by a build with a different number of levels */
-  { uint8_t c[400]; int cn = craft(c, MX_NUM_LEVELS); mx_meta_init(&T);
-    CHECK(cn == MX_SAVE_MAX - 1 && mx_meta_unpack(&T, &of, c, cn) == 1, "the independent writer's 20-level version 1 blob is accepted (layout agrees with the documentation)");
+  { uint8_t c[MX_SAVE_MAX + 32]; int cn = craft(c, MX_NUM_LEVELS); mx_meta_init(&T);
+    CHECK(cn == MX_SAVE_MAX - 1 && mx_meta_unpack(&T, &of, c, cn) == 1, "the independent writer's version 1 blob with current level count is accepted (layout agrees with the documentation)");
     CHECK(T.kills == 1000 && T.pops == 1010 && T.pw[3] == 23 && T.ach == 0x15 && of == 2 && T.stars[0] == 1 && T.stars[1] == 2 && T.stars[2] == 3 && T.best[19] == 519, "...and every field lands where the layout says"); }
-  { uint8_t c[400]; int cn = craft(c, 5); mx_meta_init(&T); for(int i = 0; i < MX_NUM_LEVELS; i++){ T.stars[i] = 3; T.best[i] = 99; }
+  { uint8_t c[MX_SAVE_MAX + 32]; int cn = craft(c, 5); mx_meta_init(&T); for(int i = 0; i < MX_NUM_LEVELS; i++){ T.stars[i] = 3; T.best[i] = 99; }
     CHECK(mx_meta_unpack(&T, &of, c, cn) == 1 && T.stars[4] == 2 && T.best[4] == 504 && T.stars[5] == 0 && T.best[5] == 0 && T.best[19] == 0, "a save from a 5-level build loads: the new levels read as not played"); }
-  { uint8_t c[600]; int cn = craft(c, MX_NUM_LEVELS + 5); mx_meta_init(&T);
-    CHECK(cn <= (int)sizeof c && mx_meta_unpack(&T, &of, c, cn) == 1 && T.best[MX_NUM_LEVELS - 1] == 500u + MX_NUM_LEVELS - 1 && of == 2, "a save from a 25-level build loads: the extra levels are dropped"); }
+  { uint8_t c[MX_SAVE_MAX + 32]; int cn = craft(c, MX_NUM_LEVELS + 5); mx_meta_init(&T);
+    CHECK(cn <= (int)sizeof c && mx_meta_unpack(&T, &of, c, cn) == 1 && T.best[MX_NUM_LEVELS - 1] == 500u + MX_NUM_LEVELS - 1 && of == 2, "a save from a build with five additional levels loads: the extra levels are dropped"); }
 
   /* best score now lives in the core */
   { MxStats B; mx_meta_init(&B); memset(&W, 0, sizeof W); W.level = 3; W.men = 2; W.score = 500; mx_meta_win(&B, &W);
@@ -140,7 +140,7 @@ int main(void){
       CHECK(bb[nn - 5] == (0 | (MX_TOOL_VALVE << 1) | 16) && mx_meta_unpack_opt(&B, &of2, &g, bb, nn) == 1 && g.nofight == 1 && g.collapse == 0 && g.tool == MX_TOOL_VALVE, "landlords-fight-back OFF is bit 4 of the options byte and round trips");
       MxOptions d; mx_options_default(&d); CHECK(d.nofight == 0, "default: landlords fight back"); } }
   { uint8_t c[MX_SAVE_MAX + 8]; int cn = craft(c, MX_NUM_LEVELS); MxOptions r = { 1, MX_TOOL_SPLAT }; MxStats B; mx_meta_init(&B); int of2 = -1;
-    CHECK(cn == MX_SAVE_MAX - 1 && c[4] == 1, "(the independent writer still produces a 175-byte version 1 blob)");
+    CHECK(cn == MX_SAVE_MAX - 1 && c[4] == 1, "(the independent writer still produces a version 1 blob)");
     CHECK(mx_meta_unpack_opt(&B, &of2, &r, c, cn) == 1 && r.collapse == 0 && r.tool == MX_TOOL_NONE && B.best[4] == 504 && of2 == 2, "a version 1 save still loads: progress kept, options = defaults");
     CHECK(mx_meta_unpack(&B, &of2, c, cn) == 1, "...also through the old entry point");
     CHECK(mx_meta_unpack_opt(&B, &of2, &r, c, cn - 1) == 0, "a version 1 blob one byte short is refused (the size check follows the version)"); }
