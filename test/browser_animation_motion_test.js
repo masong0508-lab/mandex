@@ -57,7 +57,9 @@ function animationRegression(html,assert,section){
   const dist=(a,b)=>Math.hypot(a.hx-b.hx,a.hy-b.hy);
   assert(dist(sample(0,0),sample(.6,0))<1e-7,'windup begins from idle');
   assert(dist(sample(.001,0),sample(0,.3))<1e-4,'windup joins strike without a jump');
-  assert(dist(sample(0,.3),sample(0,.22))>10,'strike has real movement');
+  assert(dist(sample(.3,0),sample(.001,0))>20,'final windup drives arm into release');
+  assert(sample(0,.3).hx<-30,'arm is extended exactly when projectile is released');
+  assert(dist(sample(0,.3),sample(0,.12))>10,'strike has visible recovery');
   assert(dist(sample(0,.001),sample(0,0))<.01,'attack recovers smoothly');
   assert(dist(sample(.1,.001,'boss',true),sample(.1,0,'boss',true))<.01,'boss second windup joins recovery');
   assert(dist(sample(0,.35,'bat'),sample(0,0,'bat'))<1e-7,'unannounced bat swing starts from neutral');
