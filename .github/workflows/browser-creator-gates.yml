@@ -43,6 +43,10 @@ jobs:
         run: node test/browser_manual_camera_test.js
       - name: Creator expansion, landing pose and effect visibility
         run: node test/browser_camera_expansion_test.js
+      - name: Player and enemy animation motion continuity
+        run: node test/browser_animation_motion_test.js
+      - name: Interactive world and destruction animation feedback
+        run: node test/browser_world_animation_test.js
       - name: Counterpunch interrupts and multi-hit recovery
         run: node test/browser_combat_recovery_test.js
       - name: Stomp-pad boost and held-button ascent
