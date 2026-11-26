@@ -599,6 +599,12 @@ function flightFaceFor(vx,previous){
   return vx>12?1:vx< -12?-1:previous<0?-1:1;
 }
 function flightPitch(vx,vy){return Math.atan2(vy,Math.abs(vx))*.6}
+// Exact integration of the angular acceleration across variable simulation dt.
+function diveSpinIntegral(t){return t<.12?t*t/.24:t-.06}
+function advanceDivePose(m,dt){
+  const a=Math.max(0,m.diveAge||0),b=a+Math.max(0,dt);
+  m.spin+=14*(diveSpinIntegral(b)-diveSpinIntegral(a));m.diveAge=b;
+}
 function tubeStep(m,dt){
   if(m.tubeT>0)m.tubeT-=dt;
   if(m.tubeCd>0){m.tubeCd-=dt;return}
@@ -1464,6 +1470,7 @@ function manStep(dt){
 // The sling can be stretched on past a full pull when you drag toward the air valve (see pointermove); power never exceeds a full pull.
 function pullVec(){let dx=SX-man.x,dy=SY-man.y;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}return[dx,dy]}
 function launch(){const[dx,dy]=pullVec();if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}man.x=SX-dx;man.y=SY-dy;
+  man.recoilAt=time;man.recoilSX=SX;man.recoilSY=SY;man.recoilDX=dx;man.recoilDY=dy;
   const sp0=1-.5*man.inf-.1*(man.bel||0);man.R=14*(1+.9*man.inf+.35*(man.bel||0));man.vx=dx*9.2*sp0;man.vy=dy*9.2*sp0;man.mode='fly';if(man.inf>.6){ST().inflated++;popText(man.x,man.y-60,'HOT AIR!','#9fd8ff',26)}
   if(pw.sel){man.pwr=pw.sel;man.bm=pw.sel==='burp'?burpMult(man):1;pw.left[pw.sel]--;ST()['pw_'+pw.sel]++;pw.sel=null}
   if(man.pwr==='turbo'){
@@ -1680,7 +1687,7 @@ function dive(){
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){burpBlast();return}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){const m=man;m.beaned=true;const sp=Math.hypot(m.vx,m.vy)||1;m.vx+=m.vx/sp*520;m.vy+=m.vy/sp*520-80;SFX.fart();shake=Math.max(shake,5);popText(m.x,m.y-34,'PFFFRRRT!','#b6e04a',30);
     for(let i=0;i<26;i++)P({k:6,x:m.x-m.vx*.03,y:m.y-m.vy*.03,vx:-m.vx*.35+(rnd()-.5)*160,vy:-m.vy*.35+(rnd()-.5)*160,l:.9+rnd()*.6,l0:1.5,s:6+rnd()*7,c:'#a6d63c'});ring(m.x,m.y,46,'#b6e04a');return}
-  if(man.mode==='fly'&&!man.dive){man.dive=true;man.vx*=.4;man.vy=Math.max(man.vy,0)+780;SFX.pop();shake=Math.max(shake,3);ring(man.x,man.y,50,'#fff')}}
+  if(man.mode==='fly'&&!man.dive){man.dive=true;man.spin=Number.isFinite(man.ang)?man.ang:0;man.diveAge=0;man.vx*=.4;man.vy=Math.max(man.vy,0)+780;SFX.pop();shake=Math.max(shake,3);ring(man.x,man.y,50,'#fff')}}
 
 // =====================================================================
 //  TARGETS: grumpy landlords
@@ -1889,7 +1896,7 @@ function update(dt){
   if(man.mode==='fly'){
     for(let i=0;i<8&&man.mode==='fly';i++)manStep(dt/8);
     if(man.mode==='fly'){const m=man;m.face=flightFaceFor(m.vx,m.face);
-      m.ang+=(m.dive?0:(flightPitch(m.vx,m.vy)-m.ang)*.15);if(m.dive)m.spin+=dt*14;
+      m.ang+=(m.dive?0:(flightPitch(m.vx,m.vy)-m.ang)*.15);if(m.dive)advanceDivePose(m,dt);
       m.gooT+=dt;if(m.gooT>.04){m.gooT=0;if(parts.length<1200)parts.push({k:3,x:m.x-m.vx*.01,y:m.y-m.vy*.01,vx:-m.vx*.05+(rnd()-.5)*40,vy:(rnd()-.5)*40,l:.7,l0:.7,s:2+rnd()*2})}
       m.stT+=dt;if(m.stT>.2){m.stT=0;const c=Math.cos(m.ang),sn=Math.sin(m.ang);   // stink trail
         P({k:6,x:m.x+(-30*c-8*sn),y:m.y+(-30*sn+8*c),vx:-m.vx*.04+(rnd()-.5)*20,vy:-12-rnd()*16,l:.9+rnd()*.4,l0:1.3,s:5+rnd()*3,c:'#a6d63c'})}
@@ -2509,11 +2516,13 @@ function drawSlamScene(t){
   ctx.save();ctx.translate(6,-90+bob);drawSlam(t);ctx.restore()}
 
 function drawBall(t,fk){drawSide(t,fk)}   // the tumbling dive is the same hero reach (it just spins), so he never folds into a lump
+function splatGrowth(t){const q=Math.max(0,Math.min(1,t/.18));return .28+.72*(1-(1-q)*(1-q)*(1-q))}
 function drawGooSplat(t,x,y){
-  ctx.save();ctx.translate(x,y);const g=ctx.createRadialGradient(-4,-4,2,0,0,34);g.addColorStop(0,'#b8ff8a');g.addColorStop(.7,'#6fe34a');g.addColorStop(1,'#3fb52f');
+  const grow=splatGrowth(t);
+  ctx.save();ctx.translate(x,y);ctx.scale(grow,grow);const g=ctx.createRadialGradient(-4,-4,2,0,0,34);g.addColorStop(0,'#b8ff8a');g.addColorStop(.7,'#6fe34a');g.addColorStop(1,'#3fb52f');
   ctx.fillStyle=g;ctx.beginPath();for(let a=0;a<6.28;a+=.35){const r=28+Math.sin(a*3+1)*5+Math.sin(a*5)*3;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r*.9)}ctx.closePath();ctx.fill();
   ctx.strokeStyle='#2f8f26';ctx.lineWidth=2;ctx.stroke();
-  ctx.fillStyle='#6fe34a';for(let i=0;i<5;i++){const dx=-22+i*11,len=8+Math.min(t,1.8)*14*(1+((i*7)%5)/5);ctx.fillRect(dx-2,18,4,len);ctx.beginPath();ctx.arc(dx,18+len,3.2,0,7);ctx.fill()}
+  ctx.fillStyle='#6fe34a';for(let i=0;i<5;i++){const dx=-22+i*11,len=8+Math.max(0,Math.min(t-.1,1.8))*14*(1+((i*7)%5)/5);ctx.fillRect(dx-2,18,4,len);ctx.beginPath();ctx.arc(dx,18+len,3.2,0,7);ctx.fill()}
   ctx.restore()}
 // =====================================================================
 //  EXTRA POSES: gross-out + idle gags (front variants, back view) and the frame table the console sprite generator reuses
@@ -3385,7 +3394,7 @@ function pSkin(P,fill){const p=new Path2D(),n=P.length;let x0=1e9,y0=1e9,x1=-1e9
 const RAG_ST=[[-21.5,-20.5,-40,-28,-57,-36],[21.5,-20.5,40,-28,57,-36],[-10,24,-17,39,-26,55],[10,24,17,39,26,55]];   // armL armR legL legR of the 'star' pose
 function ragFl(){const f=Math.sin(time*16);return[[-12,8,-27,12+f*2,-44,4+f*4],[-10,6,-24,16-f*2,-42,13-f*3]]}
 function ragXf(m){if(m.mode==='stuck'){const w=Math.sin(m.t*26)*Math.exp(-m.t*3.2),a=w*.17;return{k:'st',a,sx:.56*(1-w*.05),sy:.45*(1+w*.07),c:Math.cos(a),s:Math.sin(a)}}
-  if(m.mode==='fly'&&!m.dive){const a=m.ang;return{k:'fl',a,sx:.64,sy:.64,c:Math.cos(a),s:Math.sin(a)}}return null}
+  if(m.mode==='fly'&&!m.dive){const face=m.face<0?-1:1,a=m.ang*face;return{k:'fl',a,sx:.64*face,sy:.64,c:Math.cos(a),s:Math.sin(a)}}return null}
 function rW(X,m,x,y){return[m.x+x*X.sx*X.c-y*X.sy*X.s,m.y+x*X.sx*X.s+y*X.sy*X.c]}
 function rL(X,m,x,y){const dx=x-m.x,dy=y-m.y;return[(dx*X.c+dy*X.s)/X.sx,(-dx*X.s+dy*X.c)/X.sy]}
 function ragHit(p){if(!solidAt(p.x,p.y))return;const gx=Math.floor(p.x/V),gy=Math.floor(p.y/V);let bx=0,by=0,bd=1e9,nx=0,ny=0;
@@ -3395,7 +3404,7 @@ function ragHit(p){if(!solidAt(p.x,p.y))return;const gx=Math.floor(p.x/V),gy=Mat
   p.px=p.x-vx*.6;p.py=p.y-vy*.6}
 function ragStep(m,dt){const X=ragXf(m);if(!X){m.rg=null;return}
   dt=clamp(dt,1/240,1/20);const f60=dt*60;
-  const rest=X.k==='st'?RAG_ST:ragFl(),kr=(X.k==='st'?[.05,.035]:[.2,.14]).map(k=>1-Math.pow(1-k,f60)),gk=X.k==='st'?1:.3,sc=(X.sx+X.sy)/2;
+  const rest=X.k==='st'?RAG_ST:ragFl(),kr=(X.k==='st'?[.05,.035]:[.2,.14]).map(k=>1-Math.pow(1-k,f60)),gk=X.k==='st'?1:.3,sc=(Math.abs(X.sx)+Math.abs(X.sy))/2;
   if(!m.rg||m.rg.k!==X.k)m.rg={k:X.k,P:rest.map(r=>{const t=rW(X,m,r[0],r[1]),f=X.k==='st'?.45:1;
     return[0,1,2].map(i=>{const q=rW(X,m,r[0]+(r[2*i]-r[0])*(i?f:0),r[1]+(r[2*i+1]-r[1])*(i?f:0));return{x:q[0],y:q[1],px:q[0],py:q[1]}})})};
   const pdt=m.rg.dt||dt;
@@ -3564,8 +3573,9 @@ function renderMan(){
     else if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else if(dragging)drawFront('up','scream',time);else{const bz=Math.sin(time*2.6);drawSpin(0,Object.assign({},SPIN_POSE.T_IDLE,{t:time,belly:[1+.012*bz,1-.01*bz]}))}
     JIG=null}
   else if(m.dive){const face=m.face<0?-1:1,a=m.spin*face;
-    ctx.rotate(a);ctx.scale(.62*face,.62);
-    JIG=jigOpts(j,.62*face,.62,a);drawBall(time,'scream');JIG=null}
+    const sc=Number.isFinite(m.diveAge)?.62+.02*Math.max(0,1-m.diveAge/.12):.62;
+    ctx.rotate(a);ctx.scale(sc*face,sc);
+    JIG=jigOpts(j,sc*face,sc,a);INF=bgrow(stom(m));drawBall(time,'scream');INF=0;JIG=null}
   else{const face=m.face<0?-1:1,a=m.ang*face;
     ctx.rotate(a);ctx.scale(.64*face,.64);
     JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=bgrow(stom(m));drawSide(time,'scream');INF=0;JIG=null}
@@ -3582,7 +3592,7 @@ function drawLandlord(t){
   const step=t.mv?Math.sin(t.wk*2.2)*(t.mv>1?3.4:2.4):0,lean=t.mv>1?.12*fc:0;
   ctx.save();ctx.translate(t.x,t.y+bob+hop);const SZ=kind==='boss'?1.38:1.14;ctx.scale(SZ*fc,SZ);if(lean)ctx.rotate(lean);
   if(LORD_NEW){ctx.save();ctx.drawImage(LORD_GLOW,-28,-32);   // cached glow, no per-actor gradient allocation
-  ctx.translate(0,15);ctx.scale(-.27,.27);LWM=2.8;try{cgLordBig(t.t||0,{game:1,kind,mv:t.mv,wk:t.wk,pan,wind,swing:sw?Math.max(t.swing,.001):0,stun:t.stun>0,blink:t.blink})}finally{LWM=1}ctx.restore()}
+  ctx.translate(0,15);ctx.scale(-.27,.27);LWM=2.8;try{cgLordBig(t.t||0,{game:1,kind,mv:t.mv,wk:t.wk,pan,wind,windTime:t.wind||0,b2:!!t.b2,swing:sw?Math.max(t.swing,.001):0,stun:t.stun>0,blink:t.blink})}finally{LWM=1}ctx.restore()}
   else{
   // little shoes (they only show when he is on the move)
   if(t.mv||wind||sw){ctx.fillStyle='#111';ctx.fillRect(-5+step,11.5,5,2.6);ctx.fillRect(1-step,11.5,5,2.6)}
@@ -3627,6 +3637,22 @@ function drawCases(){for(const c of cases){ctx.save();ctx.translate(c.x,c.y);ctx
 // =====================================================================
 function txt(s,x,y,size,fill,align,stroke){ctx.font=`bold ${size}px "Trebuchet MS",Impact,sans-serif`;ctx.textAlign=align||'left';ctx.lineWidth=Math.max(3,size/6);ctx.strokeStyle=stroke||'#000';ctx.lineJoin='round';ctx.strokeText(s,x,y);ctx.fillStyle=fill;ctx.fillText(s,x,y)}
 function drawCloud(c){ctx.globalAlpha=.9;ctx.fillStyle='#fff';const r=34*c.s;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.arc(c.x+r*.9,c.y+6,r*.75,0,7);ctx.arc(c.x-r*.9,c.y+9,r*.65,0,7);ctx.arc(c.x+r*.2,c.y-r*.4,r*.7,0,7);ctx.fill();ctx.globalAlpha=1}
+// The band stays attached to the posts and returns from the release pose.
+const SLING_BAND_POINT={x:0,y:0};
+function slingBandPoint(m,back){
+  const p=SLING_BAND_POINT,offset=back?4:-2;
+  if(m.mode==='aim'&&!m.chug){p.x=m.x+offset;p.y=m.y+6;return p}
+  const age=time-m.recoilAt,u=Math.max(0,Math.min(1,age/.36));
+  const k=Number.isFinite(age)&&age>=0&&m.recoilSX===SX&&m.recoilSY===SY?(1-u)*(1-u)*Math.cos(3*Math.PI*u):0;
+  p.x=SX+(offset-(m.recoilDX||0))*k;p.y=SY+28+(-22-(m.recoilDY||0))*k;
+  return p;
+}
+function drawSlingBand(back,m){
+  const p=slingBandPoint(m,back),x=SX+(back?13:-12),y=SY+(back?24:22);
+  ctx.save();ctx.lineCap='round';ctx.strokeStyle='#2a160a';ctx.lineWidth=5;
+  ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo((x+p.x)/2,(y+p.y)/2+2,p.x,p.y);ctx.stroke();
+  ctx.lineWidth=1.3;ctx.strokeStyle='#95603a';ctx.stroke();ctx.restore();
+}
 function drawSling(back){
   if(!CL.slings){drawSling1(back);return}
   const sx=SX,sy=SY;for(const s of CL.slings){SX=s[0];SY=s[1];drawSling1(back)}SX=sx;SY=sy}   // every sling of the wide finale stands in the world; the man uses the current one
@@ -3910,10 +3936,10 @@ function draw(){
   if(tubes.length)drawTubes();
   if(pads.length)drawPads();
   // sling band behind man
-  if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX+13,SY+24);ctx.lineTo(man.x+4,man.y+6);ctx.stroke()}
+  drawSlingBand(true,man);
   if(man.mode==='aim'&&dragging){const pv=pullVec(),vx=pv[0]*9.2,vy=pv[1]*9.2;const gd=OPT().guide==null?2:OPT().guide;for(let t=.06,i=0;t<[0,.55,1.7][gd];t+=.075,i++){ctx.fillStyle=`rgba(255,255,255,${.9-i*.035})`;ctx.beginPath();ctx.arc(man.x+vx*t,man.y+vy*t+450*t*t,3.4-i*.07,0,7);ctx.fill()}}
   renderMan();if(man.mode==='aim'||man.mode==='fly')drawInfFX(man);
-  if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX-12,SY+22);ctx.lineTo(man.x-2,man.y+6);ctx.stroke()}
+  drawSlingBand(false,man);
   drawSling(false);
   if(rubbleCull)drawParts(rubbleX0,rubbleX1,rubbleY0,rubbleY1);else drawParts();drawTexts();
   ctx.restore();
@@ -4529,6 +4555,29 @@ function cgSpark(x,y,r,c){ctx.fillStyle=c||'#fff';ctx.beginPath();ctx.moveTo(x,y
 // The landlord, drawn big (used in cutscenes and, scaled down, in the game): top hat with a buckle, monocle, curly mustache, waistcoat, watch chain,
 // trousers and shoes.  Faces left; origin = between his feet.  o (optional, game): kind, mv/wk (walking), pan, wind, swing, stun, blink.
 let LWM=1;   // outline multiplier, so the small in-game sprite keeps readable outlines
+// Use gameplay countdowns for anticipation, strike and recovery. When a
+// boss has a queued second throw, recover toward the next windup.
+const LORD_ARM_POSE={hx:0,hy:0,ex:0,ey:0,angle:0};
+function lordAttackPose(t,o,p){
+  const wave=Math.sin(t*3.2)*.3,ix=-27+wave*1.4,iy=-59+wave*3,iex=-17+wave*1.4,iey=-52;
+  const throwing=o.kind==='thrower'||o.kind==='boss',direct=o.kind==='bat'||o.kind==='healer';
+  const duration=throwing?(o.b2?.4:.6):.36,swingDuration=o.kind==='bat'?.35:o.kind==='healer'?.4:.3;
+  const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)};
+  const cock=o.windTime>0?smooth((duration-o.windTime)/.14):0;
+  const cx=throwing?-9:-19,cy=throwing?-92:-78,cex=-20,cey=throwing?-80:-69;
+  p.hx=ix+(cx-ix)*cock;p.hy=iy+(cy-iy)*cock;p.ex=iex+(cex-iex)*cock;p.ey=iey+(cey-iey)*cock;p.angle=.1-.6*cock;
+  if(o.swing>0){
+    const u=Math.max(0,Math.min(1,1-o.swing/swingDuration));
+    if(u<.3){
+      const k=smooth(u/.3),x=direct?ix:cx,y=direct?iy:cy,ex=direct?iex:cex,ey=direct?iey:cey;
+      p.hx=x+(-34-x)*k;p.hy=y+(-62-y)*k;p.ex=ex+(-24-ex)*k;p.ey=ey+(-64-ey)*k;p.angle=(direct?.1:-.5)+(.9-(direct?.1:-.5))*k;
+    }else{
+      const k=smooth((u-.3)/.7);
+      p.hx=-34+(p.hx+34)*k;p.hy=-62+(p.hy+62)*k;p.ex=-24+(p.ex+24)*k;p.ey=-64+(p.ey+64)*k;p.angle=.9+(p.angle-.9)*k;
+    }
+  }
+  return p;
+}
 function cgLordBig(t,o){o=o||{};const kind=o.kind||'',game=!!o.game,mvg=game?(o.mv?1:0):1,ph=game?(o.wk||0)*2.2:t*5.2,st=Math.sin(ph)*mvg,bob=game?(mvg?Math.abs(Math.sin(ph))*-2.2:0):Math.abs(Math.sin(ph))*-2.2,
   bl=game?(o.blink<0):((t*1.3%3.1)>2.98),sneer=.5+.5*Math.sin(t*2.3),pan=!!o.pan,wind=!!o.wind,sw=!!o.swing,stun=!!o.stun,wave=game?(sw?1:Math.sin(t*3.2)*.3):Math.sin(t*6.5);
   const SUC={bat:'#2f5d3a',thrower:'#3a4a7a',boss:'#1c1c24',sprinter:'#7a5a1c',healer:'#f4f4f4',shield:'#33413f'}[kind]||'#4a5568',
@@ -4550,11 +4599,12 @@ function cgLordBig(t,o){o=o||{};const kind=o.kind||'',game=!!o.game,mvg=game?(o.
   // near arm and what it holds
   let hx,hy;
   if(pan){hx=-22;hy=-88+Math.sin(t*23+1)*2;lim(-14,-66,-19,-78,7.5,SUk);lim(-19,-78,hx,hy,6.6,SUk)}
+  else if(game){const p=lordAttackPose(t,o,LORD_ARM_POSE);hx=p.hx;hy=p.hy;lim(-14,-66,p.ex,p.ey,7.5,SUk);lim(p.ex,p.ey,hx,hy,6.6,SUk)}
   else if(wind&&(kind==='thrower'||kind==='boss')){hx=-9;hy=-92;lim(-14,-66,-20,-80,7.5,SUk);lim(-20,-80,hx,hy,6.6,SUk)}
   else if(sw){hx=-30;hy=-62;lim(-14,-66,-22,-62,7.5,SUk);lim(-22,-62,hx,hy,6.6,SUk)}
   else{const ex=-17+wave*1.4;hx=ex-10;hy=-59+wave*3;lim(-14,-66,ex,-52,7.5,SUk);lim(ex,-52,hx,hy,6.6,SUk)}
   if(!pan){ctx.save();ctx.translate(hx-2,hy-3);
-    if(kind==='thrower'||kind==='boss'){ctx.rotate(wind?-.5:sw?.9:.1);cgR(-9,-6,18,13,'#7a4a22',1.6,2);cgR(-3,-9,6,3,'#3a220c',1,1);cgR(-1.6,-1.5,3.2,4,'#ffd23f',.8)}   // briefcase
+    if(kind==='thrower'||kind==='boss'){ctx.rotate(game?LORD_ARM_POSE.angle:wind?-.5:sw?.9:.1);cgR(-9,-6,18,13,'#7a4a22',1.6,2);cgR(-3,-9,6,3,'#3a220c',1,1);cgR(-1.6,-1.5,3.2,4,'#ffd23f',.8)}   // briefcase
     else if(kind==='bat'){ctx.rotate(sw?-1.2+(.35-Math.min(.35,o.swing||0))/.35*2.6:-.3);cgP([-1.5,2,1.5,2,3.4,-28,-3.4,-28],'#b97a3c',1.4);cgR(-2.2,0,4.4,6,'#5a3414',1,1)}   // club
     else if(kind!=='healer'){ctx.rotate(-.5+wave*.18);cgR(-8,-13,16,20,'#fbfbf4',1.5,1);ctx.strokeStyle='#9aa';ctx.lineWidth=1;for(const y of[-9,-5,-1,3]){ctx.beginPath();ctx.moveTo(-5,y);ctx.lineTo(5,y);ctx.stroke()}cgE(0,5,2.4,2.4,'#c43a3a',.8)}   // papers
     ctx.restore()}
