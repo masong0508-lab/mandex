@@ -6,7 +6,7 @@ const fs=require('fs'),path=require('path');
 const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 const core=fs.readFileSync(path.join(__dirname,'../core/mx.c'),'utf8');
 const start=html.indexOf('const EARLY_TACTICS=[');
-const end=html.indexOf('const chEnd=',start);
+const end=html.indexOf('// BEGIN MANDEX TRIAL DATA',start);
 assert(start>=0&&end>start,'live JS early-level hint data found');
 const levels=Array.from({length:60},()=>({}));
 const longWalk='Special controls: walking, jumping and punching';levels[22].tip=longWalk;
