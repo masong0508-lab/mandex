@@ -89,6 +89,15 @@ echo "--- Browser motion animation: dive, sling, mirrored ragdoll, attacks and i
 if command -v node >/dev/null 2>&1;then node browser_animation_motion_test.js;fi
 echo "--- Browser world animation: live pads, tubes, moving TNT, and shockwave easing ---"
 if command -v node >/dev/null 2>&1;then node browser_world_animation_test.js;fi
+echo "--- Browser landscape custom-level paging and actions ---"
+if command -v node >/dev/null 2>&1;then node browser_landscape_select_test.js;fi
+echo "--- Native fractured-pad and tube pulse animation ---"
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wall $flags -I../core native_prop_animation_test.c ../core/mx.c -lm -o "native_prop_animation_$mode"
+  "./native_prop_animation_$mode"
+done
 echo "--- Trial expansion: raw asset, native table and browser decoder parity ---"
 if command -v node >/dev/null 2>&1;then node trial_pack_test.js;fi
 for mode in float fixed;do
