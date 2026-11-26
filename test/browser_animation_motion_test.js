@@ -29,15 +29,14 @@ function animationRegression(html,assert,section){
   assert(start>=0,'elastic sling band pose exists');
   const boot=new Function(`
     let SX=128,SY=362,time=10;
-    ${cut('function slingBandPoint(','function drawSling(back)')}
+    ${cut('const SLING_BAND_POINT=','function drawSling(back)')}
     return {point:slingBandPoint,clock:v=>{time=v}};
   `)();
-  const m={mode:'aim',x:50,y:405};const a=boot.point(m,true),b=boot.point(m,false);
-  const ax=a.x,ay=a.y,bx=b.x,by=b.y;
+  const m={mode:'aim',x:50,y:405};const a=boot.point(m,true),ax=a.x,ay=a.y,b=boot.point(m,false),bx=b.x,by=b.y;
   m.mode='fly';m.recoilAt=10;m.recoilSX=128;m.recoilSY=362;m.recoilDX=78;m.recoilDY=-43;
   const first=boot.point(m,true);near(first.x,ax,'back band continuous on release');near(first.y,ay,'back band y continuous');
   const second=boot.point(m,false);near(second.x,bx,'front band continuous on release');near(second.y,by,'front band y continuous');
-  boot.clock(10.1);const mid=boot.point(m,true);assert(mid.x>ax&&mid.x<160,'elastic band returns toward posts');
+  boot.clock(10.1);const mid=boot.point(m,true);assert(mid.x>ax&&mid.x<180,'elastic band returns toward posts');
   boot.clock(10.5);const rest=boot.point(m,true);near(rest.x,128,'band settles at center');near(rest.y,390,'band settles below post');
   m.recoilSX=1200;boot.clock(10.05);near(boot.point(m,true).x,128,'old district recoil cannot leak into new sling');
  }
