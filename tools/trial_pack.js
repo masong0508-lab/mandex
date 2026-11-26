@@ -162,16 +162,27 @@ ${rows}
 };
 #endif
 `;
-  // ASCII code units 33..153; JSON escapes all sensitive characters. JS
-  // reads only the chosen stage, so no giant raw grid allocations at boot.
-  const packed=JSON.stringify(String.fromCharCode(...commands));
+  // Pack binary commands into script-safe ASCII. Only the selected map is
+  // decoded; no uncompressed level grid is retained at startup.
+  const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  let encoded="";
+  for(let i=0;i<commands.length;i+=3){
+    const a=commands[i],b=commands[i+1]||0,c=commands[i+2]||0;
+    encoded+=alphabet[a>>2]+alphabet[((a&3)<<4)|(b>>4)]+
+      (i+1<commands.length?alphabet[((b&15)<<2)|(c>>6)]:"=")+
+      (i+2<commands.length?alphabet[c&63]:"=");
+  }
+  const packed=JSON.stringify(encoded);
   const web=`// BEGIN MANDEX TRIAL DATA
 const TRIAL_START=LEVELS.length;
 const TRIAL_BYTES=${packed};
 const TRIAL_META=${JSON.stringify(table.map(t=>[t.name,t.tip,t.off,t.rects,t.roomOff,t.rooms,t.targetOff,t.targets,t.padOff,t.pads,t.tubeOff,t.tubes,t.men,t.walk]))};
 const TRIAL_DISTRICTS=${JSON.stringify(levels.filter((_,i)=>i%20===0).map(l=>l.district))};
 function buildTrial(i){
-  const a=TRIAL_META[i],read=j=>TRIAL_BYTES.charCodeAt(j),pals=${JSON.stringify(palettes)},kinds=${JSON.stringify(kinds)};
+  const a=TRIAL_META[i],alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",read=j=>{
+    const off=Math.floor(j/3)*4,part=j%3,p=alphabet.indexOf(TRIAL_BYTES[off+part]),q=alphabet.indexOf(TRIAL_BYTES[off+part+1]);
+    return part===0?(p<<2)|(q>>4):part===1?((p&15)<<4)|(q>>2):((p&3)<<6)|q;
+  },pals=${JSON.stringify(palettes)},kinds=${JSON.stringify(kinds)};
   for(let k=a[2],end=k+a[3]*5;k<end;k+=5)rect(read(k),read(k+1),read(k+2),read(k+3),read(k+4));
   for(let k=a[4],end=k+a[5]*5;k<end;k+=5)interiors.push({x:read(k),y:read(k+1),w:read(k+2),h:read(k+3),p:pals[read(k+4)]});
   for(let k=a[6],end=k+a[7]*4;k<end;k+=4)tgt(read(k),read(k+1),kinds[read(k+2)],read(k+3));
