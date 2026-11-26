@@ -213,6 +213,14 @@ typedef struct {
    -1 = stationary/airborne (hold the actual side-on pose); 0..3 are
    the successive 1-cell phases of a grounded 4-cell stride. The core
    advances gait only by actual, collision-resolved horizontal motion. */
+/* Read the actual remaining walking seconds, including earned +3s bonuses.
+ * Integer ceiling avoids showing zero while the player can still move. */
+static inline int mx_walk_seconds_left(const MxMan *m){
+  if(m->mode!=MAN_WALK||m->wt<=0)return 0;
+  real t=rclamp(m->wt,0,RI(MX_WALK_T+15));
+  int whole=rfloor(t);
+  return whole+(t>RI(whole));
+}
 static inline int mx_walk_anim_phase(const MxMan *m){
   if(m->mode != MAN_WALK || !m->gr || rabs(m->vx) <= R(3)) return -1;
   return rfloor(m->gait) & 3;
