@@ -4602,13 +4602,19 @@ function lordAttackPose(t,o,p){
   const cock=o.windTime>0?smooth((duration-o.windTime)/.14):0;
   const cx=throwing?-9:-19,cy=throwing?-92:-78,cex=-20,cey=throwing?-80:-69;
   p.hx=ix+(cx-ix)*cock;p.hy=iy+(cy-iy)*cock;p.ex=iex+(cex-iex)*cock;p.ey=iey+(cey-iey)*cock;p.angle=.1-.6*cock;
+  // Finish the forward motion BEFORE the countdown crosses zero.
+  // A projectile or melee hit is emitted at that crossing, not later in recovery.
+  if(!direct&&o.windTime>0&&o.windTime<.085){
+    const k=smooth(1-o.windTime/.085);
+    p.hx+=(-34-p.hx)*k;p.hy+=(-62-p.hy)*k;p.ex+=(-24-p.ex)*k;p.ey+=(-64-p.ey)*k;p.angle+=(.9-p.angle)*k;
+  }
   if(o.swing>0){
     const u=Math.max(0,Math.min(1,1-o.swing/swingDuration));
-    if(u<.3){
-      const k=smooth(u/.3),x=direct?ix:cx,y=direct?iy:cy,ex=direct?iex:cex,ey=direct?iey:cey;
-      p.hx=x+(-34-x)*k;p.hy=y+(-62-y)*k;p.ex=ex+(-24-ex)*k;p.ey=ey+(-64-ey)*k;p.angle=(direct?.1:-.5)+(.9-(direct?.1:-.5))*k;
+    if(direct&&u<.3){
+      const k=smooth(u/.3);
+      p.hx=ix+(-34-ix)*k;p.hy=iy+(-62-iy)*k;p.ex=iex+(-24-iex)*k;p.ey=iey+(-64-iey)*k;p.angle=.1+.8*k;
     }else{
-      const k=smooth((u-.3)/.7);
+      const k=smooth(direct?(u-.3)/.7:u);
       p.hx=-34+(p.hx+34)*k;p.hy=-62+(p.hy+62)*k;p.ex=-24+(p.ex+24)*k;p.ey=-64+(p.ey+64)*k;p.angle=.9+(p.angle-.9)*k;
     }
   }
