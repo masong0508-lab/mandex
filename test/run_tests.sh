@@ -90,7 +90,7 @@ if command -v node >/dev/null 2>&1;then node browser_animation_motion_test.js;fi
 echo "--- Browser world animation: live pads, tubes, moving TNT, and shockwave easing ---"
 if command -v node >/dev/null 2>&1;then node browser_world_animation_test.js;fi
 echo "--- Browser landscape custom-level paging and actions ---"
-if command -v node >/dev/null 2>&1;then node browser_landscape_select_test.js;fi
+if command -v node >/dev/null 2>&1;then node browser_landscape_select_test.js;node browser_walk_finish_test.js;fi
 echo "--- Native fractured-pad and tube pulse animation ---"
 for mode in float fixed;do
   flags=""
