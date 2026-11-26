@@ -1247,7 +1247,7 @@ function wBlocked(x,y){
   }
   return false;
 }
-function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.gait=0;m.vx=m.vy=0;m.gr=false;m.wt=WALK_T;m.pT=0;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.R=14;m.pwr=m.pwr;
+function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.gait=0;m.vx=m.vy=0;m.landFx=0;m.landPower=0;m.gr=false;m.wt=WALK_T;m.pT=0;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.R=14;m.pwr=m.pwr;
   let ok=!wBlocked(m.x,m.y);for(let u=1;u<=110&&!ok;u++){if(!wBlocked(m.x,m.y-u)){m.y-=u;ok=true}}
   for(let r=4;r<=200&&!ok;r+=4)for(let a=0;a<16&&!ok;a++){const an=-Math.PI/2+(a%2?1:-1)*Math.ceil(a/2)*.4,qx=m.x+Math.cos(an)*r,qy=m.y+Math.sin(an)*r;if(!wBlocked(qx,qy)){m.x=qx;m.y=qy;ok=true}}   // nearest free spot, preferring up
   goo(m.x,m.y,22,260);SFX.splat();ring(m.x,m.y,50,'#7dff5a');popText(m.x,m.y-50,'ON YOUR FEET!','#7dff5a',26);shake=Math.max(shake,4)}
@@ -1277,6 +1277,7 @@ function walkPunch(){const m=man,cx=m.x+m.face*17,cy=m.y-3,run=Math.abs(m.vx)>10
 function walkSlam(){const m=man,cx=m.x,cy=m.y+WHH+4,beforeCases=cases.length;let d=0;for(const[hw,dm]of[[14,34],[26,18]])d+=walkHit(cx,cy+4,hw,10,dm);
   m.stomp=false;shake=Math.max(shake,9);ring(cx,cy,70,'#fff');ring(cx,cy,45,'#ffd23f');dust(cx,cy,10,14);SFX.boom&&SFX.crunch(1);wobKick(Math.floor(cx/V),Math.floor(cy/V),6,0,.9);if(cases.length===beforeCases)popText(cx,cy-34,'BELLY SLAM!','#ff8a3a',24);return d}
 function walkStep(dt){const m=man;
+  m.landFx=Math.max(0,(m.landFx||0)-dt);
   m.wt-=dt;if(m.wt<=0){popText(m.x,m.y-40,'TIME!','#ff6b6b',26);walkQuit();return}
   if(wBlocked(m.x,m.y)){let f=false;for(let u=2;u<=80&&!f;u+=2)for(const sg of[0,-1,1])if(!wBlocked(m.x+sg*u,m.y-u)){m.x+=sg*u;m.y-=u;f=true;break}}   // rubble fell on him: pop him out
   // Record the real start AFTER rubble recovery; moving the player out of
@@ -1319,6 +1320,7 @@ function walkStep(dt){const m=man;
   for(let i=0;i<ny;i++){const sy=dy/ny;
     if(!wBlocked(m.x,m.y+sy))m.y+=sy;
     else{if(sy>0){if(m.stomp){walkSlam();if(!wBlocked(m.x,m.y+sy)){m.y+=sy;m.vy*=.8;continue}}
+        if(m.vy>180){m.landFx=.16;m.landPower=Math.max(.2,Math.min(1,(m.vy-160)/420))}
         if(m.vy>380){dust(m.x,m.y+WHH,6,10);SFX.thud&&SFX.thud(.5)}m.vy=0}else{m.vy=0;if(Math.abs(dy)>2)SFX.thud&&SFX.thud(.3)}
       break}}
   m.gr=wBlocked(m.x,m.y+1.5);
@@ -1374,8 +1376,17 @@ function drawWalkPunchFx(m){
   }
   ctx.stroke();ctx.restore();
 }
+// Contact-anchored squash is art only, scaled by actual landing speed.
+function walkLandingSquash(m){
+  if(!m.gr||!(m.landFx>0))return 0;
+  const q=Math.min(1,m.landFx/.16);
+  return Math.max(0,Math.min(1,m.landPower||0))*q*q;
+}
+function walkAirPitch(m){
+  return m.stomp?0:.13*Math.max(-1,Math.min(1,(m.vy||0)/345));
+}
 function drawWalkMan(m){
-  const turning=m.turn>0,sc=.36,step=walkStrideStep(m),hip=2.4*step;
+  const turning=m.turn>0,sc=.36,step=walkStrideStep(m),hip=2.4*step,squash=walkLandingSquash(m);
   if(m.gr){
     ctx.save();ctx.fillStyle='rgba(19,28,20,.26)';
     ctx.beginPath();ctx.ellipse(m.x,m.y+WHH+1,12-Math.abs(step)*1.1,2.5,0,0,6.2832);ctx.fill();ctx.restore();
@@ -1386,8 +1397,8 @@ function drawWalkMan(m){
   // Punch lunge translates art only; the floor contact stays grounded.
   const punchLunge=walkPunchLunge(m.pT,m.turn);
   if(punchLunge)ctx.translate(visualFace<0?-punchLunge:punchLunge,0);
-  ctx.scale(visualFace<0?-sc:sc,sc);ctx.translate(0,-50);
-  if(!m.gr)ctx.rotate(m.stomp?0:m.vy<0?-.08:.08);
+  ctx.scale((visualFace<0?-sc:sc)*(1+.10*squash),sc*(1-.16*squash));ctx.translate(0,-50);
+  if(!m.gr)ctx.rotate(walkAirPitch(m));
   const th=turning?walkTurnAngle(m.turn):Math.PI/2+.055*step;
   WALK_SPIN_POSE.th=th;WALK_SPIN_POSE.hip=hip;
   WALK_SPIN_POSE.psi=-3.7*step;WALK_SPIN_POSE.t=time;
@@ -3281,8 +3292,15 @@ function updParts(dt){
     if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}}
 function updTexts(dt){for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=28*dt;if(t.t>t.l)texts.splice(i,1)}}
 let endT=0;
-function drawParts(){
-  for(const p of parts){const a=p.l/p.l0;
+function drawParts(x0,x1,y0,y1){
+  // Paint culling only: the simulation still updates every effect. The
+  // conservative margin covers growing clouds, rotated shapes and trails.
+  for(const p of parts){
+    if(x0!==undefined){
+      const pad=8+Math.max(32,3*Math.abs(p.s||0),.035*Math.max(Math.abs(p.vx||0),Math.abs(p.vy||0))+2);
+      if(p.x+pad<x0||p.x-pad>x1||p.y+pad<y0||p.y-pad>y1)continue;
+    }
+    const a=p.l/p.l0;
     if(p.k===0){ctx.globalAlpha=Math.min(1,p.l);ctx.fillStyle=p.c;ctx.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s)}
     else if(p.k===1){ctx.globalAlpha=a*.5;ctx.fillStyle=p.c||'#e6e0d2';ctx.beginPath();ctx.arc(p.x,p.y,p.s*(1+(1-a)*1.4),0,7);ctx.fill()}
     else if(p.k===2){ctx.globalAlpha=Math.min(1,a*1.4);ctx.strokeStyle='#ffd36b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*.035,p.y-p.vy*.035);ctx.stroke()}
@@ -3897,7 +3915,7 @@ function draw(){
   renderMan();if(man.mode==='aim'||man.mode==='fly')drawInfFX(man);
   if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX-12,SY+22);ctx.lineTo(man.x-2,man.y+6);ctx.stroke()}
   drawSling(false);
-  drawParts();drawTexts();
+  if(rubbleCull)drawParts(rubbleX0,rubbleX1,rubbleY0,rubbleY1);else drawParts();drawTexts();
   ctx.restore();
   if(camOn)ctx.restore();
   grade();
@@ -5443,8 +5461,9 @@ function drawMobileEditor(){
       W/2,Math.min(H-80,y+225),14,'#cfd','center');
   }else if(E.starters){
     txt('START A BUILD — Undo restores the old one',W/2,y+13,17,'#ffd23f','center');
-    E_STARTERS.forEach((name,i)=>btn(12,y+28+i*52,W-24,44,name,
-      ()=>eApplyStarter(i),{size:16}));
+    const sw=(W-36)/2;
+    E_STARTERS.forEach((name,i)=>btn(12+(i%2)*(sw+12),y+28+Math.floor(i/2)*52,sw,44,name,
+      ()=>eApplyStarter(i),{size:14}));
   }else{
     const actions=[
       ['MEN -',()=>eAdjustMen(-1)],
@@ -5735,7 +5754,7 @@ function eAdjustMen(delta){
 }
 // Deterministic starter structures: no generated textures, random levels,
 // extra draw calls or terrain outside the canonical 120x60 creator grid.
-const E_STARTERS=['THREE-STOREY TOWER','BREAKAWAY BRIDGE','FACTORY WORKSHOP'];
+const E_STARTERS=['THREE-STOREY TOWER','BREAKAWAY BRIDGE','FACTORY WORKSHOP','ROOFTOP TENEMENTS','TNT TRANSFER DEPOT','RUBBER BOUNCE ARENA'];
 function eStarterPattern(kind){
   if(!Number.isInteger(kind)||kind<0||kind>=E_STARTERS.length)throw Error('Unknown starter');
   const g=new Uint8Array(120*ROWS);
@@ -5756,7 +5775,7 @@ function eStarterPattern(kind){
     fill(55,32,60,32,4);fill(92,32,96,32,4);
     fill(47,50,48,51,5);fill(101,50,102,51,5);
     t=[[68,34],[84,34]];
-  }else{ // warehouse with glass windows, mezzanines and TNT supports
+  }else if(kind===2){ // warehouse with glass windows, mezzanines and TNT supports
     fill(40,54,110,55,3);fill(41,20,108,21,2);
     fill(41,22,42,53,2);fill(107,22,108,53,2);
     fill(42,39,107,40,1);fill(42,27,107,28,1);
@@ -5764,6 +5783,25 @@ function eStarterPattern(kind){
     fill(82,40,83,53,6);fill(48,53,49,53,5);
     fill(103,53,104,53,5);
     t=[[54,27],[75,39],[95,54]];
+  }else if(kind===3){ // grounded apartment tower: three occupied floors
+    fill(39,58,107,59,3);fill(40,16,42,57,2);fill(104,16,106,57,2);
+    fill(42,16,104,17,2);fill(42,30,104,31,1);fill(42,44,104,45,1);
+    fill(71,45,73,57,6);fill(40,48,42,49,5);fill(104,33,106,35,4);
+    fill(40,20,42,22,4);fill(104,50,106,52,4);
+    t=[[57,58],[83,44],[90,30]];
+  }else if(kind===4){ // TNT transfer depot: blast-sensitive piers under a catwalk
+    fill(36,58,112,59,3);fill(42,34,44,57,6);fill(95,34,97,57,6);
+    fill(42,32,97,33,1);fill(42,49,44,50,5);fill(95,49,97,50,5);
+    fill(51,30,55,31,7);fill(86,30,90,31,7);
+    fill(62,46,78,47,1);fill(68,48,70,57,2);fill(36,56,40,57,8);
+    t=[[58,32],[81,32],[109,58]];
+  }else{ // staggered rubber roofs make a vertical trick-shot challenge
+    fill(39,58,114,59,3);
+    fill(48,51,49,57,2);fill(59,51,60,57,2);fill(48,50,60,50,7);
+    fill(75,40,76,57,6);fill(86,40,87,57,6);fill(75,39,87,39,7);
+    fill(96,29,97,57,2);fill(111,29,112,57,2);fill(96,28,112,28,7);
+    fill(96,49,97,50,5);fill(111,49,112,50,5);
+    t=[[55,50],[81,39],[104,28]];
   }
   const level={n:E_STARTERS[kind],m:6,c:encodeCells(g),t};
   validateSharedLevel(level); // Refuse a bad template before touching an edit.
@@ -5780,8 +5818,9 @@ function drawStarterMenu(x,y,w){
   panel(x,y,w,256);
   txt('CHOOSE A STARTER',x+w/2,y+27,20,'#ffd23f','center');
   txt('Replaces the grid — Undo restores it',x+w/2,y+48,12,'#cfd','center');
-  E_STARTERS.forEach((name,i)=>btn(x+12,y+60+i*52,w-24,44,name,
-    ()=>eApplyStarter(i),{size:15}));
+  const sw=(w-36)/2;
+  E_STARTERS.forEach((name,i)=>btn(x+12+(i%2)*(sw+12),y+60+Math.floor(i/2)*52,sw,44,name,
+    ()=>eApplyStarter(i),{size:13}));
   btn(x+12,y+216,w-24,30,'CANCEL',()=>{E.starters=false},{size:13});
 }
 function eCell(px,py){return[Math.floor(px/V),Math.floor(py/V)]}
@@ -5926,7 +5965,7 @@ function drawEditor(){
   btn(x,y2,106,24,'STARTER BUILDS',()=>{E.starters=!E.starters},{size:12,on:E.starters});
   btn(x+112,y2,90,24,'CHECK BUILD',eCheckBuild,{size:11});
   txt(E.name?E.name:'unsaved level',W-8,y1+17,13,'#99a','right');
-  if(E.starters)drawStarterMenu(W-308,66,296)}
+  if(E.starters)drawStarterMenu(W-428,66,416)}
 
 // ---------- level finished: stars, achievements ----------
 function onWin(){
