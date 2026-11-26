@@ -1513,12 +1513,12 @@ static void man_step(MxWorld *w, real dt){
     if(m->tubeT > 0) m->tubeT -= dt;
     if(m->tubeCd > 0) m->tubeCd -= dt;
     else for(int i = 0; i < w->ntubes; i++){
-      const MxTube *tb = &w->tubes[i];
+      MxTube *tb = &w->tubes[i];
       real dx = m->x - tb->ax, dy = m->y - tb->ay;
       if(rmul(dx, dx) + rmul(dy, dy) > rmul(MX_TUBE_R, MX_TUBE_R)) continue;
       ev(w, EV_TUBE, tb->ax, tb->ay, i, tb->bx, tb->by);
       m->x = tb->bx; m->y = tb->by; m->vx = tb->vx; m->vy = tb->vy; m->ang = 0;
-      m->tubeT = R(0.55); m->tubeCd = R(0.35);
+      m->tubeT = R(0.55); m->tubeCd = R(0.35); tb->pulse=R(0.45);
       if(w->shake < R(3)) w->shake = R(3);
       break;
     }
@@ -2914,6 +2914,8 @@ static void man_pose(MxMan *m, real dt){
 void mx_update(MxWorld *w, real dt){
   MX_PH_MARK(0);
   w->nev = 0; w->crack_ev = 0; w->time += dt;
+  /* The brief transfer glow is visual wall-clock feedback, like the browser. */
+  for(int i=0;i<w->ntubes;i++)if(w->tubes[i].pulse>0)w->tubes[i].pulse=rclamp(w->tubes[i].pulse-dt,0,R(0.45));
   for(int c=0;c<MX_MAX_CHUNKS;c++)if(w->chunks[c].active&&w->chunks[c].has_tnt){w->chunks[c].tnt_impact=0;w->chunks[c].tnt_hit=-1;}
   if(w->support_cd > 0) w->support_cd--;
   if(w->freeze > 0){ w->freeze--; return; }
