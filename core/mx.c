@@ -1445,6 +1445,8 @@ static MX_HOT void man_plow(MxWorld *w){
     MxChunk *ch = &w->chunks[c];
     if(!ch->active) continue;
     real dx = ch->x - m->x, dy = ch->y - m->y, reach = ch->rad + MAN_R + R(0.5);
+    /* Fast axis rejection before squared fixed-point distances. */
+    if(rabs(dx)>reach || rabs(dy)>reach)continue;
     if(rmul(dx, dx) + rmul(dy, dy) > rmul(reach, reach)) continue;
     int hit = 0, cnt = 0; real ax = 0, ay = 0, lim = rmul(MAN_R + RC, MAN_R + RC);
     for(int i = 0; i < ch->count; i++){
@@ -1473,6 +1475,7 @@ static MX_HOT void man_plow(MxWorld *w){
     MxTarget *t = &w->targets[i];
     if(!t->alive) continue;
     real dx = t->x - m->x, dy = t->y - m->y, r = MAN_R + R(0.875) + R(0.25);
+    if(rabs(dx)>=r || rabs(dy)>=r)continue;
     if(rmul(dx, dx) + rmul(dy, dy) < rmul(r, r) && !bat_block(w, t)){
       w->bank_contact = 1;
       kill_target(w, t);
@@ -2214,6 +2217,7 @@ static void upd_targets(MxWorld *w, real dt){
       MxChunk *ch = &w->chunks[c];
       if(!ch->active) continue;
       real dx = ch->x - t->x, dy = ch->y - t->y, reach = ch->rad + r + R(0.5);
+      if(rabs(dx)>reach || rabs(dy)>reach)continue;
       if(rmul(dx, dx) + rmul(dy, dy) > rmul(reach, reach)) continue;
       for(int k = 0; k < ch->count; k++){
         MxCell *a = &ch->cells[k];
