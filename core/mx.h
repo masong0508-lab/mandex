@@ -199,7 +199,7 @@ typedef struct {
   /* body pose (cosmetic, like the jiggle): in flight ang eases toward 0.6 x the path angle measured as if he faced +x (front-ends mirror
      it when he flies left); spin is the belly-flop's tumble in radians.  Both are 0 outside flight.  mx_man_wobble() is the side-to-side
      rock after he sticks (about +-0.17 rad at first, gone in a second). */
-  real spin;
+  real spin, dive_age;  /* cosmetic ramp timer, saturated after 0.12 seconds */
   real j_px, j_py, j_vx, j_vy;       /* previous position / estimated velocity */
 } MxMan;
 
