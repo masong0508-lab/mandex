@@ -1845,7 +1845,7 @@ static void title_bottom(View *v){
   if(out_open){ outfits_bottom(v->buf); return; }
   draw_world(v, 0);
   panel(v->buf, 8, 6, 240, 38);
-  if(sel_level>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel_level,&stars);char b[]="TRIAL 00/27 CLEAR 00/20 STAR 00/60";int d=(sel_level-MX_TRIAL_START)/20+1;b[6]='0'+d/10;b[7]='0'+d%10;b[17]='0'+clear/10;b[18]='0'+clear%10;b[28]='0'+stars/10;b[29]='0'+stars%10;gfx_text_c(v->buf,128,11,b,C_UILINE,C_UIBG,1);}
+  if(sel_level>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel_level,&stars);char b[]="TRIAL 00/27 CLEAR 00/20 STAR 00/60";int d=(sel_level-MX_TRIAL_START)/20+1;b[6]='0'+d/10;b[7]='0'+d%10;b[18]='0'+clear/10;b[19]='0'+clear%10;b[29]='0'+stars/10;b[30]='0'+stars%10;gfx_text_c(v->buf,128,11,b,C_UILINE,C_UIBG,1);}
   else gfx_text_c(v->buf,128,11,"UP/DOWN: TRIAL DISTRICTS",C_UILINE,C_UIBG,1);
   const char *nm = mx_level_name(sel_level);
   gfx_text_c(v->buf, 128, 21, nm, C_GOLD, C_BLACK, gfx_text_w(nm,2)>204?1:2);

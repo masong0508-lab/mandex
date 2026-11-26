@@ -951,20 +951,20 @@ static MX_HOT void support_pass(MxWorld *w){
       wob_zero(w, gi); clear_links(w, gi);
     }
     cx = rdiv(cx, M); cy = rdiv(cy, M);
-    real rad = 0, tq = 0, ti = 0, cvx = rdiv(mvx, M), cvy = rdiv(mvy, M);
+    real rad2 = 0, tq = 0, ti = 0, cvx = rdiv(mvx, M), cvy = rdiv(mvy, M);
     for(int k = 0; k < n; k++){
       MxCell *c = &ch->cells[k];
       real d = MATS[c->m].d, rx = c->lx + R(0.5) - cx, ry = c->ly + R(0.5) - cy;
       tq += rmul(d, rmul(rx, c->wy - cvy) - rmul(ry, c->wx - cvx)); ti += rmul(d, rmul(rx, rx) + rmul(ry, ry));
       c->lx = rx; c->ly = ry; c->wx = c->lx + cx; c->wy = c->ly + cy;
-      real r = rsqrt(rmul(c->lx, c->lx) + rmul(c->ly, c->ly));
-      if(r > rad) rad = r;
+      real r2 = rmul(c->lx, c->lx) + rmul(c->ly, c->ly);
+      if(r2 > rad2) rad2 = r2;
     }
     ch->rest = 0; ch->restT = 0;
     ch->active = 1; ch->count = n; ch->x = cx; ch->y = cy; ch->ang = 0;
     ch->vx = rclamp(cvx, -WOB_VMAX, WOB_VMAX); ch->vy = rclamp(cvy, -WOB_VMAX, WOB_VMAX);
     ch->w = ti > R(1) ? rclamp(rdiv(tq, ti), -RI(6), RI(6)) : 0;   /* the sway becomes a topple */
-    ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rad + R(1); ch->cs = RI(1); ch->sn = 0;
+    ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rsqrt(rad2) + R(1); ch->cs = RI(1); ch->sn = 0;
     ch->px = cx; ch->py = cy; ch->pa = 0;
     ch->tnt_hit=-1;
     recompute(ch);
@@ -1028,9 +1028,14 @@ static MX_HOT void resolve_static(MxWorld *w, MxChunk *ch, MxCell *a, real nx, r
 }
 
 static MX_HOT void step_chunks(MxWorld *w, real dt){
-  int any = 0;
-  for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active){ any = 1; break; }
-  if(!any) return;
+  int bodies=0;
+  for(int c=0;c<MX_MAX_CHUNKS;c++)if(w->chunks[c].active&&++bodies==2)break;
+  if(!bodies)return;
+#ifdef MX_REFERENCE_CHUNK_HASH
+  const int pair_contacts=1;
+#else
+  const int pair_contacts=bodies>1;
+#endif
   if(w->bh_hi >= w->bh_lo) memset(&w->bhead[w->bh_lo * (MX_COLS + 4)], 0xff, (size_t)(w->bh_hi - w->bh_lo + 1) * (MX_COLS + 4) * sizeof w->bhead[0]);
   int blo = MX_ROWS + 4, bhi = -1;
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
@@ -1050,7 +1055,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         a->wx = ch->x + rmul(ch->cs, a->lx) - rmul(ch->sn, a->ly);
         a->wy = ch->y + rmul(ch->sn, a->lx) + rmul(ch->cs, a->ly);
       }
-      if(!a->edge) continue;
+      if(!a->edge||!pair_contacts)continue;
       int gx = rfloor(a->wx) + 2, gy = rfloor(a->wy) + 2;
       if(gx < 0) gx = 0;
       if(gx > MX_COLS + 3) gx = MX_COLS + 3;
@@ -1073,7 +1078,14 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
       int gx = rfloor(a->wx), gy = rfloor(a->wy);
       /* Cleanup follows all substeps. Keep the fatal contact's response,
        * but stop this cell's scan as soon as that response shatters it. */
-      for(int j = gy - 1; j <= gy + 1 && !a->dead; j++) for(int k = gx - 1; k <= gx + 1 && !a->dead; k++){
+      #ifdef MX_REFERENCE_STATIC_CONTACTS
+      const int left=gx-1,right=gx+1,top=gy-1,bottom=gy+1;
+#else
+      const real fx=a->wx-RI(gx),fy=a->wy-RI(gy);
+      const int left=gx-(fx<RC),right=gx+(RI(1)-fx<RC);
+      const int top=gy-(fy<RC),bottom=gy+(RI(1)-fy<RC);
+#endif
+      for(int j=top;j<=bottom&&!a->dead;j++)for(int k=left;k<=right&&!a->dead;k++){
         if(!solid_cell(w, k, j)) continue;
         real qx = rclamp(a->wx, RI(k), RI(k + 1)), qy = rclamp(a->wy, RI(j), RI(j + 1));
         real dx = a->wx - qx, dy = a->wy - qy, d2 = rmul(dx, dx) + rmul(dy, dy);
@@ -1094,7 +1106,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         if(pen > RI(4)) pen = RI(4);
         resolve_static(w, ch, a, nx, ny, pen, k, j);
       }
-      if(a->dead) continue;
+      if(a->dead||!pair_contacts)continue;
       /* chunk vs chunk: circle-circle through the spatial buckets */
       int bx0 = gx + 1, by0 = gy + 1;
       for(int by = by0; by <= by0 + 2 && !a->dead; by++) for(int bx = bx0; bx <= bx0 + 2 && !a->dead; bx++){
@@ -1106,7 +1118,9 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
           if(oc < c && !och->rest) continue;     /* moving pairs are tested once (from the lower index); a sleeper is tested from whichever moving body reaches it */
           MxCell *o = &och->cells[id % MX_CHUNK_CELLS];
           if(o->dead) continue;
-          real dx = a->wx - o->wx, dy = a->wy - o->wy, d2 = rmul(dx, dx) + rmul(dy, dy);
+          real dx = a->wx - o->wx, dy = a->wy - o->wy;
+          if(rabs(dx)>=RI(1)||rabs(dy)>=RI(1))continue;
+          real d2=rmul(dx,dx)+rmul(dy,dy);
           if(d2 >= RI(1) || d2 < R(0.0005)) continue;
           real d = rsqrt(d2), nx = rdiv(dx, d), ny = rdiv(dy, d), pen = RI(1) - d;
           real rax = a->wx - ch->x, ray = a->wy - ch->y, rbx = o->wx - och->x, rby = o->wy - och->y;

@@ -5,8 +5,8 @@ function checkLandscape(html){
  const pa=html.indexOf('const mobilePage='),pb=html.indexOf('function layoutTick()',pa);
  const p=html.indexOf('function mobilePager('),q=html.indexOf('function mobileTab(',p);
  assert(a>=0&&b>a&&pa>=0&&pb>pa&&p>=0&&q>p);
- const env={W:960,H:540,ctx:{fillRect(){}},txt(){},selTab:1,trialDistrict:0,TRIAL_START:60,CH1:20,CH2:40,
-  LEVELS:Array.from({length:240},(_,i)=>({name:'Stage '+i})),TRIAL_DISTRICTS:Array.from({length:9},(_,i)=>'District '+i),
+ const env={W:960,H:540,ctx:{measureText:s=>({width:String(s).length*9}),fillRect(){}},txt(){},selTab:1,trialDistrict:0,TRIAL_START:60,CH1:20,CH2:40,
+  LEVELS:Array.from({length:600},(_,i)=>({name:'Stage '+i})),TRIAL_DISTRICTS:Array.from({length:27},(_,i)=>'District '+i),
   PD:{stars:{},custom:Array.from({length:25},(_,i)=>({n:'Custom '+i}))},WEB_UI:{page:{select:0}},
   actions:[],tiles:[],buttons:[],goMenu(){},startStory(i){env.actions.push(['story',i])},
   startCustom(i){env.actions.push(['play',i])},openEditor(back,i){env.actions.push(['edit',i])},
@@ -24,7 +24,7 @@ function checkLandscape(html){
  click('NEXT >');paint();assert.strictEqual(env.tiles.length,1);click('DEL');paint();assert.strictEqual(env.WEB_UI.page.select,1);assert.strictEqual(env.tiles.length,12);
  click('NEW LEVEL');assert.deepStrictEqual(env.actions.pop(),['edit',-1]);click('IMPORT LEVEL');assert.deepStrictEqual(env.actions.pop(),['import']);
  click('TRIALS');paint();assert.strictEqual(env.tiles.length,20);env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',60]);
- click('< DISTRICT');paint();env.tiles.at(-1).fn();assert.deepStrictEqual(env.actions.pop(),['story',239]);
+ click('< DISTRICT');paint();env.tiles.at(-1).fn();assert.deepStrictEqual(env.actions.pop(),['story',599]);
  return 'WEB_LANDSCAPE_SELECT_PASS all_custom_pages=1 actions=1 delete_clamp=1 trial_wrap=1';
 }
 if(require.main===module)console.log(checkLandscape(fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8')));
