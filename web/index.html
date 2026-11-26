@@ -1897,7 +1897,7 @@ function updTargets(dt){
     const radius=t.r+RC,rad2=radius*radius;
     for(const ch of chunks){
       const cdx=ch.x-t.x,cdy=ch.y-t.y,cr=ch.rad+t.r+4;
-      if(cdx*cdx+cdy*cdy>cr*cr)continue;
+      if(Math.abs(cdx)>cr||Math.abs(cdy)>cr||cdx*cdx+cdy*cdy>cr*cr)continue;
       let dead=false;
       for(const a of ch.cells){
         if(a.dead)continue; // no invisible impacts from shattered rubble
