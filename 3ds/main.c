@@ -1376,7 +1376,8 @@ static void draw_hud(const View *camera){
   rect(&top, 0, 0, 400, 24, RGB(15, 18, 30)); rect(&top, 0, 0, 400, 12, RGB(24, 28, 46)); rect(&top, 0, 23, 400, 1, RGB(255, 210, 63));
   char b[48];
   text(&top, 6, 8, "LV", 2, RGB(255, 210, 63)); itoa_(world.level + 1, b); text(&top, 30, 8, b, 2, RGB(255, 210, 63));
-  text(&top,56,8,mx_level_name(world.level),world.man.mode==MAN_WALK?1:2,RGB(255,255,255));
+  int namex=world.level>=99?70:56;
+  text(&top,namex,8,mx_level_name(world.level),world.man.mode==MAN_WALK?1:2,RGB(255,255,255));
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                               /* walk levels: the clock */
     int k = (int)(RTOF(world.man.wt) * 100.0f / MX_WALK_T); if(k < 0) k = 0; if(k > 100) k = 100;
     rect(&top, 250, 6, 142, 12, RGB(255, 255, 255)); rect(&top, 251, 7, 140, 10, RGB(40, 40, 50)); rect(&top, 251, 7, k * 140 / 100, 10, k > 30 ? RGB(125, 255, 90) : RGB(255, 74, 74));
