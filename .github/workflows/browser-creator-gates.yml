@@ -68,6 +68,8 @@ jobs:
           python3 -m playwright install --with-deps chromium
       - name: Compare actual Canvas pixels with complete reference drawing
         run: python3 test/browser_canvas_cull_test.py --out-dir out/browser-canvas
+      - name: Audit responsive text, controls and settings at eleven viewports
+        run: python3 test/browser_responsive_text_test.py
       - name: Exercise live keyboard, slingshot and orientation input
         run: python3 test/browser_input_smoke.py --out-dir out/browser-canvas/input
       - uses: actions/upload-artifact@v4

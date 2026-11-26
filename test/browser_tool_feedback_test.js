@@ -23,7 +23,7 @@ assert.strictEqual(fn('win')(aim),'','won levels have no ready prompt');
 assert(web.includes("const ready=shotReadiness(man);"),'actual HUD renders helper');
 assert(web.includes("Math.max(0,pw.left[tid]||0)"),
   'toolbar never shows undefined or negative counts');
-assert(web.includes("if(pw.sel){const tip="),
+assert(web.includes("}[pw.sel];")&&web.includes('if(tip){'),
   'browser still describes selected power effect');
 const scriptStart=web.indexOf('<script>');
 const scriptEnd=web.indexOf('</script>',scriptStart);

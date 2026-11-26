@@ -18,6 +18,10 @@ canvas.lowfx{box-shadow:none;border-radius:0}
 .perf-readout{display:flex;flex-direction:column;gap:3px;background:#182b35;padding:10px 12px;margin:10px 0;color:#d4eae9;border-radius:8px;font-size:13px}.perf-readout span{font-size:12px;color:#a9c5c5}
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #2a394a;padding:11px 0;min-height:45px}.setting-label{flex:1;min-width:0}.setting-label strong{display:block;font-size:14px}.setting-label small{display:block;font-size:12px;line-height:1.35;color:#adbed1;margin-top:3px}.setting-row select{max-width:43%;min-width:92px}.setting-row button{min-width:66px}.setting-row input{width:min(32%,180px);accent-color:#7dce91}.setting-row .value{font-size:12px;min-width:32px}#settings-content>button{display:block;width:100%;margin:10px 0}
 @media(min-width:650px){.preset-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.preset-grid button:first-child{grid-column:auto}.settings-head{padding:14px 22px}#settings-content{padding:16px 24px}}
+/* Small phones and large accessibility fonts may wrap settings labels. */
+#settings-tabs button,#settings button,#settings select{min-width:0;overflow-wrap:anywhere;white-space:normal}.settings-head>div{min-width:0}.setting-row select{min-width:0;max-width:46%}.setting-label{overflow-wrap:anywhere}.preset-grid button{min-width:0}.setting-row input{min-width:68px}
+@media(max-width:370px){#settings-tabs{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:6px 8px}#settings-content{padding:10px 12px 18px}.settings-head{padding:10px 12px}.setting-row{gap:8px}.setting-label small{font-size:12px}.setting-row select{max-width:48%;padding:8px 5px}}
+@media(max-height:440px) and (orientation:landscape){.settings-head{padding:6px 14px}.settings-head p{display:none}#settings-tabs{padding:5px 10px}#settings-tabs button{min-height:38px}#settings-content{padding:8px 14px}}
 </style></head><body>
 <canvas id="c" width="960" height="540"></canvas>
 <div id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title"><div class="settings-panel"><header class="settings-head"><div><h1 id="settings-title">Options</h1><p>MANDEX · Performance and gameplay</p></div><button type="button" id="settings-close">Done</button></header><nav id="settings-tabs" aria-label="Settings sections"></nav><div id="settings-content"></div></div></div>
@@ -1550,7 +1554,7 @@ function walkBtns(){
   }else{
     const y=H-64,r=W-12,w=62;
     WALK_BUTTONS[0].x=10;WALK_BUTTONS[1].x=82;
-    WALK_BUTTONS[0].y=WALK_BUTTONS[1].y=H-128;
+    WALK_BUTTONS[0].y=WALK_BUTTONS[1].y=y;
     WALK_BUTTONS[2].x=r-3*w-16;WALK_BUTTONS[2].y=y;
     WALK_BUTTONS[3].x=r-2*w-8;WALK_BUTTONS[3].y=y;
     WALK_BUTTONS[4].x=r-w;WALK_BUTTONS[4].y=y;
@@ -1559,13 +1563,13 @@ function walkBtns(){
   return WALK_BUTTONS;
 }
 function drawWalkHUD(){const m=man;if(state!=='play'||m.mode!=='walk')return;
-  // Keep portrait walking feedback with its controls, below the mission
-  // and streak HUD. The top bar used to paint over the timer and hint.
-  const portrait=isPortrait(),barY=portrait?H-153:40;
-  const k=clamp(m.wt/WALK_T,0,1);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W/2-80,barY,160,9);ctx.fillStyle=k>.3?'#7dff5a':'#ff4a4a';ctx.fillRect(W/2-79,barY+1,158*k,7);
-  if(!portrait)txt('A/D MOVE  W JUMP  X PUNCH  S STOMP  G GIVE UP',W/2,66,12,'#fff','center');
-  else txt('HOLD LEFT / RIGHT  ·  JUMP  ·  PUNCH  ·  STOMP',W/2,H-120,13,'#fff','center');
-  for(const b of walkBtns()){ctx.globalAlpha=KEYS[b.k]?.85:.45;rrect(b.x,b.y,b.w,b.h,10);ctx.fillStyle='#1a2038';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.globalAlpha=1;txt(b.t,b.x+b.w/2,b.y+b.h/2+5,b.t.length>2?12:20,'#fff','center')}}
+  const portrait=isPortrait(),barY=portrait?H-162:H-120,tw=Math.min(200,W-40),k=clamp(m.wt/WALK_T,0,1);
+  ctx.fillStyle='rgba(15,18,30,.86)';ctx.fillRect(W/2-tw/2-6,barY-24,tw+12,40);
+  uiText('WALK TIME  '+Math.max(0,Math.ceil(m.wt))+'s',W/2-tw/2,barY-23,tw,20,{size:15,color:'#fff'});
+  ctx.fillStyle='#253142';ctx.fillRect(W/2-tw/2,barY,tw,9);ctx.fillStyle=k>.3?'#7dff5a':'#ff6a6a';ctx.fillRect(W/2-tw/2+1,barY+1,(tw-2)*k,7);
+  if(!portrait)uiText('A / D move  ·  W jump  ·  X punch  ·  S stomp',154,H-56,W-390,28,{size:15,color:'#fff',stroke:'#162033'});
+  for(const b of walkBtns()){ctx.globalAlpha=KEYS[b.k]?.9:.65;rrect(b.x,b.y,b.w,b.h,10);ctx.fillStyle='#1a2038';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.globalAlpha=1;uiText(b.t,b.x+3,b.y+3,b.w-6,b.h-6,{size:b.t.length>2?16:26,min:11});}
+}
 function manStep(dt){
   const m=man;m.vy+=G*dt*(m.pwr==='towel'&&m.gt<1.8&&!m.dive?.3:1)*(m.tubeT>0?.1:1);m.x+=m.vx*dt;m.y+=m.vy*dt;m.gt+=dt;if(m.hitCd>0)m.hitCd-=dt;
   if(tubes.length)tubeStep(m,dt);
@@ -3937,6 +3941,55 @@ function drawCases(){for(const c of cases){const visual=sceneRenderOffset(c,rubb
 //  DRAW
 // =====================================================================
 function txt(s,x,y,size,fill,align,stroke){ctx.font=`bold ${size}px "Trebuchet MS",Impact,sans-serif`;ctx.textAlign=align||'left';ctx.lineWidth=Math.max(3,size/6);ctx.strokeStyle=stroke||'#000';ctx.lineJoin='round';ctx.strokeText(s,x,y);ctx.fillStyle=fill;ctx.fillText(s,x,y)}
+// Screen-space typography: one font, bounded cached layout, actual Canvas
+// metrics, stable word wrapping, and a visual rather than baseline centre.
+const UI_TEXT_CACHE=new Map(),UI_TEXT_MAX=384;
+function uiFont(sz){return `bold ${sz}px "Trebuchet MS",Impact,sans-serif`}
+function uiWrap(value,width,measure){
+  const lines=[];for(const paragraph of String(value).split('\n')){
+    let line='';for(const word of paragraph.trim().split(/\s+/u)){
+      if(!word)continue;
+      const joined=line?line+' '+word:word;
+      if(measure(joined)<=width){line=joined;continue}
+      if(line){lines.push(line);line=''}
+      if(measure(word)<=width){line=word;continue}
+      // Imported level names may be a single long Unicode word.
+      for(const ch of Array.from(word)){
+        if(line&&measure(line+ch)>width){lines.push(line);line=''}
+        line+=ch;
+      }
+    }lines.push(line);
+  }return lines;
+}
+function uiTextPlan(value,w,h,o={}){
+  const text=String(value??''),width=Math.max(1,Math.floor(w-4)),height=Math.max(1,Math.floor(h-2)),maxLines=Math.max(1,o.lines||1);
+  const css=WEB_UI.cssScale||1,requested=o.size||18,preferred=Math.max(requested,Math.min(24,(o.readable||11)/Math.max(.35,css)));
+  const top=Math.max(1,Math.floor(Math.min(preferred,height*.92))),floor=Math.max(1,Math.min(top,o.min||Math.ceil(requested*.76)));
+  const key=JSON.stringify([text,Math.round(width),Math.round(height),maxLines,top,floor]);
+  let plan=UI_TEXT_CACHE.get(key);if(plan)return plan;
+  let size=top,lines=[],lh=0;
+  for(;size>=floor;size--){
+    ctx.font=uiFont(size);const measure=x=>ctx.measureText(x).width;
+    lines=maxLines===1?[text.replace(/\s+/gu,' ').trim()]:uiWrap(text,width,measure);lh=size*1.19;
+    if(lines.length<=maxLines&&lines.length*lh<=height+size*.19&&lines.every(x=>measure(x)<=width))break;
+  }
+  size=Math.max(floor,size);ctx.font=uiFont(size);lh=size*1.19;
+  const cap=Math.max(1,Math.min(maxLines,Math.floor((height+size*.19)/lh))),measure=x=>ctx.measureText(x).width;
+  const clipped=lines.length>cap;lines=lines.slice(0,cap);
+  for(let i=0;i<lines.length;i++)if(measure(lines[i])>width||(clipped&&i===lines.length-1)){
+    const chars=Array.from(lines[i]);while(chars.length&&measure(chars.join('')+'…')>width)chars.pop();lines[i]=measure('…')<=width?chars.join('')+'…':'';
+  }
+  plan={size,lines,lh};if(UI_TEXT_CACHE.size>=UI_TEXT_MAX)UI_TEXT_CACHE.delete(UI_TEXT_CACHE.keys().next().value);UI_TEXT_CACHE.set(key,plan);return plan;
+}
+function uiText(value,x,y,w,h,o={}){
+  if(!(w>0&&h>0))return null;
+  ctx.save();const p=uiTextPlan(value,w,h,o),align=o.align||'center',tx=align==='left'?x+2:align==='right'?x+w-2:x+w/2;
+  ctx.font=uiFont(p.size);ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillStyle=o.color||'#fff';ctx.lineJoin='round';
+  if(o.stroke){ctx.strokeStyle=o.stroke;ctx.lineWidth=Math.min(2.5,p.size*.095)}
+  let reveal=o.reveal==null?Infinity:Math.max(0,o.reveal),ty=y+h/2-(p.lines.length-1)*p.lh/2;
+  for(const line of p.lines){const visible=line.slice(0,reveal);if(o.stroke)ctx.strokeText(visible,tx,ty,Math.max(1,w-4));ctx.fillText(visible,tx,ty,Math.max(1,w-4));reveal-=line.length+1;reveal=Math.max(0,reveal);ty+=p.lh}
+  ctx.restore();return p;
+}
 function drawCloud(c){ctx.globalAlpha=.9;ctx.fillStyle='#fff';const r=34*c.s;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.arc(c.x+r*.9,c.y+6,r*.75,0,7);ctx.arc(c.x-r*.9,c.y+9,r*.65,0,7);ctx.arc(c.x+r*.2,c.y-r*.4,r*.7,0,7);ctx.fill();ctx.globalAlpha=1}
 function drawSling(back){
   if(!CL.slings){drawSling1(back);return}
@@ -3956,7 +4009,7 @@ const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0};
 /* UI state never changes physics/world dimensions. The portrait virtual
    canvas is 540px wide and fills the available display at its real ratio;
    landscapes retain the original 960x540 artwork and screen geometry. */
-const WEB_UI={portrait:false,viewportW:0,viewportH:0,
+const WEB_UI={portrait:false,viewportW:0,viewportH:0,cssScale:1,
   page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0,editorScale:1,
   editorHeight:480,gesture:null};
 const isPortrait=()=>WEB_UI.portrait;
@@ -3971,7 +4024,7 @@ function layoutTick(){
   const stableW=Math.max(1,window.innerWidth||vw),
         stableH=Math.max(1,window.innerHeight||vh),
         por=stableH>stableW*1.08;
-  const w=por?540:960,h=por?Math.max(720,Math.min(1240,Math.round(w*stableH/stableW))):540;
+  const w=por?540:960,h=por?Math.max(720,Math.min(1440,Math.round(w*stableH/stableW))):540;
   const changed=por!==WEB_UI.portrait;
   if(changed){
     WEB_UI.portrait=por;WEB_UI.gesture=null;
@@ -3993,10 +4046,10 @@ function layoutTick(){
       css=window.getComputedStyle?window.getComputedStyle(document.body):null,
       insetW=css?(parseFloat(css.paddingLeft)||0)+(parseFloat(css.paddingRight)||0):0,
       insetH=css?(parseFloat(css.paddingTop)||0)+(parseFloat(css.paddingBottom)||0):0,
-      availW=Math.max(1,(rect.width||vw)-insetW),
-      availH=Math.max(1,(rect.height||vh)-insetH),
+      availW=Math.max(1,Math.min(vw,rect.width||vw)-insetW),
+      availH=Math.max(1,Math.min(vh,rect.height||vh)-insetH),
       scale=Math.max(.01,Math.min(availW/w,availH/h));
-    cv.style.width=Math.floor(w*scale)+'px';cv.style.height=Math.floor(h*scale)+'px';
+    WEB_UI.cssScale=scale;cv.style.width=Math.floor(w*scale)+'px';cv.style.height=Math.floor(h*scale)+'px';
   }
   if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);
   CAM.on=(por&&(state==='play'||state==='win'||state==='lose'))||
@@ -4252,8 +4305,8 @@ function drawObjectiveEdge(){
   const t=o.target,off=targetOffset(t);
   const sx=CAM.on?(t.x+off[0]-CAM.x)*CAM.z:t.x+off[0];
   const sy=CAM.on?(t.y+off[1]-CAM.y)*CAM.z:t.y+off[1];
-  const top=W<700?138:76;
-  const edge=objectiveScreenEdge(sx,sy,W,H,top,56);
+  const top=hudTop()+17;
+  const edge=objectiveScreenEdge(sx,sy,W,H,top,man.mode==='walk'?176:110);
   if(!edge.dir)return;
   const label=edge.dir===1?'< LAST':edge.dir===2?'LAST >':
     edge.dir===3?'LAST UP':'LAST DOWN';
@@ -4271,72 +4324,60 @@ function shotReadiness(m){
   const dx=m.x-SX,dy=m.y-SY;
   return dx*dx+dy*dy>=3*V*V?'RELEASE TO LAUNCH':'DRAG BACK TO AIM';
 }
+function hudTop(){return W<700?(state==='play'?((tntLiveFuses>0||combo>1)?164:128):92):(state==='play'?90:50)}
+function hudChip(label,x,y,w,h,color,background){
+  ctx.fillStyle=background||'rgba(15,18,30,.86)';ctx.fillRect(x,y,w,h);
+  uiText(label,x+6,y+2,w-12,h-4,{size:17,min:12,color,lines:1});
+}
 function drawHUD(){
-  drawWalkHUD();
-  const P=W<700;ctx.fillStyle='rgba(15,18,30,.72)';ctx.fillRect(0,0,W,P?62:34);ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(0,0,W,2);
-  {const nm=`${Number.isInteger(CL.contract)?'CONTRACT':CL.custom?'CUSTOM':'LV '+(level+1)}  ${CL.name.toUpperCase()}`;let sz=18;{while(sz>11){ctx.font=`bold ${sz}px "Trebuchet MS",Impact,sans-serif`;if(ctx.measureText(nm).width<=(P?285:250))break;sz--}}txt(nm,12,24,sz,'#ffd23f','left')}
-  const objective=objectiveSnapshot(),lb=objective.remaining;
-  txt(`LANDLORDS ${lb}/${objective.total}`,P?12:Math.max(430,300+men*Math.min(20,230/Math.max(1,men))+24),P?54:24,18,lb?'#ff8a8a':'#7dff5a','left');
-  if(state==='play'&&tntLiveFuses>0){
-    // Compact status below the mission strip, and below combo on portrait.
-    // No hot-path HUD scan or new input hit target is introduced.
-    const y=P?(combo>1?139:107):73;
-    ctx.fillStyle='rgba(55,26,19,.88)';ctx.fillRect(8,y-18,208,26);
-    ctx.fillStyle='#ff9b45';ctx.fillRect(8,y-18,3,26);
-    txt('TNT FUSE x'+tntLiveFuses+'  -  TAKE COVER!',17,y,13,'#ffe4a1','left');
+  const P=W<700,play=state==='play',objective=objectiveSnapshot(),lb=objective.remaining;
+  const name=(Number.isInteger(CL.contract)?'CONTRACT':CL.custom?'CUSTOM':'LEVEL '+(level+1))+' · '+CL.name;
+  const header=P?92:50;ctx.fillStyle='rgba(15,18,30,.91)';ctx.fillRect(0,0,W,header);
+  ctx.fillStyle='#ffd23f';ctx.fillRect(0,0,W,2);
+  if(P){
+    uiText(name,12,7,W-202,48,{size:21,min:15,lines:2,color:'#ffd23f',align:'left'});
+    if(play){btn(W-184,7,90,46,testing?'EDITOR':'MENU',backFromPlay,{size:16});btn(W-86,7,74,46,'SET',openSettings,{size:16})}
+    const cw=(W-36)/3;
+    hudChip('Landlords '+lb+'/'+objective.total,10,59,cw,28,lb?'#ffadad':'#7dff5a');
+    hudChip('Men '+men,18+cw,59,cw,28,'#e6e9f2');
+    hudChip('Score '+Math.round(shownScore),26+cw*2,59,cw,28,'#fff');
+  }else{
+    uiText(name,12,4,315,42,{size:20,min:14,lines:2,color:'#ffd23f',align:'left'});
+    hudChip('Landlords '+lb+'/'+objective.total,332,7,145,36,lb?'#ffadad':'#7dff5a');
+    hudChip('Men '+men,485,7,96,36,'#e6e9f2');
+    hudChip('Score '+Math.round(shownScore),589,7,143,36,'#fff');
+    if(play){btn(740,5,104,40,testing?'EDITOR':'MENU',backFromPlay,{size:15});btn(852,5,96,40,'SETTINGS',openSettings,{size:15})}
   }
-  if(state==='play'){
-    // Never mistake the wreckage meter for the win condition. In portrait
-    // and landscape the objective lives below the header, not over controls.
-    const label=objectiveLabel(objective);
-    const note=objective.phase==='evict'?`${label} ${lb}/${objective.total}`:
-      objective.phase==='last'&&objective.direction?
-      `${label} ${objective.direction<0?'<':'>'}`:label;
-    const oy=P?66:38;
-    ctx.fillStyle='rgba(15,18,30,.78)';ctx.fillRect(7,oy,Math.min(304,W-14),28);
-    ctx.fillStyle=objective.phase==='last'?'#ff9ec8':
-      objective.phase==='secure'?'#7dff5a':'#ffd23f';
-    ctx.fillRect(7,oy,3,28);
-    txt('GOAL: '+note,18,oy+19,14,ctx.fillStyle,'left');
+  if(play){
+    const label=objectiveLabel(objective),note=objective.phase==='evict'?label:objective.phase==='last'&&objective.direction?label+' '+(objective.direction<0?'←':'→'):label;
+    const oy=P?98:55,ow=P?W-20:315;
+    hudChip('Goal: '+note,10,oy,ow,30,objective.phase==='last'?'#ff9ec8':objective.phase==='secure'?'#7dff5a':'#ffd23f');
+    const sy=P?134:55,sw=P?(W-28)/2:245;
+    if(tntLiveFuses>0)hudChip('TNT ×'+tntLiveFuses+' · TAKE COVER',P?10:333,sy,sw,29,'#ffdda0','rgba(55,26,19,.93)');
+    if(combo>1){const x=P?18+sw:W-224,w=P?sw:214;hudChip('×'+combo+' eviction streak',x,sy,w,29,'#ff9ec8','rgba(40,12,47,.92)');ctx.fillStyle='#ff9ec8';ctx.fillRect(x,sy+27,w*Math.min(1,comboLeft/2.5),2)}
   }
-  txt(String(Math.round(shownScore)).padStart(6,'0'),W-12,24,20,'#fff','right');
-  if(combo>1&&state==='play'){
-    const q=Math.min(1,comboLeft/2.5);
-    // Portrait: the streak sits BELOW the 28px mission strip (66..94),
-    // not on top of the last-target direction or objective label.
-    const cy=P?100:39;
-    ctx.fillStyle='rgba(40,12,47,.86)';ctx.fillRect(W-170,cy,158,30);
-    txt('x'+combo+'  EVICTION STREAK',W-91,cy+20,15,'#ff9ec8','center');
-    ctx.fillStyle='#ff9ec8';ctx.fillRect(W-168,cy+28,154*q,2);
+  if(play&&man.mode==='walk')drawWalkHUD();
+  if(play&&man.mode==='aim'){
+    const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' ×'+Math.max(0,pw.left[tid]||0):'';
+    const slings=CL.slings&&!dragging&&!man.chug,footerH=P?54:46,y=H-footerH-10,span=Math.min(W-24,slings?600:P?W-24:330),toolX=(W-span)/2,bw=P?94:126,toolW=slings?span-2*bw-16:span;
+    btn(toolX,y,toolW,footerH,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:17,on:toolName()!=='NONE',disabled:!!man.chug||dragging});
+    if(slings){const xx=toolX+toolW+8;btn(xx,y,bw,footerH,'< SLING',()=>goSling(slingK-1),{size:15,disabled:slingK<=0});btn(xx+bw+8,y,bw,footerH,'SLING >',()=>goSling(slingK+1),{size:15,disabled:slingK>=CL.slings.length-1})}
+    const ready=shotReadiness(man);
+    if(ready)hudChip(ready,Math.max(12,W/2-195),y-35,Math.min(W-24,390),30,man.stun>0?'#ff7474':ready==='RELEASE TO LAUNCH'?'#7dff5a':'#ffe190');
+    const tip={beans:'Tap in flight for a fart jet.',towel:'Glide farther.',splat:'Large goo blast on landing.',turbo:'35% faster launch.',quake:'Heavy landing shockwave.',burp:'Tap in flight for a shockwave; otherwise bursts on impact.'}[pw.sel];
+    if(tip){ctx.fillStyle='rgba(15,18,30,.86)';ctx.fillRect(12,y-76,W-24,37);uiText(tip,18,y-75,W-36,35,{size:16,min:12,lines:2,color:'#ffd23f'})}
   }
-  const mstp=Math.min(P?16:20,(P?190:230)/Math.max(1,men));   // a long row of men squeezes together (the wide finale can have 17)
-  for(let i=0;i<men;i++){const x=(P?330:300)+i*mstp,dy=P?30:0;ell(x,15+dy,6,6.5,SK,1.2);ctx.fillStyle=HAIR;ctx.fillRect(x-4,18+dy,8,2.2);ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(x,11+dy,6,3.3,6.1);ctx.fill()}
-  txt('MEN',P?290:270,P?54:24,12,'#bbb','left');
-  if(hint>0&&state==='play'&&man.mode==='aim'){ctx.globalAlpha=.7+.3*Math.sin(time*5);{const hp=toScreen(SX+80,SY-60),fs=W<700?18:22,hw=fs*6.4;txt('DRAG BACK  &  RELEASE!',Math.max(hw+8,Math.min(W-hw-8,hp[0])),hp[1],fs,'#fff','center')};ctx.globalAlpha=1}
-  if(state==='play'){const tid=OPT().tool||'none',chg=(PWTOOLS.includes(tid)||tid==='burp')?' x'+Math.max(0,pw.left[tid]||0):'';
-    if(CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){const ny=P?84:46;
-      btn(W-212,H-44,96,32,'< SLING',()=>goSling(slingK-1),{size:13,disabled:slingK<=0});btn(W-108,H-44,96,32,'SLING >',()=>goSling(slingK+1),{size:13,disabled:slingK>=CL.slings.length-1});void ny}
-    // Separate immediate shot readiness from tool inventory. The
-    // selection badge already shows charges and consumes none until launch.
-    if(man.mode==='aim'){
-      const ready=shotReadiness(man);
-      if(ready){
-        const cy=H-83;
-        ctx.fillStyle='rgba(15,18,30,.82)';
-        ctx.fillRect(Math.max(5,W/2-144),cy-17,Math.min(W-10,288),23);
-        txt(ready,W/2,cy,13,man.stun>0?'#ff7474':
-           ready==='RELEASE TO LAUNCH'?'#7dff5a':'#ffe190','center');
-      }
-    }
-    if(man.mode!=='walk')btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
-    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
-  if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
-  if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
-  else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
-  if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
-  if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
-  if(state==='play'){btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});btn(W-145,3,42,28,'SET',openSettings,{size:12});}
-  if(state==='win'||state==='lose')drawEnd()}
+  if(play&&man.mode==='fly'){
+    let cue='',color='#fff';
+    if(man.pwr==='beans'&&!man.beaned){cue='TAP = FART JET';color='#b6e04a'}
+    else if(man.pwr==='burp'&&!man.burped){cue='TAP = BURP BLAST';color='#ffd23f'}
+    else if(!man.dive)cue='TAP = BELLY FLOP';
+    if(cue)hudChip(cue,W/2-Math.min(170,(W-24)/2),H-52,Math.min(340,W-24),40,color);
+  }
+  if(banner>0&&play){const bw=Math.min(720,W-32),bx=(W-bw)/2,by=hudTop()+22,bh=P?116:100;ctx.save();ctx.globalAlpha=Math.min(1,banner);ctx.fillStyle='rgba(12,18,31,.88)';rrect(bx,by,bw,bh,12);ctx.fill();uiText(CL.name,bx+12,by+8,bw-24,38,{size:P?27:30,min:18,lines:2,color:'#fff'});uiText(CL.tip||'Evict landlords. Falling TNT may survive!',bx+16,by+49,bw-32,bh-56,{size:19,min:14,lines:3,color:'#ffd23f'});ctx.restore()}
+  if(CAM.on&&play&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],hudTop()+24,H-126);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();uiText('YOU',26,yy-15,38,30,{size:14});ctx.restore()}}
+  if(state==='win'||state==='lose')drawEnd();
+}
 function star(x,y,r,on){ctx.fillStyle=on?'#ffd23f':'#3a3f55';ctx.strokeStyle='#000';ctx.lineWidth=3;ctx.beginPath();for(let i=0;i<10;i++){const a=-1.5708+i*.6283,rr=i%2?r*.45:r;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.closePath();ctx.stroke();ctx.fill()}
 // Result-screen animation. Every loop returns to its first pose and keeps
 // the original body rig, clothing and planted feet. Angles are in degrees.
@@ -4382,17 +4423,18 @@ function drawResultActor(win,elapsed,variant){
   JIG=null;drawSpin(q.th,q);ctx.restore();
 }
 function drawEnd(){
-  ctx.fillStyle='rgba(8,10,20,.72)';ctx.fillRect(0,0,W,H);const win=state==='win';
-  const P=W<700,y0=P?Math.round(H*.5-230):190,tx=P?W/2:W/2+80;
-  ctx.save();ctx.translate(P?W/2:W/2-250,P?y0+200:H/2+20);ctx.scale(.9,.9);
-  drawResultActor(win,Math.max(0,time-resultStart),level+(score|0));
-  ctx.restore();
-  txt(win?'EVICTION COMPLETE!':'THE LANDLORDS LIVE...',tx,y0,P?32:38,win?'#7dff5a':'#ff6a6a','center');
-  if(win){const st=men>=2?3:men>=1?2:1;for(let i=0;i<3;i++)star(P?tx-70+i*70:W/2-10+i*70,y0+70,28,i<st)}
-  txt('SCORE  '+Math.round(score),tx,P?y0+330:330,28,'#fff','center');
-  const bh=40,by=P?y0+370:366,cx=tx;
-  if(win){btn(cx-190,by,120,bh,'RETRY',retry,{size:16});btn(cx-60,by,120,bh,CL.custom?(testing?'EDITOR':'LEVELS'):(level+1<chEnd(level)?'NEXT >':'THE END'),nextAfterWin,{size:16,on:true,col:'#7dff5a'});btn(cx+70,by,120,bh,'MENU',()=>{testing=false;goMenu()},{size:16})}
-  else{btn(cx-125,by,120,bh,'RETRY',retry,{size:16,on:true});btn(cx+5,by,120,bh,testing?'EDITOR':'LEVELS',backFromPlay,{size:16})}}
+  ctx.fillStyle='rgba(8,10,20,.84)';ctx.fillRect(0,0,W,H);const win=state==='win',P=W<700;
+  const cw=P?W-36:548,cx=P?W/2:W-290,x=cx-cw/2,y=P?Math.max(54,(H-520)/2):88;
+  panel(x,y,cw,P?500:364);
+  uiText(win?'EVICTION COMPLETE!':'THE LANDLORDS LIVE…',x+16,y+14,cw-32,62,{size:P?32:36,min:23,lines:2,color:win?'#7dff5a':'#ff8080'});
+  if(win){const st=men>=2?3:men>=1?2:1;for(let i=0;i<3;i++)star(cx-54+i*54,y+106,23,i<st)}
+  ctx.save();ctx.translate(P?cx:185,P?y+238:270);ctx.scale(P?1.05:1.5,P?1.05:1.5);drawResultActor(win,Math.max(0,time-resultStart),level+(score|0));ctx.restore();
+  uiText('SCORE  '+Math.round(score).toLocaleString('en-US'),x+12,P?y+330:y+161,cw-24,52,{size:29,min:20,color:'#fff'});
+  const n=win?3:2,gap=10,bw=(cw-32-(n-1)*gap)/n,by=P?y+410:y+262,bh=P?56:48,left=x+16;
+  btn(left,by,bw,bh,'RETRY',retry,{size:18,on:!win,col:'#7dff5a'});
+  if(win){btn(left+bw+gap,by,bw,bh,CL.custom?(testing?'EDITOR':'LEVELS'):(level+1<chEnd(level)?'NEXT >':'THE END'),nextAfterWin,{size:18,on:true,col:'#7dff5a'});btn(left+2*(bw+gap),by,bw,bh,'MENU',()=>{testing=false;goMenu()},{size:18})}
+  else btn(left+bw+gap,by,bw,bh,testing?'EDITOR':'LEVELS',backFromPlay,{size:18});
+}
 // the WHOLE title picture (the full backdrop, no text but the logo) for the consoles: tools/gen_title.py draws it into a w x h canvas and the small screens pan across it; words = bake the logo in (the Dreamcast has no font)
 function drawTitlePicture(w,h,t,words){
   ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);const k=h/WH;ctx.save();ctx.scale(k,k);
@@ -4416,7 +4458,7 @@ function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect(
 let endScroll=0;
 const CREDITS=['MANDEX','THE LANDLORD SMASHER','','Every landlord has been evicted.','The neighbourhood is free.','Rent is cancelled.','','STARRING','The Man  -  as himself','His Towel  -  as the cape','The Belly  -  stunts and special effects','','LANDLORDS HARMED','all of them','','Thank you for playing!'];
 function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);endScroll+=frameDt*26;const PT=W<700,cx=PT?W/2:W/2+190;
-  ctx.save();ctx.beginPath();ctx.rect(0,PT?H*.5:60,W,PT?H*.5-80:H-150);ctx.clip();CREDITS.forEach((l,i)=>{const y=H-80+i*34-endScroll%(CREDITS.length*34+H-140);txt(l,cx,y,i<2?(PT?24:30):(l===l.toUpperCase()?20:17),i<2?'#ffd23f':(l===l.toUpperCase()?'#ff7eb0':'#fff'),'center')});ctx.restore();
+  const cy0=PT?H*.5:60,cy1=H-80,creditW=PT?W-36:Math.min(510,W-420),creditX=cx-creditW/2;ctx.save();ctx.beginPath();ctx.rect(creditX,cy0,creditW,cy1-cy0);ctx.clip();CREDITS.forEach((l,i)=>{const y=cy1+i*36-endScroll%(CREDITS.length*36+cy1-cy0);if(y+36<cy0||y>cy1||y<0||y+36>H)return;uiText(l,creditX+4,y,creditW-8,36,{size:i<2?(PT?25:30):(l===l.toUpperCase()?20:18),min:13,lines:2,color:i<2?'#ffd23f':l===l.toUpperCase()?'#ff7eb0':'#fff'})});ctx.restore();
   ctx.save();ctx.translate(PT?W/2:W/2-260,PT?H*.3:H/2+40);ctx.scale(1.5,1.5);
   drawResultActor(true,Math.max(0,time-resultStart),Math.floor(Math.max(0,time-resultStart)/12));ctx.restore();
   // Decorative stars stay within the existing FX cap and advance in simulation time.
@@ -4648,32 +4690,22 @@ function btn(x,y,w,h,label,fn,o){o=o||{};hits.push({x,y,w,h,fn});
   ctx.save();rrect(x,y,w,h,Math.min(10,h/3));ctx.fillStyle=dis?'rgba(60,64,80,.8)':o.on?(o.col||'#ffd23f'):hov?'rgba(255,255,255,.28)':'rgba(15,18,30,.78)';ctx.fill();
   ctx.lineWidth=2;ctx.strokeStyle=o.on?'#fff':hov?'#fff':'rgba(255,255,255,.35)';ctx.stroke();
   if(o.swatch){ctx.fillStyle=o.swatch;ctx.fillRect(x+4,y+4,w-8,6)}
-  if(label)txt(label,x+w/2,y+h/2+(o.size||18)*.33+(o.swatch?3:0),o.size||18,o.on?'#1a1a2a':dis?'#889':'#fff','center',o.on?'#fff':undefined);
+  if(label)uiText(label,x+5,y+(o.swatch?10:3),w-10,h-(o.swatch?13:6),{size:o.size||18,min:Math.min(11,o.size||18),color:dis?'#b4bac8':o.on?'#14251e':'#fff',lines:o.lines||1});
   ctx.restore()}
 function panel(x,y,w,h){ctx.save();rrect(x,y,w,h,14);ctx.fillStyle='rgba(10,14,30,.72)';ctx.fill();ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=2;ctx.stroke();ctx.restore()}
 function hitTest(x,y){for(let i=hits.length-1;i>=0;i--){const h=hits[i];if(x>=h.x&&x<h.x+h.w&&y>=h.y&&y<h.y+h.h){h.fn();return true}}return false}
 function drawToasts(dt){
-  for(let i=toasts.length-1;i>=0;i--){toasts[i].t+=dt;if(toasts[i].t>4.6)toasts.splice(i,1)}
-  const bw=Math.min(430,W-24),top=(W<700?58:42);                       // below the HUD, whatever the screen shape
-  toasts.forEach((q,i)=>{
-    const ach=q.kind==='ach',col=ach?'#ffd23f':'#7dff5a',a=Math.max(0,Math.min(1,q.t*5,(4.6-q.t)*3)),slide=(1-Math.min(1,q.t*5));
-    const e=1-Math.pow(1-Math.min(1,q.t*4),3),y=top+i*62-(1-e)*70,x=W/2-bw/2;
-    ctx.save();ctx.globalAlpha=a;
-    ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=14;ctx.shadowOffsetY=4;rrect(x,y,bw,54,14);
-    let g=ctx.createLinearGradient(0,y,0,y+54);g.addColorStop(0,'rgba(34,40,72,.97)');g.addColorStop(1,'rgba(14,18,36,.97)');ctx.fillStyle=g;ctx.fill();ctx.shadowColor='transparent';
-    ctx.lineWidth=2.5;ctx.strokeStyle=col;ctx.stroke();
-    ctx.save();rrect(x,y,bw,54,14);ctx.clip();                          // a glint sweeps across once as it lands
-    const sx=x-60+(bw+120)*Math.min(1,Math.max(0,(q.t-.15)/.7));g=ctx.createLinearGradient(sx-30,0,sx+30,0);g.addColorStop(0,'rgba(255,255,255,0)');g.addColorStop(.5,'rgba(255,255,255,.28)');g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.fillRect(x,y,bw,54);
-    ctx.fillStyle=col;ctx.globalAlpha=a*.9;ctx.fillRect(x,y+51,bw*Math.max(0,1-q.t/4.6),3);ctx.restore();   // a time bar along the bottom edge
-    ctx.globalAlpha=a;const cx=x+30,cy=y+27,pop=1+Math.max(0,.35-Math.abs(q.t-.25))*1.2;
-    g=ctx.createRadialGradient(cx,cy,2,cx,cy,22);g.addColorStop(0,ach?'rgba(255,230,120,.9)':'rgba(150,255,120,.9)');g.addColorStop(1,'rgba(255,220,80,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,22*pop,0,7);ctx.fill();
-    ctx.fillStyle=col;ctx.strokeStyle='#fff7c0';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,15*pop,0,7);ctx.fill();ctx.stroke();
-    txt(ach?'★':'+',cx,cy+7*pop,20*pop,'#1a1a2a','center');
-    const tx=x+58,tw=bw-72;let fs=18;ctx.font='bold '+fs+'px "Trebuchet MS",Impact,sans-serif';while(fs>11&&ctx.measureText(q.title).width>tw){fs--;ctx.font='bold '+fs+'px "Trebuchet MS",Impact,sans-serif'}
-    txt(q.title,tx,y+23,fs,'#fff','left');
-    let fs2=13;ctx.font=fs2+'px "Trebuchet MS",sans-serif';while(fs2>9&&ctx.measureText(q.sub||'').width>tw){fs2--;ctx.font=fs2+'px "Trebuchet MS",sans-serif'}
-    txt(q.sub||'',tx,y+43,fs2,'#b6bddb','left');
-    ctx.restore()})}
+  if(!toasts.length)return;
+  // One notification at a time, with its own visible lifetime.
+  const q=toasts[0];q.t+=dt;if(q.t>4.6){toasts.shift();return}
+  const bw=Math.min(470,W-24),x=(W-bw)/2,top=state==='play'?hudTop()+8:state==='select'?110:100,y=top+5*(1-Math.min(1,q.t*5));
+  const col=q.kind==='ach'?'#ffd23f':'#7dff5a';ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,q.t*6,(4.6-q.t)*4));
+  rrect(x,y,bw,68,12);ctx.fillStyle='#172234';ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=1.6;ctx.stroke();
+  uiText(q.kind==='ach'?'★':'+',x+6,y+8,38,49,{size:27,color:col});
+  uiText(q.title,x+48,y+4,bw-60,29,{size:19,min:13,lines:1,align:'left'});
+  uiText(q.sub||'',x+48,y+33,bw-60,29,{size:15,min:11,lines:2,align:'left',color:'#c2cfdd'});
+  ctx.fillStyle=col;ctx.fillRect(x+8,y+65,(bw-16)*Math.max(0,1-q.t/4.6),2);ctx.restore();
+}
 
 // ---------- screens ----------
 const UISTATES=['menu','select','ach','outfit','options','ending'];
@@ -4845,8 +4877,7 @@ function cutBox(lines,t,hl){
   ctx.fillStyle='#ffd23f';ctx.fillRect(46,y0+bh-9,(W-92)*read,3);
   ctx.restore();
   let left=Math.floor(Math.max(0,t-.4)*CPS);
-  for(let i=0;i<n;i++){const s=lines[i],k=Math.max(0,Math.min(s.length,left));left-=s.length;let fs=22;ctx.font=`bold 22px "Trebuchet MS",Impact,sans-serif`;const fw=ctx.measureText(s).width;if(fw>W-110)fs=Math.floor(22*(W-110)/fw);   // a long line shrinks to fit the box instead of running into its edge
-    txt(s.slice(0,k),50,y0+38+i*30,fs,i===hl?'#ffd23f':'#fff','left')}
+  for(let i=0;i<n;i++){const s=lines[i],k=Math.max(0,Math.min(s.length,left));left-=s.length;uiText(s,48,y0+13+i*30,W-104,30,{size:22,min:12,align:'left',reveal:k,color:i===hl?'#ffd23f':'#fff'})}
   if(Math.floor(Math.max(0,t-.4)*CPS)>=cutTotal()&&Math.sin(time*7)>-.3){ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(W-70,y0+bh-24);ctx.lineTo(W-52,y0+bh-17);ctx.lineTo(W-70,y0+bh-10);ctx.closePath();ctx.fill()}}
 // the logo: stacked extrusion, gold face, shine
 function cgLogo(s,x,y,size){ctx.save();ctx.translate(x,y);ctx.font='bold '+size+'px "Trebuchet MS",Impact,sans-serif';ctx.textAlign='center';ctx.lineJoin='round';
@@ -5553,19 +5584,19 @@ function storyUnlocked(i){return PD.unlockAll||i<3||(PD.stars[i-1]||0)>0}
 function mobileHeader(title,detail,back){
   ctx.fillStyle='rgba(10,14,30,.92)';ctx.fillRect(0,0,W,H);
   ctx.fillStyle='rgba(255,210,63,.16)';ctx.fillRect(0,0,W,7);
-  txt(title,W/2,59,36,'#ffd23f','center','#7a1a1a');
-  if(detail)txt(detail,W/2,85,15,'#cfd','center');
+  uiText(title,back?112:14,12,back?W-224:W-28,52,{size:34,min:22,lines:2,color:'#ffd23f'});
+  if(detail)uiText(detail,14,67,W-28,27,{size:17,color:'#cfd'});
   if(back)btn(12,14,92,42,'< BACK',back,{size:16});
 }
-function mobilePager(kind,number,size,atY){
+function mobilePager(kind,number,size,atY,left=12,span=W-24){
   const pages=Math.max(1,Math.ceil(number/size));
   const page=mobilePage(kind,number,size);
   WEB_UI.page[kind]=page;
   if(pages>1){
-    const y=atY==null?H-58:atY;
-    btn(12,y,116,46,'< PREV',()=>{WEB_UI.page[kind]=Math.max(0,page-1)},{size:16,disabled:page===0});
-    txt('PAGE '+(page+1)+' / '+pages,W/2,y+29,18,'#fff','center');
-    btn(W-128,y,116,46,'NEXT >',()=>{WEB_UI.page[kind]=Math.min(pages-1,page+1)},{size:16,disabled:page===pages-1});
+    const y=atY==null?H-58:atY,bw=Math.min(116,(span-40)/3);
+    btn(left,y,bw,46,'< PREV',()=>{WEB_UI.page[kind]=Math.max(0,page-1)},{size:16,disabled:page===0});
+    uiText('Page '+(page+1)+' / '+pages,left+bw+4,y,span-2*bw-8,46,{size:18});
+    btn(left+span-bw,y,bw,46,'NEXT >',()=>{WEB_UI.page[kind]=Math.min(pages-1,page+1)},{size:16,disabled:page===pages-1});
   }
   return page;
 }
@@ -5575,51 +5606,34 @@ function mobileTab(x,y,w,label,fn,on){
 function drawMobileTitle(){
   ctx.fillStyle='rgba(10,14,30,.44)';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate(W/2,H*.63);ctx.scale(1.8,1.8);drawSlamScene(time);ctx.restore();
-  txt('MANDEX',W/2,H*.24,78,'#ffd23f','center','#7a1a1a');
-  txt('THE LANDLORD SMASHER',W/2,H*.31,20,'#fff','center');
+  uiText('MANDEX',16,H*.17,W-32,100,{size:78,min:40,color:'#ffd23f',stroke:'#7a1a1a'});
+  uiText('THE LANDLORD SMASHER',20,H*.31-10,W-40,38,{size:23,color:'#fff'});
   ctx.globalAlpha=.72+.28*Math.sin(time*4);
-  txt('TAP ANYWHERE TO START',W/2,H-95,23,'#fff','center');
+  uiText('TAP ANYWHERE TO START',16,H-124,W-32,52,{size:24,color:'#fff'});
   ctx.globalAlpha=1;
 }
 function drawMobileCutscene(){
-  const sc=CUTS[cutI],cs=cutCam(cutI,cutT);
-  const frameH=Math.min(H*.47,420),scale=W/960;
+  const sc=CUTS[cutI],cs=cutCam(cutI,cutT),scale=W/960,frameH=540*scale,frameY=72;
   ctx.fillStyle='#0b101e';ctx.fillRect(0,0,W,H);
-  ctx.save();ctx.beginPath();ctx.rect(0,108,W,frameH);ctx.clip();
-  ctx.translate(0,108);ctx.scale(scale,scale);
-  ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);
-  ctx.translate(-cs.x,-cs.y);
-  /* Existing cutscene staging is authored at 960x540. Keep that virtual
-     stage even on a portrait canvas, instead of letting W=540 crop sky,
-     actors and cinematic effects before the frame is scaled to fit. */
-  const portraitW=W,portraitH=H;
-  try{W=960;H=540;sc.draw(cutT)}
-  finally{W=portraitW;H=portraitH;ctx.restore()}
-  txt('SCENE '+(cutI+1)+' / '+CUTS.length,W/2,45,20,'#ffd23f','center');
-  btn(W-118,12,106,42,'SKIP >>',endCut,{size:15});
-  const boxY=frameH+128,read=Math.max(0,Math.min(1,(cutT-.4)*CPS/Math.max(1,cutTotal())));
-  panel(18,boxY,W-36,Math.min(210,H-boxY-100));
-  ctx.fillStyle='#ffd23f';ctx.fillRect(34,boxY+9,(W-68)*read,4);
-  let left=Math.floor(Math.max(0,cutT-.4)*CPS);
-  for(let i=0;i<sc.lines.length;i++){
-    const words=sc.lines[i],visible=words.slice(0,Math.max(0,Math.min(words.length,left)));left-=words.length;
-    let fs=18;ctx.font='bold 18px sans-serif';
-    while(fs>12&&ctx.measureText(visible).width>W-82){fs--;ctx.font='bold '+fs+'px sans-serif'}
-    txt(visible,W/2,boxY+43+i*48,fs,i===sc.hl?'#ffd23f':'#fff','center');
-  }
+  ctx.save();ctx.beginPath();ctx.rect(0,frameY,W,frameH);ctx.clip();ctx.translate(0,frameY);ctx.scale(scale,scale);ctx.translate(480+cs.sx,270+cs.sy);ctx.rotate(cs.r);ctx.scale(cs.z,cs.z);ctx.translate(-cs.x,-cs.y);
+  const portraitW=W,portraitH=H;try{W=960;H=540;sc.draw(cutT)}finally{W=portraitW;H=portraitH;ctx.restore()}
+  uiText('Scene '+(cutI+1)+' / '+CUTS.length,14,12,W-144,44,{size:20,color:'#ffd23f',align:'left'});btn(W-118,12,106,44,'SKIP >>',endCut,{size:15});
+  const boxY=frameY+frameH+12,boxH=Math.min(360,H-boxY-82),read=Math.max(0,Math.min(1,(cutT-.4)*CPS/Math.max(1,cutTotal())));
+  panel(12,boxY,W-24,boxH);ctx.fillStyle='#ffd23f';ctx.fillRect(26,boxY+10,(W-52)*read,3);
+  const lh=(boxH-30)/Math.max(1,sc.lines.length);let left=Math.floor(Math.max(0,cutT-.4)*CPS);
+  for(let i=0;i<sc.lines.length;i++){const line=sc.lines[i];uiText(line,26,boxY+20+i*lh,W-52,lh,{size:22,min:14,lines:Math.max(1,Math.floor(lh/18)),align:'left',reveal:left,color:i===sc.hl?'#ffd23f':'#fff'});left=Math.max(0,left-line.length)}
   btn(W/2-134,H-66,268,52,'TAP TO CONTINUE >',()=>cutClick(W/2,H-50),{size:18,on:true});
 }
 function drawMobileMenu(){
   mobileHeader('MANDEX','THE LANDLORD SMASHER');
-  ctx.save();ctx.globalAlpha=.24;ctx.translate(W*.8,H*.72);ctx.scale(2,2);drawSlamScene(time);ctx.restore();
-  const y=H*.19,w=W-76,x=38,h=62,g=13;
+  const x=24,w=W-48,top=116,bottom=H-65,g=12,h=Math.max(52,Math.min(76,Math.floor((bottom-top-5*g)/6))),y=top+Math.max(0,(bottom-top-6*h-5*g)/2);
   btn(x,y,w,h,'PLAY',openLevelLibrary,{size:28,on:true,col:'#7dff5a'});
-  btn(x,y+(h+g),w,h,'LEVEL CREATOR',()=>openEditor(false),{size:24});
-  btn(x,y+2*(h+g),w,h,'ACHIEVEMENTS '+achCount()+'/'+ACH.length,()=>{state='ach';WEB_UI.page.ach=0},{size:19});
-  btn(x,y+3*(h+g),w,h,'OUTFITS '+ownedCount()+'/'+OUTFITS.length,()=>{state='outfit';WEB_UI.page.outfit=0},{size:21});
-  btn(x,y+4*(h+g),w,h,'OPTIONS',openSettings,{size:21});
-  btn(x,H-130,w,52,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();setMuted(!muted)},{size:18});
-  txt(totalStars()+' ★ EARNED',W/2,H-28,18,'#ffd23f','center');
+  btn(x,y+(h+g),w,h,'LEVEL CREATOR',()=>openEditor(false),{size:23});
+  btn(x,y+2*(h+g),w,h,'ACHIEVEMENTS  '+achCount()+'/'+ACH.length,()=>{state='ach';WEB_UI.page.ach=0},{size:20});
+  btn(x,y+3*(h+g),w,h,'OUTFITS  '+ownedCount()+'/'+OUTFITS.length,()=>{state='outfit';WEB_UI.page.outfit=0},{size:20});
+  btn(x,y+4*(h+g),w,h,'OPTIONS',openSettings,{size:22});
+  btn(x,y+5*(h+g),w,h,muted?'SOUND: OFF':'SOUND: ON',()=>{audioInit();setMuted(!muted)},{size:18});
+  uiText(totalStars()+' ★ EARNED',16,H-49,W-32,35,{size:20,color:'#ffd23f'});
 }
 // One hierarchy for both screen orientations. No previews build or simulate worlds.
 let selectDistrict=-1,selectCustomItem=null,selectParentPage=0;
@@ -5694,67 +5708,64 @@ function selectModel(){
 }
 function drawLibraryCard(x,y,w,h,c){
   btn(x,y,w,h,'',c.locked?()=>SFX.pop():c.fn,{disabled:c.locked,on:c.primary,col:'#7dff5a'});
-  const fg=c.primary?'#172920':c.locked?'#9ba3b4':'#fff',sub=c.primary?'#254634':c.locked?'#8b91a4':'#bac8d8';
-  const fit=(s,sz)=>{ctx.font='bold '+sz+'px "Trebuchet MS",sans-serif';if(ctx.measureText(s).width<=w-28)return s;let k=s.length;while(k>2&&ctx.measureText(s.slice(0,k)+'…').width>w-28)k--;return s.slice(0,k)+'…'};
-  txt(fit(c.title,20),x+w/2,y+h*.39,20,fg,'center',c.primary?'#7dff5a':undefined);
-  txt(fit(c.detail+(c.stars?'  '+ '★'.repeat(c.stars):''),13),x+w/2,y+h*.71,13,sub,'center',c.primary?'#7dff5a':undefined);
+  const fg=c.primary?'#172920':c.locked?'#c4c9d3':'#fff',sub=c.primary?'#254634':c.locked?'#aeb5c3':'#bac8d8';
+  const top=Math.floor(h*.54);uiText(c.title,x+8,y+4,w-16,top-5,{size:h>=100?24:21,min:15,lines:2,color:fg});
+  uiText(c.detail+(c.stars?'  '+'★'.repeat(c.stars):''),x+8,y+top,w-16,h-top-4,{size:h>=100?18:15,min:11,lines:2,color:sub});
 }
 function drawLevelLibrary(){
   const model=selectModel(),por=W<700;
   ctx.fillStyle='#101827';ctx.fillRect(0,0,W,H);
   btn(14,14,94,42,'< BACK',selectBack,{size:16});
-  txt(model.title,W/2,65,por?27:30,'#ffd23f','center');
-  txt(model.detail,W/2,94,15,'#c5d5e0','center');
+  uiText(model.title,116,12,W-232,55,{size:por?28:31,min:20,lines:2,color:'#ffd23f'});
+  uiText(model.detail,18,70,W-36,32,{size:17,min:13,lines:2,color:'#c5d5e0'});
   const margin=por?18:58,gap=12,cols=model.cols===1?1:(por?2:4);
   const contentW=model.cols===1?Math.min(W-2*margin,640):W-2*margin;
   const x0=(W-contentW)/2,cw=(contentW-(cols-1)*gap)/cols;
   let top=114;
   if(model.actions){const aw=(contentW-gap)/2;model.actions.forEach((a,i)=>btn(x0+i*(aw+gap),top,aw,44,a.title,a.fn,{size:16}));top+=56}
-  const rh=model.cols===1?(por?96:73):(por?84:82),maxRows=model.cols===1?4:por?4:3;
+  const maxRows=model.cols===1?4:por?4:3,visibleRows=Math.min(maxRows,Math.max(1,Math.ceil(model.cards.length/cols))),rh=model.cols===1?(por?Math.max(96,Math.min(140,Math.floor((H-top-90-(visibleRows-1)*gap)/visibleRows))):73):(por?Math.max(84,Math.min(112,Math.floor((H-top-90-(visibleRows-1)*gap)/visibleRows))):82);
   const rows=Math.min(maxRows,Math.max(1,Math.floor((H-top-74+gap)/(rh+gap)))),size=rows*cols;
   const page=mobilePage('select',model.cards.length,size);WEB_UI.page.select=page;
-  if(!model.cards.length)txt('No saved levels yet. Create or import one above.',W/2,top+54,16,'#bac8d8','center');
+  // Tall displays get comfortable breathing room without adding more rows.
+  if(por&&model.cards.length<=size&&model.cards.length>0&&!model.actions){const used=Math.ceil(model.cards.length/cols)*(rh+gap)-gap;top+=Math.max(0,Math.min(96,Math.floor((H-70-top-used)*.22)));}
+  if(!model.cards.length)uiText('No saved levels yet. Create or import one above.',x0,top+20,contentW,72,{size:19,lines:2,color:'#bac8d8'});
   for(let k=0;k<size;k++){const c=model.cards[page*size+k];if(!c)break;
     drawLibraryCard(x0+(k%cols)*(cw+gap),top+Math.floor(k/cols)*(rh+gap),cw,rh,c)}
   mobilePager('select',model.cards.length,size,H-60);
 }
 function drawMobileSelect(){drawLevelLibrary()}
-function drawMobileAchievements(){
+function drawAchievementList(){
   mobileHeader('ACHIEVEMENTS',achCount()+' / '+ACH.length+' COMPLETE',goMenu);
-  const top=111,rh=60,size=Math.max(3,Math.floor((H-top-88)/rh)),page=mobilePage('ach',ACH.length,size);
-  ACH.slice(page*size,(page+1)*size).forEach((a,i)=>{
-    const y=top+i*rh,got=PD.ach[a.id];
-    panel(14,y,W-28,rh-6);
-    txt(got?'★':'?',43,y+36,28,got?'#ffd23f':'#889','center');
-    txt(a.n,77,y+25,17,got?'#fff':'#cbd','left');
-    txt(a.d,77,y+44,12,'#aab','left');
-    if(!got&&a.p){const[p,n]=a.p();txt(Math.min(p,n)+'/'+n,W-25,y+24,13,'#ffd23f','right')}
-  });
-  mobilePager('ach',ACH.length,size);
+  const P=W<700,cols=P?1:2,gap=8,margin=14,top=108,rh=P?70:60,cw=(W-2*margin-(cols-1)*gap)/cols,rows=Math.max(1,Math.min(12,Math.floor((H-top-74)/(rh+gap)))),size=rows*cols,page=mobilePage('ach',ACH.length,size);
+  ACH.slice(page*size,(page+1)*size).forEach((a,i)=>{const x=margin+(i%cols)*(cw+gap),y=top+Math.floor(i/cols)*(rh+gap),got=PD.ach[a.id],progress=!got&&a.p;
+    panel(x,y,cw,rh);uiText(got?'★':'?',x+5,y+6,42,rh-12,{size:25,color:got?'#ffd23f':'#889'});
+    const textW=cw-62-(progress?68:0);
+    uiText(a.n,x+48,y+4,textW,27,{size:18,min:13,align:'left',color:got?'#fff':'#d4d9e2'});
+    uiText(a.d,x+48,y+29,textW,rh-33,{size:14,min:11,lines:2,align:'left',color:'#b7c2d0'});
+    if(progress){const[p,n]=a.p();uiText(Math.min(p,n)+'/'+n,x+cw-68,y+4,62,rh-8,{size:15,min:12,color:'#ffd23f'});}
+  });mobilePager('ach',ACH.length,size);
 }
-function drawMobileOutfits(){
+function drawMobileAchievements(){drawAchievementList()}
+function drawOutfitLibrary(){
   mobileHeader('OUTFITS',ownedCount()+' / '+OUTFITS.length+' UNLOCKED',goMenu);
-  ctx.save();ctx.translate(W/2,198);ctx.scale(1.1,1.1);
-  if(outfitCur.rainbow)applyOutfit(outfitCur,time);
-  const sw=Math.sin(time*5);drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');
-  ctx.restore();txt(outfitCur.n,W/2,285,22,'#fff','center');
-  const top=310,rh=75,cols=2,size=Math.max(2,Math.floor((H-top-90)/(rh+9)))*cols;
-  const page=mobilePage('outfit',OUTFITS.length,size);
-  OUTFITS.slice(page*size,(page+1)*size).forEach((o,k)=>{
-    const x=12+(k%2)*264,y=top+Math.floor(k/2)*(rh+9),
-      own=!!PD.own[o.id],sel=outfitCur===o;
-    btn(x,y,252,rh,o.n,()=>{if(own){equip(o);SFX.ding()}else SFX.pop()},
-      {size:o.n.length>17?13:17,on:sel,disabled:!own});
-    txt(own?(sel?'WEARING':'TAP TO WEAR'):'LOCKED',x+126,y+rh-8,12,own?'#fff':'#889','center');
-  });
-  mobilePager('outfit',OUTFITS.length,size);
+  const P=W<700,previewW=P?W-28:300,previewX=14,previewY=108,previewH=P?182:H-126;
+  panel(previewX,previewY,previewW,previewH);
+  ctx.save();ctx.translate(previewX+previewW/2,previewY+(P?82:previewH*.55));ctx.scale(P?.9:1.55,P?.9:1.55);if(outfitCur.rainbow)applyOutfit(outfitCur,time);drawManFrame('IDLE_A');ctx.restore();
+  uiText(outfitCur.n,previewX+8,previewY+previewH-42,previewW-16,36,{size:20,min:14,lines:2});
+  const x0=P?14:previewX+previewW+12,top=P?previewY+previewH+12:previewY,gap=8,cw=(W-x0-14-gap)/2,rh=P?84:67,rows=Math.max(1,Math.min(7,Math.floor((H-top-72)/(rh+gap)))),size=rows*2,page=mobilePage('outfit',OUTFITS.length,size);
+  OUTFITS.slice(page*size,(page+1)*size).forEach((o,k)=>{const x=x0+(k%2)*(cw+gap),y=top+Math.floor(k/2)*(rh+gap),own=!!PD.own[o.id],sel=outfitCur===o;
+    btn(x,y,cw,rh,'',()=>{if(own){equip(o);SFX.ding()}else SFX.pop()},{on:sel,disabled:!own,col:'#7dff5a'});
+    uiText(o.n,x+7,y+4,cw-14,rh*.52-5,{size:18,min:13,lines:2,color:sel?'#172920':own?'#fff':'#c4c9d3'});
+    uiText(own?(sel?'WEARING':'Tap to wear'):'Locked: '+(o.h||'Unlock through play'),x+7,y+rh*.52,cw-14,rh*.48-4,{size:14,min:11,lines:2,color:sel?'#254634':own?'#bce6ca':'#aeb5c3'});
+  });mobilePager('outfit',OUTFITS.length,size,H-58,x0,W-x0-14);
 }
+function drawMobileOutfits(){drawOutfitLibrary()}
 function drawMobileOptions(){openSettings();}
 /* Portrait creator: a genuine 120-column editing surface with horizontal
    panning, unclipped world-cell touch mapping and a separate tool/action tray.
    No copy of E.g, no second offscreen canvas and no changed save encoding. */
 function mobileEditorSurface(){
-  const h=Math.min(GY,Math.max(300,H-320));
+  const h=Math.min(GY,Math.max(300,H-360));
   WEB_UI.editorHeight=h;WEB_UI.editorScale=h/GY;
   WEB_UI.editorX=clamp(WEB_UI.editorX,0,Math.max(0,WW-W/WEB_UI.editorScale));
   return h;
@@ -5798,9 +5809,7 @@ function drawMobileEditor(){
   ctx.restore();
   ctx.fillStyle='rgba(12,17,34,.92)';ctx.fillRect(0,surface,W,H-surface);
   btn(10,surface+8,120,48,'< PAN',()=>{WEB_UI.editorX=Math.max(0,WEB_UI.editorX-150)},{size:18});
-  txt('COL '+(Math.floor(WEB_UI.editorX/V)+1)+'–'+
-    Math.min(COLS,Math.ceil((WEB_UI.editorX+W/sc)/V)),
-    W/2,surface+38,16,'#ffd23f','center');
+  uiText('Columns '+(Math.floor(WEB_UI.editorX/V)+1)+'–'+Math.min(COLS,Math.ceil((WEB_UI.editorX+W/sc)/V)),138,surface+8,W-276,48,{size:17,lines:2,color:'#ffd23f'});
   btn(W-130,surface+8,120,48,'PAN >',()=>{
     WEB_UI.editorX=Math.min(Math.max(0,WW-W/sc),WEB_UI.editorX+150)
   },{size:18});
@@ -5824,10 +5833,9 @@ function drawMobileEditor(){
     btn(408,y+154,120,42,E.shape==='pen'?'PEN':'RECT',()=>{
       E.shape=E.shape==='pen'?'rect':'pen'
     },{size:16});
-    txt('BRUSH '+brushLabel()+'  •  '+(E.tool==='mat'?MAT[E.mat].n:E.tool).toUpperCase(),
-      W/2,Math.min(H-80,y+225),14,'#cfd','center');
+    uiText('Brush '+brushLabel()+' · '+(E.tool==='mat'?MAT[E.mat].n:E.tool),14,y+200,W-28,27,{size:16,color:'#cfd'});
   }else if(E.starters){
-    txt('START A BUILD — Undo restores the old one',W/2,y+13,17,'#ffd23f','center');
+    uiText('Start a build · Undo restores the old one',14,y,W-28,25,{size:17,color:'#ffd23f'});
     E_STARTERS.forEach((name,i)=>btn(12,y+28+i*52,W-24,44,name,
       ()=>eApplyStarter(i),{size:16}));
   }else{
@@ -5845,8 +5853,7 @@ function drawMobileEditor(){
     ];
     actions.forEach((a,i)=>btn(12+(i%4)*132,y+Math.floor(i/4)*48,120,42,a[0],a[1],
         {size:14,on:i===5}));
-    txt('MEN '+E.men+'  •  '+(E.name||'UNSAVED LEVEL'),
-      W/2,Math.min(H-77,y+164),15,'#ffd23f','center');
+    uiText('Men '+E.men+' · '+(E.name||'Unsaved level'),14,y+145,W-28,46,{size:18,min:13,lines:2,color:'#ffd23f'});
   }
   btn(30,H-57,W-60,50,E.starters?'CANCEL STARTERS':p?'< BRUSH TOOLS':'LEVEL ACTIONS >',()=>{
     if(E.starters){E.starters=false;return}
@@ -5951,29 +5958,8 @@ function tile(x,y,w,h,label,name,stars,locked,fn,showStars){
   txt(s,x+w/2,y+h-12,13,locked?'#778':'#fff','center');ctx.restore()}
 function drawSelect(){drawLevelLibrary()}
 function confirmDel(L){try{return confirm('Delete "'+L.n+'"?')}catch(e){return true}}
-function drawAch(){
-  ctx.fillStyle='rgba(10,14,30,.6)';ctx.fillRect(0,0,W,H);
-  txt('ACHIEVEMENTS',W/2,50,38,'#ffd23f','center','#7a1a1a');txt(`${achCount()} / ${ACH.length}`,W-20,40,22,'#fff','right');
-  btn(16,14,90,36,'< MENU',goMenu,{size:16});
-  const rows=13,rw=450,rh=32,x0=[18,492],y0=62;
-  ACH.forEach((a,i)=>{const c=(i/rows)|0,r=i%rows,x=x0[c],y=y0+r*(rh+2),got=PD.ach[a.id];
-    ctx.save();rrect(x,y,rw,rh,8);ctx.fillStyle=got?'rgba(40,60,30,.85)':'rgba(15,18,30,.78)';ctx.fill();ctx.strokeStyle=got?'#7dff5a':'rgba(255,255,255,.2)';ctx.lineWidth=2;ctx.stroke();
-    ctx.fillStyle=got?'#ffd23f':'#3a3f55';ctx.beginPath();ctx.arc(x+20,y+17,11,0,7);ctx.fill();txt(got?'★':'?',x+20,y+23,15,got?'#1a1a2a':'#889','center',got?'#fff':'#000');
-    txt(a.n,x+40,y+15,15,got?'#fff':'#aab','left');txt(a.d,x+40,y+30,11,got?'#cfd':'#889','left');
-    if(!got&&a.p){const[p,m]=a.p();txt(`${Math.min(p,m)}/${m}`,x+rw-10,y+22,13,'#ffd23f','right')}ctx.restore()})}
-function drawOutfits(){
-  ctx.fillStyle='rgba(10,14,30,.62)';ctx.fillRect(0,0,W,H);
-  txt('OUTFITS',W/2,50,38,'#ffd23f','center','#7a1a1a');btn(16,14,90,36,'< MENU',goMenu,{size:16});
-  panel(30,70,330,430);
-  ctx.save();ctx.translate(195,370);ctx.scale(1.4,1.4);if(outfitCur.rainbow)applyOutfit(outfitCur,time);const sw=Math.sin(time*5);drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');ctx.restore();
-  txt(outfitCur.n,195,110,24,'#fff','center');
-  const cols=2,cw=268,ch=OUTFITS.length>14?48:58,x0=384,y0=72;
-  OUTFITS.forEach((o,i)=>{const c=i%cols,r=(i/cols)|0,x=x0+c*(cw+10),y=y0+r*(ch+4),own=PD.own[o.id],sel=outfitCur===o;
-    hits.push({x,y,w:cw,h:ch,fn:()=>{if(own){equip(o);SFX.ding()}else SFX.pop()}});const hov=mouseX>=x&&mouseX<x+cw&&mouseY>=y&&mouseY<y+ch;
-    ctx.save();rrect(x,y,cw,ch,10);ctx.fillStyle=sel?'rgba(60,90,40,.9)':hov&&own?'rgba(255,255,255,.28)':'rgba(15,18,30,.78)';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=sel?'#7dff5a':'rgba(255,255,255,.3)';ctx.stroke();
-    let c1=o.thong?o.tg:o.br,c2=o.tow;if(o.rainbow){c1=`hsl(${(time*60)%360},85%,52%)`;c2=`hsl(${(time*60+180)%360},85%,70%)`}
-    ctx.globalAlpha=own?1:.35;ctx.fillStyle=c1;rrect(x+10,y+9,46,46,8);ctx.fill();ctx.fillStyle=c2;rrect(x+36,y+29,26,26,6);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;rrect(x+10,y+9,46,46,8);ctx.stroke();ctx.globalAlpha=1;
-    txt(o.n,x+74,y+26,17,own?'#fff':'#889','left');txt(own?(sel?'WEARING':'tap to wear'):'locked: '+o.h,x+74,y+48,12,own?'#cfd':'#aab','left');ctx.restore()})}
+function drawAch(){drawAchievementList()}
+function drawOutfits(){drawOutfitLibrary()}
 
 // ---------- demolition contracts ----------
 // Demolition contracts: separate from campaign and creator saves.
@@ -6364,7 +6350,7 @@ function drawEditor(){
   btn(x,y2,56,24,'EXIT',()=>{selectRoute(1);goSelect()},{size:12});x+=62;
   btn(x,y2,106,24,'STARTER BUILDS',()=>{E.starters=!E.starters},{size:12,on:E.starters});
   btn(x+112,y2,90,24,'CHECK BUILD',eCheckBuild,{size:11});
-  txt(E.name?E.name:'unsaved level',W-8,y1+17,13,'#99a','right');
+  uiText(E.name||'Unsaved level',648,y1,304,24,{size:14,align:'right',color:'#b5bfd0'});
   if(E.starters)drawStarterMenu(W-308,66,296)}
 
 // ---------- level finished: stars, achievements ----------
@@ -6395,13 +6381,11 @@ addEventListener('keydown',e=>{
   if(e.code==='F4'&&!e.repeat&&!settingsOpen){setPerfPreset(perfTier===0?1:0);e.preventDefault()}
 });
 function drawFrameMeter(){
+  if(state!=='play')return;
   ctx.save();ctx.setTransform(outputScale,0,0,cv.height/H,0,0);
-  ctx.fillStyle='rgba(8,12,27,.9)';ctx.fillRect(8,8,277,48);
-  ctx.font='bold 13px monospace';ctx.textAlign='left';ctx.fillStyle='#ffdc81';
-  ctx.fillText('RENDER '+frameMeterFps+' FPS   SIM '+frameMeterSps+' SPS',16,27);
-  ctx.fillStyle='#eee';
-  ctx.fillText('GAME TIME '+frameMeterSpeed+'%  FX '+(webEcoFX?'ECO':'FULL')+' [F4]',16,46);
-  ctx.restore();
+  const w=Math.min(W-24,260),x=W-w-12,y=hudTop()+(toasts.length?82:8);ctx.fillStyle='rgba(8,12,27,.88)';ctx.fillRect(x,y,w,42);
+  uiText(frameMeterFps+' FPS · '+frameMeterSps+' sim/s',x+6,y+2,w-12,20,{size:14,color:'#ffdc81',align:'left'});
+  uiText(frameMeterSpeed+'% speed · FX '+(webEcoFX?'ECO':'FULL'),x+6,y+22,w-12,18,{size:12,color:'#eee',align:'left'});ctx.restore();
 }
 /* Physics and game logic must not run once per monitor refresh: at 120/144 Hz
  * that also doubles frame-triggered gameplay effects, while a 30 Hz screen

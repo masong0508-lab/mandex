@@ -92,7 +92,7 @@ const env={
   GUIDES:['OFF','SHORT','FULL'],SHAKES:[['OFF',0],['LOW',.5],['FULL',1]],
   OPT:()=>({}),optVol:()=>.8,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
   btn:(x,y,w,h,label,fn,o)=>records.push({x,y,w,h,label,fn}),
-  panel:()=>{},txt:()=>{},drawSlamScene:()=>{},drawManFrame:()=>{},
+  panel:()=>{},txt:()=>{},uiText:()=>{},drawSlamScene:()=>{},drawManFrame:()=>{},
   goMenu:()=>{},goSelect:()=>{},startStory:()=>{},startCustom:()=>{},openSettings:()=>{settingsOpened++},
   openEditor:()=>{},importCode:()=>{},exportCode:()=>{},confirmDel:()=>true,
   pdSave:()=>{},pdTouch:()=>{},equip:()=>{},setMuted:()=>{},audioInit:()=>{},

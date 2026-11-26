@@ -12,7 +12,7 @@ const storyUnlocked=i=>i<3||!!PD.stars[i-1],ch2Unlocked=i=>i===20||!!PD.stars[i-
 const startStory=i=>launches.push(['story',i]),startContract=i=>launches.push(['contract',i]),startCustom=i=>launches.push(['custom',i]),openEditor=(back,i)=>edits.push(i),exportCode=q=>shared.push(q.n),importCode=()=>imports++,confirmDel=()=>true,pdTouch=()=>{},pdSave=()=>deleted++;
 const goMenu=()=>goes++,goSelect=()=>{},SFX={pop(){}};
 const ctx={fillRect(){},measureText(s){return {width:s.length*8}}};
-const txt=()=>{},btn=(x,y,w,h,label,fn)=>hits.push({x,y,w,h,label,fn});
+const txt=()=>{},uiText=()=>{},btn=(x,y,w,h,label,fn)=>hits.push({x,y,w,h,label,fn});
 const mobilePage=(k,n,size)=>Math.max(0,Math.min(Math.ceil(n/size)-1,WEB_UI.page[k]||0));
 const mobilePager=(k,n,size,y)=>{if(n>size){btn(12,y,100,46,'prev',()=>{});btn(W-112,y,100,46,'next',()=>{})}};
 `;
