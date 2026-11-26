@@ -89,6 +89,14 @@ echo "--- Browser motion animation: dive, sling, mirrored ragdoll, attacks and i
 if command -v node >/dev/null 2>&1;then node browser_animation_motion_test.js;fi
 echo "--- Browser world animation: live pads, tubes, moving TNT, and shockwave easing ---"
 if command -v node >/dev/null 2>&1;then node browser_world_animation_test.js;fi
+echo "--- Trial expansion: raw asset, native table and browser decoder parity ---"
+if command -v node >/dev/null 2>&1;then node trial_pack_test.js;fi
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function -DMX_LEVEL_LOCKS $flags -I../core native_trial_pack_test.c ../core/mx_meta.c -lm -o "native_trial_pack_$mode"
+  "./native_trial_pack_$mode"
+done
 echo "--- Native dive motion: float and fixed angular acceleration ---"
 for mode in float fixed;do
   flags=""
