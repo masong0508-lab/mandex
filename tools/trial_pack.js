@@ -10,7 +10,25 @@ function generateTrials(){
     {label:"Spring Heights",prefix:"Spring",wall:2,floor:1,roof:7,kind:[1,5,2,0],tip:"BANK OFF THE RUBBER ROOFS"},
     {label:"Delivery Works",prefix:"Delivery",wall:2,floor:6,roof:1,kind:[2,1,6,4],tip:"USE THE TUBE TO CROSS THE YARD"},
     {label:"Night Patrol",prefix:"Night",wall:3,floor:2,roof:6,kind:[4,5,6,7],tip:"EVICT GUARDS BEFORE THE BOSS"},
-    {label:"Cascade Works",prefix:"Cascade",wall:3,floor:6,roof:7,kind:[1,3,5,6],tip:"CHAIN BLASTS AND RUBBER REBOUNDS"}
+    {label:"Cascade Works",prefix:"Cascade",wall:3,floor:6,roof:7,kind:[1,3,5,6],tip:"CHAIN BLASTS AND RUBBER REBOUNDS"},
+    {"label":"Harbor Freight","prefix":"Harbor","wall":6,"floor":1,"roof":2,"kind":[1,2,3,4],"tip":"CUT THE STEEL GANTRY","tnt":1,"pad":0,"tube":1,"sand":0,"walk":0},
+    {"label":"Foundry Lane","prefix":"Foundry","wall":2,"floor":6,"roof":1,"kind":[2,3,4,0],"tip":"SET OFF THE FOUNDATION CHARGES","tnt":1,"pad":0,"tube":0,"sand":0,"walk":0},
+    {"label":"Dune Depot","prefix":"Dune","wall":3,"floor":1,"roof":2,"kind":[0,1,5,2],"tip":"RELEASE THE YARD SAND","tnt":0,"pad":0,"tube":0,"sand":1,"walk":0},
+    {"label":"Skyline Arcade","prefix":"Skyline","wall":6,"floor":6,"roof":7,"kind":[1,5,3,6],"tip":"REBOUND FROM THE ROOFLINE","tnt":0,"pad":1,"tube":0,"sand":0,"walk":1},
+    {"label":"Brick Market","prefix":"Market","wall":2,"floor":2,"roof":1,"kind":[0,4,1,2],"tip":"CLEAR THE LOWER SHOPS","tnt":1,"pad":0,"tube":0,"sand":0,"walk":1},
+    {"label":"Pneumatic Post","prefix":"Post","wall":3,"floor":6,"roof":2,"kind":[2,6,1,4],"tip":"RIDE THE DELIVERY TUBE","tnt":0,"pad":0,"tube":1,"sand":0,"walk":0},
+    {"label":"Railyard Switch","prefix":"Switch","wall":6,"floor":1,"roof":6,"kind":[1,4,2,5],"tip":"SEVER THE BRIDGE PIERS","tnt":1,"pad":0,"tube":0,"sand":0,"walk":0},
+    {"label":"Quarry Exchange","prefix":"Quarry","wall":3,"floor":6,"roof":3,"kind":[4,1,0,6],"tip":"TOPPLE THE STONE STORAGE","tnt":1,"pad":0,"tube":0,"sand":1,"walk":0},
+    {"label":"Canal Station","prefix":"Canal","wall":2,"floor":6,"roof":7,"kind":[2,1,5,3],"tip":"BANK ACROSS THE CANAL","tnt":0,"pad":1,"tube":1,"sand":0,"walk":0},
+    {"label":"Clocktower Court","prefix":"Clock","wall":3,"floor":1,"roof":6,"kind":[3,5,4,6],"tip":"HIT THE TOWER FROM BELOW","tnt":0,"pad":0,"tube":0,"sand":0,"walk":1},
+    {"label":"Glass Terminal","prefix":"Terminal","wall":4,"floor":6,"roof":4,"kind":[1,2,5,0],"tip":"BREAK THE FRAME UNDER THE GLASS","tnt":1,"pad":0,"tube":0,"sand":0,"walk":0},
+    {"label":"Warehouse Nine","prefix":"Warehouse","wall":6,"floor":2,"roof":1,"kind":[2,4,6,3],"tip":"USE THE CHARGED CORNER POSTS","tnt":1,"pad":0,"tube":1,"sand":0,"walk":1},
+    {"label":"Rubber Reservoir","prefix":"Reservoir","wall":2,"floor":1,"roof":7,"kind":[5,3,1,6],"tip":"USE ROOF PADS TO REACH THE FAR SIDE","tnt":0,"pad":1,"tube":0,"sand":1,"walk":1},
+    {"label":"Steel Causeway","prefix":"Causeway","wall":6,"floor":6,"roof":2,"kind":[4,3,2,6],"tip":"DROP THE LOAD-BEARING DECK","tnt":1,"pad":0,"tube":0,"sand":0,"walk":0},
+    {"label":"Rooftop Gardens","prefix":"Garden","wall":2,"floor":1,"roof":7,"kind":[0,5,6,1],"tip":"CROSS THE GARDEN ROOFS","tnt":0,"pad":1,"tube":1,"sand":0,"walk":1},
+    {"label":"Factory Annex","prefix":"Annex","wall":3,"floor":2,"roof":6,"kind":[3,4,2,1],"tip":"BREAK THE SUPPORTS IN SEQUENCE","tnt":1,"pad":0,"tube":0,"sand":1,"walk":0},
+    {"label":"Midnight Exchange","prefix":"Midnight","wall":3,"floor":6,"roof":1,"kind":[4,5,6,7],"tip":"EVICT THE GUARDS THEN THE BOSS","tnt":1,"pad":0,"tube":1,"sand":0,"walk":1},
+    {"label":"Grand Demolition","prefix":"Grand","wall":6,"floor":6,"roof":7,"kind":[4,6,3,7],"tip":"COMBINE REBOUNDS AND BLAST SUPPORTS","tnt":1,"pad":1,"tube":1,"sand":0,"walk":1}
   ];
   const shapes=["Court","Stacks","Bridge","Terrace"];
   const palettes=["#e8d3a8","#d7dfe9","#d2b6b4","#b9d6be"];
@@ -50,7 +68,44 @@ function generateTrials(){
     // Four different silhouettes per district; difficulty changes heights,
     // widths, spans and occupied floors, not just enemy count or names.
     const x=32+((district*3+tier)%5),fh=8+(tier%3)*2;
-    if(shape===0){
+    if(district>=9){
+      const d=district-9, fy=8+2*((d+tier)%2);
+      if(shape===0){
+        house(31+(d%4)+tier%2,16+2*((d+tier)%3),1+(tier>>1),fy,g.wall,g.floor,g.roof);
+        house(69+(d%3)*3+tier,18+2*((d+2*tier)%3),2+(tier>=2?1:0),fy,g.wall,g.floor,g.roof);
+      }else if(shape===1){
+        if(d%2===0){
+          house(32+d%4,16+2*(tier%2),2+(tier>=3?1:0),fy,g.wall,g.floor,g.roof);
+          house(70+d%5,20+2*(tier%2),3+(tier>=2?1:0)+(tier===4?1:0),fy,g.wall,g.floor,g.roof);
+        }else{
+          house(34+d%4,20+2*(tier%2),3+(tier>=2?1:0)+(tier===4?1:0),fy,g.wall,g.floor,g.roof);
+          house(77+d%5,16+2*(tier%2),2+(tier>=3?1:0),fy,g.wall,g.floor,g.roof);
+        }
+      }else if(shape===2){
+        const A=house(30+d%5,16+2*(tier%2),3+(tier===4?1:0),fy,g.wall,g.floor,g.roof);
+        const B=house(87-d%4-tier,18+2*(d%2),3+(tier>=3?1:0),fy,g.wall,g.floor,g.roof);
+        const y=58-fy*(1+((tier+d)%2)),start=A.x+A.w,end=B.x;
+        fill(start,y,end-start,2,6);
+        for(let px=start+4;px<end-1;px+=8)fill(px,y+2,2,58-y,6);
+        target(Math.floor((start+end)/2),y,g.kind[tier%4],5);
+      }else{
+        house(30+d%3,14+2*(tier%2),1+(tier%2),fy,g.wall,g.floor,g.roof);
+        house(57+d%3,16+2*(d%2),2+(tier>=2?1:0),fy,g.wall,g.floor,g.roof);
+        house(88+d%4,16+2*(tier%2),3+(tier>=3?1:0),fy,g.wall,g.floor,g.roof);
+      }
+      for(const H of houses){
+        if(g.tnt){fill(H.x,56,2,2,5);if(tier>=2)fill(H.x+H.w-2,56,2,2,5)}
+        if(g.pad){fill(H.x+3,H.top,4,1,7);pads.push([H.x+3,H.top,4])}
+      }
+      if(g.tube&&(shape===2||shape===3||tier>=2)){
+        const A=houses[0],B=houses[1];tubes.push([29,36-tier*2,A.x+A.w+4,Math.max(8,Math.min(A.top,B.top)-5)]);
+      }
+      if(g.sand&&shape!==2){
+        const A=houses[0],B=houses[1],start=A.x+A.w+2,width=Math.min(B.x-start-2,10+tier*2);
+        if(width>=5)for(let y=0;y<Math.min(4+tier,Math.ceil(width/2));y++)for(let cx=start+y;cx<start+width-y;cx++)if(!get(cx,59-y))fill(cx,59-y,1,1,8);
+      }
+      if(g.kind.includes(7)){for(const q of targets)if(q[2]===7)q[2]=4;if(tier>=3)targets[0][2]=7}
+    }else if(shape===0){
       house(x,18+(tier%3)*2,1+(tier>>1),fh,g.wall,g.floor,g.roof);
       house(68+tier*2,24-(tier%3)*2,2+(tier>=3?1:0),fh,g.wall,g.floor,g.roof);
     }else if(shape===1){
@@ -99,9 +154,9 @@ function generateTrials(){
       targets[0][2]=7;
     }else if(district===7)for(const t of targets)if(t[2]===7)t[2]=2;
     const name=g.prefix+" "+shapes[shape]+" "+(tier+1);
-    const tip=district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
+    const tip=district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
     const men=Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
-    const walk=(district===5||district===7)&&tier>=2 || district===8&&tier>=3;
+    const walk=(district===5||district===7)&&tier>=2 || district===8&&tier>=3 || district>=9&&!!g.walk&&tier>=2;
     if(targets.length<2||targets.length>20||rooms.length>20||pads.length>3||tubes.length>3)fail("entity cap "+name);
     const keys=new Set();
     for(const [tx,ty] of targets){
@@ -204,8 +259,8 @@ const TRIAL_BYTES=${packed};
 const TRIAL_META=${JSON.stringify(table.map(t=>[t.name,t.tip,t.off,t.rects,t.roomOff,t.rooms,t.targetOff,t.targets,t.padOff,t.pads,t.tubeOff,t.tubes,t.men,t.walk]))};
 const TRIAL_DISTRICTS=${JSON.stringify(levels.filter((_,i)=>i%20===0).map(l=>l.district))};
 function buildTrial(i){
-  const a=TRIAL_META[i],alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",read=j=>{
-    const off=Math.floor(j/3)*4,part=j%3,p=alphabet.indexOf(TRIAL_BYTES[off+part]),q=alphabet.indexOf(TRIAL_BYTES[off+part+1]);
+  const a=TRIAL_META[i],digit=c=>c>=65&&c<=90?c-65:c>=97&&c<=122?c-71:c>=48&&c<=57?c+4:c===43?62:63,read=j=>{
+    const off=Math.floor(j/3)*4,part=j%3,p=digit(TRIAL_BYTES.charCodeAt(off+part)),q=digit(TRIAL_BYTES.charCodeAt(off+part+1));
     return part===0?(p<<2)|(q>>4):part===1?((p&15)<<4)|(q>>2):((p&3)<<6)|q;
   },pals=${JSON.stringify(palettes)},kinds=${JSON.stringify(kinds)};
   for(let k=a[2],end=k+a[3]*5;k<end;k+=5)rect(read(k),read(k+1),read(k+2),read(k+3),read(k+4));
