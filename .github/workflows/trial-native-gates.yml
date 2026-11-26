@@ -37,6 +37,8 @@ jobs:
           if [ "${{ matrix.mode }}" = fixed ]; then flags+=(-DMX_FIXED); fi
           gcc "${flags[@]}" -Wno-unused-function test/native_trial_pack_test.c core/mx_meta.c -lm -o /tmp/trials
           /tmp/trials
+          gcc "${flags[@]}" -Wno-unused-function test/walk_jump_forgiveness_test.c -lm -o /tmp/walk
+          /tmp/walk
           gcc "${flags[@]}" test/native_prop_animation_test.c core/mx.c -lm -o /tmp/props
           /tmp/props
           gcc "${flags[@]}" -Wno-unused-function test/native_dive_pose_test.c -lm -o /tmp/dive

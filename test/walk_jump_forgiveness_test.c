@@ -108,6 +108,14 @@ int main(void){
   for(int y=15;y<45;y++)for(int x=65;x<96;x++)w.grid[IDX(x,y)]=MX_STEEL;
   for(int n=0;n<20;n++)tick(0,0,0);
   CHECK(w.man.x<RI(30)&&!wblocked(&w,w.man.x,w.man.y),"wedged walker returns to validated safe point");
+  scene(0);w.ntubes=1;w.tubes[0]=(MxTube){.ax=w.man.x,.ay=w.man.y,.bx=RI(70),.by=RI(20),.vx=RI(60)};
+  real timer=w.man.wt;walk_tube_step(&w,DT);
+  CHECK(w.man.mode==MAN_WALK&&w.man.x==RI(70)&&w.man.y==RI(20)&&w.man.vx==RI(22)&&w.man.vy==R(-18.75)&&w.man.wt==timer,"tube crosses safely on foot with no lost life or time");
+  CHECK(w.man.tubeCd>R(.8)&&w.tubes[0].pulse>0,"tube cooldown and visual pulse");
+  scene(0);w.ntubes=1;w.tubes[0]=(MxTube){.ax=w.man.x,.ay=w.man.y,.bx=RI(70),.by=RI(20),.vx=RI(60)};
+  for(int y=10;y<=30;y++)for(int x=65;x<=75;x++)w.grid[IDX(x,y)]=MX_STEEL;
+  real ox=w.man.x,oy=w.man.y;walk_tube_step(&w,DT);
+  CHECK(w.man.x==ox&&w.man.y==oy&&w.man.tubeCd>0,"solid tube exit refuses transport");
   if(failures){fprintf(stderr,"WALK_JUMP_FORGIVENESS_FAIL %d/%d\n",failures,checks);return 1;}
   printf("WALK_JUMP_FORGIVENESS_PASS cases=%d short_hop=1 held_height=1 coyote=1 no_double=1 edge=1 stomp=1 pad=1\n",checks);
   return 0;

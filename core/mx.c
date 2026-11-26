@@ -1971,6 +1971,27 @@ static int walk_rescue(MxWorld *w){
     if(walk_place(w,RI(8+8*x),RI(MX_ROWS)-WHH-R(.25)-RI(y*6)))return 1;
   return 0;
 }
+/* On-foot tube transfer shares the physical mouths with flight, but
+   preserves the walking life and tests the larger body at the exit.
+   Blocked exits do not spend time or teleport into a solid wall. */
+static void walk_tube_step(MxWorld *w,real dt){
+  MxMan *m=&w->man;
+  if(m->mode!=MAN_WALK||!w->ntubes)return;
+  if(m->tubeCd>0){m->tubeCd=rclamp(m->tubeCd-dt,0,RI(1));return;}
+  for(int i=0;i<w->ntubes;i++){
+    MxTube *tb=&w->tubes[i];
+    real dx=m->x-tb->ax,dy=m->y-tb->ay;
+    if(rabs(dx)>MX_TUBE_R||rabs(dy)>MX_TUBE_R||rmul(dx,dx)+rmul(dy,dy)>rmul(MX_TUBE_R,MX_TUBE_R))continue;
+    const real sx=m->walk_safe_x,sy=m->walk_safe_y;const int safe=m->walk_safe;
+    int ok=0;for(int k=0;k<=4;k++)if(walk_place(w,tb->bx,tb->by-RI(k))){ok=1;break;}
+    if(!ok){m->tubeCd=R(.20);return;}
+    m->walk_safe=safe;m->walk_safe_x=sx;m->walk_safe_y=sy;
+    m->vx=rclamp(tb->vx,R(-22),R(22));m->vy=R(-18.75);m->face=m->vx<0?-1:1;
+    m->tubeT=0;m->tubeCd=R(.85);tb->pulse=R(.45);
+    if(w->shake<R(3))w->shake=R(3);
+    ev(w,EV_TUBE,tb->ax,tb->ay,i,tb->bx,tb->by);return;
+  }
+}
 static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
   mx_flight_face_update(m);
@@ -3019,7 +3040,7 @@ void mx_update(MxWorld *w, real dt){
     }
     if(m->t > R(2.6)){ ev(w, EV_POP, m->x, m->y, 0, 0, 0); end_run(w); }
   } else if(m->mode == MAN_WALK){
-    walk_step(w, dt);
+    walk_step(w, dt);walk_tube_step(w,dt);
   } else if(m->mode == MAN_WAIT){
     int nch = busy_count(w);
     w->waitT += dt;

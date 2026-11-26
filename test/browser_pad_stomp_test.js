@@ -76,7 +76,7 @@ function make(source,initial={}){
     if(keys!==undefined){for(const key of Object.keys(e.KEYS))delete e.KEYS[key];Object.assign(e.KEYS,keys)}
     const before=e.events.length;e.time+=1/60;step(1/60);
     return {man:{...e.man},events:e.events.slice(before)};
-  },snapshot(){const {ledgeGrace,jumpHold,gait,landFx,landPower,...man}=e.man;return {man,grid:Array.from(e.grid),hp:Array.from(e.hp),
+  },snapshot(){const {ledgeGrace,jumpHold,gait,landFx,landPower,jumpBuffer,jumpLatched,walkJam,walkSafe,safeX,safeY,...man}=e.man;return {man,grid:Array.from(e.grid),hp:Array.from(e.hp),
     events:e.events.slice(),shake:e.shake,time:e.time}}};
 }
 const count=(row,event)=>row.events.filter(e=>e[0]===event).length;
