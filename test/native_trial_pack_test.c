@@ -62,6 +62,13 @@ int main(void){
   CHECK(n==MX_JOURNAL_MAX&&mx_journal_record_size(disk,sizeof disk)==n);
   uint32_t gen=0;int outfit=0;mx_meta_init(&T);
   CHECK(mx_journal_unpack(&T,&outfit,NULL,&gen,disk,n)&&gen==7&&T.best[59]==12345&&T.best[239]==67890);
+  /* Migrate the previous 220-stage MXS1 v2 save without changing old IDs. */
+  uint8_t prior[1176]={0};
+  memcpy(prior,"MXS1",4);prior[4]=2;prior[5]=220;prior[66+219]=3;
+  mx_journal_put32(prior+66+220+5+4*219,765432);
+  mx_journal_put32(prior+1172,mx_crc32(prior,1172));
+  mx_meta_init(&T);CHECK(mx_meta_unpack(&T,&outfit,prior,sizeof prior));
+  CHECK(T.stars[219]==3&&T.best[219]==765432&&T.stars[220]==0&&T.best[239]==0);
   printf("NATIVE_TRIAL_PACK_PASS levels=%d raw=%d command_bytes=%zu\n",MX_TRIAL_COUNT,MX_TRIAL_COUNT*MX_ROWS*MX_COLS,sizeof MX_TRIAL_DATA);
   return 0;
 }
