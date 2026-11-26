@@ -1830,9 +1830,9 @@ static void title_bottom(View *v){
   if(out_open){ outfits_bottom(v->buf); return; }
   draw_world(v, 0);
   panel(v->buf, 8, 6, 240, 38);
-  gfx_text_c(v->buf, 128, 11, "SELECT LEVEL", C_UILINE, C_UIBG, 1);
+  gfx_text_c(v->buf, 128, 11, sel_level>=MX_TRIAL_START?"TRIAL: UP/DOWN DISTRICT":"UP/DOWN: TRIAL DISTRICTS", C_UILINE, C_UIBG, 1);
   const char *nm = mx_level_name(sel_level);
-  gfx_text_c(v->buf, 128, 21, nm, C_GOLD, C_BLACK, 2);
+  gfx_text_c(v->buf, 128, 21, nm, C_GOLD, C_BLACK, gfx_text_w(nm,2)>204?1:2);
   gfx_text(v->buf, 14, 20, "<", C_WHITE, 2);
   gfx_text(v->buf, 232, 20, ">", C_WHITE, 2);
   if(!mx_level_unlocked(&stats, sel_level)){ gfx_text_c(v->buf, 128, 36, "LOCKED - BEAT THE LEVEL BEFORE", C_GRAY, C_UIBG, 1); }
@@ -2000,7 +2000,8 @@ int main(void){
         for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
         apply_outfit(outfit_sel); sfx_play(SFX_CLICK, 64);
       }
-      if(ch){ sel_level = (sel_level + ch + MX_NUM_LEVELS) % MX_NUM_LEVELS; load_level(sel_level); sfx_play(SFX_CLICK, 64); }
+      if(down & (KEY_UP|KEY_DOWN)){sel_level=mx_trial_district_step(sel_level,(down&KEY_DOWN)?1:-1);load_level(sel_level);sfx_play(SFX_CLICK,64);}
+      else if(ch){ sel_level = (sel_level + ch + MX_NUM_LEVELS) % MX_NUM_LEVELS; load_level(sel_level); sfx_play(SFX_CLICK, 64); }
       else if(((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)) && !mx_level_unlocked(&stats, sel_level)) sfx_play(SFX_CLICK, 24);
       else if((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)){
         save_sync();                                               /* an outfit chosen on the title is kept */
