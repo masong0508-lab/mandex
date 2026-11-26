@@ -14,6 +14,7 @@
 #include "mx_meta.h"
 
 #define MX_JOURNAL_MAX (MX_SAVE_MAX + 12)
+#define MX_JOURNAL_DISK_BYTES (((MX_JOURNAL_MAX + 511) / 512) * 512)
 
 static inline void mx_journal_put32(uint8_t *p, uint32_t v){
   p[0]=(uint8_t)v; p[1]=(uint8_t)(v>>8);
@@ -33,6 +34,17 @@ static inline int mx_journal_pack(const MxStats *stats, int outfit,
   if(!n) return 0;
   mx_journal_put32(dst+8+n,mx_crc32(dst,8+n));
   return n+12;
+}
+/* VMU records are padded to whole blocks. Read the actual historical
+ * payload size from its validated version/count fields; old 60-level
+ * journals remain readable after the trial expansion. */
+static inline int mx_journal_record_size(const uint8_t *src,int available){
+  if(!src || available<14 || src[0]!='M'||src[1]!='X'||src[2]!='J'||src[3]!='1' ||
+     src[8]!='M'||src[9]!='X'||src[10]!='S'||src[11]!='1')return 0;
+  const int ver=src[12],nl=src[13];
+  if(ver<1||ver>MX_SAVE_VERSION||nl<1||nl>MX_NUM_LEVELS)return 0;
+  const int n=12+66+nl+4+1+4*nl+(ver>=2?1:0)+4;
+  return n<=available&&n<=MX_JOURNAL_MAX?n:0;
 }
 static inline int mx_journal_unpack(MxStats *stats, int *outfit, MxOptions *opt,
                                     uint32_t *generation, const uint8_t *src,
