@@ -90,10 +90,10 @@ int main(void){
   mx_journal_put32(old+384,mx_crc32(old,384));
   mx_meta_init(&stats);dc_saved_len=0;dc_save_slot=-1;dc_save_load();
   CHECK(dc_save_slot==0 && dc_save_generation==91 && stats.stars[59]==3 && stats.best[59]==123456);
-  CHECK(stats.stars[60]==0 && stats.best[239]==0);
-  stats.stars[239]=3;stats.best[239]=432100;console_opt.profile=3;console_opt.eco=1;console_opt.shake=2;mus_pref=0;dc_save_sync();
+  CHECK(stats.stars[60]==0 && stats.best[599]==0);
+  stats.stars[599]=3;stats.best[599]=432100;console_opt.profile=3;console_opt.eco=1;console_opt.shake=2;mus_pref=0;dc_save_sync();
   CHECK(dc_save_slot==1 && disk_size[1]==MX_JOURNAL_DISK_BYTES);
-  mx_meta_init(&stats);mx_options_default(&console_opt);mus_pref=1;dc_save_load();CHECK(stats.best[59]==123456 && stats.best[239]==432100 && console_opt.profile==3 && console_opt.eco && console_opt.shake==2 && !mus_pref);
+  mx_meta_init(&stats);mx_options_default(&console_opt);mus_pref=1;dc_save_load();CHECK(stats.best[59]==123456 && stats.best[599]==432100 && console_opt.profile==3 && console_opt.eco && console_opt.shake==2 && !mus_pref);
   printf("vmu_save_test: %s\n",fail?"FAILED":"all passed");
   return fail!=0;
 }

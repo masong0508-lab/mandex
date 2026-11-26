@@ -63,11 +63,11 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
 #define MX_TRIAL_START   60
-#define MX_TRIAL_COUNT   180
+#define MX_TRIAL_COUNT   540
 #define MX_TRIAL_DISTRICT_SIZE 20
 #define MX_NUM_LEVELS    (MX_TRIAL_START + MX_TRIAL_COUNT)
-#if MX_NUM_LEVELS > 255
-#error "Level count must fit the save format"
+#if MX_NUM_LEVELS > 1500
+#error "Level count must fit the 8KB cartridge save budget"
 #endif
 #define MX_CH2_START     20      /* chapter 2: levels 20-39 */
 #define MX_CH3_START     40      /* chapter 3 (the Wolfman): levels 40-59 */

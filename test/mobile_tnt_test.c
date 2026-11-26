@@ -30,7 +30,7 @@ static void wall(int x,int y,int mat){
 }
 int main(void){
   CHECK(sizeof(MxCell)==24,"fuse fits existing mobile voxel layout");
-  CHECK(MX_TRIAL_START == 60 && MX_NUM_LEVELS == 240,"existing 60 campaign IDs and trial count preserved");
+  CHECK(MX_TRIAL_START == 60 && MX_NUM_LEVELS == 600,"existing 60 campaign IDs and trial count preserved");
   scene();
   MxChunk *ch=charge(R(20.5),R(20.5));
   CHECK(ch->has_tnt && !ch->tnt_fused,"detached TNT starts alive, unarmed");

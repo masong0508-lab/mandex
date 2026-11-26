@@ -41,9 +41,10 @@ static inline int mx_journal_pack(const MxStats *stats, int outfit,
 static inline int mx_journal_record_size(const uint8_t *src,int available){
   if(!src || available<14 || src[0]!='M'||src[1]!='X'||src[2]!='J'||src[3]!='1' ||
      src[8]!='M'||src[9]!='X'||src[10]!='S'||src[11]!='1')return 0;
-  const int ver=src[12],nl=src[13];
+  const int ver=src[12];if(ver>=4&&available<15)return 0;
+  const int nl=src[13]+(ver>=4?(int)src[14]*256:0);
   if(ver<1||ver>MX_SAVE_VERSION||nl<1||nl>MX_NUM_LEVELS)return 0;
-  const int n=12+66+nl+4+1+4*nl+(ver>=2?1:0)+(ver>=3?1:0)+4;
+  const int n=12+66+(ver>=4)+nl+4+1+4*nl+(ver>=2?1:0)+(ver>=3?1:0)+4;
   return n<=available&&n<=MX_JOURNAL_MAX?n:0;
 }
 static inline int mx_journal_unpack(MxStats *stats, int *outfit, MxOptions *opt,

@@ -1765,7 +1765,7 @@ int main(void){
       rect(&top, 140, 161, 120, 9, RGB(15, 18, 30));
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
-      if(sel>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel,&stars);snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/9  %d/20 CLEARED  %d/60 STARS",(sel-MX_TRIAL_START)/20+1,clear,stars);textc(&top,200,228,b,1,RGB(255,210,63));}
+      if(sel>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel,&stars);snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/27  %d/20 CLEARED  %d/60 STARS",(sel-MX_TRIAL_START)/20+1,clear,stars);textc(&top,200,228,b,1,RGB(255,210,63));}
       else textc(&top, 200, 228, "UP/DOWN: TRIAL DISTRICTS", 1, RGB(255, 210, 63));
       if(!snd_ok){ char sb[48]; sprintf(sb, "NO SOUND (ndsp %08X) - NEEDS dspfirm.cdc", (unsigned)snd_err); textc(&top, 200, 212, sb, 1, RGB(255, 90, 90)); }
 #if defined(__3DS__) && !MX_N3DS_NO_SAVE

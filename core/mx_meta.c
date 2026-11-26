@@ -190,10 +190,10 @@ uint32_t mx_crc32(const uint8_t *p, int n){
 static void put32(uint8_t *p, uint32_t v){ p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
 static uint32_t get32(const uint8_t *p){ return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24; }
 #define SAVE_NCOUNT 11
-#define SAVE_HDR 6
+#define SAVE_HDR 7
 #define SAVE_PW (SAVE_HDR + 4 * SAVE_NCOUNT)       /* 50 */
 #define SAVE_STARS (SAVE_PW + 16)                  /* 66 */
-static int save_size(int nlev, int ver){ return SAVE_STARS + nlev + 4 + 1 + 4 * nlev + (ver >= 2 ? 1 : 0) + (ver >= 3 ? 1 : 0) + 4; }
+static int save_size(int nlev, int ver){ return SAVE_STARS - (ver<4) + nlev + 4 + 1 + 4 * nlev + (ver >= 2 ? 1 : 0) + (ver >= 3 ? 1 : 0) + 4; }
 
 void mx_options_default(MxOptions *o){ memset(o,0,sizeof *o); }
 const char *mx_tool_name(int t){
@@ -207,7 +207,7 @@ int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t
   const int n = save_size(MX_NUM_LEVELS, MX_SAVE_VERSION);
   if(!s || !out || cap < n) return 0;
   const int *cnt[SAVE_NCOUNT] = { &s->kills, &s->cells, &s->booms, &s->maxChain, &s->shots, &s->flops, &s->wins, &s->oneShots, &s->bestScore, &s->inflated, &s->pops };
-  memcpy(out, "MXS1", 4); out[4] = MX_SAVE_VERSION; out[5] = (uint8_t)MX_NUM_LEVELS;
+  memcpy(out, "MXS1", 4); out[4] = MX_SAVE_VERSION; out[5] = (uint8_t)MX_NUM_LEVELS; out[6]=(uint8_t)(MX_NUM_LEVELS>>8);
   for(int i = 0; i < SAVE_NCOUNT; i++) put32(out + SAVE_HDR + 4 * i, *cnt[i] < 0 ? 0u : (uint32_t)*cnt[i]);
   for(int i = 0; i < 4; i++) put32(out + SAVE_PW + 4 * i, s->pw[i] < 0 ? 0u : (uint32_t)s->pw[i]);
   uint8_t *p = out + SAVE_STARS;
@@ -224,16 +224,18 @@ int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t
 
 int mx_meta_unpack(MxStats *s, int *outfit, const uint8_t *in, int len){ return mx_meta_unpack_opt(s, outfit, 0, in, len); }
 int mx_meta_unpack_opt(MxStats *s, int *outfit, MxOptions *opt, const uint8_t *in, int len){
-  if(!s || !outfit || !in || len < SAVE_HDR) return 0;
+  if(!s || !outfit || !in || len < 6) return 0;
   if(memcmp(in, "MXS1", 4) != 0 || in[4] < 1 || in[4] > MX_SAVE_VERSION) return 0;
-  const int ver = in[4], nl = in[5], n = save_size(nl, ver);
+  const int ver=in[4]; if(ver>=4&&len<7)return 0;
+  const int hdr=ver>=4?7:6, nl=in[5]+(ver>=4?(int)in[6]*256:0), n=save_size(nl,ver);
+  if(nl<1)return 0;
   if(len < n) return 0;
   if(mx_crc32(in, n - 4) != get32(in + n - 4)) return 0;
   /* everything below is validated: nothing can fail from here, so *s is only ever written whole */
   int *cnt[SAVE_NCOUNT] = { &s->kills, &s->cells, &s->booms, &s->maxChain, &s->shots, &s->flops, &s->wins, &s->oneShots, &s->bestScore, &s->inflated, &s->pops };
-  for(int i = 0; i < SAVE_NCOUNT; i++){ uint32_t v = get32(in + SAVE_HDR + 4 * i); *cnt[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
-  for(int i = 0; i < 4; i++){ uint32_t v = get32(in + SAVE_PW + 4 * i); s->pw[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
-  const uint8_t *st = in + SAVE_STARS, *p = st + nl;
+  for(int i = 0; i < SAVE_NCOUNT; i++){ uint32_t v = get32(in + hdr + 4 * i); *cnt[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
+  for(int i = 0; i < 4; i++){ uint32_t v = get32(in + hdr + 44 + 4 * i); s->pw[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
+  const uint8_t *st = in + hdr + 60, *p = st + nl;
   for(int i = 0; i < MX_NUM_LEVELS; i++) s->stars[i] = i < nl ? (uint8_t)(st[i] > 3 ? 3 : st[i]) : 0;
   s->ach = get32(p) & ((1u << MX_NUM_ACH) - 1u); p += 4;
   *outfit = *p < MX_NUM_OUTFITS ? *p : 0; p++;

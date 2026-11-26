@@ -583,7 +583,7 @@ static void draw_title(void){
     text("THE LANDLORD SMASHER",320,225,29,WHITE,1,Z_HUD);
   }
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
-  if(title_lv>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,title_lv,&stars);char b[80];snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/9  %d/20 CLEARED  %d/60 STARS",(title_lv-MX_TRIAL_START)/20+1,clear,stars);text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
+  if(title_lv>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,title_lv,&stars);char b[80];snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/27  %d/20 CLEARED  %d/60 STARS",(title_lv-MX_TRIAL_START)/20+1,clear,stars);text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
   else text("UP/DOWN: TRIAL DISTRICTS",320,394,17,argb(255,210,63,255),1,Z_HUD);
   { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD);
     snprintf(tb, sizeof tb, "X OPTIONS / Y FIGHT: %s", nofight ? "OFF" : "ON"); text(tb, 320, 418, 16, argb(255, 255, 255, 220), 1, Z_HUD); }
