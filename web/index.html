@@ -5714,14 +5714,24 @@ function drawSelect(){
     for(let i=0;i<CH1;i++){const c=i%cols,r=(i/cols)|0;tile(x0+c*(tw+gx),y0+r*(th+gy),tw,th,i+1,LEVELS[i].name,PD.stars[i]||0,!storyUnlocked(i),()=>startStory(i))}
     txt(`${totalStars()} / ${CH1*3} ★   ${storyDone()}/${CH1} beaten`,W/2,H-14,15,'#cfd','center')}
   else{
-    const cu=PD.custom,cols=4,tw=206,th=96,gx=10,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=112;
-    tile('+','NEW LEVEL',0,false,()=>openEditor(false,-1),false);
-    tile('⇩','IMPORT A LEVEL CODE',0,false,importCode,false);
-    cu.slice(0,10).forEach((L,k)=>{const i2=k+2,c=i2%cols,r=(i2/cols)|0,x=x0+c*(tw+gx),y=y0+r*(th+gy);
-      tile(k+1,L.n,0,false,()=>{startCustom(k)},false);
-      // (tile() registered first; the small buttons registered after win the hit test)
-      btn(x+6,y+th-62,48,22,'EDIT',()=>openEditor(false,k),{size:11});btn(x+58,y+th-62,54,22,'SHARE',()=>exportCode(L),{size:11});btn(x+116,y+th-62,48,22,'DEL',()=>{if(!confirmDel(L))return;cu.splice(k,1);pdTouch();pdSave()},{size:11})});
-    if(!cu.length)txt('Make a level in the creator and it shows up here.',W/2,H-30,15,'#cfd','center')}}
+    const cu=PD.custom,cols=4,tw=206,th=96,gx=10,gy=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=158,size=12;
+    btn(x0,112,206,34,'NEW LEVEL',()=>openEditor(false,-1),{size:15,on:true,col:'#7dff5a'});
+    btn(x0+tw+gx,112,206,34,'IMPORT LEVEL',importCode,{size:15});
+    txt(cu.length+' SAVED LEVELS',W-x0-100,135,15,'#cfd','center');
+    const page=mobilePage('select',cu.length,size),first=page*size;
+    WEB_UI.page.select=page;
+    for(let k=0;k<size&&first+k<cu.length;k++){
+      const i=first+k,L=cu[i],x=x0+(k%cols)*(tw+gx),y=y0+Math.floor(k/cols)*(th+gy);
+      tile(x,y,tw,th,i+1,L.n,0,false,()=>startCustom(i),false);
+      // Register these after the tile so action taps do not start gameplay.
+      btn(x+6,y+40,57,26,'EDIT',()=>openEditor(false,i),{size:12});
+      btn(x+70,y+40,60,26,'SHARE',()=>exportCode(L),{size:12});
+      btn(x+137,y+40,63,26,'DEL',()=>{if(!confirmDel(L))return;cu.splice(i,1);pdTouch();pdSave();WEB_UI.page.select=mobilePage('select',cu.length,size)},{size:12});
+    }
+    if(!cu.length)txt('Make a level in the creator and it shows up here.',W/2,276,20,'#cfd','center');
+    mobilePager('select',cu.length,size);
+  }
+}
 function confirmDel(L){try{return confirm('Delete "'+L.n+'"?')}catch(e){return true}}
 function drawAch(){
   ctx.fillStyle='rgba(10,14,30,.6)';ctx.fillRect(0,0,W,H);
