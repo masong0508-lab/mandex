@@ -47,7 +47,8 @@ assert "if(m.gr)m.gait=((m.gait||0)+Math.abs(m.x-strideStartX))%(4*V)" in web
 assert "m.x/15" not in web
 # Reversals now blend through walkTurnAngle()/walkTurnFace() rather than
 # snapping directly back to the old side-on walking transform.
-assert "const th=turning?walkTurnAngle(m.turn):Math.PI/2+.055*step;" in web
+assert "const th=m.stomp&&!m.gr?Math.PI*.86:turning?walkTurnAngle(m.turn):Math.PI/2+.055*step;" in web
+assert "if(!m.gr&&m.stomp){ctx.translate(0,8);ctx.scale(1.08,.83);}" in web
 assert "const visualFace=turning?walkTurnFace(m.face,m.turn):m.face;" in web
 assert "lit?'rgba(255,224,164,.52)'" in web
 assert "x.fillStyle='rgba(215,248,166,.20)'" in web
