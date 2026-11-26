@@ -1607,8 +1607,34 @@ function inflationTarget(raw){
   raw=Number.isFinite(raw)?Math.max(0,raw):0;
   return raw<=1?raw*(1+.18*raw):1.18+.67*(1-Math.exp(-.8*(raw-1)));
 }
+// Cosmetic-only PRNG. Never consume the shared gameplay random stream.
+let expressionSeed=0x29b41e63;
+function expressionRandom(m){
+  let x=m.expressionSeed>>>0;
+  if(!x){expressionSeed=(expressionSeed+0x9e3779b9)>>>0;x=expressionSeed||1}
+  x^=x<<13;x^=x>>>17;x^=x<<5;m.expressionSeed=x>>>0;
+  return m.expressionSeed/4294967296;
+}
+function toolExpressionTick(m,dt,active){
+  const was=!!m.expressionActive;
+  m.expressionActive=active;
+  m.expressionWait=Math.max(0,(m.expressionWait||0)-dt);
+  m.expressionFlash=Math.max(0,(m.expressionFlash||0)-dt);
+  m.expressionReady=Math.max(0,(m.expressionReady||0)-dt);
+  if(was&&!active&&m.mode==='aim')m.expressionReady=.8;
+  if(active&&!m.expressionWait&&!m.expressionFlash){
+    // Occasional comic embarrassment, independent of pressure and fill.
+    if(expressionRandom(m)<1-Math.exp(-.65*dt)){
+      m.expressionFlash=.85;m.expressionWait=1.65+expressionRandom(m)*.5;
+    }
+  }
+  const target=m.expressionFlash>0?Math.min(1,m.expressionFlash/.24):0;
+  m.expressionBlush=clamp((m.expressionBlush||0)+(target-(m.expressionBlush||0))*(1-Math.exp(-dt*(target>(m.expressionBlush||0)?11:7))),0,1);
+}
 function inflationTick(m,dt){
   const raw=Math.max(0,stom(m)||0);
+  const active=m.mode==='aim'&&!!(m.seated||m.vlv||m.chug);
+  if(active||m.expressionActive||m.expressionBlush>0.001||m.expressionReady>0||m.expressionWait>0||m.expressionFlash>0)toolExpressionTick(m,dt,active);
   if(raw===0&&m.infVisual==null)return;
   const target=inflationTarget(raw),prior=Number.isFinite(m.infRaw)?m.infRaw:0;
   const gain=Math.max(0,(raw-prior)/Math.max(dt,.00001));
@@ -1628,8 +1654,9 @@ function inflationSample(m,t){
   // Compress in one axis and compensate in the other axes rather than
   // breathing new volume into the body during an animation cycle.
   const aspect=clamp(.028*pump*pulse+.014*brace*settle,-.045,.045);
-  const face=pressure>.82?'scream':pressure>.46?'burp':'cool';
-  return {raw,fill,pressure,pump,brace,pulse,aspect,face};
+  const ready=m.mode==='aim'&&!m.expressionActive&&m.expressionReady>0&&pressure<.82;
+  const face=pressure>.82?'scream':ready?'bliss':pressure>.46?'burp':'cool';
+  return {raw,fill,pressure,pump,brace,pulse,aspect,face,blush:clamp(m.expressionBlush||0,0,1)};
 }
 // The maximum belly extent stays above the planted feet. One geometry
 // drives the outline, garment, highlights and rotating body.
@@ -1649,12 +1676,12 @@ function inflationProfileGeometry(f,pose,speed=0,aspect=0){
 }
 function inflationFrontPose(a){
   const f=a.fill,k=a.brace,b=a.pump*a.pulse;
-  return {armL:[-35-f*5,-12-k*6,-33-f*8,-34+k*12],armR:[35+f*5,-12-k*6,33+f*8,-34+k*12],head:[b*1.1,-k*1.8,(k*.035+b*.025)]};
+  return {armL:[-35-f*5,-12-k*6,-33-f*8,-34+k*12],armR:[35+f*5,-12-k*6,33+f*8,-34+k*12],head:[b*1.1,-k*1.8,(k*.035+b*.025)],expressionBlush:a.blush};
 }
 function inflationDrinkPose(c,a,t){
   const u=c.ph===2||c.ph===4?1:0;
   const sip=u*(.5+.5*Math.sin(t*12));
-  const q={t,cape:1,quiff:1,inflate:a.fill,inflateAspect:a.aspect,face:a.face,hp:-a.brace*4,hr:2*a.pump*a.pulse,
+  const q={t,cape:1,quiff:1,inflate:a.fill,inflateAspect:a.aspect,expressionBlush:a.blush,face:a.face,hp:-a.brace*4,hr:2*a.pump*a.pulse,
     arms:{L:[-34-a.fill*3,-7,-2,-29-a.fill*6,12,1],R:[32,-11,5,30,-32,4]}};
   if(u){
     q.arms.R=[32,-23,6,6,-32-sip*1.8,15];
@@ -2459,7 +2486,7 @@ function drawFront(pose,fk,t,o){
   ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(-6,-52,5,2.8,-.4,0,6.3);ctx.fill();
   frontHair();
   ctx.fillStyle='rgba(74,45,26,.35)';for(let k=0;k<12;k++)ctx.fillRect(-8+k*1.4,-33+(k%3)*1.2,1,1);
-  if(INF>.45){ctx.fillStyle='rgba(235,40,50,'+Math.min(.62,(INF-.45)*1.4)*(.9+.1*Math.sin(t*14))+')';ctx.beginPath();ctx.ellipse(0,-39,13,10.5,0,0,6.3);ctx.fill();ctx.beginPath();ctx.ellipse(0,-33,10.5,7,0,0,6.3);ctx.fill()}   // blushing redder as the pressure builds
+  if(o&&o.expressionBlush>.015){ctx.fillStyle='rgba(240,93,105,'+(.30*o.expressionBlush)+')';ctx.beginPath();ctx.ellipse(-9.5,-39,4.8,3.1,-.15,0,6.3);ctx.ellipse(9.5,-39,4.8,3.1,.15,0,6.3);ctx.fill()}
   if(WORK)workHatF();face(0,-43,1,fk,t,false,o&&o.fx);if(WOLF||WOLFH)wolfHeadF(WOLF?3:WOLFH);if(o&&o.head)ctx.restore();if(o&&o.after)o.after()}
 // ---- seated side profile, rear on the air valve (local origin = the rear on the nozzle, he faces right, y up is negative). f = belly inflation 0..1.
 // Everything but the belly keeps its size: head, neck, chest, arms and legs are separate shapes; only the belly bulge grows out the front.
@@ -2503,7 +2530,7 @@ function drawSeatSide(f,t,a){
   const hx=4+tr-f*2,hy=-70-a.brace*1.5;   // leans back to counterbalance the belly
   blob([pEll(hx,hy,13,12.5),pEll(hx+6,hy+6,10.5,8)],{ow:1.9});                                               // skull + jaw
   blob([pEll(hx+15.5,hy+1,3.6,3.2)],{ow:1.4,hl:0});                                                          // nose
-  if(f>.45){ctx.fillStyle='rgba(235,40,50,'+Math.min(.62,(f-.45)*1.4)*(.9+.1*Math.sin(t*14))+')';ctx.beginPath();ctx.ellipse(hx+3,hy+3,11.5,10,0,0,6.3);ctx.fill();ctx.beginPath();ctx.ellipse(hx+15.5,hy+1,3.6,3.2,0,0,6.3);ctx.fill();ctx.beginPath();ctx.ellipse(hx-6,hy+1,3,4.2,0,0,6.3);ctx.fill()}   // face reddens as the pressure builds
+  if(a.blush>.015){ctx.fillStyle='rgba(240,93,105,'+(.30*a.blush)+')';ctx.beginPath();ctx.ellipse(hx+7.5,hy+5.5,5,3.2,-.2,0,6.3);ctx.fill()}
   blob([pEll(hx-6,hy+1,3,4.2)],{ow:1.3,sd:1,hl:0});                                                          // ear
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(hx-12,hy+2);ctx.quadraticCurveTo(hx-15,hy-14,hx-3,hy-13);ctx.quadraticCurveTo(hx+4,hy-16,hx+10,hy-8);
   ctx.quadraticCurveTo(hx+2,hy-9,hx-3,hy-8);ctx.quadraticCurveTo(hx-8,hy-6,hx-9,hy+2);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.2;ctx.stroke();
@@ -3283,7 +3310,7 @@ function drawSpin(th,o){
           else if(f==='sheepish'){eye(s,-1,4.6,5.2,-s*1.4,.8,2.3);ctx.fillStyle=SK;ctx.fillRect(s*6-6,-7,12,5.6);ctx.strokeStyle=OUT;ctx.lineWidth=1.7;ctx.beginPath();ctx.moveTo(s*6-5,-1.5);ctx.lineTo(s*6+5,-1.5);ctx.stroke()}
           else if(f)eye(s,-1,5.5,6.5,.3,.3,1.6);
           else eye3(s,FX.e,gzv)},[hd]);
-        fd(s*10.4,6,()=>{const f=OP&&OP.face;ctx.fillStyle=f?'rgba(255,55,75,.62)':'rgba(255,105,110,.34)';ctx.beginPath();ctx.ellipse(s*10.4,6,f?4.9:3.3,f?3.3:2.2,0,0,6.3);ctx.fill()});
+        fd(s*10.4,6,()=>{const f=OP&&OP.face,b=clamp(o.expressionBlush||0,0,1);ctx.fillStyle=f?'rgba(255,55,75,.62)':'rgba(255,105,110,'+(.34+.24*b)+')';ctx.beginPath();ctx.ellipse(s*10.4,6,f?4.9:3.3+b*1.4,f?3.3:2.2+b*.8,0,0,6.3);ctx.fill()});
         fd(s*5.3,5.7,()=>stacheLobe(s))}
       mouthWrap();ctx.restore()});
     // grin, wrapped round the jaw so it bends away as the head turns (points on the far side are pinned to the edge)

@@ -25,7 +25,7 @@ with sync_playwright() as p:
             for(const ph of mode==='drink'?[1,2,3,4,5]:[0]){
               man.mode=mode==='seated'||mode==='drink'?'aim':mode;
               man.x=480;man.y=270;man.inf=f;man.bel=0;man.infVisual=inflationTarget(f);
-              man.infRaw=f;man.infPump=.8;man.infPhase=1;
+              man.infRaw=f;man.infPump=.8;man.infPhase=1;man.expressionBlush=.8;
               man.seated=mode==='seated';man.vlv=man.seated;
               man.chug=mode==='drink'?{ph,th:ph===1?1:ph===2?Math.PI:ph===3?4.4:0,t:ph===2?.7:1.5,keep:0}:null;
               man.ang=.24;man.face=1;man.t=.2;man.a=1;man.dive=false;man.pop=0;

@@ -56,6 +56,23 @@ ok(a.fill===b.fill,'oscillation does not change visual mass');
 const g=valveSupportGeometry(36,420,480),h=valveSupportGeometry(996,420,480);
 ok(g.postX===19&&g.footY===431&&g.baseY===471,'support aligns with station');
 ok(h.postX-g.postX===960&&h.footX-g.footX===960,'support follows wide-level sling');
+let events=0;
+for(let seed=1;seed<=100;seed++){
+ const m={mode:'aim',seated:true,inf:.35,bel:0,expressionSeed:Math.imul(seed,0x9e3779b9)>>>0};
+ let max=0,previous=0;
+ for(let i=0;i<180;i++){
+  toolExpressionTick(m,1/60,true);const a=inflationSample(m,i/60);
+  ok(a.blush>=0&&a.blush<=1,'bounded cheek tint');
+  ok(Math.abs(a.blush-previous)<.18,'smooth reaction envelope');previous=a.blush;
+  max=Math.max(max,a.blush);
+ }
+ if(max>.5)events++;
+ m.seated=false;toolExpressionTick(m,1/60,false);
+ ok(inflationSample(m,3).face==='bliss','completed tool use receives brief cheerful expression');
+ for(let i=0;i<180;i++)toolExpressionTick(m,1/60,false);
+ ok(m.expressionBlush<.001&&m.expressionReady===0,'reaction fully recovers');
+}
+ok(events>10&&events<99,'random reactions neither universal nor absent');
 return checks;`)(assert);
 assert(html.includes("m.mode==='aim'&&(m.seated||m.vlv)"),'stable seat path');
 assert(html.includes('drawSpin(c.th||0,o)'),'continuous soda turn');
