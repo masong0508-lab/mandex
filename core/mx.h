@@ -63,7 +63,7 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
 #define MX_TRIAL_START   60
-#define MX_TRIAL_COUNT   540
+#define MX_TRIAL_COUNT   600
 #define MX_TRIAL_DISTRICT_SIZE 20
 #define MX_NUM_LEVELS    (MX_TRIAL_START + MX_TRIAL_COUNT)
 #if MX_NUM_LEVELS > 1500
@@ -188,7 +188,9 @@ typedef struct {
   real wt, pT, pCd, padCd, hurtCd, stun;
   /* Walking forgiveness: short coyote window after leaving a ledge, and
      short-hop release after an ordinary player jump. No new buffers. */
-  real ledge_grace, jump_hold;
+  real ledge_grace, jump_hold, jump_buffer;
+  real walk_safe_x, walk_safe_y, walk_jam; /* validated temporary recovery point, not a saved checkpoint */
+  uint8_t jump_latched, walk_safe;
   real gait;            /* cosmetic ground distance, modulo 4 cells; no renderer memory or save data */
   int8_t in_ax; uint8_t in_jump, in_punch, in_stomp;
   real tubeT, tubeCd;  /* just posted out of a tube: gravity is 10 % for tubeT seconds, no second tube for tubeCd seconds */
@@ -410,6 +412,12 @@ static inline int mx_tube_pulse_stage(const MxTube *t){
 #define MX_HQ_LEVEL        39
 #define MX_HQ_DISTRICTS    3
 #define MX_HQ_BONUS_MEN    4
+#define MX_RELAY_START     640 /* 20 circuits: stages 600+k, 620+k, 640+k */
+#define MX_RELAY_BONUS_MEN 6
+static inline int mx_level_stage_count(int l){return l==MX_HQ_LEVEL||(l>=MX_RELAY_START&&l<MX_NUM_LEVELS)?3:1;}
+static inline int mx_stage_source(int l,int d){return l>=MX_RELAY_START&&l<MX_NUM_LEVELS?l-40+20*(d<0?0:d>2?2:d):l;}
+static inline int mx_stage_bonus(int l){return l>=MX_RELAY_START?MX_RELAY_BONUS_MEN:MX_HQ_BONUS_MEN;}
+const char *mx_stage_tactic(const MxWorld *w);
 void mx_load(MxWorld *w, int level);
 void mx_update(MxWorld *w, real dt);          /* dt ~ 1/60 s */
 void mx_set_pull(MxWorld *w, real dx, real dy); /* drag offset from anchor, cells */

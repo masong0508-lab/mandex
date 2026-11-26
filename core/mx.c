@@ -1952,19 +1952,41 @@ static int wblocked(const MxWorld *w, real x, real y){
   return 0;
 }
 #define PX(n) rmul(RI(n), R(0.125))
+/* Never move a walker to a point that intersects the new rubble pose or
+   outside the stage. Recovery only runs after local escape failed. */
+static int walk_place(MxWorld *w,real x,real y){
+  MxMan *m=&w->man;
+  if(x<WHW+R(.25)||x>RI(MX_COLS)-WHW-R(.25)||y<WHH||y>RI(MX_ROWS)-WHH||wblocked(w,x,y))return 0;
+  m->x=x;m->y=y;m->vx=m->vy=0;m->gr=0;m->stomp=0;
+  m->ledge_grace=m->jump_hold=m->jump_buffer=m->walk_jam=0;
+  m->walk_safe=1;m->walk_safe_x=x;m->walk_safe_y=y;
+  return 1;
+}
+static int walk_rescue(MxWorld *w){
+  MxMan *m=&w->man;
+  if(m->walk_safe&&walk_place(w,m->walk_safe_x,m->walk_safe_y))return 1;
+  /* Sling-side entry lane is a fallback, not a free teleport on input.
+     A clear point can be found in nine bounded probes. */
+  for(int y=0;y<3;y++)for(int x=0;x<3;x++)
+    if(walk_place(w,RI(8+8*x),RI(MX_ROWS)-WHH-R(.25)-RI(y*6)))return 1;
+  return 0;
+}
 static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
   mx_flight_face_update(m);
   if(m->face != -1) m->face = 1;
-  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=0;
+  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=m->jump_buffer=0;m->jump_latched=m->walk_safe=0;m->walk_jam=0;
   m->in_ax = 0; m->in_jump = m->in_punch = m->in_stomp = 0;
+  m->x=rclamp(m->x,WHW+R(.25),RI(MX_COLS)-WHW-R(.25));m->y=rclamp(m->y,WHH,RI(MX_ROWS)-WHH);
   int ok = !wblocked(w, m->x, m->y);
-  for(int u = 1; u <= 110 && !ok; u++) if(!wblocked(w, m->x, m->y - PX(u))){ m->y -= PX(u); ok = 1; }
+  for(int u = 1; u <= 110 && !ok; u++) if(m->y-PX(u)>=WHH&&!wblocked(w,m->x,m->y-PX(u))){m->y-=PX(u);ok=1;}
   for(int r = 4; r <= 200 && !ok; r += 4) for(int a = 0; a < 16 && !ok; a++){           /* nearest free spot, preferring up */
     real an = -R(1.5708) + (a & 1 ? 1 : -1) * ((a + 1) / 2) * R(0.4);
     real qx = m->x + rmul(rcos(an), PX(r)), qy = m->y + rmul(rsin(an), PX(r));
-    if(!wblocked(w, qx, qy)){ m->x = qx; m->y = qy; ok = 1; }
+    if(walk_place(w,qx,qy))ok=1;
   }
+  if(!ok)ok=walk_rescue(w);
+  if(ok){m->walk_safe=1;m->walk_safe_x=m->x;m->walk_safe_y=m->y;}
   ev(w, EV_WALK, m->x, m->y, 0, 0, 0);
   if(w->shake < RI(4)) w->shake = RI(4);
 }
@@ -2045,7 +2067,13 @@ static void walk_step(MxWorld *w, real dt){
       int sg = k == 0 ? 0 : k == 1 ? -1 : 1;
       if(!wblocked(w, m->x + sg * PX(u), m->y - PX(u))){ m->x += sg * PX(u); m->y -= PX(u); f = 1; }
     }
+    if(!f){
+      m->walk_jam+=dt;
+      if(m->walk_jam>=R(.25)&&walk_rescue(w)){ev(w,EV_WALK,m->x,m->y,1,0,0);}
+      else return; /* no input or punch through solid rubble while wedged */
+    }
   }
+  m->walk_jam=0;
   /* Don't count a forced pop-out from rubble as a walking stride. */
   const real stride_start_x=m->x;
   int ax = m->in_ax;
@@ -2062,10 +2090,13 @@ static void walk_step(MxWorld *w, real dt){
   if(m->in_punch && m->pCd <= 0) walk_punch(w);
   /* Walkers get 0.1s to jump after leaving a ledge. A jump consumes the
      window immediately so it can never turn into a double jump. */
+  if(m->in_jump&&!m->jump_latched)m->jump_buffer=R(.12);
+  m->jump_latched=m->in_jump;
   if(m->gr) m->ledge_grace=R(0.1);
-  if(m->in_jump && (m->gr || m->ledge_grace > 0) && !m->stomp){
-    m->vy=R(-43.125); m->gr=0; m->ledge_grace=0; m->jump_hold=R(0.16);
+  if(m->jump_buffer>0 && (m->gr || m->ledge_grace > 0) && !m->stomp){
+    m->vy=R(-43.125); m->gr=0; m->ledge_grace=0; m->jump_hold=R(0.16);m->jump_buffer=0;
   }
+  else if(m->jump_buffer>0)m->jump_buffer=rclamp(m->jump_buffer-dt,0,R(.12));
   /* A tap makes a controllable short hop; holding jump keeps the original
      full-height trajectory. Only the player's jump sets this flag, so rubber
      pads, pneumatic tubes and other launches are never cut. */
@@ -2080,7 +2111,7 @@ static void walk_step(MxWorld *w, real dt){
      The existing cooldown protects ascent only; a ceiling or expiry gives
      the player stomp control again immediately. */
   if(m->in_stomp && !m->gr && !m->stomp && !(m->padCd > 0 && m->vy < 0)){
-    m->stomp=1; m->jump_hold=0; m->ledge_grace=0;
+    m->stomp=1; m->jump_hold=0; m->ledge_grace=0;m->jump_buffer=0;
     if(m->vy < RI(90)) m->vy=RI(90);
   }
   /* walk_slam() clears the impact pose before pad detection. Retain this
@@ -2129,7 +2160,7 @@ static void walk_step(MxWorld *w, real dt){
     m->gait += rabs(m->x-stride_start_x);
     if(m->gait >= RI(4)) m->gait -= RI(4);
   }
-  if(m->gr) m->stomp = 0;
+  if(m->gr){m->stomp=0;m->walk_safe=1;m->walk_safe_x=m->x;m->walk_safe_y=m->y;}
   if(m->padCd > 0) m->padCd -= dt;
   if(m->gr && !(m->padCd > 0)){
     int by = rfloor(m->y + WHH + R(0.25));
@@ -2137,7 +2168,7 @@ static void walk_step(MxWorld *w, real dt){
       int bx = rfloor(m->x + (k == 0 ? -R(0.5) : k == 1 ? 0 : R(0.5)));
       if(INB(bx, by) && w->grid[IDX(bx, by)] == MX_RUBBER){
         m->vy = stomp_landing ? R(-67.5) : R(-58.75); m->gr = 0; m->stomp = 0; m->padCd = R(0.3);
-        m->ledge_grace=m->jump_hold=0;
+        m->ledge_grace=m->jump_hold=m->jump_buffer=0;
         ev(w, EV_PAD, m->x, m->y + WHH, stomp_landing, 0, 0);
         break;
       }
@@ -2540,7 +2571,7 @@ static void build_trial(MxWorld *w,int index){
   w->walk=t->walk;
 }
 static void build(MxWorld *w, int l){
-  if(l>=MX_TRIAL_START){build_trial(w,l-MX_TRIAL_START);return;}
+  if(l>=MX_TRIAL_START){build_trial(w,mx_stage_source(l,w->district)-MX_TRIAL_START);return;}
   if(l >= MX_CH3_START){ build_ch3(w, l - MX_CH3_START); return; }
   const int W_ = MX_WOOD, B = MX_BRICK, S = MX_STONE, ST = MX_STEEL, RU = MX_RUBBER;
   switch(l){
@@ -2813,7 +2844,7 @@ static void load_level(MxWorld *w, int level, int district){
   level = level < 0 ? 0 : level % MX_NUM_LEVELS;
   w->substeps = first ? SUBSTEPS : keep_sub;
   w->wob_enabled = first ? 1 : keep_wob;
-  w->level = level; w->district = district; w->state = MX_PLAY; w->men = level_men(level); w->banner = R(2.4);
+  w->level = level; w->district = district; w->state = MX_PLAY; w->men = level_men(mx_stage_source(level,district)); w->banner = R(2.4);
   build(w, level);
   for(int r = 0; r < w->nrooms; r++){ const MxRoom *rm = &w->rooms[r]; for(int y = rm->y; y < rm->y + rm->h; y++) for(int x = rm->x; x < rm->x + rm->w; x++) w->paper[IDX(x, y)] = (uint8_t)(rm->pal + 1); }
   unclip_targets(w);
@@ -2844,15 +2875,17 @@ static void load_level(MxWorld *w, int level, int district){
 void mx_load(MxWorld *w, int level){ load_level(w, level, 0); }
 /* Landlord HQ: the district is cleared; build the next one in the same grid, keeping the score, the men left (plus a bonus) and the session counters. */
 static void hq_next_district(MxWorld *w){
-  int men = w->men + MX_HQ_BONUS_MEN, score = w->score + 3000, d = w->district + 1;
+  const int level=w->level;
+  int men=w->men+mx_stage_bonus(level), score=w->score+3000, d=w->district+1;
   int inf = w->st_inflated, pops = w->st_pops, pw[4] = { w->st_pw[0], w->st_pw[1], w->st_pw[2], w->st_pw[3] };
   int combo = w->combo, peak = w->combo_peak; real combo_left = w->combo_left;
   uint32_t rng = w->rng;
-  load_level(w, MX_HQ_LEVEL, d);
-  w->men = men; w->score = score; w->combo = combo; w->combo_peak = peak; w->combo_left = combo_left; w->st_inflated = inf; w->st_pops = pops; for(int i = 0; i < 4; i++) w->st_pw[i] = pw[i]; w->rng ^= rng; w->banner = R(2.4);
-  ev(w, EV_DISTRICT, 0, 0, d, 0, 0);
+  load_level(w,level,d);
+  w->men = men; w->score = score; w->combo = combo; w->combo_peak = peak; w->combo_left = combo_left; w->st_inflated = inf; w->st_pops = pops; for(int i = 0; i < 4; i++) w->st_pw[i] = pw[i]; w->rng = rng; w->banner = R(2.4);
+  ev(w, EV_DISTRICT, 0, 0, d, RI(mx_stage_bonus(level)), 0);
 }
 
+const char *mx_stage_tactic(const MxWorld *w){return mx_level_tactic(mx_stage_source(w->level,w->district));}
 void mx_set_wobble_budget(MxWorld *w, int cells){ w->wob_budget = cells < 0 ? 0 : cells; if(!cells) w->wob_shift = 0; }
 void mx_set_substeps(MxWorld *w, int n){ w->substeps = n < 2 ? 2 : n > 4 ? 4 : n; }
 void mx_preview_point(const MxWorld *w, real t, real *ox, real *oy){
@@ -3048,7 +3081,7 @@ void mx_update(MxWorld *w, real dt){
     int nch = busy_count(w);
     if(mx_targets_alive(w) == 0){
       w->winT += dt;
-      if(w->winT > R(1.6) && w->level == MX_HQ_LEVEL && w->district < MX_HQ_DISTRICTS - 1){ hq_next_district(w); return; }
+      if(w->winT > R(1.6) && w->district + 1 < mx_level_stage_count(w->level)){ hq_next_district(w); return; }
       if(w->winT > R(1.6)){ w->state = MX_WIN; w->score += w->men * 3000; ev(w, EV_WIN, 0, 0, 0, 0, 0); }
     } else if(w->men == 0 && m->mode == MAN_NONE){
       if(nch == 0){

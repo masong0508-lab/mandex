@@ -45,7 +45,7 @@ static void play(int L,int seq,int replay){
   /* Original stages retain their original global limit. For new trials
    * allow the real life budget, not a blanket relaxation of phase limits. */
   const int budget=L<MX_TRIAL_START?ORIGINAL_LIMIT:
-      (lives+1)*(w.walk?LIFE_LIMIT:60*FPS)+45*FPS;
+      (lives+1+((mx_level_stage_count(L)-1)*mx_stage_bonus(L)))*(w.walk||mx_level_stage_count(L)>1?LIFE_LIMIT:60*FPS)+45*FPS;
   unsigned r=1234u+seq*7919u+L*104729u;
   int f,shot=0,done=0,phase=w.man.mode,phase_at=0,life_at=0,last_men=w.men,last_district=w.district;
   const char *reason="session budget";

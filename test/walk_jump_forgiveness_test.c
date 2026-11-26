@@ -93,6 +93,21 @@ int main(void){
   tick(0,0,0);
   CHECK(w.man.vy<R(-22.5),"releasing jump cannot shorten a bounce pad launch");
 
+  /* Brief tap just before touching down must be consumed once at
+     the next grounded tick. No held auto-repeat and no airborne reset. */
+  scene(MX_STEEL);w.man.gr=0;w.man.y-=R(.20);w.man.vy=RI(12);
+  tick(0,1,0);CHECK(w.man.jump_buffer>0,"pre-landing jump is buffered");
+  tick(0,0,0);CHECK(w.man.vy<0&&w.man.jump_buffer==0,"released buffered jump launches once");
+  scene(MX_STEEL);tick(0,1,0);
+  for(int n=0;n<120;n++)tick(0,1,0);
+  CHECK(w.man.gr&&w.man.vy==0,"holding jump after landing never auto-repeats");
+  /* Recovery from a thick rubble box must not leave the player stuck.
+     The old safe point is on a separate clear platform. */
+  scene(MX_STEEL);w.man.walk_safe=1;w.man.walk_safe_x=RI(15);w.man.walk_safe_y=RI(40)-WHH-R(.03);
+  w.man.x=RI(80);w.man.y=RI(30);
+  for(int y=15;y<45;y++)for(int x=65;x<96;x++)w.grid[IDX(x,y)]=MX_STEEL;
+  for(int n=0;n<20;n++)tick(0,0,0);
+  CHECK(w.man.x<RI(30)&&!wblocked(&w,w.man.x,w.man.y),"wedged walker returns to validated safe point");
   if(failures){fprintf(stderr,"WALK_JUMP_FORGIVENESS_FAIL %d/%d\n",failures,checks);return 1;}
   printf("WALK_JUMP_FORGIVENESS_PASS cases=%d short_hop=1 held_height=1 coyote=1 no_double=1 edge=1 stomp=1 pad=1\n",checks);
   return 0;
