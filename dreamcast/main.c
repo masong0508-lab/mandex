@@ -1069,7 +1069,8 @@ static void draw_all(void){
   if(m->mode == MAN_WALK && world.state == MX_PLAY){                       /* walk levels: the clock and the controls */
     int k = (int)(m->wt * 100.0f / MX_WALK_T); if(k < 0) k = 0; if(k > 100) k = 100;
     quad(246, 40, 148, 12, Z_HUD, WHITE); quad(247, 41, 146, 10, Z_HUD + 0.05f, argb(40, 40, 50, 255)); quad(247, 41, 146.0f * k / 100.0f, 10, Z_HUD + 0.1f, k > 30 ? argb(125, 255, 90, 255) : argb(255, 74, 74, 255));
-    text("TIME", 238, 51, 12, WHITE, 2, Z_HUD + 0.1f);
+    char clock[24];snprintf(clock,sizeof clock,"TIME %ds",mx_walk_seconds_left(m));
+    text(clock,238,51,12,k>30?WHITE:argb(255,100,100,255),2,Z_HUD+.1f);
     text("A JUMP   B PUNCH   X SLAM   L GIVE UP", 320, 466, 14, argb(255, 255, 255, 205), 1, Z_HUD);
   }
   if(m->mode == MAN_FLY && !m->dive) text("PRESS A = BELLY FLOP", 320, 466, 20, argb(255, 255, 255, 205), 1, Z_HUD);
