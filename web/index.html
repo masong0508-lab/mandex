@@ -1305,7 +1305,10 @@ function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;
   let ok=!wBlocked(m.x,m.y);for(let u=1;u<=110&&!ok;u++){if(!wBlocked(m.x,m.y-u)){m.y-=u;ok=true}}
   for(let r=4;r<=200&&!ok;r+=4)for(let a=0;a<16&&!ok;a++){const an=-Math.PI/2+(a%2?1:-1)*Math.ceil(a/2)*.4,qx=m.x+Math.cos(an)*r,qy=m.y+Math.sin(an)*r;if(!wBlocked(qx,qy)){m.x=qx;m.y=qy;ok=true}}   // nearest free spot, preferring up
   goo(m.x,m.y,22,260);SFX.splat();ring(m.x,m.y,50,'#7dff5a');popText(m.x,m.y-50,'ON YOUR FEET!','#7dff5a',26);shake=Math.max(shake,4)}
-function walkQuit(){const m=man;if(m.mode!=='walk')return;goo(m.x,m.y,20,240);SFX.pop();m.mode='done'}
+function walkQuit(){const m=man;if(m.mode!=='walk')return;
+  // Touch owners belong to this walking life, not the next one.
+  if(typeof TID!=='undefined'&&typeof releaseWalkTouch==='function')for(const id in TID)releaseWalkTouch(id);
+  goo(m.x,m.y,20,240);SFX.pop();m.mode='done'}
 // hit everything in a box: cells, loose chunk cells and landlords.  returns the damage actually dealt
 function walkHit(cx,cy,hw,hh,dmg){let dealt=0;const x0=Math.floor((cx-hw)/V),x1=Math.floor((cx+hw)/V),y0=Math.floor((cy-hh)/V),y1=Math.floor((cy+hh)/V);
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(inb(x,y)&&grid[idx(x,y)]===RUBBER)continue;dealt+=damageCell(x,y,dmg)}   // bounce pads shrug off fists
@@ -1501,9 +1504,14 @@ function drawWalkHUD(){const m=man;if(state!=='play'||m.mode!=='walk')return;
   // and streak HUD. The top bar used to paint over the timer and hint.
   const portrait=isPortrait(),barY=portrait?H-153:40;
   const k=clamp(m.wt/WALK_T,0,1);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W/2-80,barY,160,9);ctx.fillStyle=k>.3?'#7dff5a':'#ff4a4a';ctx.fillRect(W/2-79,barY+1,158*k,7);
+  txt(Math.max(0,Math.ceil(m.wt))+'s',W/2+88,barY+9,13,k>.3?'#fff':'#ff8a8a','left');
   if(!portrait)txt('A/D MOVE  W JUMP  X PUNCH  S STOMP  G GIVE UP',W/2,66,12,'#fff','center');
   else txt('HOLD LEFT / RIGHT  ·  JUMP  ·  PUNCH  ·  STOMP',W/2,H-120,13,'#fff','center');
-  for(const b of walkBtns()){ctx.globalAlpha=KEYS[b.k]?.85:.45;rrect(b.x,b.y,b.w,b.h,10);ctx.fillStyle='#1a2038';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.globalAlpha=1;txt(b.t,b.x+b.w/2,b.y+b.h/2+5,b.t.length>2?12:20,'#fff','center')}}
+  for(const b of walkBtns()){ctx.globalAlpha=KEYS[b.k]?.85:.45;rrect(b.x,b.y,b.w,b.h,10);ctx.fillStyle='#1a2038';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.globalAlpha=1;txt(b.t,b.x+b.w/2,b.y+b.h/2+5,b.t.length>2?12:20,'#fff','center')}
+  // A deliberate tap, never a held/slide-to movement input. This is the
+  // mobile equivalent of G / console GIVE UP, with the final life labeled.
+  btn(portrait?184:10,H-(portrait?106:64),portrait?82:134,portrait?80:54,men>0?'NEXT MAN':'END RUN',()=>{if(state==='play'&&man===m)walkQuit()},{size:portrait?11:14});
+}
 function manStep(dt){
   const m=man;m.vy+=G*dt*(m.pwr==='towel'&&m.gt<1.8&&!m.dive?.3:1)*(m.tubeT>0?.1:1);m.x+=m.vx*dt;m.y+=m.vy*dt;m.gt+=dt;if(m.hitCd>0)m.hitCd-=dt;
   if(tubes.length)tubeStep(m,dt);
