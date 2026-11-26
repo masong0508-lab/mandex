@@ -1608,7 +1608,7 @@ void mx_release(MxWorld *w){
     } }
   m->mode = MAN_FLY; m->gt = 0; w->men--;
   m->face = m->vx < 0 ? -1 : 1;
-  m->spin = 0; m->ang = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
+  m->spin = m->dive_age = 0; m->ang = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
   ev(w, EV_LAUNCH, m->x, m->y, 0, 0, 0);
 }
 void mx_select_power(MxWorld *w, int pw){
@@ -1626,7 +1626,7 @@ void mx_dive(MxWorld *w){
     return;
   }
   if(m->mode != MAN_FLY || m->dive) return;
-  m->dive = 1; m->vx = rmul(m->vx, R(0.4));
+  m->dive = 1; m->spin = m->ang; m->dive_age = 0; m->vx = rmul(m->vx, R(0.4));
   if(m->vy < 0) m->vy = 0;
   m->vy += R(97.5);
   if(w->shake < R(3)) w->shake = R(3);
@@ -2864,8 +2864,21 @@ real mx_man_wobble(const MxMan *m){
 
 /* flight pose: pitch toward the path (eased like the browser's 15 % a frame), belly-flop spin */
 static void man_pose(MxMan *m, real dt){
-  if(m->mode != MAN_FLY){ m->ang = m->spin = 0; return; }
-  if(m->dive){ m->spin += rmul(dt, RI(14)); return; }
+  if(m->mode != MAN_FLY){ m->ang = m->spin = m->dive_age = 0; return; }
+  if(m->dive){
+    /* Integrate the 0.12s angular acceleration across the simulation tick.
+       The ramp saturates; subsequent frames use the original tumble rate. */
+    const real ramp=R(0.12), age=rclamp(m->dive_age,0,ramp);
+    if(dt<=0)return;
+    const real part=rclamp(dt,0,ramp-age);
+    if(part>0){
+      const real mean=rdiv(age+rmul(part,R(0.5)),ramp);
+      m->spin+=rmul(rmul(RI(14),part),mean);
+    }
+    m->dive_age=age+part;
+    m->spin+=rmul(RI(14),dt-part);
+    return;
+  }
   real tgt = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
   m->ang += rmul(tgt - m->ang, rclamp(rmul(dt, RI(9)), 0, RI(1)));
 }
