@@ -637,7 +637,7 @@ function bodyClear(cx,row){for(let y=row-5;y<=row-1;y++)for(let x=cx-2;x<=cx+2;x
 function unclipTargets(){for(const t of targets){const row=Math.floor(t.y/V+.875+1e-9),cx=Math.floor(t.x/V);if(bodyClear(cx,row))continue;
   for(let d=1;d<=3;d++){let pick=0;if(bodyClear(cx-d,row))pick=-d;else if(bodyClear(cx+d,row))pick=d;if(pick){t.x+=pick*V;t.hx=t.x;break}}}}
 function load(l,custom){
-  CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
+  resetPlayInput();CAM.manual=false;CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
   /* The air valve and every tool begin unequipped for each new level;
      a previously saved AIR choice cannot obstruct the very next shot. */
@@ -3623,7 +3623,7 @@ function drawSling1(back){
 // Landscape is untouched (zoom 1, camera at 0,0).  In portrait the screen is a tall 540xN canvas, the world is drawn zoomed in,
 // the ground sits at the bottom, and the camera slides sideways: to the buildings while you pull back, with the man in flight,
 // and to the wreckage between throws.  Aiming works in SCREEN distance, so the moving camera never fights your finger.
-const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0};
+const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0,manual:false};
 /* UI state never changes physics/world dimensions. The portrait virtual
    canvas is 540px wide and fills the available display at its real ratio;
    landscapes retain the original 960x540 artwork and screen geometry. */
@@ -3644,14 +3644,15 @@ function layoutTick(){
   const w=por?540:960,h=por?Math.max(720,Math.min(1240,Math.round(w*stableH/stableW))):540;
   const changed=por!==WEB_UI.portrait;
   if(changed){
-    WEB_UI.portrait=por;WEB_UI.gesture=null;
+    WEB_UI.portrait=por;WEB_UI.gesture=null;CAM.manual=false;
+    if(typeof resetPlayInput==='function')resetPlayInput();
     if(typeof dragging!=='undefined')dragging=false;
     if(typeof sliderDrag!=='undefined')sliderDrag=false;
     if(typeof E!=='undefined'&&E){E.drag=null;E.pointer=null;}
     for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
     CAM.reset=true;CAM.snap=true;hits=[];
   }
-  if(w!==W||h!==H){W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
+  if(w!==W||h!==H){if(typeof resetPlayInput==='function')resetPlayInput();W=w;H=h;cv.width=w;cv.height=h;CAM.snap=true;_vig=null;}
   if(vw!==WEB_UI.viewportW||vh!==WEB_UI.viewportH||changed){
     WEB_UI.viewportW=vw;WEB_UI.viewportH=vh;
     const rect=document.body.getBoundingClientRect(),
@@ -3664,11 +3665,13 @@ function layoutTick(){
     cv.style.width=Math.floor(w*scale)+'px';cv.style.height=Math.floor(h*scale)+'px';
   }
   if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);
-  CAM.on=(por&&(state==='play'||state==='win'||state==='lose'))||
-    !!(CL&&CL.cols>120&&(state==='play'||state==='win'||state==='lose'));
+  const playing=state==='play'||state==='win'||state==='lose';
+  if(state!=='play'&&CAM.manual){CAM.manual=false;CAM.reset=true;if(typeof resetPlayInput==='function')resetPlayInput()}
+  CAM.on=playing&&(por||!!(CL&&CL.cols>120)||CAM.manual);
 }
 function camTick(dt){
   if(!CAM.on){CAM.z=1;CAM.x=0;CAM.y=0;return}
+  if(CAM.manual){manualCameraClamp();return}
   // Aim frames the sling and its targets. Portrait walking instead shows
   // the nearby route at a readable scale, with feet above the touch HUD.
   const m=man,portrait=isPortrait(),walking=portrait&&m.mode==='walk';
@@ -3706,6 +3709,68 @@ function camTick(dt){
 const toWorld=(sx,sy)=>CAM.on?[sx/CAM.z+CAM.x,sy/CAM.z+CAM.y]:[sx,sy];
 const toScreen=(x,y)=>CAM.on?[(x-CAM.x)*CAM.z,(y-CAM.y)*CAM.z]:[x,y];
 let AIM0={sx:0,sy:0,wx:0,wy:0};
+/* Gameplay input owns its own pointers; neither editor nor menu touches
+ * may finish an aim, and camera inspection never launches a shot. */
+const PLAY_INPUT={aim:null,soda:null,pan:new Map()};
+function cancelAim(id){
+  const a=PLAY_INPUT.aim;
+  if(!a||(id!==undefined&&a.id!==id))return;
+  PLAY_INPUT.aim=null;
+  if(dragging&&state==='play'&&man===a.man&&man.mode==='aim'){
+    man.x=a.x;man.y=a.y;man.seated=a.seated;man.vlv=a.vlv;
+  }
+  dragging=false;
+}
+function resetPlayInput(){
+  cancelAim();PLAY_INPUT.soda=null;sodaHold=false;PLAY_INPUT.pan.clear();
+}
+function manualCameraClamp(){
+  CAM.z=clamp(CAM.z,Math.max(.55,W/WW),1.8);
+  const bottom=WH-H/CAM.z;
+  CAM.x=clamp(CAM.x,0,Math.max(0,WW-W/CAM.z));
+  CAM.y=clamp(CAM.y,Math.min(0,bottom),Math.max(0,bottom));
+}
+function cameraMode(on){
+  if(state!=='play')return;
+  resetPlayInput();
+  CAM.manual=!!on;
+  if(on){CAM.on=true;CAM.reset=false;CAM.snap=false;manualCameraClamp()}
+  else{
+    CAM.on=isPortrait()||!!(CL&&CL.cols>120);
+    CAM.reset=true;CAM.snap=true;CAM.hold=0;
+    if(!CAM.on){CAM.z=1;CAM.x=0;CAM.y=0}
+  }
+}
+/* Transform the old gesture centroid into the new one, preserving the
+ * world point under the fingers/cursor except at a world boundary. */
+function manualCameraTransform(x0,y0,x1,y1,scale){
+  const old=CAM.z,z=clamp(old*scale,Math.max(.55,W/WW),1.8);
+  CAM.x+=x0/old-x1/z;CAM.y+=y0/old-y1/z;CAM.z=z;
+  manualCameraClamp();
+}
+function manualCameraDown(e,x,y){
+  const p=PLAY_INPUT.pan;
+  if(p.has(e.pointerId)||p.size>=2)return;
+  p.set(e.pointerId,{x,y});
+  try{cv.setPointerCapture(e.pointerId)}catch(_){}
+}
+function manualCameraMove(e,x,y){
+  const p=PLAY_INPUT.pan,a=p.get(e.pointerId);
+  if(!a)return;
+  if(p.size===1)manualCameraTransform(a.x,a.y,x,y,1);
+  else{
+    let b;for(const [id,v] of p)if(id!==e.pointerId){b=v;break}
+    const d0=Math.max(8,Math.hypot(a.x-b.x,a.y-b.y)),d1=Math.max(8,Math.hypot(x-b.x,y-b.y));
+    manualCameraTransform((a.x+b.x)*.5,(a.y+b.y)*.5,(x+b.x)*.5,(y+b.y)*.5,d1/d0);
+  }
+  a.x=x;a.y=y;
+}
+function releasePlayPointer(id){
+  PLAY_INPUT.pan.delete(id);
+  if(PLAY_INPUT.soda===id){PLAY_INPUT.soda=null;sodaHold=false}
+  cancelAim(id);
+}
+
 
 // the last pass over the picture: a warm key light from the sun's corner, cooler shadows, a soft vignette and a hint of bloom, so the flat flash-game colours sit together
 let _vig=null;
@@ -3930,7 +3995,10 @@ function drawHUD(){
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
   if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);txt(CL.name,W/2,180,40,'#fff','center');txt(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,20,'#ffd23f','center');ctx.globalAlpha=1}
   if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
-  if(state==='play')btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
+  if(state==='play'){
+    btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
+    btn(W-146,P?66:74,138,30,CAM.manual?'FOLLOW':'CAMERA',()=>cameraMode(!CAM.manual),{size:14,on:CAM.manual});
+  }
   if(state==='win'||state==='lose')drawEnd()}
 function star(x,y,r,on){ctx.fillStyle=on?'#ffd23f':'#3a3f55';ctx.strokeStyle='#000';ctx.lineWidth=3;ctx.beginPath();for(let i=0;i<10;i++){const a=-1.5708+i*.6283,rr=i%2?r*.45:r;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.closePath();ctx.stroke();ctx.fill()}
 function drawEnd(){
@@ -3983,7 +4051,7 @@ function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);end
   drawParts();btn(W-150,H-56,130,40,'MENU',goMenu,{size:16,on:true})}
 function backFromPlay(){if(testing){openEditor(true);return}goSelect()}
 cv.addEventListener('pointerdown',e=>{
-  audioInit();if(man&&man.G)gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
+  audioInit();if(man&&man.G&&!(state==='play'&&CAM.manual))gagReset(man.G);const[x,y]=pt(e);mouseX=x;mouseY=y;
   if(state==='cutscene'){cutClick(x,y);return}
   if(state==='title'){goMenu();return}
   if(isPortrait()&&['menu','select','ach','outfit','options'].includes(state)){
@@ -4006,7 +4074,14 @@ cv.addEventListener('pointerdown',e=>{
       try{cv.setPointerCapture(e.pointerId)}catch(_){}
     return;
   }
+  if(state==='play'){
+    if(PLAY_INPUT.aim&&!dragging)PLAY_INPUT.aim=null;
+    if(PLAY_INPUT.aim||PLAY_INPUT.soda!==null)return;
+    if(e.button===2){if(!CAM.manual)cameraMode(true);manualCameraDown(e,x,y);return}
+    if(e.button!==undefined&&e.button!==0)return;
+  }
   if(hitTest(x,y))return;
+  if(state==='play'&&CAM.manual){manualCameraDown(e,x,y);return}
   if(state==='play'&&man.mode==='walk'){
     if(walkTouch(x,y,e.pointerId))try{cv.setPointerCapture(e.pointerId)}catch(_){}
     return;
@@ -4014,11 +4089,12 @@ cv.addEventListener('pointerdown',e=>{
   if(state==='win'){nextAfterWin();return}
   if(state==='lose'){retry();return}
   const[wx,wy]=toWorld(x,y);
-  if(man.mode==='aim'&&toolOn('burp')&&!man.chug&&!man.seated&&pw.left.burp>0&&Math.abs(wx-STX)<48&&wy>GY-62){sodaHold=true;startChug();if(!man.chug)sodaHold=false;try{cv.setPointerCapture(e.pointerId)}catch(_){}return}   // tap the soda stand: he hops over and chugs
+  if(man.mode==='aim'&&toolOn('burp')&&!man.chug&&!man.seated&&pw.left.burp>0&&Math.abs(wx-STX)<48&&wy>GY-62){PLAY_INPUT.soda=e.pointerId;sodaHold=true;startChug();if(!man.chug){sodaHold=false;PLAY_INPUT.soda=null}try{cv.setPointerCapture(e.pointerId)}catch(_){}return}   // tap the soda stand: he hops over and chugs
   if(man.mode==='aim'&&!man.chug&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(wx-VX,wy-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}   // tap the valve: he sits and fills; drag him off to fire
-  if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
+  if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){PLAY_INPUT.aim={id:e.pointerId,man,x:man.x,y:man.y,seated:man.seated,vlv:man.vlv};AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
+  if(state==='play'&&CAM.manual){manualCameraMove(e,mx,my);return}
   if(state==='play'&&man.mode==='walk'&&TID[e.pointerId]){
     walkTouch(mx,my,e.pointerId);return;
   }
@@ -4032,7 +4108,7 @@ cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
     }
     return;
   }
-  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
+  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||state!=='play'||!PLAY_INPUT.aim||PLAY_INPUT.aim.id!==e.pointerId||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
   if(vOn&&dv<VPULL){const k=.9*(VPULL-dv)/(VPULL-VGRAB);man.x+=(VX-man.x)*k;man.y+=(VY-man.y)*k}});   // nearing the valve the sling stretches on back toward it (power stays a full pull), then he drops onto it
 cv.addEventListener('pointerup',e=>{
   if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId){
@@ -4048,8 +4124,13 @@ cv.addEventListener('pointerup',e=>{
     }else if(g.screen===state)hitTest(p[0],p[1]);
     return;
   }
-  sodaHold=false;if(sliderDrag){sliderDrag=false;pdSave();SFX.boing()}
+  if(sliderDrag){sliderDrag=false;pdSave();SFX.boing()}
   if(state==='edit'){eEndStroke(e.pointerId,false);return}
+  if(state!=='play')return;
+  if(PLAY_INPUT.pan.delete(e.pointerId))return;
+  if(PLAY_INPUT.soda===e.pointerId){PLAY_INPUT.soda=null;sodaHold=false;return}
+  if(!PLAY_INPUT.aim||PLAY_INPUT.aim.id!==e.pointerId)return;
+  PLAY_INPUT.aim=null;
   if(dragging){dragging=false;if(man.mode==='aim'){
     if(man.vlv){man.seated=true;return}man.seated=false;launch()
   }}
@@ -4058,7 +4139,7 @@ addEventListener('keyup',e=>{KEYS[e.code]=false});
 function releaseAllWalkTouches(){
   for(const id in TID){KEYS[TID[id]]=false;delete TID[id]}
   WEB_UI.gesture=null;
-  dragging=false;sodaHold=false;sliderDrag=false;
+  resetPlayInput();dragging=false;sodaHold=false;sliderDrag=false;
 }
 addEventListener('blur',()=>{for(const k in KEYS)KEYS[k]=false;releaseAllWalkTouches()});
 addEventListener('orientationchange',releaseAllWalkTouches);
@@ -4068,16 +4149,28 @@ for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
   if(ev==='pointercancel'){
     if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
     if(state==='edit')eEndStroke(e.pointerId,true);
-    if(dragging){dragging=false;man.seated=false}
+    if(state==='play')releasePlayPointer(e.pointerId);
   }
 });
 cv.addEventListener('lostpointercapture',e=>{
   releaseWalkTouch(e.pointerId);
   if(state==='edit')eEndStroke(e.pointerId,true);
+  if(state==='play')releasePlayPointer(e.pointerId);
 });
+cv.addEventListener('contextmenu',e=>{if(state==='play')e.preventDefault()});
+cv.addEventListener('wheel',e=>{
+  if(state!=='play')return;
+  e.preventDefault();
+  if(dragging||PLAY_INPUT.soda!==null||PLAY_INPUT.pan.size)return;
+  if(!CAM.manual)cameraMode(true);
+  const [x,y]=pt(e),dy=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?H:1);
+  manualCameraTransform(x,y,x,y,Math.exp(clamp(-dy*.002,-.65,.65)));
+},{passive:false});
 addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
   if(e.code==='Space'){dive();e.preventDefault()}
+  if(state==='play'&&e.code==='KeyC'&&!e.repeat){cameraMode(!CAM.manual);return}
+  if(state==='play'&&(e.code==='Equal'||e.code==='Minus')){if(dragging)return;if(!CAM.manual)cameraMode(true);manualCameraTransform(W/2,H/2,W/2,H/2,e.code==='Equal'?1.15:1/1.15);e.preventDefault();return}
   if(state==='cutscene'){if(e.key==='Escape')endCut();else if(e.key===' '||e.key==='Enter'){e.preventDefault();cutClick(0,999)}return}
   if(state==='title')return;
   if(state==='play'&&CL.slings&&man.mode==='aim'&&!dragging&&!man.chug){if(e.key==='[')goSling(slingK-1);if(e.key===']')goSling(slingK+1)}
