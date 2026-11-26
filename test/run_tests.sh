@@ -81,6 +81,10 @@ echo "--- Browser: bounded collision hashing, repeated contacts and no stale rub
 if command -v node >/dev/null 2>&1;then node browser_collision_hash_test.js;fi
 echo "--- Browser walking camera: portrait focus, zoom bounds and world edges ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_camera_test.js;fi
+echo "--- Browser manual camera: pointer ownership, pinch, pan, zoom and cancellation ---"
+if command -v node >/dev/null 2>&1;then node browser_manual_camera_test.js;fi
+echo "--- Browser content expansion: six starter structures, landing poses and zoom-aware particle rendering ---"
+if command -v node >/dev/null 2>&1;then node browser_camera_expansion_test.js;fi
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
 if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
 echo "--- Browser custom levels: safe 360-column finale transition ---"
