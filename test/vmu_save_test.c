@@ -89,10 +89,10 @@ int main(void){
   mx_journal_put32(old+384,mx_crc32(old,384));
   mx_meta_init(&stats);dc_saved_len=0;dc_save_slot=-1;dc_save_load();
   CHECK(dc_save_slot==0 && dc_save_generation==91 && stats.stars[59]==3 && stats.best[59]==123456);
-  CHECK(stats.stars[60]==0 && stats.best[219]==0);
-  stats.stars[219]=3;stats.best[219]=432100;dc_save_sync();
+  CHECK(stats.stars[60]==0 && stats.best[239]==0);
+  stats.stars[239]=3;stats.best[239]=432100;dc_save_sync();
   CHECK(dc_save_slot==1 && disk_size[1]==MX_JOURNAL_DISK_BYTES);
-  mx_meta_init(&stats);dc_save_load();CHECK(stats.best[59]==123456 && stats.best[219]==432100);
+  mx_meta_init(&stats);dc_save_load();CHECK(stats.best[59]==123456 && stats.best[239]==432100);
   printf("vmu_save_test: %s\n",fail?"FAILED":"all passed");
   return fail!=0;
 }

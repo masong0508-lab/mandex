@@ -9,13 +9,14 @@ function generateTrials(){
     {label:"Powder District",prefix:"Powder",wall:6,floor:2,roof:1,kind:[3,2,4,0],tip:"HIT THE ORANGE TNT SUPPORTS"},
     {label:"Spring Heights",prefix:"Spring",wall:2,floor:1,roof:7,kind:[1,5,2,0],tip:"BANK OFF THE RUBBER ROOFS"},
     {label:"Delivery Works",prefix:"Delivery",wall:2,floor:6,roof:1,kind:[2,1,6,4],tip:"USE THE TUBE TO CROSS THE YARD"},
-    {label:"Night Patrol",prefix:"Night",wall:3,floor:2,roof:6,kind:[4,5,6,7],tip:"EVICT GUARDS BEFORE THE BOSS"}
+    {label:"Night Patrol",prefix:"Night",wall:3,floor:2,roof:6,kind:[4,5,6,7],tip:"EVICT GUARDS BEFORE THE BOSS"},
+    {label:"Cascade Works",prefix:"Cascade",wall:3,floor:6,roof:7,kind:[1,3,5,6],tip:"CHAIN BLASTS AND RUBBER REBOUNDS"}
   ];
   const shapes=["Court","Stacks","Bridge","Terrace"];
   const palettes=["#e8d3a8","#d7dfe9","#d2b6b4","#b9d6be"];
   const levels=[],distinct=new Set();
   const fail=(msg)=>{throw Error(msg)};
-  for(let district=0;district<8;district++)for(let shape=0;shape<4;shape++)for(let tier=0;tier<5;tier++){
+  for(let district=0;district<groups.length;district++)for(let shape=0;shape<4;shape++)for(let tier=0;tier<5;tier++){
     const g=groups[district],grid=new Uint8Array(WIDTH*HEIGHT),targets=[],rooms=[],pads=[],tubes=[],houses=[];
     const get=(x,y)=>grid[y*WIDTH+x];
     function fill(x,y,w,h,m){
@@ -82,6 +83,12 @@ function generateTrials(){
       if(width>=5)for(let j=0;j<Math.min(5+tier,Math.ceil(width/2));j++)for(let cx=start+j;cx<start+width-j;cx++)if(!get(cx,59-j))fill(cx,59-j,1,1,8);
       fill(A.x,56,2,2,5);
     }
+    if(district===8){
+      // Mixed-mechanic district: blast supports, spring roofs, and a tube on bridges.
+      for(const H of houses){fill(H.x,56,2,2,5);if(tier>=2)fill(H.x+H.w-2,56,2,2,5);pads.push([H.x+3,H.top,4]);}
+      const A=houses[0],B=houses[1];
+      if(shape===2||shape===3)tubes.push([29,36-tier*2,A.x+A.w+5,Math.max(8,Math.min(A.top,B.top)-5)]);
+    }
     if(district===6){
       const A=houses[0],B=houses[1],exitX=A.x+A.w+5,exitY=Math.max(8,Math.min(A.top,B.top)-5);
       tubes.push([29,35-tier*2,exitX,exitY]);
@@ -92,9 +99,9 @@ function generateTrials(){
       targets[0][2]=7;
     }else if(district===7)for(const t of targets)if(t[2]===7)t[2]=2;
     const name=g.prefix+" "+shapes[shape]+" "+(tier+1);
-    const tip=shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
+    const tip=district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
     const men=Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
-    const walk=(district===5||district===7)&&tier>=2;
+    const walk=(district===5||district===7)&&tier>=2 || district===8&&tier>=3;
     if(targets.length<2||targets.length>20||rooms.length>20||pads.length>3||tubes.length>3)fail("entity cap "+name);
     const keys=new Set();
     for(const [tx,ty] of targets){
@@ -154,7 +161,7 @@ function emitTrials(levels){
     return {off,rects:rects.length,roomOff,rooms:l.rooms.length,targetOff,targets:l.targets.length,padOff,pads:l.pads.length,tubeOff,tubes:l.tubes.length,name:l.name,tip:l.tip,men:l.men,walk:l.walk?1:0};
   };
   for(const l of levels)table.push(collect(l));
-  for(let d=0;d<8;d++){
+  for(let d=0;d<levels.length/20;d++){
     const rows=levels.slice(d*20,(d+1)*20);
     districts.push(JSON.stringify({format:"MXTRIAL1",width:WIDTH,height:HEIGHT,district:rows[0].district,levels:rows},null,1)+"\n");
   }
@@ -228,5 +235,5 @@ if(typeof require==='function'&&require.main===module){
   if(a<0||b<a)throw Error('trial data markers missing from game');
   const end=b+marker.length+(html[b+marker.length]==='\n'?1:0);
   fs.writeFileSync(webPath,html.slice(0,a)+out.web+html.slice(end));
-  console.log('Generated 160 trials; '+out.commandBytes+' binary command bytes.');
+  console.log('Generated '+generateTrials().length+' trials; '+out.commandBytes+' binary command bytes.');
 }

@@ -5,11 +5,11 @@ const root=path.join(__dirname,'..');
 const pack=require('../tools/trial_pack.js');
 const levels=pack.generateTrials();
 const out=pack.emitTrials(levels);
-assert.strictEqual(levels.length,160);
-assert.strictEqual(new Set(levels.map(l=>l.rows.join(''))).size,160);
-assert.strictEqual(levels.reduce((n,l)=>n+l.rows.join('').length,0),1152000);
-assert(out.commandBytes<160*7200/5,'compact command payload must fit handheld budget');
-for(let d=0;d<8;d++){
+assert.strictEqual(levels.length,180);
+assert.strictEqual(new Set(levels.map(l=>l.rows.join(''))).size,180);
+assert.strictEqual(levels.reduce((n,l)=>n+l.rows.join('').length,0),1296000);
+assert(out.commandBytes<180*7200/5,'compact command payload must fit handheld budget');
+for(let d=0;d<9;d++){
  const source=fs.readFileSync(path.join(root,'content/trials/district-'+(d+1)+'.json'),'utf8');
  assert.strictEqual(source,out.districts[d],'uncompressed editable source matches generator');
 }
@@ -31,4 +31,4 @@ for(let i=0;i<levels.length;i++){
  assert.strictEqual(p.length,l.pads.length,'browser pads '+i);
  assert.strictEqual(pipes.length,l.tubes.length,'browser tubes '+i);
 }
-console.log('TRIAL_PACK_PASS levels='+levels.length+' raw_cells=1152000 commands='+out.commandBytes);
+console.log('TRIAL_PACK_PASS levels='+levels.length+' raw_cells=1296000 commands='+out.commandBytes);

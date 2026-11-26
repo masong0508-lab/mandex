@@ -24,7 +24,8 @@ static const uint32_t expected[MX_TRIAL_COUNT]={
   0x4a94051du,0x3892ae5u,0x8cf5b2adu,0xba52cd6du,0x20772a79u,0x44d0c115u,0xff48bca9u,0x4b286a05u,
   0x750494a5u,0xcb254f05u,0x8125a85u,0x95c4ad85u,0xc6d536adu,0x1049b38du,0x98ade351u,0x6c69ef55u,
   0x257870f1u,0x9817a489u,0x6466e3d5u,0xa3f1e89u,0x611814f5u,0x12db05e9u,0x4a44c2f1u,0x74390c2du,
-  0x7061d5b1u,0x44ead239u,0x7904545u,0xb8cde155u,0x5eb0e1c5u,0xaa191385u,0x7bc31595u,0x6e5e0315u
+  0x7061d5b1u,0x44ead239u,0x7904545u,0xb8cde155u,0x5eb0e1c5u,0xaa191385u,0x7bc31595u,0x6e5e0315u,
+  0x9b8ffd5du,0x6e65f509u,0x88e0ffc5u,0xa493a301u,0x18c07275u,0x6619cef1u,0xac268f8du,0xa16f7099u,0x44d8f581u,0x5d74148du,0x6ac7f299u,0x11e734d5u,0xfb577ae5u,0xc8265931u,0x36d765e9u,0xad88f025u,0x41d3ae45u,0x811ee385u,0x24c21b25u,0xf6357d35u
 };
 static MxWorld W;
 static uint32_t digest(void){
@@ -54,12 +55,13 @@ int main(void){
   CHECK(mx_trial_district_step(0,1)==MX_TRIAL_START);
   CHECK(mx_trial_district_step(MX_TRIAL_START,1)==MX_TRIAL_START+20);
   CHECK(mx_trial_district_step(MX_NUM_LEVELS-1,1)==0);
-  CHECK(MX_JOURNAL_DISK_BYTES==1536&&MX_SAVE_MAX==1176);
-  S.stars[59]=2;S.best[59]=12345;S.stars[219]=3;S.best[219]=67890;
+  CHECK(MX_JOURNAL_DISK_BYTES==1536&&MX_SAVE_MAX==1276);
+  S.stars[59]=2;S.best[59]=12345;S.stars[239]=3;S.best[239]=67890;
+  int stars=0;CHECK(mx_trial_cleared(&S,239,&stars)==1&&stars==3);CHECK(mx_trial_cleared(&S,59,&stars)==0&&stars==0);
   uint8_t disk[MX_JOURNAL_DISK_BYTES]={0};int n=mx_journal_pack(&S,0,NULL,7,disk,sizeof disk);
   CHECK(n==MX_JOURNAL_MAX&&mx_journal_record_size(disk,sizeof disk)==n);
   uint32_t gen=0;int outfit=0;mx_meta_init(&T);
-  CHECK(mx_journal_unpack(&T,&outfit,NULL,&gen,disk,n)&&gen==7&&T.best[59]==12345&&T.best[219]==67890);
+  CHECK(mx_journal_unpack(&T,&outfit,NULL,&gen,disk,n)&&gen==7&&T.best[59]==12345&&T.best[239]==67890);
   printf("NATIVE_TRIAL_PACK_PASS levels=%d raw=%d command_bytes=%zu\n",MX_TRIAL_COUNT,MX_TRIAL_COUNT*MX_ROWS*MX_COLS,sizeof MX_TRIAL_DATA);
   return 0;
 }

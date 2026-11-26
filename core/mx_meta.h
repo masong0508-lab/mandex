@@ -70,6 +70,16 @@ int mx_tool_power(int tool);                             /* the PW_* a start too
    20 levels = 176 bytes (175 for a version 1 blob).  Not saved: unlock_all and the per-level transients (lv_*, seen_*).  A save with fewer or more levels than this build
    still loads (missing levels read as 0, extra ones are dropped); any other layout change must bump the version byte. */
 #define MX_SAVE_VERSION 2
+/* District summary for the native title selectors; derived, never serialized. */
+static inline int mx_trial_cleared(const MxStats *s,int level,int *stars){
+  int total=0,clear=0;
+  if(level>=MX_TRIAL_START&&level<MX_NUM_LEVELS){
+    int first=MX_TRIAL_START+((level-MX_TRIAL_START)/MX_TRIAL_DISTRICT_SIZE)*MX_TRIAL_DISTRICT_SIZE;
+    for(int i=first;i<first+MX_TRIAL_DISTRICT_SIZE;i++){int n=s->stars[i];if(n>3)n=3;total+=n;clear+=n>0;}
+  }
+  if(stars)*stars=total;
+  return clear;
+}
 #define MX_SAVE_MAX (66 + MX_NUM_LEVELS + 4 + 1 + 4 * MX_NUM_LEVELS + 1 + 4)
 uint32_t mx_crc32(const uint8_t *p, int n);
 /* returns the number of bytes written, or 0 if cap is too small */

@@ -87,8 +87,8 @@ const env={
   hits:records,ACH:Array.from({length:17},(_,i)=>({id:'a'+i,n:'Achievement '+i,d:'Earn '+i})),
   OUTFITS:Array.from({length:16},(_,i)=>({id:'look'+i,n:'Outfit '+i})),
   outfitCur:{n:'Classic Red'},PD:{stars:{},ach:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
-  LEVELS:Array.from({length:220},(_,i)=>({name:'District Building '+i})),
-  CH1:20,CH2:40,TRIAL_START:60,TRIAL_DISTRICTS:Array.from({length:8},(_,i)=>'District '+i),trialDistrict:0,selTab:0,
+  LEVELS:Array.from({length:240},(_,i)=>({name:'District Building '+i})),
+  CH1:20,CH2:40,TRIAL_START:60,TRIAL_DISTRICTS:Array.from({length:9},(_,i)=>'District '+i),trialDistrict:0,selTab:0,TRIAL_META:Array.from({length:180},()=>['Trial','TIP',0,0,0,0,0,4,0,0,0,0,6,0]),
   GUIDES:['OFF','SHORT','FULL'],SHAKES:[['OFF',0],['LOW',.5],['FULL',1]],
   OPT:()=>({}),optVol:()=>.8,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
   btn:(x,y,w,h,label,fn,o)=>records.push({x,y,w,h,label,fn}),
@@ -101,7 +101,8 @@ const env={
   storyUnlocked:()=>true,ch2Unlocked:()=>true,ch3Unlocked:()=>true,
   SFX:{pop:()=>{},ding:()=>{}},performance:{now:()=>0}
 };
-const methods=new Function('env','with(env){'+mobile+
+const trialHelpers=extract('function trialDistrictProgress(', 'function goMenu()');
+const methods=new Function('env','with(env){'+trialHelpers+mobile+
   'return {menu:drawMobileMenu,select:drawMobileSelect,ach:drawMobileAchievements,'+
   'outfit:drawMobileOutfits,options:drawMobileOptions}};')(env);
 let total=0;
