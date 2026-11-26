@@ -47,6 +47,8 @@ jobs:
         run: node test/browser_animation_motion_test.js
       - name: Interactive world and destruction animation feedback
         run: node test/browser_world_animation_test.js
+      - name: Landscape creator selection, pagination and trial navigation
+        run: node test/browser_landscape_select_test.js
       - name: Complete trial pack generation and decoder parity
         run: node test/trial_pack_test.js
       - name: Counterpunch interrupts and multi-hit recovery
