@@ -1109,12 +1109,18 @@ static void draw_cases(const View *v){
   }
 }
 static void draw_pads(const View *v){
-  int p = v->ppc, bob = (frame >> 3) & 3;
-  for(int i = 0; i < world.npads; i++){
-    const MxPad *pd = &world.pads[i];
-    int cx = VX(v, pd->x + pd->w * .5f), cy = VY(v, (float)pd->y);
-    for(int k = 0; k < 3; k++){ int yy = cy - p * (3 + 3 * k) - bob; u32 c = k == 0 ? RGB(255, 255, 255) : k == 1 ? RGB(255, 158, 200) : RGB(255, 110, 150);
-      line(v->s, cx - p * 5 / 4, yy + p / 2, cx, yy - p / 2, c); line(v->s, cx, yy - p / 2, cx + p * 5 / 4, yy + p / 2, c); }
+  int p=v->ppc;
+  for(int i=0;i<world.npads;i++){
+    const MxPad *pd=&world.pads[i];int first,span=mx_pad_live_run(&world,pd,&first);
+    if(!span)continue;
+    int cx=VX(v,first+span*.5f),cy=VY(v,(float)pd->y);
+    int half=span*p/2;if(half>p*5/4)half=p*5/4;
+    for(int k=0;k<3;k++){
+      int q=mx_pad_phase(world.time,k),yy=cy-2*p-q*6*p/60;
+      u32 col=q<10||q>=50?RGB(220,100,145):q<20||q>=40?RGB(255,158,200):RGB(255,255,255);
+      line(v->s,cx-half,yy+p/2,cx,yy-p/2,col);
+      line(v->s,cx,yy-p/2,cx+half,yy+p/2,col);
+    }
   }
 }
 static void draw_man(const View *v){
@@ -1208,6 +1214,14 @@ static void draw_tubes(const View *v){
     disc(s, ax, ay, p * 15 / 4, RGB(200, 154, 58)); disc(s, ax, ay, p * 13 / 4, c); disc(s, ax, ay, p * 11 / 4, RGB(42, 33, 24)); disc(s, ax, ay, p, c); disc(s, ax, ay, p / 2 + 1, RGB(42, 33, 24));
     rect(s, bx - p * 19 / 4, by - p * 3 / 2, p * 4, p * 3, RGB(200, 150, 58)); rect(s, bx - p * 9 / 2, by - p * 5 / 4, p * 7 / 2, p * 5 / 8 + 1, RGB(255, 224, 138));
     rect(s, bx - p * 3 / 4, by - p * 13 / 8, p * 3 / 2, p * 13 / 4, c);
+    int stage=mx_tube_pulse_stage(t);
+    if(stage){
+      int r=p*4+(12-stage)*p/8,dist=p+(12-stage)*p/2;
+      u32 glow=stage>=6?RGB(255,255,255):RGB(255,210,63);
+      rect(s,ax-r,ay-1,2,2,glow);rect(s,ax+r-1,ay-1,2,2,glow);
+      rect(s,ax-1,ay-r,2,2,glow);rect(s,ax-1,ay+r-1,2,2,glow);
+      line(s,bx+dist,by-p,bx+dist,by+p,glow);
+    }
   }
 }
 static void draw_sling(const View *v){
