@@ -855,10 +855,16 @@ static void draw_all(void){
     quad4(qx, qy, Z_TARGET + 0.2f, argb(30, 18, 6, 255)); quad4(ix, iy, Z_TARGET + 0.25f, argb(122, 74, 34, 255)); puff(cx, cy, 1.8f, Z_TARGET + 0.3f, argb(255, 210, 63, 255));
   }
   for(int i = 0; i < world.npads; i++){
-    const MxPad *pd = &world.pads[i];
-    float cx = X(pd->x + pd->w * 0.5f), cy = Y((float)pd->y); float bob = (float)((int)(world.time * 8) & 3);
-    for(int k = 0; k < 3; k++){ float yy = cy - 15 - 15 * k - bob * 1.5f; uint32 c = k == 0 ? WHITE : k == 1 ? argb(255, 158, 200, 255) : argb(255, 110, 150, 255);
-      seg(cx - 10, yy + 4, cx, yy - 4, 2.4f, Z_FX - 0.2f, c); seg(cx, yy - 4, cx + 10, yy + 4, 2.4f, Z_FX - 0.2f, c); }
+    const MxPad *pd=&world.pads[i];int first,span=mx_pad_live_run(&world,pd,&first);
+    if(!span)continue;
+    float cx=X(first+span*.5f),cy=Y((float)pd->y),half=span*PXC*.5f;
+    if(half>10)half=10;
+    for(int k=0;k<3;k++){
+      int q=mx_pad_phase(world.time,k);float yy=cy-PXC*(2+q*.1f);
+      uint32 col=q<10||q>=50?argb(220,100,145,255):q<20||q>=40?argb(255,158,200,255):WHITE;
+      seg(cx-half,yy+4,cx,yy-4,2.4f,Z_FX-.2f,col);
+      seg(cx,yy-4,cx+half,yy+4,2.4f,Z_FX-.2f,col);
+    }
   }
   /* chapter 2 pneumatic tubes: balloon, brass mouth, nozzle stub */
   for(int i = 0; i < world.ntubes; i++){
@@ -873,6 +879,14 @@ static void draw_all(void){
     puff(ax, ay, 19, Z_TARGET + 0.2f, argb(200, 154, 58, 255)); puff(ax, ay, 16.5f, Z_TARGET + 0.25f, c); puff(ax, ay, 14.5f, Z_TARGET + 0.3f, argb(42, 33, 24, 255));
     { float a = world.time * 5; for(int k = 0; k < 24; k++){ float aa = k * 0.3f + a, r = k * 0.5f; puff(ax + cosf(aa) * r, ay + sinf(aa) * r, 1.4f, Z_TARGET + 0.35f, c); } }
     quad(bx - 24, by - 8, 20, 16, Z_TARGET + 0.2f, argb(200, 150, 58, 255)); quad(bx - 22, by - 6, 17, 3, Z_TARGET + 0.25f, argb(255, 224, 138, 255)); quad(bx - 4, by - 9, 7, 18, Z_TARGET + 0.3f, c);
+    int stage=mx_tube_pulse_stage(t);
+    if(stage){
+      float r=20+(12-stage)*.8f,dist=5+(12-stage)*2.5f;
+      uint32 glow=argb(255,240,175,65+stage*15);
+      quad(ax-r,ay-1,3,3,Z_TARGET+.4f,glow);quad(ax+r-1,ay-1,3,3,Z_TARGET+.4f,glow);
+      quad(ax-1,ay-r,3,3,Z_TARGET+.4f,glow);quad(ax-1,ay+r-1,3,3,Z_TARGET+.4f,glow);
+      seg(bx+dist,by-7,bx+dist,by+7,2,Z_TARGET+.4f,glow);
+    }
   }
   /* the air valve has no presence until selected with DOWN. */
   if(world.valve_ok){ float vx = X(MX_VALVE_X), vy = Y(MX_VALVE_Y), gy = Y((float)MX_ROWS); int f = m->mode == MAN_AIM ? (int)(m->inf * 100) : 0;
