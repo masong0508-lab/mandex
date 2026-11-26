@@ -1207,7 +1207,7 @@ function drawValve(){
   if(!open){ctx.globalAlpha=.8;txt('LOCKED',VX,VY-12,11,'#aab','center');txt('beat 3 levels',VX,VY-26,10,'#889','center');ctx.globalAlpha=.38}
   else if(m.mode==='aim'&&!m.seated&&!dragging&&stom(m)<.001){ctx.globalAlpha=.6+.4*Math.sin(t*4);txt('TAP: AIR VALVE',VX,VY-12,11,'#fff','center');ctx.globalAlpha=1}
   if(m.mode==='aim'&&stom(m)>0){const w=44;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(VX-w/2,VY-62,w,7);ctx.fillStyle=f<.5?'#7dff5a':f<.8?'#ffd23f':'#ff4a4a';ctx.fillRect(VX-w/2+1,VY-61,(w-2)*f,5);
-    if(f>.7&&!OPT().noBurst&&Math.sin(t*20)>0)txt('DANGER!',VX,VY-68,13,'#ff4a4a','center')}
+    if(!OPT().noBurst)txt(f>=.85?'RELEASE SOON':Math.round(f*100)+'% FULL',VX+18,VY-68,12,f>=.85?'#ff7070':'#dff3ff','center')}
   ctx.restore()}
 function drawInfFX(m){
   ctx.save();ctx.translate(m.x,m.y);
@@ -1581,6 +1581,58 @@ function bellyVol(bx,by,rx,ry,f){if(f<.05)return;const k=Math.min(1,f),gr=ctx.cr
 // BGROW
 const stom=m=>(m.inf||0)+(m.bel||0);
 const bgrow=f=>f<=1?f:1+(f-1)*.6;   // BGROW: what the sprites draw.  The body keeps its proportions; only the belly mass grows, and slower past full
+// Inflation presentation only. Keep the collision/mass value in stom(m).
+// A bounded continuous curve keeps even the unlimited-fill option drawable.
+const INFLATE_VISUAL_MAX=1.85;
+function inflationTarget(raw){
+  raw=Number.isFinite(raw)?Math.max(0,raw):0;
+  return raw<=1?raw*(1+.18*raw):1.18+.67*(1-Math.exp(-.8*(raw-1)));
+}
+function inflationTick(m,dt){
+  const raw=Math.max(0,stom(m)||0);
+  if(raw===0&&m.infVisual==null)return;
+  const target=inflationTarget(raw),prior=Number.isFinite(m.infRaw)?m.infRaw:0;
+  const gain=Math.max(0,(raw-prior)/Math.max(dt,.00001));
+  const charge=clamp(gain*3.6,0,1);
+  m.infVisual=Number.isFinite(m.infVisual)?m.infVisual+(target-m.infVisual)*(1-Math.exp(-(raw<prior?24:30)*dt)):target;
+  m.infPump=(m.infPump||0)+(charge-(m.infPump||0))*(1-Math.exp(-(charge>0?22:9)*dt));
+  m.infPhase=((m.infPhase||0)+dt*(10+4*Math.min(1,raw)))%(Math.PI*2);
+  m.infRaw=raw;
+}
+function inflationSample(m,t){
+  const raw=Number.isFinite(stom(m))?Math.max(0,stom(m)):0;
+  const base=Number.isFinite(m.infVisual)?m.infVisual:inflationTarget(raw);
+  const pressure=clamp(raw/(m.chug?1.15:1),0,1),phase=m.infPhase||0;
+  const pump=clamp(m.infPump||0,0,1),brace=clamp((pressure-.43)/.52,0,1);
+  const pulse=Math.sin(phase),settle=Math.sin(phase*.5+t*.5);
+  const fill=clamp(base*(1+.035*pump*pulse+.012*brace*settle),0,INFLATE_VISUAL_MAX);
+  const face=pressure>.82?'scream':pressure>.46?'burp':'cool';
+  return {raw,fill,pressure,pump,brace,pulse,face};
+}
+// The maximum belly extent stays above the planted feet. One geometry
+// drives the outline, garment, highlights and rotating body.
+function frontInflationGeometry(f){
+  f=clamp(Number.isFinite(f)?f:0,0,INFLATE_VISUAL_MAX);
+  return {cy:-2+f*6.5,rx:22+f*17,ry:17+f*13.5,depth:17+f*21,z:6+f*9};
+}
+function inflationFrontPose(a){
+  const f=a.fill,k=a.brace,b=a.pump*a.pulse;
+  return {armL:[-35-f*5,-12-k*6,-33-f*8,-34+k*12],armR:[35+f*5,-12-k*6,33+f*8,-34+k*12],head:[b*1.1,-k*1.8,(k*.035+b*.025)]};
+}
+function inflationDrinkPose(c,a,t){
+  const u=c.ph===2||c.ph===4?1:0;
+  const sip=u*(.5+.5*Math.sin(t*12));
+  const q={t,cape:1,quiff:1,inflate:a.fill,face:a.face,hp:-a.brace*4,hr:2*a.pump*a.pulse,
+    arms:{L:[-34-a.fill*3,-7,-2,-29-a.fill*6,12,1],R:[32,-11,5,30,-32,4]}};
+  if(u){
+    q.arms.R=[32,-23,6,6,-32-sip*1.8,15];
+    const k=c.ph===2?0:1,start=k===0?CT_BK:CT_TB;
+    const lvl=c.keep>0?1-((c.keep*.8)%1):1-clamp((c.t-start)/.55,0,1);
+    q.prop={k:'bottle',h:'R',level:lvl,index:k,angle:Math.PI+.25+(1-lvl)*.24};
+    q.face=a.pressure>.82?'scream':'burp';
+  }
+  return q;
+}
 const burpMult=m=>OPT().burpCharge?clamp(1+(stom(m)-BEL_SET)*2.2,1,3.2):1;   // BEL_MAX .3 = the "second sprite" belly; it settles to BEL_SET once the soda has sloshed down
 // chug choreography: hop to the stand -> spin to face away and grab bottle 1 -> glug (back to camera) -> spin round to show off the belly -> bottle 2 -> leap back to the sling
 const CT_A=.3,CT_BK=CT_A+.25,CT_C=CT_BK+.55,CT_TB=CT_C+.25,CT_D=CT_TB+.55,CT_END=CT_D+.35;
@@ -1734,13 +1786,12 @@ function drawBurpStand(){if(state!=='play'||!toolOn('burp'))return;const c=man.c
   if(!c&&man.mode==='aim'&&pw.left.burp>0&&!dragging){ctx.globalAlpha=.7+.3*Math.sin(time*5);txt(pw.sel==='burp'?'HOLD: MORE SODA':'TAP TO CHUG  (HOLD = KEEP GUZZLING)',STX-26,TY-50,14,'#ffd23f','center');ctx.globalAlpha=1}
   if(man.mode==='aim'&&stom(man)>.001){const cap=OPT().noBurst?STOM_MAX:SODA_BURST,f=clamp(stom(man)/cap,0,1),w=64,x0=STX-w/2,y0=GY-124;ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(x0,y0,w,8);
     ctx.fillStyle=f<.55?'#7dff5a':f<.85?'#ffd23f':'#ff4a4a';ctx.fillRect(x0+1,y0+1,(w-2)*f,6);
-    if(!OPT().noBurst){ctx.fillStyle='#fff';ctx.fillRect(x0+w/SODA_BURST-1,y0-3,2,14);if(f>.85&&Math.sin(time*20)>0)txt('DANGER!',STX,y0-8,13,'#ff4a4a','center')}
+    if(!OPT().noBurst){ctx.fillStyle='#fff';ctx.fillRect(x0+w/SODA_BURST-1,y0-3,2,14);if(f>.85)txt('RELEASE SOON',STX,y0-8,12,'#ff7070','center')}
     if(OPT().burpCharge)txt('BURP x'+burpMult(man).toFixed(1),STX,y0+24,12,'#ff9ec8','center')}}
-function drawChugMan(m){const c=m.chug,ph=c.ph;ctx.save();ctx.scale(.5,.5);
-  if(ph===1||ph===3)drawSpin(c.th,{});else if(ph===2)drawBack(null,time,{});else{INF=bgrow(stom(m));drawFront('up','cool',time);INF=0}
-  ctx.restore();
-  if(ph===2||ph===4){const k=ph===2?0:1,t0=ph===2?CT_BK:CT_TB,lvl=c.keep>0?1-((c.keep*.8)%1):1-clamp((c.t-t0)/(CT_D-CT_TB),0,1),px=ph===2?0:3,py=ph===2?-20:-17,tl=ph===2?.32:.58;   // from behind only the upturned base shows over his head
-    ctx.save();ctx.translate(px,py);ctx.rotate(Math.PI+tl+(1-lvl)*.3);ctx.translate(0,34);ctx.scale(.9,.9);bottleDraw(0,0,lvl,BOTCOL[k]);ctx.restore()}}
+function drawChugMan(m){
+  const c=m.chug,a=inflationSample(m,time),o=inflationDrinkPose(c,a,time);
+  ctx.save();ctx.scale(.5,.5);drawSpin(c.th||0,o);ctx.restore();
+}
 function inCone(rx,ry,dx,dy,L,k,pad){const al=rx*dx+ry*dy;if(al<4||al>L)return -1;const pe=Math.abs(-rx*dy+ry*dx);return pe<=k*al+pad?al:-1}
 function burpBlast(){const m=man;m.burped=true;const a=Math.atan2(m.vy,m.vx)*.5,dx=Math.cos(a),dy=Math.sin(a),bm=m.bm||1,L=128*Math.sqrt(bm),n=Math.ceil(L/V)+2,cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);
   for(let j=-n;j<=n;j++)for(let i=-n;i<=n;i++){const al=inCone(i*V,j*V,dx,dy,L,.3,12);if(al<0)continue;damageCell(cx+i,cy+j,Math.round((3+Math.floor(6*(1-al/L)))*bm))}
@@ -1985,6 +2036,7 @@ function update(dt){
     m.a=m.t>2?Math.max(0,1-(m.t-2)/.6):1;if(m.t>2.6){goo(m.x,m.y,20,240);SFX.pop();m.mode='done'}}
   if(man.mode==='walk')walkStep(dt);
   if(man.burped&&man.bel>0)man.bel=Math.max(0,man.bel-dt*1.2);
+  if(man.mode==='aim'||man.mode==='fly'||man.mode==='stuck')inflationTick(man,dt);
   if(man.jg)jigStep(man,dt);
   if(man.jg&&(man.mode==='stuck'||man.mode==='fly'))ragStep(man,dt);
   if(man.mode==='done'){man={mode:'wait',x:-999,y:-999,t:0,a:1,R:14};waitT=0;aftershock()}
@@ -2051,10 +2103,10 @@ function pEgg(cx,cy,rx,ry,fill){const p=new Path2D(),t=cy-ry*.95,b=cy+ry*1.05;p.
   p.bezierCurveTo(cx+rx*.85,t,cx+rx*1.06,cy-ry*.25,cx+rx*1.04,cy+ry*.2);p.bezierCurveTo(cx+rx*1.02,cy+ry*.72,cx+rx*.55,b,cx,b);
   p.bezierCurveTo(cx-rx*.55,b,cx-rx*1.02,cy+ry*.72,cx-rx*1.04,cy+ry*.2);p.bezierCurveTo(cx-rx*1.06,cy-ry*.25,cx-rx*.85,t,cx,t);p.closePath();
   const m=Math.max(rx,ry*1.1);return{p,fill,bb:[cx-m,cy-m,cx+m,cy+m]}}
-function bellyDetail(f){const cy=-2+f*14,rx=22+f*16,ry=17+f*20;ctx.save();
+function bellyDetail(f){const {cy,rx,ry}=frontInflationGeometry(f);ctx.save();
   const g=ctx.createRadialGradient(0,cy+ry*.6,2,0,cy+ry*.5,ry*.95);g.addColorStop(0,'rgba(222,115,105,.42)');g.addColorStop(1,'rgba(222,115,105,0)');
   ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(0,cy+ry*.45,rx*.95,ry*.8,0,0,6.3);ctx.fill();
-  ctx.strokeStyle='rgba(88,52,30,.55)';ctx.lineWidth=.8;ctx.lineCap='round';const n=Math.min(140,34+(f*40|0));
+  ctx.strokeStyle='rgba(88,52,30,.55)';ctx.lineWidth=.8;ctx.lineCap='round';const n=perf.detail>0?Math.min(64,24+(f*23|0)):12;
   for(let i=0;i<n;i++){const v=Math.pow(cgRnd(i+800),1.8),y=cy-ry*.85+ry*1.55*v,w=Math.sqrt(Math.max(0,1-Math.pow((y-cy)/ry,2))),x=(cgRnd(i+700)*2-1)*rx*.86*w,l=3+cgRnd(i+900)*3,r=(cgRnd(i+950)-.5)*3;
     ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+l*.5+r,y+l*.2,x+l+r*.5,y+(cgRnd(i+990)>.5?l*.9:-l*.4));ctx.stroke()}
   const ny=cy+ry*.56,nw=1.6+f*.6,nh=3.4+f*1.3;
@@ -2255,7 +2307,8 @@ function jigMerge(o){if(!JIG)return o;o=Object.assign({},o||{});o.bo=JIG.bo;o.ro
 // outie navel and a throb.  Also stops the old red flash from turning the whole belly into a solid red blob.  (cx,cy,rx,ry) = belly ellipse, (nx,ny) = navel.
 // STRAINFX
 function strainFX(cx,cy,rx,ry,f,nx,ny,t){
-  if(f<=1)return;const k=Math.min(1,(f-1)*2.3),th=.5+.5*Math.sin(t*(7+k*9));
+  if(f<=1)return;const k=Math.min(1,(f-1)*2.3),th=.5+.5*Math.sin(t*(7+k*3));
+  if(perf.detail===0){ctx.save();ctx.strokeStyle='rgba(255,193,112,'+(.2*k)+')';ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(cx,cy,rx*.94,ry*.94,0,0,6.3);ctx.stroke();ctx.restore();return;}
   ctx.save();ctx.globalAlpha=1;ctx.lineCap='round';
   const g=ctx.createRadialGradient(cx-rx*.32,cy-ry*.38,1,cx,cy,Math.max(rx,ry));
   g.addColorStop(0,'rgba(255,255,255,'+(.4*k)+')');g.addColorStop(.5,'rgba(255,190,190,0)');g.addColorStop(1,'rgba(255,80,100,'+((.28+.18*th)*k)+')');
@@ -2281,7 +2334,7 @@ function workHatSide(){ctx.save();ctx.lineJoin='round';ctx.strokeStyle=OUT;ctx.l
  ctx.beginPath();ctx.ellipse(36,-27,19,2.8,.06,0,6.3);ctx.fillStyle='#e8a800';ctx.fill();ctx.stroke();
  ctx.beginPath();ctx.moveTo(17.5,-27);ctx.bezierCurveTo(17,-39,24,-43,31,-43);ctx.bezierCurveTo(38,-43,44,-37,43,-27);ctx.closePath();ctx.fillStyle='#ffc61a';ctx.fill();ctx.stroke();
  ctx.fillStyle='#ffe57a';ctx.beginPath();ctx.moveTo(27,-42.5);ctx.lineTo(25,-27);ctx.lineTo(33,-27);ctx.lineTo(33,-42.5);ctx.closePath();ctx.fill();ctx.restore()}
-function workVestF(o){const f=INF,rx=22+f*16,ry=17+f*20,cy=-2+f*14,yh=cy+ry*.62;ctx.save();ctx.lineJoin='round';
+function workVestF(o){const f=INF,{rx,ry,cy}=frontInflationGeometry(f),yh=cy+ry*.62;ctx.save();ctx.lineJoin='round';
  if(o&&o.bo)ctx.translate(o.bo[0],o.bo[1]);if(o&&o.belly){ctx.translate(0,-2+(o.bdy||0));ctx.scale(o.belly[0],o.belly[1]);ctx.translate(0,2)}
  for(const s of[-1,1]){const P=()=>{ctx.beginPath();ctx.moveTo(s*6.5,-30.5);ctx.quadraticCurveTo(s*14,-33,s*20,-29);ctx.lineTo(s*22.5,-20);ctx.bezierCurveTo(s*(rx+1.5),-8,s*(rx+2),cy-ry*.2,s*rx*.97,yh-1);ctx.quadraticCurveTo(s*rx*.7,yh+2.5,s*rx*.38,yh);ctx.bezierCurveTo(s*11,cy+ry*.2,s*9,-14,s*6.5,-30.5);ctx.closePath()};
   P();ctx.fillStyle='#ff6a00';ctx.fill();ctx.save();ctx.clip();ctx.fillStyle='#e6ff3a';ctx.fillRect(-40,cy-ry*.35,80,3.2);ctx.fillRect(-40,cy+ry*.3,80,3.2);ctx.fillStyle='rgba(120,40,0,.25)';ctx.fillRect(-40,cy+ry*.45,80,30);ctx.restore();
@@ -2349,21 +2402,21 @@ function drawFront(pose,fk,t,o){
   if(THONG){gluteCreases();thongFront()}
   if(o&&o.ro)ctx.restore();
   // torso: shoulders, chest, belly and love handles are ONE mass, drawn after the briefs so the belly overhangs the waistband
-  {const wo=o&&o.bo&&o.ro?[(o.bo[0]+o.ro[0])/2,(o.bo[1]+o.ro[1])/2]:[0,0],bM=new DOMMatrix();
+  {const ig=frontInflationGeometry(INF),wo=o&&o.bo&&o.ro?[(o.bo[0]+o.ro[0])/2,(o.bo[1]+o.ro[1])/2]:[0,0],bM=new DOMMatrix();
    if(o&&o.bo)bM.translateSelf(o.bo[0],o.bo[1]);if(o&&o.belly){bM.translateSelf(0,-2+(o.bdy||0));bM.scaleSelf(o.belly[0],o.belly[1]);bM.translateSelf(0,2)}
    const xf=(q,M)=>{const p=new Path2D();p.addPath(q.p,M);const b=q.bb,pts=[[b[0],b[1]],[b[2],b[1]],[b[0],b[3]],[b[2],b[3]]].map(c=>[M.a*c[0]+M.c*c[1]+M.e,M.b*c[0]+M.d*c[1]+M.f]);
      return{p,fill:q.fill,bb:[Math.min(...pts.map(c=>c[0])),Math.min(...pts.map(c=>c[1])),Math.max(...pts.map(c=>c[0])),Math.max(...pts.map(c=>c[1]))]}};
    ctx.fillStyle='rgba(110,30,30,.30)';for(const q of[-1,1]){ctx.beginPath();ctx.ellipse(q*17.5+wo[0],15.4+wo[1],10.6,3.2,0,0,6.3);ctx.fill()}                  // the shadow a love handle throws on the shorts
-   blob([pYoke(1,0,0),pEll(0,-22,21,10),(o&&o.sk?pSkin(skPts(0,-2+INF*14,22+INF*16,17+INF*20,o.sk,o.belly,o.bdy)):xf(INF>.04?pEgg(0,-2+INF*14,22+INF*16,17+INF*20):pEll(0,-2+INF*14,22+INF*16,17+INF*20),bM)),pEll(-17.5+wo[0],10.4+wo[1],11,6.4),pEll(17.5+wo[0],10.4+wo[1],11,6.4)]);
+   blob([pYoke(1,0,0),pEll(0,-22,21,10),(o&&o.sk?pSkin(skPts(0,ig.cy,ig.rx,ig.ry,o.sk,o.belly,o.bdy)):xf(pEll(0,ig.cy,ig.rx,ig.ry),bM)),pEll(-17.5+wo[0],10.4+wo[1],11,6.4),pEll(17.5+wo[0],10.4+wo[1],11,6.4)]);
    ctx.save();ctx.translate(0,-3);curls(Array.from({length:14},(_,k)=>[-5+(k*7)%11,-21+((k*5)%9),k%2?1:-1]));ctx.restore();
    ctx.strokeStyle='rgba(176,92,52,.7)';ctx.lineWidth=1.3;ctx.lineCap='round';ctx.beginPath();ctx.arc(-9,-18,7,.2,2.6);ctx.stroke();ctx.beginPath();ctx.arc(9,-18,7,.5,2.9);ctx.stroke();       // under each pec
    ctx.fillStyle='rgba(255,255,255,.28)';ctx.beginPath();ctx.ellipse(-8,-28,6,2.8,-.3,0,6.3);ctx.fill();
    const bgrp=o&&(o.belly||o.bo);if(bgrp){ctx.save();if(o.bo)ctx.translate(o.bo[0],o.bo[1]);if(o.belly){ctx.translate(0,-2+(o.bdy||0));ctx.scale(o.belly[0],o.belly[1]);ctx.translate(0,2)}}
    ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(-9,-9,8,4.5,-.4,0,6.3);ctx.fill();
    if(INF>.04)bellyDetail(INF);else{ctx.strokeStyle='rgba(176,92,52,.8)';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(0,4+INF*16,2.4+INF*2.5,.1,3.1);ctx.stroke()}                                                      // navel
-   if(INF>.04){const f=INF,cy=-2+f*14,rx=22+f*16,ry=17+f*20;ctx.save();ctx.fillStyle='rgba(255,255,255,'+(.2+f*.25)+')';ctx.beginPath();ctx.ellipse(-rx*.4,cy-ry*.35,rx*.2,ry*.2,-.5,0,6.3);ctx.fill();
+   if(INF>.04){const f=INF,{cy,rx,ry}=ig;ctx.save();ctx.fillStyle='rgba(255,255,255,'+(.2+f*.25)+')';ctx.beginPath();ctx.ellipse(-rx*.4,cy-ry*.35,rx*.2,ry*.2,-.5,0,6.3);ctx.fill();
      if(f>.3){ctx.strokeStyle='rgba(205,70,60,'+Math.min(.8,(f-.3)*1.4)+')';ctx.lineWidth=1.2;ctx.lineCap='round';for(const q of[-1,1])for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(q*rx*.15,cy+(k-1)*ry*.3,rx*.8,q>0?-.5+Math.PI*0:Math.PI-.5,q>0?.5:Math.PI+.5);ctx.stroke()}}
-     if(f>.65){ctx.globalAlpha=Math.min(.28,(f-.65)*1.2)*(.6+.4*Math.sin(time*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(0,cy,rx*.97,ry*.97,0,0,6.3);ctx.fill()}ctx.globalAlpha=1;ctx.restore();stretchBriefs(cy,rx,ry,f);ctx.save();strainFX(0,cy,rx,ry,f,0,4+f*16-1.5,time);ctx.restore()}
+     if(f>.65){ctx.globalAlpha=Math.min(.28,(f-.65)*1.2)*(.6+.4*Math.sin(time*26));ctx.fillStyle='#ff4a4a';ctx.beginPath();ctx.ellipse(0,cy,rx*.97,ry*.97,0,0,6.3);ctx.fill()}ctx.globalAlpha=1;ctx.restore();stretchBriefs(cy,rx,ry,f);ctx.save();strainFX(0,cy,rx,ry,f,0,cy+ry*.56,time);ctx.restore()}
    curls(Array.from({length:6},(_,k)=>[k%2?.9:-.9,-13+k*2.6,k%2?1:-1]));
    if(bgrp)ctx.restore();
    for(const q of[-1,1]){ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(q*10+wo[0],12.4+wo[1]);ctx.quadraticCurveTo(q*19+wo[0],15+wo[1],q*26+wo[0],11.6+wo[1]);ctx.stroke()}}   // the fold under each roll
@@ -2378,18 +2431,19 @@ function drawFront(pose,fk,t,o){
   if(WORK)workHatF();face(0,-43,1,fk,t,false,o&&o.fx);if(WOLF||WOLFH)wolfHeadF(WOLF?3:WOLFH);if(o&&o.head)ctx.restore();if(o&&o.after)o.after()}
 // ---- seated side profile, rear on the air valve (local origin = the rear on the nozzle, he faces right, y up is negative). f = belly inflation 0..1.
 // Everything but the belly keeps its size: head, neck, chest, arms and legs are separate shapes; only the belly bulge grows out the front.
-function drawSeatSide(f,t){
-  const fl=Math.sin(t*9),tr=f>.5?Math.sin(t*40)*f*.8:0;
+function drawSeatSide(f,t,a){
+  a=a||{pump:0,brace:clamp(f,0,1),pulse:0};
+  const fl=Math.sin(t*9),tr=a.pump*a.pulse*1.25+a.brace*Math.sin(t*10)*.7,raise=a.brace*9;
   // towel streaming behind from his neck
   ctx.beginPath();ctx.moveTo(-1,-52);ctx.bezierCurveTo(-12,-56+fl*2,-26,-46+fl*3,-38,-52+fl*4);ctx.lineTo(-36,-30+fl*3);ctx.bezierCurveTo(-24,-30,-12,-34,-2,-40);ctx.closePath();
   ctx.fillStyle=TOW;ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.8;ctx.stroke();ctx.strokeStyle=TOWS;ctx.lineWidth=2.6;
   for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(-10-k*9,-52+k+fl*2);ctx.lineTo(-11-k*9,-36+k+fl*2);ctx.stroke()}
   // far arm (up, panicking) and far leg, darker
-  blob([pTap(-1,-46,5.6,-9,-58,4.8,SKD),pTap(-9,-58,4.8,-5,-74,4.2,SKD),pEll(-5,-75,5,5,SKD)],{ow:1.6,hl:0});
+  blob([pTap(-1,-46,5.6,-9,-52-raise*.65,4.8,SKD),pTap(-9,-52-raise*.65,4.8,-8+tr,-63-raise,4.2,SKD),pEll(-8+tr,-64-raise,5,5,SKD)],{ow:1.6,hl:0});
   blob([pTap(-2,-9,7,20,-8,5.8,SKD),pTap(20,-8,5.6,22,10,4.4,SKD)],{ow:1.6,hl:0});
   ctx.fillStyle='#fff';ctx.strokeStyle=OUT;ctx.lineWidth=1.2;ell(22,9,4.6,5,'#fff',1.2);blob([pEll(25,16,8.5,3.6,'#8a5a2b')],{ow:1.6,hl:0});
   // torso: back, chest and a thick neck, never changing size
-  const A=[3+f*3,-35+f*1.5,11+f*3,9+f*2.5],B=[7+f*10,-22+f*3,10+f*13,10+f*9],C=[5+f*7,-11+f*3.5,9+f*8,6+f*4];
+  const A=[3+f*3,-35+f*1.5,11+f*3,9+f*2.5],B=[7+f*13,-22+f*2.4,10+f*15,10+f*8],C=[5+f*7,-11+f*3.5,9+f*8,6+f*4];
   blob([pEll(-4,-30,13,22),pEll(2,-44,15,11),pTap(2,-50,7,3,-60,6.4,SK),pEll(A[0],A[1],A[2],A[3]),pEll(B[0],B[1],B[2],B[3]),pEll(C[0],C[1],C[2],C[3])],{ow:1.9});      // chest + belly: ONE outline, no seam
   ctx.strokeStyle='rgba(176,92,52,.6)';ctx.lineWidth=1.3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-14,-48);ctx.quadraticCurveTo(-17,-36,-13,-24);ctx.stroke();      // spine groove
   curls(Array.from({length:5},(_,k)=>[8+(k*3)%7,-46+(k*5)%8,k%2?1:-1]));
@@ -2412,9 +2466,9 @@ function drawSeatSide(f,t){
   blob([pTap(24,6,5.2,24,13,4.8,'#fff')],{ow:1.4,shc:'rgba(110,110,165,.30)',hl:0});ctx.strokeStyle=WORK?'rgba(0,0,0,0)':'#e33';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(19.4,9);ctx.lineTo(28.6,9);ctx.stroke();
   blob([pEll(27,17,9,4,'#8a5a2b')],{ow:1.7,shc:'rgba(60,30,10,.4)',hl:0});
   // near arm: hand pressed on the swelling belly
-  {const bx=7+f*10,by=-22+f*3,rx=10+f*13,ry=10+f*9,hx=bx+rx*.62,hy=by-ry*.78,ex=8+f*3,ey=-37+f*1.5;blob([pTap(3,-47,6,ex,ey,5.2),pTap(ex,ey,5,hx,hy,4.4),pEll(ex,ey,5.4,5.3),pEll(hx,hy,5.6,5)],{ow:1.8})}   // hand rests on top of the belly
+  {const [bx,by,rx,ry]=B,hx=bx+rx*.62,hy=by-ry*.78,ex=8+f*4,ey=-37+f*1.5;blob([pTap(3,-47,6,ex,ey,5.2),pTap(ex,ey,5,hx,hy,4.4),pEll(ex,ey,5.4,5.3),pEll(hx,hy,5.6,5)],{ow:1.8})}   // hand rests on top of the belly
   // head in profile: skull, jaw, nose, ear, comb-over, eye, moustache, mouth
-  const hx=4+tr-f*2,hy=-70+f*1.2;   // leans back to counterbalance the belly
+  const hx=4+tr-f*2,hy=-70-a.brace*1.5;   // leans back to counterbalance the belly
   blob([pEll(hx,hy,13,12.5),pEll(hx+6,hy+6,10.5,8)],{ow:1.9});                                               // skull + jaw
   blob([pEll(hx+15.5,hy+1,3.6,3.2)],{ow:1.4,hl:0});                                                          // nose
   if(f>.45){ctx.fillStyle='rgba(235,40,50,'+Math.min(.62,(f-.45)*1.4)*(.9+.1*Math.sin(t*14))+')';ctx.beginPath();ctx.ellipse(hx+3,hy+3,11.5,10,0,0,6.3);ctx.fill();ctx.beginPath();ctx.ellipse(hx+15.5,hy+1,3.6,3.2,0,0,6.3);ctx.fill();ctx.beginPath();ctx.ellipse(hx-6,hy+1,3,4.2,0,0,6.3);ctx.fill()}   // face reddens as the pressure builds
@@ -2423,10 +2477,10 @@ function drawSeatSide(f,t){
   ctx.quadraticCurveTo(hx+2,hy-9,hx-3,hy-8);ctx.quadraticCurveTo(hx-8,hy-6,hx-9,hy+2);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.2;ctx.stroke();
   ctx.strokeStyle=HAIR;ctx.lineWidth=1.4;ctx.lineCap='round';for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(hx-5+k*3.5,hy-13);ctx.quadraticCurveTo(hx+1+k*3,hy-16+k,hx+7+k*2,hy-11);ctx.stroke()}   // comb-over strands
   ctx.fillStyle='rgba(255,105,110,.35)';ctx.beginPath();ctx.ellipse(hx+8,hy+6,3.4,2.2,0,0,6.3);ctx.fill();
-  const wide=f>.5?1.25:1;ell(hx+10,hy-3,4.2*wide,4.8*wide,'#fff',1.2);ell(hx+11.4,hy-2.8,2.2,2.6,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(hx+10.8,hy-4,.9,0,6.3);ctx.fill();   // eye
+  const wide=1+a.brace*.25;ell(hx+10,hy-3,4.2*wide,4.8*wide,'#fff',1.2);ell(hx+11.4,hy-2.8,2.2,2.6,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(hx+10.8,hy-4,.9,0,6.3);ctx.fill();   // eye
   ctx.strokeStyle=HAIR;ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(hx+6,hy-10-f*2);ctx.lineTo(hx+14,hy-8+f*2);ctx.stroke();                                                          // worried brow
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(hx+8,hy+4);ctx.quadraticCurveTo(hx+14,hy+2,hx+20,hy+4.5);ctx.quadraticCurveTo(hx+22,hy+7,hx+17,hy+7.5);ctx.quadraticCurveTo(hx+11,hy+7,hx+8,hy+6.5);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1;ctx.stroke();   // moustache
-  ell(hx+15,hy+11,3+f*2,2.6+f*3.2,'#5a1010',1.2);                                                           // mouth, opening wider as the pressure builds
+  ell(hx+15,hy+11,3+a.brace*2,2.6+a.brace*3.2,'#5a1010',1.2);                                                           // mouth, opening wider as the pressure builds
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(hx+9,hy+10,8.5,.2,2.4);ctx.fill();                              // stubble shadow on the jaw
   if(f>.45){ctx.fillStyle='rgba(120,200,255,.85)';for(let k=0;k<2;k++){const sy=hy-10+((t*40+k*17)%26);ctx.beginPath();ctx.ellipse(hx+(k?-2:15),sy,1.6,2.4,0,0,6.3);ctx.fill()}}   // sweat
 }
@@ -3110,7 +3164,7 @@ function drawSpin(th,o){
   }
 
   // ---------------- upper body: shoulders, chest, belly and love handles are ONE mass (see blob); the chest and belly marks sit on top of it
-  const shL=G3(-20.5,-21.5,0,7.4,6.8,7,{ox:oU}),shR=G3(20.5,-21.5,0,7.4,6.8,7,{ox:oU}),trL=G3(-9,-28.5,0,9.5,5.2,8,{ox:oU}),trR=G3(9,-28.5,0,9.5,5.2,8,{ox:oU}),chest=G3(0,-21,0,21,11.5,11,{ox:oU}),belly=G3(0,-2,6,22*bs[0],17*bs[1],17,{ox:oM+bo[0],oy:bo[1],bias:3});
+  const shL=G3(-20.5,-21.5,0,7.4,6.8,7,{ox:oU}),shR=G3(20.5,-21.5,0,7.4,6.8,7,{ox:oU}),trL=G3(-9,-28.5,0,9.5,5.2,8,{ox:oU}),trR=G3(9,-28.5,0,9.5,5.2,8,{ox:oU}),chest=G3(0,-21,0,21,11.5,11,{ox:oU}),ig=frontInflationGeometry(o.inflate||0),belly=G3(0,ig.cy,ig.z,ig.rx*bs[0],ig.ry*bs[1],ig.depth,{ox:oM+bo[0],oy:bo[1],bias:3});
   const hnd=[-1,1].map(q=>{const hxx=q*18,hz=4,a=10.5,b=6,c=13,hy=10;return{q,px:hxx*C+hz*S+oM+wo[0],py:hy+wo[1],rx:Math.hypot(a*C,c*S),b}});
   add(belly.d,()=>{
     ctx.fillStyle='rgba(110,30,30,.30)';for(const h of hnd){ctx.beginPath();ctx.ellipse(h.px,h.py+5.4,h.rx*.98,h.b*.85,0,0,6.2832);ctx.fill()}                  // the shadow a love handle throws on the shorts
@@ -3123,7 +3177,7 @@ function drawSpin(th,o){
     dec([chest],-9,-26,()=>{ctx.fillStyle='rgba(255,255,255,.26)';ctx.beginPath();ctx.ellipse(0,0,7,3.4,-.4,0,6.3);ctx.fill()},{back:1});
     dec([belly],0,-6,()=>curls(Array.from({length:6},(_,k)=>[k%2?.9:-.9,-7+k*2.6,k%2?1:-1])));
     dec([belly],-7,-10,()=>{ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(0,0,8,5,-.4,0,6.3);ctx.fill()});
-    dec([belly],0,5.5,()=>{ctx.strokeStyle='rgba(176,92,52,.85)';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.arc(0,-1.5,2.4,.1,3.1);ctx.stroke()});               // navel
+    dec([belly],0,ig.cy+ig.ry*(7.5/17),()=>{ctx.strokeStyle='rgba(176,92,52,.85)';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.arc(0,-1.5,2.4,.1,3.1);ctx.stroke()});               // navel
     dec([belly],0,0,()=>{ctx.fillStyle='rgba(176,92,52,.24)';ctx.beginPath();ctx.ellipse(0,0,1.6,10,0,0,6.3);ctx.fill();dimples(0,4,6.2)},{back:1});      // spine and the two dimples above the butt
     for(const h of hnd){ctx.strokeStyle='rgba(170,90,50,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.ellipse(h.px,h.py,h.rx*.8,h.b*.7,0,.35,Math.PI-.35);ctx.stroke()}});            // the fold under each roll
 
@@ -3217,7 +3271,7 @@ function drawSpin(th,o){
   if(!NOTOWEL&&!CA){const Hh=[rF[0],rF[1],rF[2]],tm=rF[1]>-62.5?2:1,cl=live?towelFor(TW_SPIN,Hh,0,tm):towelStatic(Hh,tm);for(const q of towelJobs(cl,rF[2]))add(q.d,q.fn)}
   if(!CA)add(rF[2]+.2,()=>{if(covering)palm(rF);else{blob([pEll(rF[0],rF[1],6.8,6.8)],{ow:0});knuckles(rF)}});                // the raised hand over the towel's held edge
 
-  if(o.prop){const H=o.prop.h==='L'?lF:rF;add(H[2]+.8,()=>{if(o.prop.k==='lint')lint(H[0]+(o.prop.dx||0),H[1]+(o.prop.dy||-7))})}
+  if(o.prop){const H=o.prop.h==='L'?lF:rF;add(H[2]+.8,()=>{if(o.prop.k==='lint')lint(H[0]+(o.prop.dx||0),H[1]+(o.prop.dy||-7));else if(o.prop.k==='bottle'){ctx.save();ctx.translate(H[0],H[1]);ctx.rotate(o.prop.angle);ctx.scale(.85,.85);bottleDraw(0,14,o.prop.level,BOTCOL[o.prop.index]);ctx.restore()}})}
   if(o.sweatB)add(60,()=>{ctx.save();ctx.translate(oU,0);sweatBeads();ctx.restore()});
   if(o.cape){const walking=!!o.walkFeet,ca=walking?th:capeAng(th),Cq=Math.cos(ca),Sq=Math.sin(ca),N=8,Lp=[],Rp=[];
     for(let j=0;j<=N;j++){const u=j/N,y=-27+u*76,w=14+u*18+Math.sin(tt*4+u*2)*1.4*u,z=-11.5-u*4+Math.sin(tt*3+u*3)*1.8*u-(walking?(8+o.capeTrail)*u*u:0),fold=walking?(2+7*u)*Math.abs(Sq):0;Lp.push([-w*Cq+(z-fold)*Sq+oU*(1-u),y]);Rp.push([w*Cq+(z+fold)*Sq+oU*(1-u),y])}
@@ -3654,23 +3708,26 @@ function renderMan(){
     const wob=Math.sin(m.t*26)*Math.exp(-m.t*3.2);            // rocks from side to side for about a second after landing
     ctx.rotate(wob*.17);jigSquash(j);
     const bp=m.burpT>0?1+.07*Math.sin(time*38):1,sx=.56*(1-wob*.05)*bp,sy=.45*(1+wob*.07)*bp;ctx.scale(sx,sy);   // puffs up and shudders before the burst
-    JIG=jigOpts(j,sx,sy,wob*.17);ragOpts(JIG,m);INF=bgrow(stom(m));drawFront('star','dizzy',time);INF=0;JIG=null;ctx.restore();return}
+    JIG=jigOpts(j,sx,sy,wob*.17);ragOpts(JIG,m);INF=inflationSample(m,time).fill;drawFront('star','dizzy',time);INF=0;JIG=null;ctx.restore();return}
   if(m.mode==='walk'){drawWalkMan(m);return}
+  const infl=inflationSample(m,time);
+  if(m.mode==='aim'&&(m.seated||m.vlv)){
+    ctx.save();ctx.translate(m.x,m.y-1.4);ctx.scale(.70,.70);drawSeatSide(infl.fill,time,infl);ctx.restore();return;
+  }
   ctx.save();ctx.translate(m.x,m.y);jigSquash(j);
   if(m.mode==='aim'&&m.chug){drawChugMan(m);ctx.restore();return}
   if(m.mode==='aim'){const sc=.5*(1+m.pop*.5),a=Math.atan2(SY-m.y,SX-m.x)*.25,sy=sc*(dragging?.94:1);
-    const ix=1,iy=1;ctx.translate((stom(m)>.5?Math.sin(time*45)*Math.min(1,stom(m))*2.2:0)+((stom(m)>.02&&dragging&&m.vlv)?-7:0),(stom(m)>.02&&dragging&&m.vlv)?-4:0);ctx.rotate(a);ctx.scale(sc*ix,sy*iy);JIG=jigOpts(j,sc*ix,sy*iy,a);
+    const ix=1,iy=1;ctx.rotate(a);ctx.scale(sc*ix,sy*iy);JIG=jigOpts(j,sc*ix,sy*iy,a);
     const fn=dragging?null:gagFrame(m.G),sp=fn&&spinLive(m.G);
-    if(stom(m)>.02&&dragging&&m.vlv){ctx.translate(0,8/sc);ctx.scale(1.4,1.4);drawSeatSide(bgrow(stom(m)),time)}                  // side profile: rear on the valve, belly swelling out the front
-    else if(stom(m)>.02){INF=bgrow(stom(m));drawFront('up',stom(m)>.5||dragging?'scream':'cool',time);INF=0}   // burpburster: belly full of soda   // seated on the valve: front view, belly swelling
+    if(infl.fill>.015){INF=infl.fill;drawFront('up',dragging?'scream':infl.face,time,inflationFrontPose(infl));INF=0}
     else if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else if(dragging)drawFront('up','scream',time);else{const bz=Math.sin(time*2.6);drawSpin(0,Object.assign({},SPIN_POSE.T_IDLE,{t:time,belly:[1+.012*bz,1-.01*bz]}))}
     JIG=null}
   else if(m.dive){const face=m.diveFace||m.face||1,a=m.spin||0;
     ctx.rotate(a);ctx.scale(.64*face,.64);
-    JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=bgrow(stom(m));drawBall(time,'scream');INF=0;JIG=null}
+    JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=infl.fill;drawBall(time,'scream');INF=0;JIG=null}
   else{const face=m.face<0?-1:1,a=m.ang*face;
     ctx.rotate(a);ctx.scale(.64*face,.64);
-    JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=bgrow(stom(m));drawSide(time,'scream');INF=0;JIG=null}
+    JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=infl.fill;drawSide(time,'scream');INF=0;JIG=null}
   ctx.restore()}
 const LORD_NEW=true;
 const LORD_SPRITES=new Map();

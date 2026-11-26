@@ -1,0 +1,5 @@
+# Inflation animation: continuity and cartoon acting
+
+The visual fill model smooths the actual pressure with a short response lag, bounded rhythmic pump motion and a continuous volume curve; unlimited gameplay fill no longer creates unlimited artwork dimensions. The seat uses one nozzle-aligned pose for tap, drag and release, and visible reactions progress from confident to surprised as pressure rises. Front volume, clothing and surface details share one geometry; head and legs keep their base proportions. Soda uses the same projected body throughout the turn, with the bottle attached to the character's hand in depth order. Low-detail profiles reduce costly decorative shading. The gauge shows a steady readable warning rather than a flicker.
+
+This is a presentation-only change. Original air/soda fill timing, collision radius, launch speed, power effects, burst thresholds, progress and level selection are unchanged. New JS tests exercise growth/deflation across 30/60/120 Hz, bounded geometry, and phase continuity; a Chromium job exercises the real Canvas in both Ultra Low and High. Native artwork and ROMs are unchanged pending verification.
