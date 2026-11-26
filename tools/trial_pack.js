@@ -195,3 +195,20 @@ TRIAL_META.forEach((a,i)=>LEVELS.push({name:a[0],tip:a[1],men:a[12],walk:!!a[13]
   return {header,web,districts,commandBytes:commands.length,occupied:levels.reduce((n,l)=>n+l.occupied,0)};
 }
 if(typeof module!=='undefined')module.exports={generateTrials,emitTrials};
+
+/* Regenerate the editable maps and both runtime representations together.
+ * The HTML remains standalone and is never loaded from a remote endpoint. */
+if(typeof require==='function'&&require.main===module){
+  const fs=require('fs'),path=require('path'),root=path.join(__dirname,'..');
+  const out=emitTrials(generateTrials());
+  const dir=path.join(root,'content/trials');fs.mkdirSync(dir,{recursive:true});
+  out.districts.forEach((d,i)=>fs.writeFileSync(path.join(dir,'district-'+(i+1)+'.json'),d));
+  fs.writeFileSync(path.join(root,'core/trial_levels.h'),out.header);
+  const webPath=path.join(root,'web/index.html'),html=fs.readFileSync(webPath,'utf8');
+  const a=html.indexOf('// BEGIN MANDEX TRIAL DATA'),marker='// END MANDEX TRIAL DATA';
+  const b=html.indexOf(marker,a);
+  if(a<0||b<a)throw Error('trial data markers missing from game');
+  const end=b+marker.length+(html[b+marker.length]==='\n'?1:0);
+  fs.writeFileSync(webPath,html.slice(0,a)+out.web+html.slice(end));
+  console.log('Generated 160 trials; '+out.commandBytes+' binary command bytes.');
+}
