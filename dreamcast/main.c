@@ -1276,7 +1276,7 @@ int main(int argc, char **argv){
           recolor_man(outfit_sel);
           dc_save_sync();
         } }
-        if(pressed & CONT_Y){ nofight = !nofight; dc_save_sync(); }
+        if(pressed & CONT_Y){ nofight = !nofight; console_opt.nofight=nofight; dc_save_sync(); }
         if(pressed & (CONT_START | CONT_A)){ on_title = 0; if(tx_ttl){ pvr_mem_free(tx_ttl); tx_ttl = 0; }
           if(title_lv == 0 && !intro_seen && tx_ic_top && tx_ic_bot){ intro_seen = 1; intro_level = 0; in_intro = 1; intro_start(); }
           else if(title_lv == MX_CH3_START && !wolf_seen && tx_ic_top && tx_ic_bot){ wolf_seen = 1; intro_level = title_lv; in_intro = 1; intro_start_wolf(); }
@@ -1289,7 +1289,7 @@ int main(int argc, char **argv){
         if(pressed & CONT_START)paused=0;
         else if(pressed & CONT_Y){load_level(world.level);paused=0;}
         else if(pressed & CONT_DPAD_LEFT)dc_return_to_title(world.level);
-        else if(pressed & CONT_B)mus_pref=!mus_pref;
+        else if(pressed & CONT_B){mus_pref=!mus_pref;console_opt.music_off=!mus_pref;}
       } else {
         /* START and Y are exclusive navigation actions. Previously START
            could pause while a simultaneous A/B press still fired the sling,

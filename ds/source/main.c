@@ -2007,7 +2007,7 @@ int main(void){
       if(down & KEY_RIGHT) ch = 1;
       if((down & KEY_TOUCH) && hit(&t, 0, 0, 48, 48)) ch = -1;
       if((down & KEY_TOUCH) && hit(&t, 208, 0, 48, 48)) ch = 1;
-      if((up & KEY_R) && !combo_held){                           /* next unlocked outfit; locked ones are skipped */
+      if(!opt_open && (up & KEY_R) && !combo_held){                           /* next unlocked outfit; locked ones are skipped */
         for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
         apply_outfit(outfit_sel); sfx_play(SFX_CLICK, 64);
       }

@@ -1604,7 +1604,7 @@ int main(void){
       else if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
       else if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } apply_outfit(outfit_sel); n3_save_sync(); }
-      if(down & KEY_Y){ nofight = !nofight; mx_set_fight(&world, !nofight); n3_save_sync(); }
+      if(down & KEY_Y){ nofight = !nofight; console_opt.nofight=nofight; mx_set_fight(&world, !nofight); n3_save_sync(); }
       if(down & (KEY_A | KEY_START | KEY_TOUCH)){
         if(sel == 0 && !intro_seen){ intro_seen = 1; intro_level = 0; app = ST_INTRO; intro_start(); }
         else if(sel == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_level = sel; app = ST_INTRO; intro_start_wolf(); }
@@ -1615,7 +1615,7 @@ int main(void){
       if((down & KEY_START) || choice==0) app=ST_PLAY;
       else if((down & KEY_SELECT) || choice==1){ load_level(world.level);app=ST_PLAY; }
       else if((down & KEY_B) || choice==2){ app=ST_TITLE;sel=world.level;load_level(sel); }
-      else if(down & KEY_Y) mus_pref=!mus_pref; /* dedicated pause music shortcut */
+      else if(down & KEY_Y){mus_pref=!mus_pref;console_opt.music_off=!mus_pref;} /* dedicated pause music shortcut */
     } else {
       MxMan *m = &world.man;
       {int aim=m->mode==MAN_AIM&&world.state==MX_PLAY;if(aim&&!was_aim){int pw=mx_tool_power(console_opt.tool);if(pw&&world.pw_sel!=pw)mx_select_power(&world,pw);}was_aim=aim;}
@@ -1637,7 +1637,7 @@ int main(void){
       /* Y controls music in aiming/flight, but remains PUNCH on foot.
          In pause use Y as well; on the title it controls landlord AI. */
       if((down & KEY_Y) && world.state==MX_PLAY &&
-         m->mode!=MAN_WALK)mus_pref=!mus_pref;
+         m->mode!=MAN_WALK){mus_pref=!mus_pref;console_opt.music_off=!mus_pref;}
       if((down&KEY_X)&&m->mode==MAN_AIM){
         int nx=world.pw_sel;
         for(int k=0;k<PW_COUNT;k++){nx=(nx+1)%PW_COUNT;if(nx==PW_NONE||world.pw_left[nx]>0)break;}
