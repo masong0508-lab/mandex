@@ -62,7 +62,13 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #endif
 #define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    60
+#define MX_TRIAL_START   60
+#define MX_TRIAL_COUNT   160
+#define MX_TRIAL_DISTRICT_SIZE 20
+#define MX_NUM_LEVELS    (MX_TRIAL_START + MX_TRIAL_COUNT)
+#if MX_NUM_LEVELS > 255
+#error "Level count must fit the save format"
+#endif
 #define MX_CH2_START     20      /* chapter 2: levels 20-39 */
 #define MX_CH3_START     40      /* chapter 3 (the Wolfman): levels 40-59 */
 #define MX_STORY_LEVELS  20      /* chapter 1: the story achievements and outfits count only these, so adding levels never moves earned goalposts */
@@ -385,6 +391,12 @@ const char *mx_combo_taunt(int count);  /* compact adult-comedy stingers shared 
 int  mx_targets_alive(const MxWorld *w);
 int  mx_cells_left(const MxWorld *w);
 const char *mx_level_name(int level);
+static inline int mx_trial_district_step(int level,int dir){
+  if(level<MX_TRIAL_START)return dir>0?MX_TRIAL_START:MX_NUM_LEVELS-MX_TRIAL_DISTRICT_SIZE;
+  const int d=(level-MX_TRIAL_START)/MX_TRIAL_DISTRICT_SIZE;
+  if(dir>0)return d==MX_TRIAL_COUNT/MX_TRIAL_DISTRICT_SIZE-1?0:MX_TRIAL_START+(d+1)*MX_TRIAL_DISTRICT_SIZE;
+  return d==0?0:MX_TRIAL_START+(d-1)*MX_TRIAL_DISTRICT_SIZE;
+}
 const char *mx_level_tactic(int level); /* read-only stage guidance */
 void mx_set_wobble_budget(MxWorld *w, int cells);   /* handhelds: cap the lattice work per frame (0 = off); hits then wake fewer cells instead of stalling the frame */
 void mx_set_substeps(MxWorld *w, int n);       /* 2..4: physics steps per frame */
