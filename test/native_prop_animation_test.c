@@ -6,6 +6,13 @@
 static MxWorld W;
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"FAIL prop line %d: %s\n",__LINE__,#c);return 1;}}while(0)
 int main(void){
+  MxMan clock={0};clock.mode=MAN_WALK;
+  clock.wt=R(48.2);CHECK(mx_walk_seconds_left(&clock)==49);
+  clock.wt=RI(45);CHECK(mx_walk_seconds_left(&clock)==45);
+  clock.wt=R(.01);CHECK(mx_walk_seconds_left(&clock)==1);
+  clock.wt=R(-.1);CHECK(mx_walk_seconds_left(&clock)==0);
+  clock.wt=RI(100);CHECK(mx_walk_seconds_left(&clock)==60);
+  clock.mode=MAN_AIM;CHECK(mx_walk_seconds_left(&clock)==0);
   int cases=0;
   for(int width=1;width<=8;width++)for(unsigned mask=0;mask<(1u<<width);mask++){
     MxPad p={40,20,(uint8_t)width};
