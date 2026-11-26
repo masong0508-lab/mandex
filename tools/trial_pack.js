@@ -28,7 +28,10 @@ function generateTrials(){
     {"label":"Rooftop Gardens","prefix":"Garden","wall":2,"floor":1,"roof":7,"kind":[0,5,6,1],"tip":"CROSS THE GARDEN ROOFS","tnt":0,"pad":1,"tube":1,"sand":0,"walk":1},
     {"label":"Factory Annex","prefix":"Annex","wall":3,"floor":2,"roof":6,"kind":[3,4,2,1],"tip":"BREAK THE SUPPORTS IN SEQUENCE","tnt":1,"pad":0,"tube":0,"sand":1,"walk":0},
     {"label":"Midnight Exchange","prefix":"Midnight","wall":3,"floor":6,"roof":1,"kind":[4,5,6,7],"tip":"EVICT THE GUARDS THEN THE BOSS","tnt":1,"pad":0,"tube":1,"sand":0,"walk":1},
-    {"label":"Grand Demolition","prefix":"Grand","wall":6,"floor":6,"roof":7,"kind":[4,6,3,7],"tip":"COMBINE REBOUNDS AND BLAST SUPPORTS","tnt":1,"pad":1,"tube":1,"sand":0,"walk":1}
+    {"label":"Grand Demolition","prefix":"Grand","wall":6,"floor":6,"roof":7,"kind":[4,6,3,7],"tip":"COMBINE REBOUNDS AND BLAST SUPPORTS","tnt":1,"pad":1,"tube":1,"sand":0,"walk":1},
+    {"label":"Switchback Depot","prefix":"Switchback","wall":2,"floor":1,"roof":2,"kind":[0,1,2,3],"tip":"CLIMB THE YARD STEPS; PUNCH WOOD","tnt":0,"pad":0,"tube":0,"sand":0,"walk":2},
+    {"label":"Rooftop Relay","prefix":"Relay","wall":3,"floor":6,"roof":7,"kind":[1,5,2,4],"tip":"CLIMB THE STEPS; REBOUND OVER WALLS","tnt":0,"pad":1,"tube":1,"sand":0,"walk":2},
+    {"label":"Three-Stage Circuit","prefix":"Circuit","wall":6,"floor":2,"roof":7,"kind":[4,6,3,7],"tip":"BREAK THE SUPPORTS; FINISH THE CIRCUIT","tnt":1,"pad":1,"tube":1,"sand":0,"walk":1}
   ];
   const shapes=["Court","Stacks","Bridge","Terrace"];
   const palettes=["#e8d3a8","#d7dfe9","#d2b6b4","#b9d6be"];
@@ -153,10 +156,43 @@ function generateTrials(){
       for(const t of targets)if(t[2]===7)t[2]=4;
       targets[0][2]=7;
     }else if(district===7)for(const t of targets)if(t[2]===7)t[2]=2;
+    // Walker-first routes: solid yard steps (two-cell rise, three/four-cell
+    // tread), a breakable entrance and a rubber launch ledge where safe.
+    // Geometry stays in the same 120x60 working grid. No invisible
+    // platforms, scripted teleports or extra collision systems.
+    if(district>=27){
+      const A=houses[0],B=houses[1],left=A.x+A.w+1,right=B.x-1;
+      const clearance=(x,y)=>targets.every(([tx,ty])=>x<tx-2||x>tx+2||y<ty-5||y>=ty);
+      // Choose a contiguous clear bay rather than overwriting a pier,
+      // tube mouth, target or house. Every column grows from ground.
+      let start=-1,span=0;
+      for(let x=left;x<right;){
+        let end=x;while(end<right&&Array.from({length:9},(_,j)=>59-j).every(y=>!get(end,y)&&clearance(end,y)))end++;
+        if(end-x>span){span=end-x;start=x}
+        x=end===x?x+1:end+1;
+      }
+      const steps=Math.min(4,Math.floor(span/3));
+      if(steps>=2){
+        const tread=Math.min(4,Math.floor(span/steps));
+        for(let k=0;k<steps;k++){
+          const h=2*(k+1),sx=start+k*tread;
+          fill(sx,60-h,tread,h,3);
+          // The highest tread is a real rubber tile, checked by walk
+          // physics even when the decorative pad list is already full.
+          if(g.pad&&k===steps-1){fill(sx,60-h,tread,1,7);if(pads.length<3)pads.push([sx,60-h,tread])}
+        }
+      }
+      // Timber entry panel is intentionally punchable; the frame stays
+      // supported until the player actually breaks it.
+      if(district<29)for(const H of houses){
+        for(let y=H.base-5;y<H.base;y++)for(let x=H.x;x<H.x+2;x++)
+          if(get(x,y)&&get(x,y)!==4&&clearance(x,y))fill(x,y,1,1,1);
+      }
+    }
     const name=g.prefix+" "+shapes[shape]+" "+(tier+1);
     const tip=district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
     const men=Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
-    const walk=(district===5||district===7)&&tier>=2 || district===8&&tier>=3 || district>=9&&!!g.walk&&tier>=2;
+    const walk=(district===5||district===7)&&tier>=2 || district===8&&tier>=3 || district>=9&&(g.walk===2||!!g.walk&&tier>=2);
     if(targets.length<2||targets.length>20||rooms.length>20||pads.length>3||tubes.length>3)fail("entity cap "+name);
     const keys=new Set();
     for(const [tx,ty] of targets){
