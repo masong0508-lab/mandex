@@ -47,18 +47,18 @@ static void dc_save_load(void){
     if(dc_save_slot>=0 && !mx_journal_newer(generation,valid_generation))
       continue;
     valid_generation=generation;dc_save_slot=i;dc_save_status=1;
-    stats=trial;outfit_sel=outf;nofight=opt.nofight;
+    stats=trial;outfit_sel=outf;console_opt=opt;nofight=opt.nofight;mus_pref=!opt.music_off;
   }
   if(dc_save_slot>=0){
     dc_save_generation=any_seen ? seen_generation : valid_generation;
-    MxOptions opt; mx_options_default(&opt);opt.nofight=(uint8_t)nofight;
+    MxOptions opt=console_opt;opt.nofight=(uint8_t)nofight;opt.music_off=!mus_pref;
     dc_saved_len=mx_meta_pack_opt(&stats,outfit_sel,&opt,
                                  dc_saved_payload,sizeof dc_saved_payload);
   }
 }
 static void dc_save_sync(void){
   uint8_t payload[MX_SAVE_MAX],disk[MX_JOURNAL_DISK_BYTES];
-  MxOptions opt;mx_options_default(&opt);opt.nofight=(uint8_t)nofight;
+  MxOptions opt=console_opt;opt.nofight=(uint8_t)nofight;opt.music_off=!mus_pref;
   int n=mx_meta_pack_opt(&stats,outfit_sel,&opt,payload,sizeof payload);
   if(!n || (dc_saved_len==n && !memcmp(payload,dc_saved_payload,n)))return;
   memset(disk,0,sizeof disk);

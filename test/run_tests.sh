@@ -100,6 +100,10 @@ for mode in float fixed;do
 done
 echo "--- Trial expansion: raw asset, native table and browser decoder parity ---"
 if command -v node >/dev/null 2>&1;then node trial_pack_test.js;fi
+for opts_flags in '' '-DMX_FIXED'; do
+  gcc -std=gnu99 -O2 $opts_flags -I../core native_options_test.c ../core/mx_meta.c -lm -o /tmp/mx_native_opts
+  /tmp/mx_native_opts
+done
 for mode in float fixed;do
   flags=""
   test "$mode" = fixed && flags="-DMX_FIXED"

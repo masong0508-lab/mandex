@@ -14,7 +14,8 @@
 
 #define NV 6
 static struct { int id, seg, left, freq, active, pitch_pending; const Sfx *s; } vo[NV];
-static int cool[SFX_COUNT];
+static int cool[SFX_COUNT], effects_off;
+void sfx_set_enabled(int enabled){effects_off=!enabled;if(effects_off)for(int i=0;i<NV;i++)if(vo[i].active){soundKill(vo[i].id);vo[i].active=0;}}
 
 #ifdef MX_NOSOUND
 static const int snd_ok = 0;            /* diagnostic build: never touch the ARM7 sound path */
@@ -32,7 +33,7 @@ static const signed char MUS_WAVE[32] __attribute__((aligned(4))) = {
     0, -12, -23, -34, -45, -55, -65, -77, -88, -99,-106,-108,-102, -88, -64, -34 };
 static int sfx_fcap(int f){ return f > 1250 ? 1250 + (f - 1250) / 6 : f; }     /* nothing above ~1.4 kHz: that is where the ear-piercing was */
 void sfx_play(int id, int pan){
-  if(!snd_ok) return;
+  if(!snd_ok || effects_off) return;
   const Sfx *s = &SFX[id];
   if(cool[id] > 0) return;
   cool[id] = s->cool;

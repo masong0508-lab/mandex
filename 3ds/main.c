@@ -25,6 +25,10 @@
 #include "mx_snd.h"
 extern u16 gfx_pal[256]; void gfx_init(void);      /* ds/source/gfx.c (built with -DMX_FIXED as its own unit; only the palette is used here) */
 #include "mx_meta.h"
+#include "mx_options_menu.h"
+static MxOptions console_opt;
+static MxOptMenu opt_menu;
+static int opt_open, was_aim;
 #include "mx_save_journal.h"
 #include <sys/stat.h>
 #include "manspr.h"                                /* the same pixel-art man as the DS and Dreamcast ports (generated from the web game) */
@@ -88,7 +92,7 @@ static void music_update(int want){                       /* the theme loops on 
 }
 static void sound_tick(void){ for(int i = 0; i < SFX_COUNT; i++) if(snd_cool[i] > 0) snd_cool[i]--; }
 void sfx_play(int id, int pan){
-  if(!snd_ok || id < 0 || id >= SFX_COUNT || snd_cool[id] > 0) return;
+  if(console_opt.sfx_off || !snd_ok || id < 0 || id >= SFX_COUNT || snd_cool[id] > 0) return;
   snd_cool[id] = mx_snd_cooldown(id);
   int c = snd_next++ % 7;
   float mix[12] = { 0 }; mix[0] = 0.45f * (127 - pan) / 64.0f; mix[1] = 0.45f * pan / 64.0f; if(mix[0] > 0.6f) mix[0] = 0.6f; if(mix[1] > 0.6f) mix[1] = 0.6f;
@@ -165,18 +169,18 @@ static void n3_save_load(void){
     if(!mx_journal_unpack(&trial, &o, &opt, &generation, buf, (int)n)) continue;
     if(n3_save_slot >= 0 && !mx_journal_newer(generation, n3_save_generation)) continue;
     n3_save_slot = i; n3_save_generation = generation;
-    stats = trial; outfit_sel = o; nofight = opt.nofight;
+    stats = trial; outfit_sel = o; console_opt=opt; nofight=opt.nofight; mus_pref=!opt.music_off;
     n3_save_status = 1;
   }
   if(n3_save_slot >= 0){
-    MxOptions opt; mx_options_default(&opt); opt.nofight = (uint8_t)nofight;
+    MxOptions opt=console_opt; opt.nofight=(uint8_t)nofight; opt.music_off=!mus_pref;
     n3_saved_len = mx_meta_pack_opt(&stats, outfit_sel, &opt,
                                    n3_saved_payload, sizeof n3_saved_payload);
   }
 }
 static void n3_save_sync(void){
   uint8_t payload[MX_SAVE_MAX], record[MX_JOURNAL_MAX];
-  MxOptions opt; mx_options_default(&opt); opt.nofight = (uint8_t)nofight;
+  MxOptions opt=console_opt; opt.nofight=(uint8_t)nofight; opt.music_off=!mus_pref;
   int n = mx_meta_pack_opt(&stats, outfit_sel, &opt, payload, sizeof payload);
   if(!n || (n == n3_saved_len && !memcmp(payload, n3_saved_payload, n))) return;
   int slot = n3_save_slot == 0 ? 1 : 0;
@@ -1248,6 +1252,7 @@ static real n3_aim_x[39], n3_aim_y[39];
 static int n3_aim_frame = -1, n3_aim_count;
 #endif
 static void draw_aim(const View *v){
+  if(console_opt.no_guide)return;
   if(world.man.mode != MAN_AIM || !dragging) return;
 #if MX_N3DS_AIM_CACHE
   if(n3_aim_frame != frame){
@@ -1285,6 +1290,7 @@ static unsigned n3_particles_rasterized; /* host diagnostic; zero runtime cost *
 #endif
 static void draw_parts(const View *v){
   for(int i = 0; i < (MX_N3DS_PARTICLE_BOUNDS ? part_high_water : NP); i++) if(parts[i].life > 0){
+    if(i%mx_opt_fx_stride(&console_opt))continue;
     const Part *q = &parts[i]; int x = VX(v, q->x), y = VY(v, q->y), k = v->ppc >= 4 ? 2 : 1;
 #if MX_N3DS_PARTICLE_VIEW_CULL
     /* Hearts are <=10 px wide and glints have <=9 px arms.
@@ -1507,13 +1513,43 @@ static int pause3_touch_at(int x,int y){
   return -1;
 }
 static void load_level(int l){
-  mx_load(&world, l); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); valve_equipped=0; world.valve_ok=0;
+  mx_load(&world, l); mx_set_collapse(&world,console_opt.collapse); mx_set_fight(&world, !nofight); was_aim=0; mx_meta_level_start(&stats, &world); valve_equipped=0; world.valve_ok=0;
   memset(parts, 0, sizeof parts); part_high_water=0; memset(pops, 0, sizeof pops); mi_reset(&mi);
 #if MX_N3DS_PARTICLE_HINT
   part_free_hint = 0;
 #endif
   cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1;
   dragging = 0; pad_used = 0; pad_dx = pad_dy = 0; new_best = 0;
+}
+static void opt_change(int dir){
+  int action=mx_opt_activate(&console_opt,&opt_menu,dir,app==ST_TITLE);
+  if(action==MX_O_ERASE){mx_meta_init(&stats);outfit_sel=0;outfit_seen=1;toast_nq=0;toast_t=0;toast_id=-1;sel=0;apply_outfit(0);outfit_scan(1);load_level(0);}
+  nofight=console_opt.nofight;mus_pref=!console_opt.music_off;
+  mx_set_fight(&world,!nofight);mx_set_collapse(&world,console_opt.collapse);
+  if(action==MX_O_SAVE_NOW||action==MX_O_ERASE)n3_save_sync();
+  sfx_play(SFX_CLICK,64);
+}
+static void options_input(u32 down,int x,int y){
+  if((down&KEY_B)||((down&KEY_TOUCH)&&x<70&&y>=210)){opt_open=0;opt_menu.confirm=0;n3_save_sync();return;}
+  if((down&KEY_TOUCH)&&y>=18&&y<38){mx_opt_page(&opt_menu,x/80);return;}
+  if((down&KEY_TOUCH)&&y>=42&&y<42+mx_opt_rows(&opt_menu)*39){mx_opt_pick(&opt_menu,(y-42)/39);opt_change(0);return;}
+  if(down&KEY_L)mx_opt_page(&opt_menu,opt_menu.page-1);
+  else if(down&KEY_R)mx_opt_page(&opt_menu,opt_menu.page+1);
+  else if(down&KEY_UP)mx_opt_move(&opt_menu,-1);
+  else if(down&KEY_DOWN)mx_opt_move(&opt_menu,1);
+  else if(down&KEY_A)opt_change(0);
+  else if(down&KEY_LEFT)opt_change(-1);
+  else if(down&KEY_RIGHT)opt_change(1);
+}
+static void draw_options(void){
+  rect(&bot,0,0,320,240,RGB(15,18,30));textc(&bot,160,4,"MANDEX OPTIONS",1,RGB(255,210,63));
+  for(int i=0;i<4;i++){rect(&bot,i*80+2,18,76,20,i==opt_menu.page?RGB(65,85,130):RGB(28,34,54));textc(&bot,i*80+40,24,mx_opt_tabs[i],1,RGB(255,230,160));}
+  for(int i=0;i<mx_opt_rows(&opt_menu);i++){int id=mx_opt_id(&opt_menu,i),y=42+i*39;u32 c=i==opt_menu.row?RGB(255,210,63):RGB(165,184,213);rect(&bot,4,y,312,36,RGB(29,37,60));rect(&bot,4,y,312,1,c);text(&bot,9,y+5,mx_opt_names[id],1,c);textc(&bot,265,y+5,mx_opt_value(&console_opt,&opt_menu,id,app==ST_TITLE),1,RGB(255,255,255));text(&bot,9,y+20,mx_opt_desc[id],1,RGB(182,197,218));}
+  if(opt_menu.page==MX_OPT_PERF)textc(&bot,160,200,console_opt.profile==3?"FLAT TOP SCREEN / ECO FX":"SLIDER STEREO / PROFILE FX",1,RGB(125,255,90));
+#if defined(__3DS__) && !MX_N3DS_NO_SAVE
+  if(opt_menu.page==MX_OPT_DATA)textc(&bot,160,170,n3_save_status<0?"SD WRITE FAILED":n3_save_status?"SD SAVE OK":"NO SAVE CONFIRMED",1,RGB(125,255,90));
+#endif
+  text(&bot,5,214,"B BACK",1,RGB(255,210,63));textc(&bot,182,214,"L/R PAGE  UP/DOWN ROW",1,RGB(255,255,255));textc(&bot,160,228,"A CHANGE / CONFIRM   LEFT/RIGHT CYCLE",1,RGB(170,195,225));
 }
 static int was_state;
 /* Real wall-clock frame completion, sampled after VBlank. */
@@ -1533,7 +1569,7 @@ int main(void){
   gfxSetDoubleBuffering(GFX_TOP, true); gfxSetDoubleBuffering(GFX_BOTTOM, true);
   srand(1234);
   sound_init();
-  mx_meta_init(&stats);
+  mx_meta_init(&stats); mx_options_default(&console_opt);
   n3_save_load();
   apply_outfit(outfit_sel);
   gfx_init();                                         /* the shared DS drawing library builds its palette in RAM (used by the cutscenes) */
@@ -1561,7 +1597,9 @@ int main(void){
       n3_frame_complete(0);
       continue;
     }
-    if(app == ST_TITLE){
+    if(opt_open){options_input(down,t.px,t.py);}
+    else if((app==ST_TITLE||app==ST_PAUSE)&&((down&KEY_X)||((down&KEY_TOUCH)&&app==ST_TITLE&&t.py>=204))){opt_open=1;mx_opt_open(&opt_menu);}
+    else if(app == ST_TITLE){
       if(down & (KEY_UP|KEY_DOWN)){sel=mx_trial_district_step(sel,(down&KEY_DOWN)?1:-1);load_level(sel);}
       else if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
       else if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
@@ -1580,6 +1618,7 @@ int main(void){
       else if(down & KEY_Y) mus_pref=!mus_pref; /* dedicated pause music shortcut */
     } else {
       MxMan *m = &world.man;
+      {int aim=m->mode==MAN_AIM&&world.state==MX_PLAY;if(aim&&!was_aim){int pw=mx_tool_power(console_opt.tool);if(pw&&world.pw_sel!=pw)mx_select_power(&world,pw);}was_aim=aim;}
       if((down & KEY_START) && world.state == MX_PLAY){
         /* Treat START as a pause-only action, not as an aim/attack input.
            In particular do not leave a dangling touch drag that launches
@@ -1704,11 +1743,12 @@ int main(void){
     /* ---- draw ---- */
     unsigned long long n3_draw_begin=osGetTime();
     bot.fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL); bot.w = 320; bot.h = 240;
-    float sl = osGet3DSliderState();                   /* the 3D slider: 0 = flat, 1 = full depth */
+    float sl = (console_opt.profile==3||opt_open)?0:osGet3DSliderState();                   /* the 3D slider: 0 = flat, 1 = full depth */
     gfxSet3D(sl > 0.03f);
     for(int eye = 0; eye < (sl > 0.03f ? 2 : 1); eye++){
     top.fb = gfxGetFramebuffer(GFX_TOP, eye ? GFX_RIGHT : GFX_LEFT, NULL, NULL); top.w = 400; top.h = 240;
-    draw_world_3d(&vt, eye ? 1 : -1, sl);
+    View shaken=vt;if(app==ST_PLAY&&!opt_open&&console_opt.shake!=2){int sh=(int)(RTOF(world.shake)*0.12f);if(sh>4)sh=4;if(console_opt.shake==1)sh/=2;shaken.ox+=(frame&1)?sh:-sh;shaken.oy+=(frame&2)?sh:-sh;}
+    draw_world_3d(&shaken, eye ? 1 : -1, sl);
     if(app == ST_TITLE){
       /* Poster framing: actual sprite art from the game, not substitute circles. */
       rect(&top, 10, 32, 380, 2, RGB(255, 210, 63));
@@ -1730,7 +1770,7 @@ int main(void){
       else if(n3_save_status < 0) textc(&top, 200, 212, "SD SAVE FAILED - CHECK CARD", 1, RGB(255, 90, 90));
       else if(n3_save_status > 0) textc(&top, 200, 212, "PROGRESS SAVED TO SD", 1, RGB(125, 255, 90));
 #endif
-      { char fb[48]; sprintf(fb, "Y: LANDLORDS FIGHT BACK  %s", nofight ? "OFF" : "ON"); textc(&top, 200, 190, fb, 1, nofight ? RGB(150, 150, 165) : RGB(125, 255, 90)); }
+      { char fb[48]; sprintf(fb, "X OPTIONS  /  Y FIGHT: %s", nofight ? "OFF" : "ON"); textc(&top, 200, 190, fb, 1, nofight ? RGB(150, 150, 165) : RGB(125, 255, 90)); }
       { char ob[64]; sprintf(ob, "L/R: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {
       draw_hud(&vt); draw_end();
@@ -1739,11 +1779,11 @@ int main(void){
         textc(&top,200,88,"PAUSED",3,RGB(255,210,63));
         textc(&top,200,116,"START RESUME",1,RGB(255,255,255));
         textc(&top,200,126,"SELECT RESTART  B MENU",1,RGB(255,255,255));
-        textc(&top,200,138,mus_pref?"Y MUSIC: ON":"Y MUSIC: OFF",1,RGB(255,210,63));
+        textc(&top,200,138,"X OPTIONS  /  Y MUSIC",1,RGB(255,210,63));
       }
     }
     /* An unobtrusive diagnostic in *both* eyes only while L+R is held. */
-    if((held&(KEY_L|KEY_R))==(KEY_L|KEY_R)){
+    if(console_opt.monitor || (!opt_open&&(held&(KEY_L|KEY_R))==(KEY_L|KEY_R))){
       char stats_line[48];
       snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d",
         (int)n3_fps.render_x10/10,(int)n3_fps.render_x10%10,
@@ -1811,7 +1851,8 @@ int main(void){
         textc(&bot,160,204,"TAP TOOL  /  X CYCLE  /  R USE AIR",1,RGB(255,210,63));
       }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
-    } else if(app == ST_TITLE) textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));
+    } else if(app == ST_TITLE){textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));rect(&bot,0,204,320,36,RGB(20,27,46));textc(&bot,160,218,"X / TAP: OPTIONS",2,RGB(255,210,63));}
+    if(opt_open)draw_options();
     { unsigned long long end=osGetTime();
       n3_draw_ms_last=end>=n3_draw_begin?(unsigned)(end-n3_draw_begin):0;
       if(n3_draw_ms_last>n3_draw_ms_window)n3_draw_ms_window=n3_draw_ms_last;

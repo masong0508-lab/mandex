@@ -55,7 +55,7 @@ int main(void){
   CHECK(mx_trial_district_step(0,1)==MX_TRIAL_START);
   CHECK(mx_trial_district_step(MX_TRIAL_START,1)==MX_TRIAL_START+20);
   CHECK(mx_trial_district_step(MX_NUM_LEVELS-1,1)==0);
-  CHECK(MX_JOURNAL_DISK_BYTES==1536&&MX_SAVE_MAX==1276);
+  CHECK(MX_JOURNAL_DISK_BYTES==1536&&MX_SAVE_MAX==1277);
   S.stars[59]=2;S.best[59]=12345;S.stars[239]=3;S.best[239]=67890;
   int stars=0;CHECK(mx_trial_cleared(&S,239,&stars)==1&&stars==3);CHECK(mx_trial_cleared(&S,59,&stars)==0&&stars==0);
   uint8_t disk[MX_JOURNAL_DISK_BYTES]={0};int n=mx_journal_pack(&S,0,NULL,7,disk,sizeof disk);

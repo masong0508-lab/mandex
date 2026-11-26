@@ -20,6 +20,7 @@
 #include <string.h>
 #include "mx.h"
 #include "mx_meta.h"
+#include "mx_options_menu.h"
 #include "mx_tool_feedback.h"
 #include "mx_objective.h"
 #include "gfx.h"
@@ -89,7 +90,7 @@ static int ach_open, ach_page;       /* achievements list shown on the title's b
 static int combo_held, cheat_t;      /* L+R+SELECT on the title = unlock every level for this session: latch (set while the three are held) and the on-screen message timer */
 static int valve_equipped;      /* gameplay toolbar gadget: default OFF, not an obstacle when flinging */
 static MxOptions opt;                /* port 13: collapsible buildings + start tool.  Saved in the cartridge blob (version 2); defaults until a save loads */
-static int opt_open, opt_cur;        /* options screen shown on the title's bottom screen; opt_cur = the highlighted row */
+static int opt_open; static MxOptMenu opt_menu;        /* options screen shown on the title's bottom screen; opt_cur = the highlighted row */
 static int was_aim; /* tool arming edge detector; collapse always follows opt.collapse */
 static int out_open, out_cur;        /* outfits screen shown on the title's bottom screen; out_cur = the highlighted outfit (outfit_sel = the one worn) */
 static int outfit_sel, toast_t = -1, toast_id, toast_q[4], toast_nq;
@@ -462,6 +463,7 @@ static real aimdot_x[16], aimdot_y[16];
 static int aimdot_frame = -1, aimdot_count;
 #endif
 static void draw_aim_dots(const View *v){
+  if(opt.no_guide)return;
   const MxMan *m = &world.man;
   if(m->mode != MAN_AIM) return;
   real dx = m->x - MX_ANCHOR_X, dy = m->y - MX_ANCHOR_Y;
@@ -1217,6 +1219,7 @@ static void draw_parts(const View *v){
   for(int i = 0; i < (MX_DS_PARTICLE_BOUNDS ? part_high_water : NPART); i++){
     const Part *p = &parts[i];
     if(p->life <= 0) continue;
+    if(p->type!=PT_RING && i%mx_opt_fx_stride(&opt))continue;
     int px = (p->x * v->ppc >> 6) - v->cx, py = (p->y * v->ppc >> 6) - v->cy;
 #if MX_DS_PARTICLE_VIEW_CULL
     /* Most particles occupy 8px or less beyond their anchor. Only pay
@@ -1784,58 +1787,55 @@ static void outfits_bottom(u8 *b){
 }
 
 /* ---- options screen (port 13): three rows on the title's bottom screen.  Tap a row (or d-pad up/down + A / left / right); B or BACK returns and saves. ---- */
-enum { OPT_COLLAPSE, OPT_TOOL, OPT_FIGHT, OPT_MUSIC, OPT_ROWS };
-#define OPT_RX 8
-#define OPT_RW 240
-static const int OPT_RY[OPT_ROWS] = { 10, 56, 102, 130 }, OPT_RH[OPT_ROWS] = { 44, 44, 26, 26 };
-static void opt_change(int row, int dir){                 /* dir +1 / -1; the two-state rows ignore the sign */
-  if(row == OPT_COLLAPSE){ opt.collapse = !opt.collapse; }
-  else if(row == OPT_TOOL){ opt.tool = (u8)((opt.tool + dir + MX_NUM_TOOLS) % MX_NUM_TOOLS); }
-  else if(row == OPT_FIGHT){ opt.nofight = !opt.nofight; }
-  else { music_pref = !music_pref; music_set(music_pref && world.state == MX_PLAY); }
-  apply_options(); sfx_play(SFX_CLICK, 64);
-}
-static int opt_row_at(const touchPosition *t){ for(int i = 0; i < OPT_ROWS; i++) if(hit(t, OPT_RX, OPT_RY[i], OPT_RW, OPT_RH[i])) return i; return -1; }
-static void options_bottom(u8 *b){
-  gfx_rect(b, 0, 0, 256, 192, C_BLACK);
-  gfx_text_c(b, 128, 6, "OPTIONS", C_GOLD, C_BLACK, 1);
-  for(int i = 0; i < OPT_ROWS; i++){
-    int x = OPT_RX, y = OPT_RY[i], w = OPT_RW, h = OPT_RH[i];
-    u8 bc = i == opt_cur ? C_GOLD : C_UILINE;
-    gfx_rect(b, x, y, w, h, C_UIBG);
-    gfx_rect(b, x, y, w, 1, bc); gfx_rect(b, x, y + h - 1, w, 1, bc);
-    gfx_rect(b, x, y, 1, h, bc); gfx_rect(b, x + w - 1, y, 1, h, bc);
-    u8 lc = i == opt_cur ? C_GOLD : C_WHITE;
-    if(i == OPT_COLLAPSE){
-      gfx_text(b, x + 6, y + 5, "COLLAPSIBLE BUILDINGS", lc, 1);
-      const char *v = opt.collapse ? "ON" : "OFF";
-      gfx_text(b, x + w - 8 - gfx_text_w(v, 2), y + 3, v, opt.collapse ? C_GOO : C_GRAY, 2);
-      gfx_text(b, x + 6, y + 17, "ON: FALLEN RUBBLE KEEPS SLUMPING AND TOPPLING", C_WHITE, 1);
-      gfx_text(b, x + 6, y + 25, "OFF: IT SETTLES AND LOCKS SOLID AT ONCE", C_GRAY, 1);
-      gfx_text(b, x + 6, y + 34, "STAYS ON UNDER LOAD; WOBBLE/SUBSTEPS ADAPT FIRST", C_UILINE, 1);
-    } else if(i == OPT_TOOL){
-      gfx_text(b, x + 6, y + 5, "START TOOL", lc, 1);
-      const char *v = mx_tool_name(opt.tool);
-      gfx_text(b, x + w - 8 - gfx_text_w(v, 2), y + 3, v, C_GOLD, 2);
-      gfx_text(b, x + 6, y + 17, "<", C_WHITE, 2); gfx_text(b, x + 6 + 12, y + 17, ">", C_WHITE, 2);
-      static const char *const D1[MX_NUM_TOOLS] = { "NO GADGET; EQUIP ONE IN THE AIM TOOLBAR", "AIR VALVE: EQUIP IN THE AIM TOOLBAR", "BEANS: PRE-ARM WHEN YOU RELOAD", "TOWEL: PRE-ARM WHEN YOU RELOAD", "SPLAT: PRE-ARM WHEN YOU RELOAD", "TURBO: FASTER LAUNCH, 1 PER LEVEL", "QUAKE: HEAVY IMPACT, 1 PER LEVEL" };
-      static const char *const D2[MX_NUM_TOOLS] = { "AIR STAYS HIDDEN UNTIL TAPPED", "AIR IS OFF AT LEVEL START", "ONE USE PER LEVEL; AIR STAYS OFF", "ONE USE PER LEVEL; AIR STAYS OFF", "ONE USE PER LEVEL; AIR STAYS OFF", "NO HEAP / EXTRA ASSETS", "STRONGER, SMALLER SHOCK THAN SPLAT" };
-      gfx_text(b, x + 34, y + 21, D1[opt.tool], C_WHITE, 1);
-      gfx_text(b, x + 34, y + 29, D2[opt.tool], C_GRAY, 1);
-    } else if(i == OPT_FIGHT){
-      gfx_text(b, x + 6, y + 5, "LANDLORDS FIGHT BACK", lc, 1);
-      const char *v = opt.nofight ? "OFF" : "ON";
-      gfx_text(b, x + w - 8 - gfx_text_w(v, 2), y + 3, v, opt.nofight ? C_GRAY : C_GOO, 2);
-      gfx_text(b, x + 6, y + 16, "WALKERS, BAT GUYS, BRIEFCASE THROWERS", C_WHITE, 1);
-    } else {
-      gfx_text(b, x + 6, y + 10, "MUSIC", lc, 1); gfx_text(b, x + 6 + 24, y + 10, "(Y)", C_UILINE, 1);
-      const char *v = music_pref ? "ON" : "OFF";
-      gfx_text(b, x + w - 8 - gfx_text_w(v, 2), y + 8, v, music_pref ? C_GOO : C_GRAY, 2);
-    }
+static void opt_change(int dir){
+  int action=mx_opt_activate(&opt,&opt_menu,dir,app==ST_TITLE);
+  if(action==MX_O_ERASE){
+    mx_meta_init(&stats);outfit_sel=0;outfit_seen=1;toast_nq=0;toast_t=-1;
+    sel_level=0;apply_outfit(0);outfit_scan(1);load_level(0);
   }
-  gfx_rect(b, 0, 160, 256, 32, C_UIBG); gfx_rect(b, 0, 160, 256, 1, C_UILINE);
-  gfx_text(b, 8, 170, "< BACK", C_WHITE, 1); gfx_text(b, 39, 170, "B", C_UILINE, 1);
-  gfx_text(b, 8, 180, "TAP A ROW OR D-PAD + A", C_UILINE, 1);
+  music_pref=!opt.music_off;
+#ifdef MX_BARE_NDS_H
+  sfx_set_enabled(!opt.sfx_off);
+#endif
+  apply_options();
+  if(action==MX_O_SAVE_NOW||action==MX_O_ERASE)save_sync();
+  if(!opt.sfx_off)sfx_play(SFX_CLICK,64);
+}
+static void options_bottom(u8 *b){
+  gfx_rect(b,0,0,256,192,C_BLACK);
+  gfx_text_c(b,128,4,"MANDEX OPTIONS",C_GOLD,C_BLACK,1);
+  for(int i=0;i<4;i++){
+    gfx_rect(b,i*64+2,16,60,17,i==opt_menu.page?C_UIHI:C_UIBG);
+    gfx_text_c(b,i*64+32,21,mx_opt_tabs[i],i==opt_menu.page?C_GOLD:C_WHITE,C_UIBG,1);
+  }
+  for(int i=0;i<mx_opt_rows(&opt_menu);i++){
+    int id=mx_opt_id(&opt_menu,i),y=36+i*29;u8 col=i==opt_menu.row?C_GOLD:C_UILINE;
+    gfx_rect(b,5,y,246,27,C_UIBG);gfx_rect(b,5,y,246,1,col);
+    gfx_text(b,10,y+4,mx_opt_names[id],col,1);
+    const char *v=mx_opt_value(&opt,&opt_menu,id,app==ST_TITLE);
+    gfx_text(b,246-gfx_text_w(v,1),y+4,v,C_WHITE,1);
+    gfx_text(b,10,y+15,mx_opt_desc[id],C_UILINE,1);
+  }
+  if(opt_menu.page==MX_OPT_PERF)gfx_text_c(b,128,154,opt.profile==3?"QUIET OVERVIEW 15HZ / ECO FX":opt.profile==1?"FULL OVERVIEW WHEN BUDGET ALLOWS":"ADAPTIVE OVERVIEW / FIXED SIM",C_GOO,C_BLACK,1);
+  if(opt_menu.page==MX_OPT_DATA)gfx_text_c(b,128,133,save_off?"SAVE UNAVAILABLE - RAM ONLY":saved_n?"CARTRIDGE SAVE LOADED / WRITTEN":"CARTRIDGE SAVE NOT CONFIRMED",C_GOO,C_BLACK,1);
+  gfx_rect(b,0,165,256,27,C_UIBG);
+  gfx_text(b,8,171,"B BACK",C_WHITE,1);
+  gfx_text_c(b,128,171,"L/R PAGE  UP/DOWN ROW",C_GOLD,C_UIBG,1);
+  gfx_text_c(b,128,182,"A CHANGE / CONFIRM   LEFT/RIGHT CYCLE",C_UILINE,C_UIBG,1);
+}
+static void options_input(int down,const touchPosition *t){
+  if((down&KEY_B)||((down&KEY_TOUCH)&&hit(t,0,165,56,27))){opt_open=0;opt_menu.confirm=0;save_sync();return;}
+  if((down&KEY_TOUCH)&&t->py>=16&&t->py<33){mx_opt_page(&opt_menu,t->px/64);return;}
+  if((down&KEY_TOUCH)&&t->py>=36&&t->py<36+mx_opt_rows(&opt_menu)*29){
+    int row=(t->py-36)/29;mx_opt_pick(&opt_menu,row);opt_change(0);return;
+  }
+  if(down&KEY_L)mx_opt_page(&opt_menu,opt_menu.page-1);
+  else if(down&KEY_R)mx_opt_page(&opt_menu,opt_menu.page+1);
+  else if(down&KEY_UP)mx_opt_move(&opt_menu,-1);
+  else if(down&KEY_DOWN)mx_opt_move(&opt_menu,1);
+  else if(down&KEY_A)opt_change(0);
+  else if(down&KEY_LEFT)opt_change(-1);
+  else if(down&KEY_RIGHT)opt_change(1);
 }
 
 static void title_bottom(View *v){
@@ -1925,7 +1925,11 @@ int main(void){
   music_set(music_pref);
   STAGE(3, RGB15(0,0,31));                             /* blue */
 
-  mx_meta_init(&stats); mx_options_default(&opt); save_load(); outfit_scan(1); apply_outfit(outfit_sel); outfit_swatches();   /* load before the first load_level(), as mx_meta_unpack asks */
+  mx_meta_init(&stats); mx_options_default(&opt); save_load(); music_pref=!opt.music_off;
+#ifdef MX_BARE_NDS_H
+  sfx_set_enabled(!opt.sfx_off);
+#endif
+  outfit_scan(1); apply_outfit(outfit_sel); outfit_swatches();   /* load before the first load_level(), as mx_meta_unpack asks */
   load_level(sel_level);
 #ifdef MX_FPS_DEMO_LEVEL
   /* Test-only automatic scenario; normal release builds never define it. */
@@ -1963,18 +1967,18 @@ int main(void){
        on every punch press; Y remains the sound shortcut everywhere else.
        This must depend on the CURRENT gameplay mode, not the level number,
        since a sling level can transition into walking mid-run. */
-    if((down & KEY_Y) &&
+    if(!opt_open && (down & KEY_Y) &&
        !(app == ST_PLAY && world.state == MX_PLAY && world.man.mode == MAN_WALK)){
-      music_pref = !music_pref;
+      music_pref = !music_pref; opt.music_off=!music_pref;
       music_set(music_pref && app != ST_PAUSE && world.state == MX_PLAY);
     }
     if(app == ST_TITLE && !ach_open && !out_open && !opt_open && (held & (KEY_L | KEY_R | KEY_SELECT)) == (KEY_L | KEY_R | KEY_SELECT) && !combo_held){
       combo_held = 1; stats.unlock_all = !stats.unlock_all; cheat_t = 120; sfx_play(SFX_TARGET, 64);       /* never saved (port 5 must leave unlock_all out) */
     }
-    if(app == ST_TITLE){ if((up & KEY_L) && !combo_held) debug_on = !debug_on; }      /* on the title L and R act on release, so a held L+R+SELECT never trips the profiler or the outfit cycle first */
+    if(!opt_open && app == ST_TITLE){ if((up & KEY_L) && !combo_held) debug_on = !debug_on; }      /* on the title L and R act on release, so a held L+R+SELECT never trips the profiler or the outfit cycle first */
     /* On-foot L already means give up this walk and return to the sling.
        It must not also change the debug overlay (or saved view preference). */
-    else if((down & KEY_L) &&
+    else if(!opt_open && (down & KEY_L) &&
             !(app == ST_PLAY && world.state == MX_PLAY && world.man.mode == MAN_WALK))
       debug_on = !debug_on;
 
@@ -1983,16 +1987,8 @@ int main(void){
       if((down & KEY_B) || ((down & KEY_TOUCH) && hit(&t, 0, 168, 70, 24))){ ach_open = 0; sfx_play(SFX_CLICK, 64); }
       if((down & KEY_RIGHT) || ((down & KEY_TOUCH) && hit(&t, 140, 168, 30, 24))){ ach_page = (ach_page + 1) % ACH_PAGES; sfx_play(SFX_CLICK, 64); }
       if((down & KEY_LEFT) || ((down & KEY_TOUCH) && hit(&t, 90, 168, 30, 24))){ ach_page = (ach_page + ACH_PAGES - 1) % ACH_PAGES; sfx_play(SFX_CLICK, 64); }
-    } else if(app == ST_TITLE && opt_open){
-      int r = (down & KEY_TOUCH) ? opt_row_at(&t) : -1;
-      if((down & KEY_B) || ((down & KEY_TOUCH) && hit(&t, 0, 160, 80, 32))){ opt_open = 0; save_sync(); sfx_play(SFX_CLICK, 64); }
-      else if(r >= 0){ opt_cur = r; opt_change(r, (r == OPT_TOOL && t.px < OPT_RX + 16) ? -1 : 1); }   /* tap a row; the left end of the tool row steps back */
-      else {
-        if(down & KEY_DOWN){ opt_cur = (opt_cur + 1) % OPT_ROWS; sfx_play(SFX_CLICK, 40); }
-        if(down & KEY_UP){ opt_cur = (opt_cur + OPT_ROWS - 1) % OPT_ROWS; sfx_play(SFX_CLICK, 40); }
-        if(down & (KEY_A | KEY_RIGHT)) opt_change(opt_cur, 1);
-        else if(down & KEY_LEFT) opt_change(opt_cur, -1);
-      }
+    } else if(opt_open){
+      options_input(down,&t);
     } else if(app == ST_TITLE && out_open){
       int c = (down & KEY_TOUCH) ? out_cell_at(&t) : -1;
       if((down & KEY_B) || ((down & KEY_TOUCH) && hit(&t, 0, 160, 80, 32))){ out_open = 0; sfx_play(SFX_CLICK, 64); }
@@ -2003,7 +1999,7 @@ int main(void){
         if(dx || dy){ out_cur = out_move(out_cur, dx, dy); sfx_play(SFX_CLICK, 40); }
       }
     } else if(app == ST_TITLE){
-      if(((down & KEY_TOUCH) && hit(&t, 78, 176, 100, 16)) || (down & KEY_X)){ opt_open = 1; opt_cur = 0; sfx_play(SFX_CLICK, 64); down &= ~(KEY_TOUCH | KEY_A | KEY_START); }
+      if(((down & KEY_TOUCH) && hit(&t, 78, 176, 100, 16)) || (down & KEY_X)){ opt_open = 1; mx_opt_open(&opt_menu); sfx_play(SFX_CLICK, 64); down &= ~(KEY_TOUCH | KEY_A | KEY_START); }
       if((down & KEY_TOUCH) && hit(&t, 190, 176, 66, 16)){ ach_open = 1; ach_page = 0; sfx_play(SFX_CLICK, 64); down &= ~KEY_TOUCH; }
       if((down & KEY_TOUCH) && hit(&t, 0, 176, 64, 16)){ out_open = 1; out_cur = outfit_sel; sfx_play(SFX_CLICK, 64); down &= ~KEY_TOUCH; }
       int ch = 0;
@@ -2033,7 +2029,8 @@ int main(void){
          Execute only one action per frame: START+SELECT or overlapping
          button presses must not load a level and then resume the old one. */
       int action=(down & KEY_TOUCH)?pause_touch_action(&t):-1;
-      if((down & KEY_START) || action==0){
+      if(down & KEY_X){opt_open=1;mx_opt_open(&opt_menu);}
+      else if((down & KEY_START) || action==0){
         app=ST_PLAY; music_set(music_pref);
       }else if((down & KEY_SELECT) || action==1){
         load_level(world.level); app=ST_PLAY; music_set(music_pref);
@@ -2255,7 +2252,7 @@ int main(void){
       else if(ev_ft > 0){ tx = ev_fx; ty = ev_fy; rate = R(0.12); ev_ft--; }
     }
     fx += rmul(tx - fx, rate); fy += rmul(ty - fy, R(0.12));
-    int sh = world.shake >> 11; if(sh > 5) sh = 5;
+    int sh = world.shake >> 11; if(sh > 5) sh = 5; if(opt.shake==2)sh=0;else if(opt.shake==1)sh/=2;
     int sx = sh ? rnd(2 * sh + 1) - sh : 0, sy = sh ? rnd(2 * sh + 1) - sh : 0;
 
     View top = { buf_top, 4, 0, 0 };
@@ -2290,8 +2287,8 @@ int main(void){
       int quiet_bottom=app==ST_PLAY && !dragging && !pad_used &&
                         !((held|down|up)&KEY_TOUCH) &&
                         !(down&(KEY_X|KEY_A|KEY_START|KEY_SELECT|KEY_R));
-      int bottom_half_rate=MX_DS_BOTTOM30 && quiet_bottom && (frame&1);
-      int bottom_overload_rate=MX_DS_OVERLOAD_BOTTOM15 && lite &&
+      int bottom_half_rate=MX_DS_BOTTOM30 && opt.profile!=1 && quiet_bottom && (frame&1);
+      int bottom_overload_rate=(opt.profile==3 || (MX_DS_OVERLOAD_BOTTOM15 && lite)) &&
                                quiet_bottom && (frame&3);
       bot_dirty=!(bottom_half_rate || bottom_overload_rate ||
                   (lite && (frame&1) && quiet_bottom));
@@ -2312,7 +2309,7 @@ int main(void){
         gfx_text_c(buf_top, 128, 72, "PAUSED", C_GOLD, C_BLACK, 2);
         gfx_text_c(buf_top, 128, 92, "START  RESUME", C_WHITE, C_UIBG, 1);
         gfx_text_c(buf_top, 128, 101, "SELECT RESTART", C_WHITE, C_UIBG, 1);
-        gfx_text_c(buf_top, 128, 110, "B      MENU", C_WHITE, C_UIBG, 1);
+        gfx_text_c(buf_top, 128, 110, "B MENU  X OPTIONS", C_WHITE, C_UIBG, 1);
         /* Touchscreen equivalents; the paused game beneath stays visible.
            No additional framebuffer and no per-play-frame drawing. */
         panel(buf_bot, 3, 134, 250, 58);
@@ -2321,7 +2318,8 @@ int main(void){
           button(buf_bot,PAUSE_BTNS[k].x,162,PAUSE_BTNS[k].w,27,PAUSE_BTNS[k].label);
       }
     }
-    if(debug_on){
+    if(opt_open && app==ST_PAUSE)options_bottom(buf_bot);
+    if(debug_on || opt.monitor){
       gfx_rect(buf_top, 0, 180, 256, 12, C_UIBG);
       gfx_text(buf_top, 2, 183, "PHYS", C_WHITE, 1);
       gfx_text(buf_top, 22, 183, gfx_int(phys_ticks * 10 / 33514), C_GOLD, 1);

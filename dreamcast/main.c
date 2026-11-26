@@ -35,6 +35,10 @@
 #include "mx_objective.h"
 #include "mx_fps_meter.h"
 #include "mx_meta.h"
+#include "mx_options_menu.h"
+static MxOptions console_opt;
+static MxOptMenu opt_menu;
+static int opt_open, was_aim;
 #include "cloth.h"
 
 KOS_INIT_FLAGS(INIT_DEFAULT);
@@ -119,7 +123,7 @@ static void music_update(int want){                       /* plays the loop whil
 }
 static void sound_tick(void){ for(int i = 0; i < SFX_COUNT; i++) if(snd_cool[i] > 0) snd_cool[i]--; }
 void sfx_play(int id, int pan){
-  if(!snd_ok || id < 0 || id >= SFX_COUNT || snd_cool[id] > 0) return;
+  if(console_opt.sfx_off || !snd_ok || id < 0 || id >= SFX_COUNT || snd_cool[id] > 0) return;
   snd_cool[id] = mx_snd_cooldown(id);
   snd_sfx_play(snd_h[id], 200, pan * 2);                  /* volume 0..255, pan 0..255 (128 = centre) */
 }
@@ -582,7 +586,7 @@ static void draw_title(void){
   if(title_lv>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,title_lv,&stars);char b[80];snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/9  %d/20 CLEARED  %d/60 STARS",(title_lv-MX_TRIAL_START)/20+1,clear,stars);text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
   else text("UP/DOWN: TRIAL DISTRICTS",320,394,17,argb(255,210,63,255),1,Z_HUD);
   { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD);
-    snprintf(tb, sizeof tb, "Y: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(tb, 320, 418, 16, argb(255, 255, 255, 220), 1, Z_HUD); }
+    snprintf(tb, sizeof tb, "X OPTIONS / Y FIGHT: %s", nofight ? "OFF" : "ON"); text(tb, 320, 418, 16, argb(255, 255, 255, 220), 1, Z_HUD); }
 }
 
 /* ---- the world ---- */
@@ -783,6 +787,7 @@ static unsigned dc_particles_rasterized; /* host-only work counter */
 #endif
 static void draw_particles(void){
   for(int i = 0; i < (MX_DC_PARTICLE_BOUNDS ? part_high_water : 256); i++) if(parts[i].life > 0){
+    if(i%mx_opt_fx_stride(&console_opt))continue;
     const Part *p = &parts[i];
 #if MX_DC_PARTICLE_VIEW_CULL
     /* Each effect is contained within 32px of its anchor. The 64px pad
@@ -810,7 +815,7 @@ static void draw_particles(void){
 }
 static void draw_all(void){
   shx = shy = 0;
-  if(world.shake > 0.05f){ shx = (frand() - 0.5f) * world.shake * 0.6f; shy = (frand() - 0.5f) * world.shake * 0.6f; }
+  if(world.shake > 0.05f){float scale=console_opt.shake==2?0:console_opt.shake==1?.3f:.6f;shx=(frand()-.5f)*world.shake*scale;shy=(frand()-.5f)*world.shake*scale;}
   /* backdrop: sky, drifting clouds, hills / city / ground + the sling post */
   tquad(&hdr_bga, DCT_BGA_W, DCT_BGA_H, 0, 0, 640, 480, 0, 0, 512, 256, Z_BG, WHITE);
   draw_clouds();
@@ -903,7 +908,7 @@ static void draw_all(void){
   /* the aiming dots */
   if(m->mode == MAN_AIM){
     float dx = m->x - MX_ANCHOR_X, dy = m->y - MX_ANCHOR_Y;
-    if(dx * dx + dy * dy > 3.0f) for(int k = 1; k <= 16; k++){
+    if(!console_opt.no_guide && dx * dx + dy * dy > 3.0f) for(int k = 1; k <= 16; k++){
       float ox, oy; mx_preview_point(&world, (float)k / 9.0f, &ox, &oy);
       int gx = (int)ox, gy = (int)oy;
       if(gx < 0 || gx >= MX_COLS || gy >= MX_ROWS) break;
@@ -1146,7 +1151,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ bank_toast_t = survivor_toast_t = collapse_toast_t = tnt_toast_t = 0; mx_load(&world, n); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
+static void load_level(int n){ bank_toast_t = survivor_toast_t = collapse_toast_t = tnt_toast_t = 0; mx_load(&world, n); mx_set_collapse(&world,console_opt.collapse); mx_set_fight(&world, !nofight); was_aim=0; mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
 
 static void draw_intro(void){
   intro_draw(ic_top, ic_bot); ic_upload(tx_ic_top, ic_top); ic_upload(tx_ic_bot, ic_bot);
@@ -1209,11 +1214,39 @@ static void dc_end_input(uint32 pressed){
   else if(pressed & CONT_START)dc_advance_after_end();
 }
 
+static void opt_change(int dir){
+  int action=mx_opt_activate(&console_opt,&opt_menu,dir,on_title);
+  if(action==MX_O_ERASE){mx_meta_init(&stats);outfit_sel=0;outfit_seen=1;toast_nq=0;toast_id=-1;toast_t=0;title_lv=0;recolor_man(0);outfit_scan(1);load_level(0);}
+  nofight=console_opt.nofight;mus_pref=!console_opt.music_off;
+  mx_set_fight(&world,!nofight);mx_set_collapse(&world,console_opt.collapse);
+  if(action==MX_O_SAVE_NOW||action==MX_O_ERASE)dc_save_sync();
+  sfx_play(SFX_CLICK,64);
+}
+static void options_input(uint32 pressed){
+  if(pressed&CONT_B){opt_open=0;opt_menu.confirm=0;dc_save_sync();}
+  else if(pressed&CONT_X)mx_opt_page(&opt_menu,opt_menu.page+1);
+  else if(pressed&CONT_Y)mx_opt_page(&opt_menu,opt_menu.page-1);
+  else if(pressed&CONT_DPAD_UP)mx_opt_move(&opt_menu,-1);
+  else if(pressed&CONT_DPAD_DOWN)mx_opt_move(&opt_menu,1);
+  else if(pressed&CONT_A)opt_change(0);
+  else if(pressed&CONT_DPAD_LEFT)opt_change(-1);
+  else if(pressed&CONT_DPAD_RIGHT)opt_change(1);
+}
+static void draw_options(void){
+  quad(0,0,640,480,Z_BG,argb(255,15,18,30));text("MANDEX OPTIONS",320,12,35,argb(255,255,210,63),1,Z_HUD);
+  for(int i=0;i<4;i++){quad(i*160+5,57,150,34,Z_HUD,argb(255,i==opt_menu.page?65:29,37,80));text(mx_opt_tabs[i],i*160+80,62,21,WHITE,1,Z_HUD+1);}
+  for(int i=0;i<mx_opt_rows(&opt_menu);i++){int id=mx_opt_id(&opt_menu,i),y=100+i*70;uint32 col=i==opt_menu.row?argb(255,255,210,63):argb(255,176,192,213);quad(20,y,600,64,Z_HUD,argb(255,30,38,61));quad(20,y,600,2,Z_HUD+1,col);text(mx_opt_names[id],32,y+7,21,col,0,Z_HUD+2);text(mx_opt_value(&console_opt,&opt_menu,id,on_title),608,y+7,21,WHITE,2,Z_HUD+2);text(mx_opt_desc[id],32,y+35,17,argb(255,182,197,218),0,Z_HUD+2);}
+  if(opt_menu.page==MX_OPT_PERF)text(console_opt.profile==3?"MINIMAL FX / FULL SIMULATION":"PROFILE FX / FULL SIMULATION",320,387,18,argb(255,125,255,90),1,Z_HUD+2);
+#if defined(__sh__) && !defined(MX_DC_NO_VMU)
+  if(opt_menu.page==MX_OPT_DATA)text(dc_save_status<0?"VMU WRITE FAILED":dc_save_status?"VMU SAVE OK":"NO SAVE CONFIRMED",320,320,18,argb(255,125,255,90),1,Z_HUD+2);
+#endif
+  text("B BACK   X/Y PAGE   UP/DOWN ROW",320,420,21,WHITE,1,Z_HUD);text("A CHANGE / CONFIRM   LEFT/RIGHT CYCLE",320,450,19,argb(255,255,210,63),1,Z_HUD);
+}
 int main(int argc, char **argv){
   (void)argc; (void)argv;
   gfx_init();
   sound_init();
-  mx_meta_init(&stats);
+  mx_meta_init(&stats); mx_options_default(&console_opt);
   dc_save_load();                         /* before level-start rebases counters */
   recolor_man(outfit_sel);
 
@@ -1232,7 +1265,9 @@ int main(int argc, char **argv){
         if(intro_tick(dn, 0, 0)){
           if(intro_mode() == 3 && intro_level == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_start_wolf(); }       /* the chapter 2 closer hands over to the wolfman cutscene */
           else { in_intro = 0; load_level(intro_level); } }
-      } else if(on_title){
+      } else if(opt_open){options_input(pressed);}
+      else if((on_title||paused)&&(pressed&CONT_X)){opt_open=1;mx_opt_open(&opt_menu);}
+      else if(on_title){
         if(pressed & (CONT_DPAD_UP | CONT_DPAD_DOWN))title_lv=mx_trial_district_step(title_lv,(pressed&CONT_DPAD_DOWN)?1:-1);
         else if(pressed & (CONT_DPAD_RIGHT | CONT_DPAD_LEFT)) title_lv = (title_lv + ((pressed & CONT_DPAD_RIGHT) ? 1 : MX_NUM_LEVELS - 1)) % MX_NUM_LEVELS;
         { int tl = (st->ltrig > 128 && !(prev_trig & 1)), tr = (st->rtrig > 128 && !(prev_trig & 2)); prev_trig = (st->ltrig > 128) | ((st->rtrig > 128) << 1);
@@ -1254,7 +1289,6 @@ int main(int argc, char **argv){
         if(pressed & CONT_START)paused=0;
         else if(pressed & CONT_Y){load_level(world.level);paused=0;}
         else if(pressed & CONT_DPAD_LEFT)dc_return_to_title(world.level);
-        else if(pressed & CONT_X){nofight=!nofight;mx_set_fight(&world,!nofight);dc_save_sync();}
         else if(pressed & CONT_B)mus_pref=!mus_pref;
       } else {
         /* START and Y are exclusive navigation actions. Previously START
@@ -1263,6 +1297,7 @@ int main(int argc, char **argv){
         if(pressed & CONT_START) paused = 1;
         else if(pressed & CONT_Y) load_level(world.level);
         if(!paused && !(pressed & CONT_Y)){
+        {int aim=world.man.mode==MAN_AIM&&world.state==MX_PLAY;if(aim&&!was_aim){int pw=mx_tool_power(console_opt.tool);if(pw&&world.pw_sel!=pw)mx_select_power(&world,pw);}was_aim=aim;}
         if(world.man.mode == MAN_AIM){
           world.valve_ok = dc_valve_equipped && mx_valve_unlocked(&stats);
           float jx = st->joyx / 127.0f, jy = st->joyy / 127.0f;
@@ -1326,8 +1361,8 @@ int main(int argc, char **argv){
     pvr_list_begin(PVR_LIST_TR_POLY);
     cur_hdr = 0;
     if(in_intro){ draw_intro();
-    } else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART   B MUSIC", 320, 270, 24, WHITE, 1, Z_HUD); text("DPAD LEFT: TITLE MENU", 320, 344, 22, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: LANDLORDS FIGHT BACK - %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
-    if(st&&st->ltrig>128&&st->rtrig>128){
+    } else if(opt_open)draw_options(); else if(on_title) draw_title(); else { draw_all(); if(paused){ text("PAUSED", 320, 200, 64, WHITE, 1, Z_HUD); text("START RESUME   Y RESTART   B MUSIC", 320, 270, 24, WHITE, 1, Z_HUD); text("DPAD LEFT: TITLE MENU", 320, 344, 22, WHITE, 1, Z_HUD); { char pb[48]; snprintf(pb, sizeof pb, "X: OPTIONS / FIGHT %s", nofight ? "OFF" : "ON"); text(pb, 320, 310, 20, WHITE, 1, Z_HUD); } } }
+    if(console_opt.monitor || (!opt_open&&st&&st->ltrig>128&&st->rtrig>128)){
       char stats_line[76];
       snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d DRAW %uMS PEAK %u",
                (int)dc_fps.render_x10/10,(int)dc_fps.render_x10%10,
