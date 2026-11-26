@@ -177,7 +177,7 @@ typedef struct { uint8_t x, y, w; } MxPad;                                  /* b
 /* Pneumatic tube (chapter 2): a man who flies within MX_TUBE_R of the mouth (ax,ay) is posted out of the nozzle (bx,by) at (vx,vy) cells/s. */
 #define MX_MAX_TUBES 3
 #define MX_TUBE_R    R(3.75)
-typedef struct { real ax, ay, bx, by, vx, vy; } MxTube;
+typedef struct { real ax, ay, bx, by, vx, vy; real pulse; } MxTube; /* visual transfer countdown only */
 
 typedef struct {
   int mode;            /* MAN_* */
@@ -356,6 +356,31 @@ typedef struct {
   int tnt_live;               /* number of separately armed moving TNT voxels */
   uint8_t tnt_soonest;        /* ticks to earliest blast, zero when none */
 } MxWorld;
+
+/* Presentation-only helpers: no cached pad geometry or extra render buffers.
+   A fractured pad may have several pieces; mark the widest contiguous
+   rubber run rather than the empty midpoint. Leftmost wins ties. */
+static inline int mx_pad_live_run(const MxWorld *w,const MxPad *p,int *first){
+  int best=0,run=0;*first=p->x;
+  if(p->y>=MX_ROWS)return 0;
+  int end=p->x+p->w;
+  if(end>MX_COLS)end=MX_COLS;
+  for(int x=p->x;x<end;x++){
+    if(w->grid[p->y*MX_COLS+x]==MX_RUBBER){
+      if(++run>best){best=run;*first=x-run+1;}
+    }else run=0;
+  }
+  return best;
+}
+/* One-second continuous chevron loop, three evenly spaced phases.
+   Use only the fractional second to avoid large fixed-point products. */
+static inline int mx_pad_phase(real time,int k){
+  real frac=time-RI(rfloor(time));
+  return (rfloor(rmul(frac,RI(60)))+20*k)%60;
+}
+static inline int mx_tube_pulse_stage(const MxTube *t){
+  return t->pulse>0?1+rfloor(rmul(rclamp(t->pulse,0,R(0.45)),RI(24))):0;
+}
 
 /* Anchor of the sling, in cells. */
 #define MX_ANCHOR_X R(16)
