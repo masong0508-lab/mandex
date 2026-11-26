@@ -1069,13 +1069,17 @@ static void draw_cases(const View *v){
   }
 }
 static void draw_pads(const View *v){
-  int p = v->ppc, bob = (frame >> 3) & 3;
-  for(int i = 0; i < world.npads; i++){
-    const MxPad *pd = &world.pads[i];
-    int cx = vx(v, RI(pd->x) + RI(pd->w) / 2), cy = vy(v, RI(pd->y));
-    for(int k = 0; k < 3; k++){
-      int y = cy - p * (3 + 3 * k) - bob; u8 c = k == 0 ? C_WHITE : k == 1 ? C_PINK : C_RED2;
-      gfx_line(v->buf, cx - p * 5 / 4, y + p / 2, cx, y - p / 2, c); gfx_line(v->buf, cx, y - p / 2, cx + p * 5 / 4, y + p / 2, c);
+  int p=v->ppc;
+  for(int i=0;i<world.npads;i++){
+    const MxPad *pd=&world.pads[i];int first,span=mx_pad_live_run(&world,pd,&first);
+    if(!span)continue;
+    int cx=vx(v,RI(first)+RI(span)/2),cy=vy(v,RI(pd->y));
+    int half=span*p/2;if(half>p*5/4)half=p*5/4;
+    for(int k=0;k<3;k++){
+      int q=mx_pad_phase(world.time,k),y=cy-2*p-q*6*p/60;
+      u8 col=q<10||q>=50?C_RED2:q<20||q>=40?C_PINK:C_WHITE;
+      gfx_line(v->buf,cx-half,y+p/2,cx,y-p/2,col);
+      gfx_line(v->buf,cx,y-p/2,cx+half,y+p/2,col);
     }
   }
 }
@@ -1120,6 +1124,14 @@ static void draw_tubes(const View *v){
     gfx_rect(v->buf, bx - p * 19 / 4, by - p * 3 / 2, p * 4, p * 3, C_GOLD2);                          /* nozzle stub on the room's wall, shooting right */
     gfx_rect(v->buf, bx - p * 9 / 2, by - p * 5 / 4, p * 7 / 2, p * 5 / 8 + 1, C_GOLD);
     gfx_rect(v->buf, bx - p * 3 / 4, by - p * 13 / 8, p * 3 / 2, p * 13 / 4, c);
+    int stage=mx_tube_pulse_stage(t);
+    if(stage){
+      int r=p*4+(12-stage)*p/8,dist=p+(12-stage)*p/2;
+      u8 glow=stage>=6?C_WHITE:C_GOLD;
+      gfx_rect(v->buf,ax-r,ay-1,2,2,glow);gfx_rect(v->buf,ax+r-1,ay-1,2,2,glow);
+      gfx_rect(v->buf,ax-1,ay-r,2,2,glow);gfx_rect(v->buf,ax-1,ay+r-1,2,2,glow);
+      gfx_line(v->buf,bx+dist,by-p,bx+dist,by+p,glow);
+    }
   }
 }
 
