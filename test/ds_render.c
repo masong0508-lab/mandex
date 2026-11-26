@@ -302,7 +302,7 @@ void swiWaitForVBlank(void){
       exit(fails!=0);
     }
   } else if(getenv("OPTIONS_LOAD")){                                      /* second boot after OPTIONS_TEST: the options come back from the chip (collapse off, splat) */
-    if(vf == 3){ int ok = opt.collapse == 0 && opt.tool == MX_TOOL_SPLAT; printf(ok ? "ok: options loaded from the chip at boot\n" : "FAIL: options not loaded (collapse=%d tool=%d)\n", opt.collapse, opt.tool); exit(!ok); }
+    if(vf == 3){ int ok=opt.collapse==0 && opt.tool==MX_TOOL_SPLAT && opt.profile==3 && opt.eco && opt.shake==1 && opt.no_guide && opt.music_off && opt.sfx_off && opt.monitor && !music_pref; printf(ok ? "ok: options loaded from the chip at boot\n" : "FAIL: options not loaded (collapse=%d tool=%d)\n", opt.collapse, opt.tool); exit(!ok); }
   } else if(getenv("TOOLBAR_TEST")){
     static int fails;
 #define TCHECK(c,msg) do{if(!(c)){printf("FAIL: %s\n",msg);fails++;}else printf("ok: %s\n",msg);}while(0)
@@ -328,35 +328,48 @@ void swiWaitForVBlank(void){
   } else if(getenv("OPTIONS_TEST")){                                       /* port 13: the options screen, the start tool, the speed safety net, saving */
     static int fails, st, men0, f0;
 #define PCHECK(c, msg) do{ if(!(c)){ printf("FAIL: %s\n", msg); fails++; } else printf("ok: %s\n", msg); }while(0)
-    if(vf == 2){ stats.stars[0] = stats.stars[1] = stats.stars[2] = 1; PCHECK(opt.collapse == 0 && opt.tool == MX_TOOL_NONE && !opt_open, "fresh boot: collapse off, air valve, screen closed"); }
-    if(vf == 4){ g_keys |= KEY_TOUCH; g_touch.px = 130; g_touch.py = 180; }                              /* the OPTIONS button on the title */
-    if(vf == 7){ PCHECK(opt_open && opt_cur == 0 && app == ST_TITLE, "the OPTIONS button opens the screen without starting a level"); shot("opt1"); }
-    if(vf == 8){ g_keys |= KEY_TOUCH; g_touch.px = 100; g_touch.py = 30; }                                /* tap the collapse row */
-    if(vf == 10){ PCHECK(opt.collapse == 1 && world.collapse == 1, "tapping the collapse row turns it on (and the world follows)"); shot("opt2"); }
-    if(vf == 11) g_keys |= KEY_DOWN;
-    if(vf == 13) PCHECK(opt_cur == 1, "d-pad down moves to the tool row");
-    if(vf == 14) g_keys |= KEY_A;
-    if(vf == 16) PCHECK(opt.tool == MX_TOOL_VALVE, "A steps NONE to AIR VALVE title preference (still hidden in gameplay)");
-    if(vf == 17) g_keys |= KEY_RIGHT;
-    if(vf == 19) PCHECK(opt.tool == MX_TOOL_BEANS, "d-pad right steps it to beans");
-    if(vf == 20){ g_keys |= KEY_TOUCH; g_touch.px = 12; g_touch.py = 86; }                                /* the left arrow */
-    if(vf == 22) PCHECK(opt.tool == MX_TOOL_VALVE, "tapping the left end of the tool row steps back");
-    if(vf == 23){ g_keys |= KEY_TOUCH; g_touch.px = 180; g_touch.py = 90; }
-    if(vf == 25){ PCHECK(opt.tool == MX_TOOL_BEANS, "tapping elsewhere on the row steps forward"); shot("opt3"); }
-    if(vf == 26) g_keys |= KEY_LEFT; if(vf == 28) PCHECK(opt.tool == MX_TOOL_VALVE, "d-pad left steps back");
-    if(vf == 29) g_keys |= KEY_LEFT; if(vf == 31) PCHECK(opt.tool == MX_TOOL_NONE, "...to none");
-    if(vf == 32) g_keys |= KEY_LEFT; if(vf == 34) PCHECK(opt.tool == MX_TOOL_QUAKE, "...wraps around to quake");
-    if(vf == 35) g_keys |= KEY_LEFT; if(vf == 37) PCHECK(opt.tool == MX_TOOL_TURBO, "...then to turbo");
-    if(vf == 38) g_keys |= KEY_DOWN; if(vf == 40) PCHECK(opt_cur == 2, "d-pad down to the landlords-fight-back row");
-    if(vf == 41) g_keys |= KEY_A; if(vf == 43){ PCHECK(opt.nofight == 1 && world.nofight == 1, "A on the fight-back row switches it off (and the world follows)"); shot("opt4f"); }
-    if(vf == 44) g_keys |= KEY_A; if(vf == 46) PCHECK(opt.nofight == 0 && world.nofight == 0, "...and back on");
-    if(vf == 50) g_keys |= KEY_DOWN; if(vf == 52) PCHECK(opt_cur == 3, "d-pad down to the music row");
-    if(vf == 53) g_keys |= KEY_A; if(vf == 55){ PCHECK(music_pref == 0, "A on the music row switches it off"); shot("opt4"); }
-    if(vf == 56) g_keys |= KEY_A; if(vf == 58) PCHECK(music_pref == 1, "...and back on");
-    if(vf == 59) g_keys |= KEY_DOWN; if(vf == 61) PCHECK(opt_cur == 0, "the cursor wraps from the bottom row to the top");
-    if(vf == 62){ opt.tool = MX_TOOL_TOWEL; }                                                             /* the start tool for the play test */
-    if(vf == 63){ g_keys |= KEY_TOUCH; g_touch.px = 20; g_touch.py = 175; }                               /* BACK */
-    if(vf == 65) PCHECK(!opt_open && app == ST_TITLE, "BACK closes the screen and stays on the title");
+    if(vf == 2){ stats.stars[0]=stats.stars[1]=stats.stars[2]=1; PCHECK(opt.collapse==0 && opt.tool==MX_TOOL_NONE && !opt_open,"fresh boot defaults"); }
+    if(vf == 4){g_keys|=KEY_TOUCH;g_touch.px=130;g_touch.py=180;}
+    if(vf == 7){PCHECK(opt_open && opt_menu.page==MX_OPT_GAME && opt_menu.row==0 && app==ST_TITLE,"title opens gameplay settings without launching");shot("opt1");}
+    if(vf == 8){g_keys|=KEY_TOUCH;g_touch.px=100;g_touch.py=45;}
+    if(vf == 10){PCHECK(opt.collapse==1 && world.collapse==1,"touch collapse applies to world");shot("opt2");}
+    if(vf == 11)g_keys|=KEY_DOWN;
+    if(vf == 13)PCHECK(opt_menu.row==1,"down selects landlord AI");
+    if(vf == 14)g_keys|=KEY_A;
+    if(vf == 16)PCHECK(opt.nofight==1 && world.nofight==1,"A disables landlord attacks");
+    if(vf == 17)g_keys|=KEY_A;
+    if(vf == 19)PCHECK(!opt.nofight && !world.nofight,"A restores landlord attacks");
+    if(vf == 20)g_keys|=KEY_DOWN;
+    if(vf == 22)PCHECK(opt_menu.row==2,"down selects starting tool");
+    if(vf == 23)g_keys|=KEY_A;
+    if(vf == 25)PCHECK(opt.tool==MX_TOOL_VALVE,"A cycles NONE to AIR");
+    if(vf == 26)g_keys|=KEY_RIGHT;
+    if(vf == 28)PCHECK(opt.tool==MX_TOOL_BEANS,"right cycles to beans");
+    if(vf == 29)g_keys|=KEY_LEFT;
+    if(vf == 31)PCHECK(opt.tool==MX_TOOL_VALVE,"left cycles to AIR");
+    if(vf == 32)g_keys|=KEY_LEFT;
+    if(vf == 34)PCHECK(opt.tool==MX_TOOL_NONE,"left cycles to NONE");
+    if(vf == 35)g_keys|=KEY_LEFT;
+    if(vf == 37)PCHECK(opt.tool==MX_TOOL_QUAKE,"reverse wrap selects quake");
+    if(vf == 38){g_keys|=KEY_TOUCH;g_touch.px=180;g_touch.py=100;}
+    if(vf == 40)PCHECK(opt.tool==MX_TOOL_NONE,"tool touch cycles forward");
+    if(vf == 41)g_keys|=KEY_RIGHT;
+    if(vf == 43)PCHECK(opt.tool==MX_TOOL_VALVE,"right selects AIR again");
+    if(vf == 44)g_keys|=KEY_RIGHT;
+    if(vf == 46)PCHECK(opt.tool==MX_TOOL_BEANS,"right selects beans again");
+    if(vf == 47)g_keys|=KEY_R;
+    if(vf == 49){PCHECK(opt_menu.page==MX_OPT_PERF && opt_menu.row==0,"R opens performance tab");shot("opt3");}
+    if(vf == 50)g_keys|=KEY_A;
+    if(vf == 52)PCHECK(opt.profile==1,"quality profile changes on A");
+    if(vf == 53)g_keys|=KEY_R;
+    if(vf == 55){PCHECK(opt_menu.page==MX_OPT_AUDIO && opt_menu.row==0,"R opens audio tab");shot("opt4");}
+    if(vf == 56)g_keys|=KEY_A;
+    if(vf == 58)PCHECK(!music_pref && opt.music_off,"A disables music");
+    if(vf == 59)g_keys|=KEY_A;
+    if(vf == 61)PCHECK(music_pref && !opt.music_off,"A restores music");
+    if(vf == 62){opt.tool=MX_TOOL_TOWEL;opt.profile=0;}
+    if(vf == 63){g_keys|=KEY_TOUCH;g_touch.px=20;g_touch.py=175;}
+    if(vf == 65)PCHECK(!opt_open && app==ST_TITLE,"BACK returns to title");
     if(vf == 66) g_keys |= KEY_A;                                                                         /* play */
     if(vf == 70){
       PCHECK(app == ST_PLAY && world.collapse == 1, "the level starts with collapsible buildings on");
@@ -388,9 +401,9 @@ void swiWaitForVBlank(void){
     if(st == 8 && vf == f0 + 125){ PCHECK(world.substeps == MX_DS_MAX_SUBSTEPS && world.collapse == 1, "full substeps recover after headroom"); st = 9; f0 = vf; }
     if(st == 9 && vf == f0 + 125){ PCHECK(world.collapse == 1, "collapse never auto-shed even after recovery");
       load_level(world.level); PCHECK(world.collapse == 1, "level reload preserves collapse preference");
-      opt_change(OPT_COLLAPSE, 1); PCHECK(opt.collapse == 0 && world.collapse == 0, "user OFF explicitly disables collapse");
-      opt_change(OPT_COLLAPSE, 1); PCHECK(opt.collapse == 1 && world.collapse == 1, "user ON restores collapse");
-      opt.collapse = 0; opt.tool = MX_TOOL_SPLAT; save_off = 0; save_sync(); st = 10;
+      mx_opt_open(&opt_menu); opt_change(1); PCHECK(opt.collapse == 0 && world.collapse == 0, "user OFF explicitly disables collapse");
+      opt_change(1); PCHECK(opt.collapse == 1 && world.collapse == 1, "user ON restores collapse");
+      opt.collapse=0; opt.tool=MX_TOOL_SPLAT; opt.profile=3; opt.eco=1; opt.shake=1; opt.no_guide=1; opt.music_off=1; opt.sfx_off=1; opt.monitor=1; save_off=0; save_sync(); st=10;
       printf(fails ? "options: %d FAILED\n" : "options: all passed\n", fails); save_report(); exit(fails != 0); }
   } else if(getenv("INTRO_TEST")){                                         /* the opening cutscene played start to finish with no input, photographed as it goes */
     static int fails, lf, last_sc = -1, played;

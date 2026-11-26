@@ -90,7 +90,7 @@ static int ach_open, ach_page;       /* achievements list shown on the title's b
 static int combo_held, cheat_t;      /* L+R+SELECT on the title = unlock every level for this session: latch (set while the three are held) and the on-screen message timer */
 static int valve_equipped;      /* gameplay toolbar gadget: default OFF, not an obstacle when flinging */
 static MxOptions opt;                /* port 13: collapsible buildings + start tool.  Saved in the cartridge blob (version 2); defaults until a save loads */
-static int opt_open; static MxOptMenu opt_menu;        /* options screen shown on the title's bottom screen; opt_cur = the highlighted row */
+static int opt_open; static MxOptMenu opt_menu;        /* shared four-page options model */
 static int was_aim; /* tool arming edge detector; collapse always follows opt.collapse */
 static int out_open, out_cur;        /* outfits screen shown on the title's bottom screen; out_cur = the highlighted outfit (outfit_sel = the one worn) */
 static int outfit_sel, toast_t = -1, toast_id, toast_q[4], toast_nq;
@@ -1794,9 +1794,7 @@ static void opt_change(int dir){
     sel_level=0;apply_outfit(0);outfit_scan(1);load_level(0);
   }
   music_pref=!opt.music_off;
-#ifdef MX_BARE_NDS_H
   sfx_set_enabled(!opt.sfx_off);
-#endif
   apply_options();
   if(action==MX_O_SAVE_NOW||action==MX_O_ERASE)save_sync();
   if(!opt.sfx_off)sfx_play(SFX_CLICK,64);
@@ -1926,9 +1924,7 @@ int main(void){
   STAGE(3, RGB15(0,0,31));                             /* blue */
 
   mx_meta_init(&stats); mx_options_default(&opt); save_load(); music_pref=!opt.music_off;
-#ifdef MX_BARE_NDS_H
   sfx_set_enabled(!opt.sfx_off);
-#endif
   outfit_scan(1); apply_outfit(outfit_sel); outfit_swatches();   /* load before the first load_level(), as mx_meta_unpack asks */
   load_level(sel_level);
 #ifdef MX_FPS_DEMO_LEVEL
