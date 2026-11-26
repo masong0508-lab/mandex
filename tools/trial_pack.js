@@ -27,12 +27,15 @@ function generateTrials(){
       const base=58,top=base-floors*fh;
       const H={x,w,top,base,fh,floors};houses.push(H);
       fill(x,base,w,2,3);
-      for(let f=1;f<=floors;f++)fill(x,base-f*fh,w,2,f===floors?roof:floor);
+      for(let f=1;f<=floors;f++){
+        const y=base-f*fh,m=f===floors?roof:floor;fill(x,y,w,2,m);
+        if(m===4)fill(x,y+1,w,1,6); // load-bearing frame under the glazing
+      }
       for(let f=0;f<floors;f++){
         const low=base-f*fh,high=low-fh;
         fill(x,high+2,2,fh-2,wall);fill(x+w-2,high+2,2,fh-2,wall);
         // Wide rooms have a central structural post and two usable bays.
-        if(w>=22)fill(x+(w>>1),high+2,1,fh-2,wall===6?6:1);
+        if(w>=16)fill(x+(w>>1),high+2,1,fh-2,wall===6||wall===4?6:1);
         if(wall!==4){fill(x,low-5,1,2,4);fill(x+w-1,low-5,1,2,4)}
         rooms.push([x+2,high+2,w-4,fh-2,(district+houses.length-1)%4]);
         if(f===0||tier>=1||f===floors-1){
@@ -57,6 +60,8 @@ function generateTrials(){
       const B=house(90-tier*2,18,3+(tier>=3?1:0),fh,g.wall,g.floor,g.roof);
       const y=58-fh*(tier%2+1),start=A.x+A.w,end=B.x;
       fill(start,y,end-start,2,g.floor);
+      // Piers carry the span according to the wood/brick/steel load limits.
+      for(let px=start+5;px<end-1;px+=10)fill(px,y+2,2,58-y,6);
       target(Math.floor((start+end)/2),y,g.kind[tier%4],6);
     }else{
       house(x,15,1+(tier%2),fh,g.wall,g.floor,g.roof);
@@ -74,7 +79,7 @@ function generateTrials(){
       // Low, supported sand bank in the yard, out of every doorway.
       const A=houses[0],B=houses[1],start=A.x+A.w+2,space=B.x-start-2;
       const width=Math.min(space,12+tier*2);
-      if(width>=5)for(let j=0;j<Math.min(5+tier,Math.ceil(width/2));j++)if(width-2*j>0)fill(start+j,59-j,width-2*j,1,8);
+      if(width>=5)for(let j=0;j<Math.min(5+tier,Math.ceil(width/2));j++)for(let cx=start+j;cx<start+width-j;cx++)if(!get(cx,59-j))fill(cx,59-j,1,1,8);
       fill(A.x,56,2,2,5);
     }
     if(district===6){
@@ -97,6 +102,19 @@ function generateTrials(){
       for(let yy=ty-5;yy<ty;yy++)for(let xx=tx-2;xx<=tx+2;xx++)if(get(xx,yy))fail("obstructed target "+name+" "+[tx,ty,xx,yy]);
       const k=ty*WIDTH+tx;if(keys.has(k))fail("duplicate target "+name);keys.add(k);
     }
+    // Match the core support flood: upward transfers reset lateral span;
+    // sideways/downward transfers must fit each material's actual limit.
+    const lim=[0,6,9,14,2,2,16,8,8],span=new Uint8Array(grid.length);span.fill(255);
+    const support=[];for(let x=0;x<WIDTH;x++){const i=(HEIGHT-1)*WIDTH+x;if(grid[i]){span[i]=0;support.push(i)}}
+    for(let n=0;n<support.length;n++){
+      const i=support[n],cx=i%WIDTH,cy=(i/WIDTH)|0,h=span[i];
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const xx=cx+dx,yy=cy+dy;if(xx<0||xx>=WIDTH||yy<0||yy>=HEIGHT)continue;
+        const j=yy*WIDTH+xx,m=grid[j],next=dy===-1?0:h+1;
+        if(m&&next<span[j]&&next<=lim[m]){span[j]=next;support.push(j)}
+      }
+    }
+    for(let i=0;i<grid.length;i++)if(grid[i]&&grid[i]!==8&&span[i]===255)fail('unsupported material span '+name+' '+[i%WIDTH,(i/WIDTH)|0,grid[i]]);
     // Verify every occupied voxel has a four-connected path to the ground.
     const seen=new Uint8Array(grid.length),queue=[];
     for(let cx=0;cx<WIDTH;cx++){const i=(HEIGHT-1)*WIDTH+cx;if(grid[i]){seen[i]=1;queue.push(i)}}
