@@ -4077,6 +4077,7 @@ cv.addEventListener('pointerdown',e=>{
   if(state==='play'){
     if(PLAY_INPUT.aim&&!dragging)PLAY_INPUT.aim=null;
     if(PLAY_INPUT.aim||PLAY_INPUT.soda!==null)return;
+    if(CAM.manual&&PLAY_INPUT.pan.size){manualCameraDown(e,x,y);return}
     if(e.button===2){if(!CAM.manual)cameraMode(true);manualCameraDown(e,x,y);return}
     if(e.button!==undefined&&e.button!==0)return;
   }
