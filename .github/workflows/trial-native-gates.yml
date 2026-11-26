@@ -45,3 +45,5 @@ jobs:
           /tmp/save
           gcc "${flags[@]}" -Wno-unused-function test/vmu_save_test.c core/mx.c core/mx_meta.c -lm -o /tmp/vmu
           /tmp/vmu
+          gcc "${flags[@]}" test/sweep.c core/mx.c -lm -o /tmp/replay
+          /tmp/replay --replay
