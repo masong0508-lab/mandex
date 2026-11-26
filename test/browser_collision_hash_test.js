@@ -52,10 +52,12 @@ for(let k=0;k<40;k++){
 chunks=[a];resetBody(a,100,100);stepChunks(0);
 check(CHUNK_HASH.size===0&&CHUNK_BUCKET_POOL.every(b=>b.length===0),
       'removed chunks cannot persist through the collision cache');
+check(CHUNK_BUCKET_POOL.length===cached.length,'single body does not populate the pair cache');
 function large(count,cols){
  COLS=cols;grid=new Uint8Array(COLS*ROWS);
  const points=[];for(let i=0;i<count;i++)points.push([(i%COLS)*V+4,Math.floor(i/COLS)*V+4]);
- chunks=[body(5,points,true)];stepChunks(0);
+ // Dense broadphase needs at least two active bodies after the single-body bypass.
+ const split=Math.floor(points.length/2);chunks=[body(5,points.slice(0,split),true),body(6,points.slice(split),true)];stepChunks(0);
 }
 large(2105,120);
 check(CHUNK_BUCKET_POOL.length===CHUNK_BUCKET_CACHE_MAX,

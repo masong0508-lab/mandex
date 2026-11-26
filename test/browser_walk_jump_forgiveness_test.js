@@ -104,8 +104,16 @@ check(m.vy===-470&&m.jumpHold===0&&m.ledgeGrace===0,'ordinary pad launch unchang
 m=pad.tick();
 check(m.vy< -180,'released jump key must not weaken a rubber pad launch');
 
-check(html.includes('m.ledgeGrace=0;m.jumpHold=0;m.R=14'),
+check(html.includes('m.ledgeGrace=0;m.jumpHold=0;m.jumpBuffer=0'),
       'enterWalk resets timers for every player life');
+const buffered=make();buffered.e.man.gr=false;buffered.e.man.y-=1.6;buffered.e.man.vy=96;
+m=buffered.tick({Space:true});check(m.jumpBuffer>0,'pre-landing tap buffered');
+m=buffered.tick();check(m.vy<0&&m.jumpBuffer===0,'buffered release launches once after floor contact');
+const noRepeat=make();for(let i=0;i<120;i++)m=noRepeat.tick({Space:true});
+check(m.gr&&m.vy===0,'held jump does not auto-repeat');
+const jam=make();jam.e.man.walkSafe=true;jam.e.man.safeX=120;jam.e.man.safeY=320-19-.24;jam.e.man.x=640;jam.e.man.y=240;
+for(let y=15;y<45;y++)for(let x=65;x<96;x++)jam.e.grid[jam.e.idx(x,y)]=6;
+for(let i=0;i<20;i++)m=jam.tick();check(m.x<240,'bounded jam rescue finds last safe platform');
 const sa=html.indexOf('<script>'),sb=html.indexOf('</script>',sa);
 new Function(html.slice(sa+8,sb));
 console.log('BROWSER_JUMP_FORGIVENESS_PASS cases='+checks+

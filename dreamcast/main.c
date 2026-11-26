@@ -381,7 +381,11 @@ static void handle_events(void){
     case EV_SURVIVOR: survivor_toast_t=120;
       for(int k=0;k<6;k++)spawn(e->x,e->y,k&1?argb(255,210,63,255):argb(190,180,160,255),230);
       break;
-    case EV_DISTRICT: break;                               /* Landlord HQ: next district; the banner (below) announces it */
+    case EV_DISTRICT: was_aim=0;dc_valve_equipped=0;world.valve_ok=0;memset(parts,0,sizeof parts);part_high_water=0;
+#if MX_DC_PARTICLE_HINT
+      part_free_hint=0;
+#endif
+      break;
     case EV_HEAL:  for(int k = 0; k < 8; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 520); break;
     case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), e->m == 2 ? 580 : 520); break;
     case EV_THROW: case EV_SWING: for(int k = 0; k < 4; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 160); break;
@@ -583,7 +587,7 @@ static void draw_title(void){
     text("THE LANDLORD SMASHER",320,225,29,WHITE,1,Z_HUD);
   }
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
-  if(title_lv>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,title_lv,&stars);char b[80];snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/27  %d/20 CLEARED  %d/60 STARS",(title_lv-MX_TRIAL_START)/20+1,clear,stars);text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
+  if(title_lv>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,title_lv,&stars);char b[80];snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/30  %d/20 CLEARED  %d/60 STARS",(title_lv-MX_TRIAL_START)/20+1,clear,stars);text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
   else text("UP/DOWN: TRIAL DISTRICTS",320,394,17,argb(255,210,63,255),1,Z_HUD);
   { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD);
     snprintf(tb, sizeof tb, "X OPTIONS / Y FIGHT: %s", nofight ? "OFF" : "ON"); text(tb, 320, 418, 16, argb(255, 255, 255, 220), 1, Z_HUD); }
@@ -1003,7 +1007,8 @@ static void draw_all(void){
   char buf[64], nm[40]; int n = 0;
   for(const char *q = mx_level_name(world.level); *q && n < 38; q++) nm[n++] = (*q >= 'a' && *q <= 'z') ? *q - 32 : *q;
   nm[n] = 0;
-  snprintf(buf, sizeof buf, "LV %d  %s", world.level + 1, nm);
+  if(mx_level_stage_count(world.level)>1)snprintf(buf,sizeof buf,"LV %d %s %d/3",world.level+1,nm,world.district+1);
+  else snprintf(buf, sizeof buf, "LV %d  %s", world.level + 1, nm);
   text(buf, 12, 26, 16, argb(255, 210, 63, 255), 0, Z_HUD + 0.1f);
   MxObjective objective=mx_objective_snapshot(&world);
   int alive=objective.remaining;
@@ -1117,9 +1122,9 @@ static void draw_all(void){
     quad(x, y + h - 4, w * k, 4, Z_HUD + 1.05f, fc); }
   if(world.banner > 0 && world.state == MX_PLAY){
     int a = (int)(255 * (world.banner > 1 ? 1.0f : world.banner));
-    if(world.level == MX_HQ_LEVEL){ char dn[32]; snprintf(dn, sizeof dn, "DISTRICT %d OF %d", world.district + 1, MX_HQ_DISTRICTS); text(dn, 320, 150, 22, argb(255, 126, 176, a), 1, Z_HUD); }
+    if(mx_level_stage_count(world.level)>1){ char dn[32]; snprintf(dn, sizeof dn, "DISTRICT %d OF %d", world.district + 1, MX_HQ_DISTRICTS); text(dn, 320, 150, 22, argb(255, 126, 176, a), 1, Z_HUD); }
     text(nm, 320, 180, 40, argb(255, 255, 255, a), 1, Z_HUD);
-    text(mx_level_tactic(world.level), 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
+    text(mx_stage_tactic(&world), 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
   }
 
   { float tp = (m->mode == MAN_FLY || m->mode == MAN_STUCK) ? (m->x - MX_ANCHOR_X) * 3.0f : 0; cam_pan += (tp - cam_pan) * 0.06f;

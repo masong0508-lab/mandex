@@ -412,7 +412,7 @@ static void on_events(void){
       ev_fx=e->x;ev_fy=e->y;ev_ft=60+8*tier;
       break; }
     case EV_DISTRICT:                                       /* Landlord HQ: the next district is built in the same grid, with fresh men */
-      cells0 = mx_cells_left(&world); dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts); part_high_water = 0; memset(pops, 0, sizeof pops); ev_ft = 0;
+      cells0 = mx_cells_left(&world); dragging = 0; pad_used = 0;was_aim=0;valve_equipped=0;world.valve_ok=0; memset(parts, 0, sizeof parts); part_high_water = 0; memset(pops, 0, sizeof pops); ev_ft = 0;
 #if MX_DS_PARTICLE_HINT
       part_free_hint = 0;
 #endif
@@ -1412,6 +1412,7 @@ static void top_hud(u8 *b){
   gfx_text(b,4,3,"LV",C_GOLD,1);
   const char *lv=gfx_int(world.level+1);int namex=14+gfx_text_w(lv,1)+2;
   gfx_text(b,14,3,lv,C_GOLD,1);gfx_text(b,namex,3,nm,C_WHITE,1);
+  if(mx_level_stage_count(world.level)>1){char stage[]="1/3";stage[0]=(char)('1'+world.district);gfx_text(b,174,3,stage,C_GOLD,1);}
   const char *sc = gfx_int(disp_score);
   gfx_text(b, 252 - gfx_text_w(sc, 1), 3, sc, C_GOLD, 1);
   gfx_text(b, 252 - gfx_text_w(sc, 1) - 6, 3, "$", C_GOLD2, 1);
@@ -1483,9 +1484,9 @@ static void banner(u8 *b){
   gfx_rect(b, 0, 70, 256, 44, C_UIBG);
   gfx_rect(b, 0, 69, 256, 1, C_UILINE); gfx_rect(b, 0, 114, 256, 1, C_UILINE);
   { static const char *const DN[MX_HQ_DISTRICTS] = { "DISTRICT 1 OF 3", "DISTRICT 2 OF 3", "DISTRICT 3 OF 3" };
-    gfx_text_c(b, 128 - slide, 76, world.level == MX_HQ_LEVEL ? DN[world.district % MX_HQ_DISTRICTS] : "LEVEL", C_GOLD, C_BLACK, 1); }
-  gfx_text_c(b, 128 + slide, 84, mx_level_name(world.level), C_WHITE, C_BLACK, 2);
-  gfx_text_c(b, 128 - slide, 102, mx_level_tactic(world.level), C_PINK, C_BLACK, 1);
+    gfx_text_c(b, 128 - slide, 76, mx_level_stage_count(world.level)>1 ? DN[world.district % MX_HQ_DISTRICTS] : "LEVEL", C_GOLD, C_BLACK, 1); }
+  {const char *nm=mx_level_name(world.level);gfx_text_c(b,128+slide,84,nm,C_WHITE,C_BLACK,gfx_text_w(nm,2)>244?1:2);}
+  gfx_text_c(b, 128 - slide, 102, mx_stage_tactic(&world), C_PINK, C_BLACK, 1);
 }
 
 static void end_panel(u8 *b){
@@ -1845,7 +1846,7 @@ static void title_bottom(View *v){
   if(out_open){ outfits_bottom(v->buf); return; }
   draw_world(v, 0);
   panel(v->buf, 8, 6, 240, 38);
-  if(sel_level>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel_level,&stars);char b[]="TRIAL 00/27 CLEAR 00/20 STAR 00/60";int d=(sel_level-MX_TRIAL_START)/20+1;b[6]='0'+d/10;b[7]='0'+d%10;b[18]='0'+clear/10;b[19]='0'+clear%10;b[29]='0'+stars/10;b[30]='0'+stars%10;gfx_text_c(v->buf,128,11,b,C_UILINE,C_UIBG,1);}
+  if(sel_level>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel_level,&stars);char b[]="TRIAL 00/30 CLEAR 00/20 STAR 00/60";int d=(sel_level-MX_TRIAL_START)/20+1;b[6]='0'+d/10;b[7]='0'+d%10;b[18]='0'+clear/10;b[19]='0'+clear%10;b[29]='0'+stars/10;b[30]='0'+stars%10;gfx_text_c(v->buf,128,11,b,C_UILINE,C_UIBG,1);}
   else gfx_text_c(v->buf,128,11,"UP/DOWN: TRIAL DISTRICTS",C_UILINE,C_UIBG,1);
   const char *nm = mx_level_name(sel_level);
   gfx_text_c(v->buf, 128, 21, nm, C_GOLD, C_BLACK, gfx_text_w(nm,2)>204?1:2);

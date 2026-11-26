@@ -51,7 +51,7 @@ static inline MxObjective mx_objective_snapshot(const MxWorld *w){
   if(w->state==MX_WIN){ o.phase=MX_OBJ_COMPLETE; return o; }
   if(w->state==MX_LOSE){ o.phase=MX_OBJ_FAILED; return o; }
   if(o.remaining==0){
-    o.phase=(w->level==MX_HQ_LEVEL && w->district<MX_HQ_DISTRICTS-1)
+    o.phase=(w->district+1<mx_level_stage_count(w->level))
       ? MX_OBJ_DISTRICT : MX_OBJ_SECURE;
   }else if(w->men<=0 && w->man.mode==MAN_NONE){
     o.phase=MX_OBJ_NO_MEN;
