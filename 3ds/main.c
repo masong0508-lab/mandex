@@ -1546,8 +1546,9 @@ int main(void){
       continue;
     }
     if(app == ST_TITLE){
-      if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
-      if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
+      if(down & (KEY_UP|KEY_DOWN)){sel=mx_trial_district_step(sel,(down&KEY_DOWN)?1:-1);load_level(sel);}
+      else if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
+      else if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } apply_outfit(outfit_sel); n3_save_sync(); }
       if(down & KEY_Y){ nofight = !nofight; mx_set_fight(&world, !nofight); n3_save_sync(); }
       if(down & (KEY_A | KEY_START | KEY_TOUCH)){
@@ -1706,6 +1707,7 @@ int main(void){
       rect(&top, 140, 161, 120, 9, RGB(15, 18, 30));
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
+      textc(&top, 200, 228, "UP/DOWN: TRIAL DISTRICTS", 1, RGB(255, 210, 63));
       if(!snd_ok){ char sb[48]; sprintf(sb, "NO SOUND (ndsp %08X) - NEEDS dspfirm.cdc", (unsigned)snd_err); textc(&top, 200, 212, sb, 1, RGB(255, 90, 90)); }
 #if defined(__3DS__) && !MX_N3DS_NO_SAVE
       else if(n3_save_status < 0) textc(&top, 200, 212, "SD SAVE FAILED - CHECK CARD", 1, RGB(255, 90, 90));
