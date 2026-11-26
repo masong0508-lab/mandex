@@ -1,9 +1,9 @@
 name: Demolition contract layouts
 on:
   push:
-    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/browser_animation_continuity_test.js','test/browser_level_library_test.js','test/browser_motion_quality_test.js','test/browser_inflation_animation_test.js','test/browser_action_animation_test.js','test/browser_valve_wardrobe_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
+    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/browser_animation_continuity_test.js','test/browser_level_library_test.js','test/browser_motion_quality_test.js','test/browser_inflation_animation_test.js','test/browser_action_animation_test.js','test/browser_valve_wardrobe_test.js','test/browser_perf_regression_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
   pull_request:
-    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/browser_animation_continuity_test.js','test/browser_level_library_test.js','test/browser_motion_quality_test.js','test/browser_inflation_animation_test.js','test/browser_action_animation_test.js','test/browser_valve_wardrobe_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
+    paths: ['web/index.html','core/**','test/browser_contracts_test.js','test/browser_animation_continuity_test.js','test/browser_level_library_test.js','test/browser_motion_quality_test.js','test/browser_inflation_animation_test.js','test/browser_action_animation_test.js','test/browser_valve_wardrobe_test.js','test/browser_perf_regression_test.js','test/native_contracts_test.c','test/save_test.c','test/vmu_save_test.c','dreamcast/vmu_save.h','.github/workflows/browser-contracts.yml']
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -16,6 +16,7 @@ jobs:
       - run: node test/browser_inflation_animation_test.js
       - run: node test/browser_action_animation_test.js
       - run: node test/browser_valve_wardrobe_test.js
+      - run: node test/browser_perf_regression_test.js
       - name: Native layouts, migration and VMU recovery
         run: |
           set -eu

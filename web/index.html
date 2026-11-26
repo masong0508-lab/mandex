@@ -1081,24 +1081,26 @@ function stepChunks(dt){
   for(const ch of chunks){if(!ch.rest){ch.vy+=G*dt;ch.vx*=.9995;ch.w*=.998;ch.x+=ch.vx*dt;ch.y+=ch.vy*dt;ch.ang+=ch.w*dt;ch.cs=Math.cos(ch.ang);ch.sn=Math.sin(ch.ang)}ch.cx=ch.cy=0;ch.cn=0;
     for(const a of ch.cells){if(a.dead)continue;if(!ch.rest){a.wx=ch.x+ch.cs*a.lx-ch.sn*a.ly;a.wy=ch.y+ch.sn*a.lx+ch.cs*a.ly}if(!pairWork)continue;const k=(Math.floor(a.wx/V)+4)*1024+(Math.floor(a.wy/V)+4);let b=map.get(k);if(!b){
       b=bucketCount<CHUNK_BUCKET_CACHE_MAX?(CHUNK_BUCKET_POOL[bucketCount]||(CHUNK_BUCKET_POOL[bucketCount]=[])):[];
-      bucketCount++;map.set(k,b)
-    }b.push(a)}}
+      bucketCount++;b.maxId=ch.id;map.set(k,b)
+    }else if(ch.id>b.maxId)b.maxId=ch.id;b.push(a)}}
   for(const ch of chunks){
     for(const a of ch.cells){
       if(a.dead)continue;
       const gx=Math.floor(a.wx/V),gy=Math.floor(a.wy/V);
-      for(let j=gy-1;j<=(ch.rest?gy-2:gy+1)&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){
-        if(!(j>=ROWS||(inb(i,j)&&grid[idx(i,j)])))continue;
+      if(!ch.rest)for(let j=Math.max(0,gy-1);j<=gy+1&&!a.dead;j++){
+        const ground=j>=ROWS,lo=ground?gx-1:Math.max(0,gx-1),hi=ground?gx+1:Math.min(COLS-1,gx+1),row=j*COLS;
+        for(let i=lo;i<=hi&&!a.dead;i++){
+        if(!ground&&!grid[row+i])continue;
         const bx=i*V,by=j*V,qx=clamp(a.wx,bx,bx+V),qy=clamp(a.wy,by,by+V),dx=a.wx-qx,dy=a.wy-qy,d2=dx*dx+dy*dy;
         if(d2>=RC*RC)continue;let nx,ny,pen;
         if(d2>1e-6){const d=Math.sqrt(d2);nx=dx/d;ny=dy/d;pen=RC-d}
         else{const l=a.wx-bx,r=bx+V-a.wx,t=a.wy-by,b=by+V-a.wy,mn=Math.min(l,r,t,b);
           if(mn===t){nx=0;ny=-1;pen=t+RC}else if(mn===l){nx=-1;ny=0;pen=l+RC}else if(mn===r){nx=1;ny=0;pen=r+RC}else{nx=0;ny=1;pen=b+RC}}
-        resolveStatic(ch,a,nx,ny,Math.min(pen,4),i,j)}
+        resolveStatic(ch,a,nx,ny,Math.min(pen,4),i,j)}}
       // A fatal contact keeps its impulse, then the shattered cell stops
       // colliding immediately. Cleanup/mass updates still happen once later.
       if(a.dead||!pairWork)continue;
-      for(let j=gy-1;j<=gy+1&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){const b=map.get((i+4)*1024+(j+4));if(!b)continue;
+      for(let j=gy-1;j<=gy+1&&!a.dead;j++)for(let i=gx-1;i<=gx+1&&!a.dead;i++){const b=map.get((i+4)*1024+(j+4));if(!b||b.maxId<=ch.id)continue;
         for(const o of b){if(a.dead)break;if(o.dead)continue;const oc=o.ch;if(oc.id<=ch.id)continue;const dx=a.wx-o.wx,dy=a.wy-o.wy,d2=dx*dx+dy*dy;if(d2>=V*V||d2<1e-6)continue;
           const d=Math.sqrt(d2),nx=dx/d,ny=dy/d,pen=V-d,rax=a.wx-ch.x,ray=a.wy-ch.y,rbx=o.wx-oc.x,rby=o.wy-oc.y;
           const vax=ch.vx-ch.w*ray,vay=ch.vy+ch.w*rax,vbx=oc.vx-oc.w*rby,vby=oc.vy+oc.w*rbx,vn=(vax-vbx)*nx+(vay-vby)*ny;
@@ -1120,7 +1122,7 @@ function stepChunks(dt){
           if(vn < -5*V){if(ch.rest)wake(ch);if(oc.rest)wake(oc)}}}
     }}
   for(const ch of chunks){if(ch.cn>0&&!ch.rest){ch.x+=ch.cx/ch.cn*.9;ch.y+=ch.cy/ch.cn*.9}ch.age+=dt}
-  for(let i=0,n=Math.min(bucketCount,CHUNK_BUCKET_CACHE_MAX);i<n;i++)CHUNK_BUCKET_POOL[i].length=0;
+  for(let i=0,n=Math.min(bucketCount,CHUNK_BUCKET_CACHE_MAX);i<n;i++){const b=CHUNK_BUCKET_POOL[i];b.length=0;b.maxId=-1;}
   map.clear();
 }
 function cleanChunks(dt){
@@ -2545,7 +2547,7 @@ function drawSeatSide(f,t,a){
    ctx.restore()}
   // boxers: the rear on the nozzle, waistband striped, the belly hangs over it
   blob([pEll(-4,-8,14,10,BR),pEll(6,-4,12,7,BR)].concat(f>.05?[pEll(C[0]+1,C[1]+C[3]*.2,C[2]*.92,C[3]*1.05,BR)]:[]),{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
-  drawWardrobeFolds(4,-8,.85,.7);
+  drawWardrobeFolds(-10,-8,.72,.7);
   if(f>.05)bandAlong([B[0]-B[2]*.4,B[1]+B[3]*.78],[B[0]+B[2]*.1,B[1]+B[3]*.98],[B[0]+B[2]*.8,B[1]+B[3]*.5],2.3,2);   // waistband rides the stretched belly
   ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-10,-11,3.2,2.4,-.5,0,6.3);ctx.fill();
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=1.6;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-6,-3);ctx.lineTo(-6,-9);ctx.lineTo(-2,-5);ctx.lineTo(2,-9);ctx.lineTo(2,-3);ctx.stroke();
@@ -3314,7 +3316,7 @@ function drawSpin(th,o){
     const fac=(f,v)=>{const rr=Math.sqrt(Math.max(0,1-v*v)),nx=rr*Math.sin(f)/A,ny=v/B,nzz=rr*Math.cos(f)/Cc,nz2=nzz*cpt-ny*spt;return(-nx*S+nz2*C)/Math.hypot(nx,ny,nzz)};
     const hp=(f,v)=>{const rr=Math.sqrt(Math.max(0,1-v*v)),X=A*rr*Math.sin(f),Y=B*v,Z=Cc*rr*Math.cos(f),Y2=Y*cpt+Z*spt,Z2=Z*cpt-Y*spt;return[X*C+Z2*S+oU,hcy+Y2]};
     add(10,()=>{                                                                                                       // hair
-      const NU=48,NV=16;ctx.fillStyle=HAIR;ctx.strokeStyle=HAIR;ctx.lineWidth=.8;ctx.lineJoin='round';ctx.beginPath();
+      const tm=ctx.getTransform(),small=state==='play'&&perf.detail===0&&Math.hypot(tm.a,tm.b)<.85,NU=small?24:48,NV=small?8:16;ctx.fillStyle=HAIR;ctx.strokeStyle=HAIR;ctx.lineWidth=.8;ctx.lineJoin='round';ctx.beginPath();
       for(let i=0;i<NU;i++){const f0=i/NU*6.2832,f1=(i+1)/NU*6.2832,fm=(f0+f1)/2;
         for(let j=0;j<NV;j++){const vm=-1+(vh(fm)+1)*(j+.5)/NV;if(fac(fm,vm)<-.05||vm<-.34)continue;
           const p0=hp(f0,-1+(vh(f0)+1)*j/NV),p1=hp(f1,-1+(vh(f1)+1)*j/NV),p2=hp(f1,-1+(vh(f1)+1)*(j+1)/NV),p3=hp(f0,-1+(vh(f0)+1)*(j+1)/NV);
@@ -3521,7 +3523,12 @@ const MAN_FRAMES={
   NAV_A:_F(.36,[0,-44]),NAV_A2:_F(.36,[0,-44]),NAV_B:_F(.36,[0,-44]),NAV_C:_F(.36,[0,-44]),NAV_D:_F(.36,[0,-44]),NAV_E:_F(.36,[0,-44]),KISS_A:_F(.36,[0,-44]),KISS_A2:_F(.36,[0,-44]),KISS_B:_F(.36,[0,-44]),KISS_C:_F(.36,[0,-44]),
   SLEEP_A:_F(.36,[1.7,-40.9]),SLEEP_B:_F(.36,[2,-39.9]),SAD:_F(.36,[0,-39]),
   CAPE_A:_F(.36,[0,-44]),SPIN_0:_F(.36,[0,-44]),SPIN_1:_F(.36,[0,-44]),SPIN_2:_F(.36,[0,-44]),SPIN_3:_F(.36,[0,-44]),SPIN_4:_F(.36,[0,-44]),SPIN_5:_F(.36,[0,-44]),SPIN_6:_F(.36,[0,-44]),SPIN_7:_F(.36,[0,-44]),SPIN_8:_F(.36,[0,-44]),SPIN_9:_F(.36,[0,-44]),SPIN_10:_F(.36,[0,-44]),SPIN_11:_F(.36,[0,-44]),SPIN_12:_F(.36,[0,-44]),SPIN_R1:_F(.36,[0,-44]),SPIN_R2:_F(.36,[0,-44]),SPIN_R3:_F(.36,[0,-44]),SPIN_R4:_F(.36,[0,-44]),SPIN_R5:_F(.36,[0,-44]),SPIN_R6:_F(.36,[0,-44]),SPIN_R7:_F(.36,[0,-44]),SPIN_R8:_F(.36,[0,-44]),SPIN_R9:_F(.36,[0,-44]),SPIN_R10:_F(.36,[0,-44]),SPIN_R11:_F(.36,[0,-44]),SPIN_BL:_F(.36,[0,-44]),SPIN_BR:_F(.36,[0,-44]),OOPS_A:_F(.36,[0,-44]),OOPS_B:_F(.36,[0,-44]),OOPS_C:_F(.36,[0,-44]),OOPS_D:_F(.36,[0,-44]),OOPS_E:_F(.36,[0,-44]),OOPS_F:_F(.36,[0,-44]),OOPS_G:_F(.36,[0,-44]),OOPS_H:_F(.36,[0,-44]),BACK_C:_F(.36,null),BACK_L:_F(.36,null),BACK_R:_F(.36,null),FART_A:_F(.36,null),FART_B:_F(.36,null)};
-function P(o){if(parts.length<fxLimit())parts.push(o)}
+function P(o){
+  const cap=fxLimit();
+  if(parts.length<cap){parts.push(o);return;}
+  // Important impact cues remain visible when decorative debris fills the pool.
+  if(o.k===5){for(let i=0;i<parts.length;i++){if(parts[i].k===0||parts[i].k===1||parts[i].k===6){parts[i]=o;return;}}}
+}
 function sweat(x,y){P({k:7,g:1,x:x+(rnd()-.5)*10,y:y+(rnd()-.5)*4,vx:(rnd()-.5)*6,vy:0,l:1.1,l0:1.1,s:1.6+rnd()*.9,c:'#bfe8ff'})}   // a bead forms on the skin, swells, then trickles down
 function updParts(dt){
   for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.l-=dt;if(p.l<=0)continue;
@@ -3534,8 +3541,18 @@ function updParts(dt){
   let n=0;for(let i=0;i<parts.length;i++)if(parts[i].l>0)parts[n++]=parts[i];parts.length=n;}
 function updTexts(dt){for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=28*dt;if(t.t>t.l)texts.splice(i,1)}}
 let endT=0,resultStart=0;
-function drawParts(){
-  for(const p of parts){const a=p.l/p.l0;
+function particlePaintRadius(p){
+  const s=Math.max(0,Number.isFinite(p.s)?p.s:0);
+  if(p.k===2)return Math.max(2,Math.abs(p.vx||0)*.035,Math.abs(p.vy||0)*.035)+3;
+  if(p.k===5)return s+5;
+  if(p.k===9)return 28;
+  if(p.k===10)return s*2+8;
+  return Math.max(6,s*3+5);
+}
+function drawParts(bounds){
+  for(const p of parts){
+    if(bounds){const r=particlePaintRadius(p);if(p.x+r<bounds.x0||p.x-r>bounds.x1||p.y+r<bounds.y0||p.y-r>bounds.y1)continue;}
+    const a=p.l/p.l0;
     if(p.k===0){ctx.globalAlpha=Math.min(1,p.l);ctx.fillStyle=p.c;ctx.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s)}
     else if(p.k===1){ctx.globalAlpha=a*.5;ctx.fillStyle=p.c||'#e6e0d2';ctx.beginPath();ctx.arc(p.x,p.y,p.s*(1+(1-a)*1.4),0,7);ctx.fill()}
     else if(p.k===2){ctx.globalAlpha=Math.min(1,a*1.4);ctx.strokeStyle='#ffd36b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-p.vx*.035,p.y-p.vy*.035);ctx.stroke()}
@@ -4112,21 +4129,27 @@ function rubbleRenderPose(ch){const a=rubbleMotion.get(ch);if(!a||rubbleAlpha>=1
   const u=rubbleAlpha,da=Math.atan2(Math.sin(ch.ang-a.ang),Math.cos(ch.ang-a.ang));
   const p=rubblePoseScratch;p.x=a.x+(ch.x-a.x)*u;p.y=a.y+(ch.y-a.y)*u;p.ang=a.ang+da*u;return p;}
 
+// Exact cache validation: compare the paint state rather than rehashing and
+// recalculating the whole slab's bounds every presented frame.
+function rubblePaintKey(a){if(a.dead)return 0;const hpMax=MAT[a.m].hp,d=a.h/hpMax>.66?0:a.h/hpMax>.33?1:2;return a.m|(d<<4)}
 function drawRubbleCached(ch){
  if(!perf.cache||ch.cells.length<20)return false;
- let hash=2166136261,minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
- for(const a of ch.cells){if(a.dead)continue;const d=a.h/MAT[a.m].hp>.66?0:a.h/MAT[a.m].hp>.33?1:2;
-  hash=Math.imul(hash^(a.m|(d<<4)),16777619);hash=Math.imul(hash^Math.round(a.lx*256),16777619);hash=Math.imul(hash^Math.round(a.ly*256),16777619);
+ let q=rubbleCache.get(ch),same=!!q&&q.cells===ch.cells&&q.keys.length===ch.cells.length;
+ if(same){
+  for(let i=0;i<ch.cells.length;i++){const a=ch.cells[i];if(q.keys[i]!==rubblePaintKey(a)||q.coords[i*2]!==a.lx||q.coords[i*2+1]!==a.ly){same=false;break}}
+  if(same){if(!q.canvas)return false;ctx.drawImage(q.canvas,q.x,q.y);return true}
+ }
+ let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+ const keys=new Uint8Array(ch.cells.length),coords=new Float64Array(ch.cells.length*2);
+ for(let i=0;i<ch.cells.length;i++){const a=ch.cells[i];keys[i]=rubblePaintKey(a);coords[i*2]=a.lx;coords[i*2+1]=a.ly;if(!keys[i])continue;
   minx=Math.min(minx,a.lx-V/2);miny=Math.min(miny,a.ly-V/2);maxx=Math.max(maxx,a.lx+V/2);maxy=Math.max(maxy,a.ly+V/2);
  }
  const x=Math.floor(minx),y=Math.floor(miny),w=Math.ceil(maxx)-x,h=Math.ceil(maxy)-y;
+ q={cells:ch.cells,keys,coords,canvas:null,x,y};rubbleCache.set(ch,q);
  if(!(w>0&&h>0)||w*h>120000)return false;
- let q=rubbleCache.get(ch);if(!q||q.hash!==hash||q.cells!==ch.cells){
-  const canvas=mkCanvas(w,h),c=canvas.getContext('2d');
-  for(const a of ch.cells)if(!a.dead){const f=a.h/MAT[a.m].hp;c.drawImage(SPR[a.m][(a.lx*7+a.ly*3|0)&3][f>.66?0:f>.33?1:2],a.lx-V/2-x,a.ly-V/2-y)}
-  q={hash,cells:ch.cells,canvas,x,y};rubbleCache.set(ch,q);
- }
- ctx.drawImage(q.canvas,q.x,q.y);return true;
+ const canvas=mkCanvas(w,h),c=canvas.getContext('2d');
+ for(let i=0;i<ch.cells.length;i++){const a=ch.cells[i],key=keys[i];if(key)c.drawImage(SPR[a.m][(a.lx*7+a.ly*3|0)&3][key>>4],a.lx-V/2-x,a.ly-V/2-y)}
+ q.canvas=canvas;ctx.drawImage(canvas,x,y);return true;
 }
 function draw(){
   hits=[];
@@ -4152,7 +4175,9 @@ function draw(){
   const paperX1=paperCull?Math.min(COLS,Math.ceil((CAM.x+W/CAM.z+paperShake)/V)+2):COLS;
   const paperY0=paperCull?Math.max(0,Math.floor((CAM.y-paperShake)/V)-2):0;
   const paperY1=paperCull?Math.min(ROWS,Math.ceil((CAM.y+H/CAM.z+paperShake)/V)+2):ROWS;
-  for(let y=paperY0;y<paperY1;y++){let x=0;while(x<COLS){const n=paper[idx(x,y)];if(!n||grid[idx(x,y)]){x++;continue}let x2=x;while(x2<COLS&&paper[idx(x2,y)]===n&&!grid[idx(x2,y)])x2++;
+  for(let y=paperY0;y<paperY1;y++){const row=y*COLS;let x=paperX0;
+    const left=paper[row+x];if(left&&!grid[row+x])while(x>0&&paper[row+x-1]===left&&!grid[row+x-1])x--;
+    while(x<paperX1){const n=paper[row+x];if(!n||grid[row+x]){x++;continue}let x2=x;while(x2<COLS&&paper[row+x2]===n&&!grid[row+x2])x2++;
     if(x2<=paperX0||x>=paperX1){x=x2;continue}
     ctx.fillStyle=interiors[n-1].p;ctx.fillRect(x*V,y*V,(x2-x)*V,V);if(perf.detail){ctx.fillStyle='rgba(0,0,0,.07)';for(let k=0;k<(x2-x)*V;k+=16)ctx.fillRect(x*V+k,y*V,8,V);}
     if(!paper[idx(x,y+1)]||y+1>=ROWS){ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x*V,(y+1)*V-5,(x2-x)*V,5)}
@@ -4212,7 +4237,7 @@ function draw(){
   renderMan();if(man.mode==='aim'||man.mode==='fly')drawInfFX(man);ctx.restore();
   if(man.mode==='aim'&&!man.chug){ctx.strokeStyle='#2a160a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(SX-12,SY+22);ctx.lineTo(man.x-2,man.y+6);ctx.stroke()}
   drawSling(false);
-  drawParts();drawTexts();
+  drawParts(camOn?{x0:rubbleX0,y0:rubbleY0,x1:rubbleX1,y1:rubbleY1}:null);drawTexts();
   ctx.restore();
   if(camOn)ctx.restore();
   if(perf.shade)grade();
