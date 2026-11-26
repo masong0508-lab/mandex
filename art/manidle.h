@@ -11,7 +11,7 @@
 #define MX_MANIDLE_H
 
 enum { FX_NONE, FX_SLAP, FX_BOING, FX_GRUNT, FX_BURP, FX_FART, FX_FLICK, FX_YAWN, FX_SNORE, FX_SNIFF, FX_WHOOSH, FX_TAUNT, FX_EEK, FX_SNAP, FX_WHEW, FX_KISS, FX_SPARKLE, FX_DISCO, FX_POP, FX_COUNT };
-enum { GAG_BELLY, GAG_WIGGLE, GAG_SCRATCH, GAG_BURP, GAG_FART, GAG_PICK, GAG_YAWN, GAG_CAPE, GAG_KISS, GAG_PINUP, GAG_DISCO, GAG_PECS, GAG_SHIMMY, GAG_HOWL, GAG_COUNT,
+enum { GAG_BELLY, GAG_WIGGLE, GAG_SCRATCH, GAG_BURP, GAG_FART, GAG_PICK, GAG_YAWN, GAG_CAPE, GAG_KISS, GAG_PINUP, GAG_DISCO, GAG_PECS, GAG_SHIMMY, GAG_HOWL, GAG_REAR_SHUFFLE, GAG_COUNT,
        GAG_OOPS };                  /* GAG_COUNT = the pickable gags (and the "asleep" marker); GAG_OOPS is only ever a rare version of the cape taunt */
 
 typedef struct { unsigned char frame, ticks, fx; } MiStep;
@@ -61,6 +61,16 @@ static const MiStep MI_GAGS[GAG_OOPS + 1][MI_MAXSTEPS] = {
            { MSF_IDLE_A, 5, 0 }, { MSF_BELLY_B, 5, FX_BOING }, { MSF_IDLE_B, 5, 0 }, { MSF_BELLY_A, 12, FX_SLAP }, { MSF_IDLE_A, 10, 0 }),
   /* howl: arms up, head back, a long AWOOO (the taunt cry), then a satisfied flex */
   MI_STEPS({ MSF_IDLE_A, 8, 0 }, { MSF_FLEX_B, 14, FX_GRUNT }, { MSF_HOWL, 16, FX_TAUNT }, { MSF_FLEX_B, 6, 0 }, { MSF_HOWL, 20, 0 }, { MSF_FLEX_B, 6, 0 }, { MSF_HOWL, 26, 0 }, { MSF_FLEX_A, 18, 0 }, { MSF_IDLE_A, 10, 0 }),
+  /* New clothed rear-view shuffle: turn in, two syncopated hip sways,
+     settle and turn back.  Existing body/outfit atlas; no new texture. */
+  MI_STEPS({MSF_SPIN_0,5,FX_WHOOSH},{MSF_SPIN_1,3,0},{MSF_SPIN_2,3,0},{MSF_SPIN_3,3,0},
+    {MSF_SPIN_4,3,0},{MSF_SPIN_5,3,0},{MSF_SPIN_6,3,0},{MSF_SPIN_7,3,0},{MSF_SPIN_8,3,0},
+    {MSF_SPIN_9,3,0},{MSF_SPIN_10,3,0},{MSF_SPIN_11,3,0},{MSF_SPIN_12,5,0},
+    {MSF_SPIN_BL,7,FX_BOING},{MSF_SPIN_12,4,0},{MSF_SPIN_BR,7,FX_BOING},{MSF_SPIN_12,4,0},
+    {MSF_SPIN_BR,5,FX_BOING},{MSF_SPIN_12,3,0},{MSF_SPIN_BL,9,FX_BOING},{MSF_SPIN_12,10,FX_TAUNT},
+    {MSF_SPIN_R11,3,FX_WHOOSH},{MSF_SPIN_R10,3,0},{MSF_SPIN_R9,3,0},{MSF_SPIN_R8,3,0},
+    {MSF_SPIN_R7,3,0},{MSF_SPIN_R6,3,0},{MSF_SPIN_R5,3,0},{MSF_SPIN_R4,3,0},
+    {MSF_SPIN_R3,3,0},{MSF_SPIN_R2,3,0},{MSF_SPIN_R1,3,0},{MSF_SPIN_0,4,0},{MSF_IDLE_A,12,0}),
   /* (row GAG_COUNT is unused: that number means "asleep") */
   MI_STEPS({ 0, 0, 0 }),
   /* the rare cape taunt (1 in MI_OOPS_ODDS): same turn and butt wag, then the boxers slip, he wobbles, notices (EEK), covers up, hauls them back on (SNAP) and turns back */
@@ -141,11 +151,19 @@ static int mi_frame(const MiState *s, int ph){
 static int mi_active(const MiState *s){ return s->gag >= 0; }
 
 /* victory dance (butt wiggle loop) and the sad slump for the end panels */
-static int mi_dance_frame(int ph){                       /* butt wiggle, then a flex-and-belly combo, then disco and a pose: one 32-beat loop */
-  static const unsigned char seq[32] = { MSF_BACK_L, MSF_BACK_C, MSF_BACK_R, MSF_BACK_C, MSF_BACK_L, MSF_BACK_C, MSF_BACK_R, MSF_BACK_C,
-                                         MSF_FLEX_A, MSF_BELLY_B, MSF_FLEX_B, MSF_BELLY_B, MSF_PEC_A, MSF_PEC_B, MSF_PEC_A, MSF_PEC_B,
-                                         MSF_DANCE_A, MSF_DANCE_B, MSF_DANCE_A, MSF_DANCE_B, MSF_DANCE_A, MSF_DANCE_B, MSF_DANCE_A, MSF_DANCE_B,
-                                         MSF_POSE_A, MSF_POSE_A, MSF_POSE_B, MSF_POSE_B, MSF_BK_A, MSF_BK_B, MSF_BK_A, MSF_BK_B };
-  return seq[(ph / 7) & 31]; }
+/* 48-beat victory routine: coherent turn into a rear shuffle and back,
+   then disco and a final pose.  Center frames between hip accents. */
+static int mi_dance_frame(int ph){
+  static const unsigned char seq[48]={
+    MSF_SPIN_0,MSF_SPIN_1,MSF_SPIN_2,MSF_SPIN_3,MSF_SPIN_4,MSF_SPIN_5,
+    MSF_SPIN_6,MSF_SPIN_7,MSF_SPIN_8,MSF_SPIN_9,MSF_SPIN_10,MSF_SPIN_11,
+    MSF_SPIN_12,MSF_SPIN_BL,MSF_SPIN_12,MSF_SPIN_BR,MSF_SPIN_12,MSF_SPIN_BL,
+    MSF_SPIN_12,MSF_SPIN_BR,MSF_SPIN_12,MSF_SPIN_BR,MSF_SPIN_12,MSF_SPIN_BL,
+    MSF_SPIN_12,MSF_SPIN_R11,MSF_SPIN_R10,MSF_SPIN_R9,MSF_SPIN_R8,MSF_SPIN_R7,
+    MSF_SPIN_R6,MSF_SPIN_R5,MSF_SPIN_R4,MSF_SPIN_R3,MSF_SPIN_R2,MSF_SPIN_R1,
+    MSF_SPIN_0,MSF_DANCE_A,MSF_DANCE_B,MSF_DANCE_A,MSF_DANCE_B,MSF_DANCE_A,
+    MSF_DANCE_B,MSF_POSE_A,MSF_POSE_B,MSF_FLEX_A,MSF_FLEX_B,MSF_SPIN_0};
+  return seq[(ph/5)%48];
+}
 
 #endif

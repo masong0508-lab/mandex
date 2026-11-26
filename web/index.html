@@ -623,6 +623,14 @@ function advanceDivePose(m,dt){
   const a=Math.max(0,m.diveAge||0),b=a+Math.max(0,dt);
   m.spin+=14*(diveSpinIntegral(b)-diveSpinIntegral(a));m.diveAge=b;
 }
+// The same 24-tick side/rear/side rebound accent as the console core.
+function rearRollOffset(m){
+  if(m.mode!=='fly'||!(m.rearT>0)||m.inf>0||m.bel>0)return 0;
+  let k=Math.floor(Math.max(0,Math.min(.4,.4-m.rearT))*60+1e-7);
+  if(k<1||k>=23)return 0;
+  if(k>12)k=23-k;
+  return Math.min(k,6);
+}
 function tubeStep(m,dt){
   if(m.tubeT>0)m.tubeT-=dt;
   if(m.tubeCd>0){m.tubeCd-=dt;return}
@@ -1183,7 +1191,7 @@ function bounceRubber(){
     if(d>.08){nx=dx/d;ny=dy/d}else{const sp=Math.hypot(m.vx,m.vy);if(sp<=0)continue;nx=-m.vx/sp;ny=-m.vy/sp;d=0}
     m.x+=nx*(R-d);m.y+=ny*(R-d);const vn=m.vx*nx+m.vy*ny;
     if(vn<0){const k=1.92*vn;m.vx-=k*nx;m.vy-=k*ny;wobKick(x,y,5,nx*vn/V*.55,ny*vn/V*.55);
-      if(m.hitCd<=0){m.hitCd=.1;bankLeft=2;SFX.boing();popText(m.x,m.y-26,'BOING!','#ff7eb0',26);ring(m.x,m.y,38,'#ff9ec8');for(let k=0;k<6;k++)chip(m.x,m.y,'#ff9ec8',(rnd()-.5)*300,-rnd()*260)}
+      if(m.hitCd<=0){m.hitCd=.1;m.rearT=.4;bankLeft=2;SFX.boing();popText(m.x,m.y-26,'BOING!','#ff7eb0',26);ring(m.x,m.y,38,'#ff9ec8');for(let k=0;k<6;k++)chip(m.x,m.y,'#ff9ec8',(rnd()-.5)*300,-rnd()*260)}
       shake=Math.max(shake,2)}}}
 function explodeMan(){const m=man;ST().pops++;pdTouch();men--;
   goo(m.x,m.y,60,420);ring(m.x,m.y,120,'#ff5a5a');ring(m.x,m.y,80,'#fff');ring(m.x,m.y,150,'#ffd23f');
@@ -1552,7 +1560,7 @@ function manStep(dt){
   {const x=Math.floor(m.x/V),y=Math.floor(m.y/V);
     if(inb(x,y)&&paper[idx(x,y)])paperHit(x,y)}
   if(m.y+m.R>=GY){m.y=GY-m.R;const s=Math.hypot(m.vx,m.vy);dust(m.x,GY-2,5,10);if(s>260)shake=Math.max(shake,4);
-    if(s>420&&m.vy>120&&(m.bounces|0)<2){m.bounces=(m.bounces|0)+1;m.vy*=-.34;m.vx*=.72;SFX.thud&&SFX.thud(.5);dust(m.x,GY-2,8,14);ring(m.x,GY-4,30,'#d9c9a0');if(m.jg){m.jg.sq=1;m.jg.sa=Math.PI/2;m.jg.st=0}return}   // a hard landing skips once or twice before he sticks
+    if(s>420&&m.vy>120&&(m.bounces|0)<2){m.bounces=(m.bounces|0)+1;m.rearT=.4;m.vy*=-.34;m.vx*=.72;SFX.thud&&SFX.thud(.5);dust(m.x,GY-2,8,14);ring(m.x,GY-4,30,'#d9c9a0');if(m.jg){m.jg.sq=1;m.jg.sa=Math.PI/2;m.jg.st=0}return}   // a hard landing skips once or twice before he sticks
     stick();return}
   manPlow()}
 // The sling can be stretched on past a full pull when you drag toward the air valve (see pointermove); power never exceeds a full pull.
@@ -1775,7 +1783,7 @@ function dive(){
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){burpBlast();return}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){const m=man;m.beaned=true;const sp=Math.hypot(m.vx,m.vy)||1;m.vx+=m.vx/sp*520;m.vy+=m.vy/sp*520-80;SFX.fart();shake=Math.max(shake,5);popText(m.x,m.y-34,'PFFFRRRT!','#b6e04a',30);
     for(let i=0;i<26;i++)P({k:6,x:m.x-m.vx*.03,y:m.y-m.vy*.03,vx:-m.vx*.35+(rnd()-.5)*160,vy:-m.vy*.35+(rnd()-.5)*160,l:.9+rnd()*.6,l0:1.5,s:6+rnd()*7,c:'#a6d63c'});ring(m.x,m.y,46,'#b6e04a');return}
-  if(man.mode==='fly'&&!man.dive){man.dive=true;man.spin=Number.isFinite(man.ang)?man.ang:0;man.diveAge=0;man.vx*=.4;man.vy=Math.max(man.vy,0)+780;SFX.pop();shake=Math.max(shake,3);ring(man.x,man.y,50,'#fff')}}
+  if(man.mode==='fly'&&!man.dive){man.dive=true;man.spin=Number.isFinite(man.ang)?man.ang:0;man.diveAge=0;man.rearT=.4;man.vx*=.4;man.vy=Math.max(man.vy,0)+780;SFX.pop();shake=Math.max(shake,3);ring(man.x,man.y,50,'#fff')}}
 
 // =====================================================================
 //  TARGETS: grumpy landlords
@@ -1998,6 +2006,7 @@ function update(dt){
     m.a=m.t>2?Math.max(0,1-(m.t-2)/.6):1;if(m.t>2.6){goo(m.x,m.y,20,240);SFX.pop();m.mode='done'}}
   if(man.mode==='walk')walkStep(dt);
   if(man.burped&&man.bel>0)man.bel=Math.max(0,man.bel-dt*1.2);
+  if(man.rearT>0)man.rearT=man.mode==='fly'?Math.max(0,man.rearT-dt):0;
   if(man.jg)jigStep(man,dt);
   if(man.jg&&(man.mode==='stuck'||man.mode==='fly'))ragStep(man,dt);
   if(man.mode==='done'){man={mode:'wait',x:-999,y:-999,t:0,a:1,R:14};waitT=0;aftershock()}
@@ -3569,6 +3578,7 @@ const MAN_GAGS=[
    {name:'yawn',steps:[I(.15),S('YWA',.5),S('YWA',.2,'yawn'),S('YWB',.55),S('YWC',.55),S('YWC',.3),I(.4)]},
    {name:'fart',steps:[...turnIn,['BACK_C',.4,''],['FART_A',.5,'grunt'],['FART_B',.7,'fart'],['FART_B',.5,''],['BACK_C',.4,''],...turnOut]},
    {name:'butt_wiggle',steps:[...turnIn,['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_L',.16,'wig'],['BACK_R',.16,'wig'],['BACK_C',.3,''],...turnOut]}];
+  fresh.push({name:'rear_shuffle',steps:[...turnIn,['SPIN_BL',.12,'wig'],['SPIN_12',.07,''],['SPIN_BR',.12,'wig'],['SPIN_12',.07,''],['SPIN_BR',.08,'wig'],['SPIN_12',.05,''],['SPIN_BL',.15,'wig'],['SPIN_12',.17,'taunt'],...turnOut]});
   fresh.push(   // the cheeky set: thrown kisses, a pin-up pose, disco, pec pops
    {name:'blow_kiss',steps:[I(.15),['BK_A',.45,''],['BK_B',.5,'kiss'],['BK_A',.3,''],['BK_B',.55,'kiss'],I(.25)]},
    {name:'pin_up',steps:[I(.15),['POSE_A',.55,'sparkle'],['POSE_B',.55,'sparkle'],['POSE_A',.55,'sparkle'],['BK_A',.3,''],['BK_B',.5,'kiss'],I(.2)]},
@@ -3660,6 +3670,15 @@ function renderMan(){
     else if(stom(m)>.02){INF=bgrow(stom(m));drawFront('up',stom(m)>.5||dragging?'scream':'cool',time);INF=0}   // burpburster: belly full of soda   // seated on the valve: front view, belly swelling
     else if(sp)drawSpin(sp.th,sp);else if(fn)drawManFrame(fn);else if(dragging)drawFront('up','scream',time);else{const bz=Math.sin(time*2.6);drawSpin(0,Object.assign({},SPIN_POSE.T_IDLE,{t:time,belly:[1+.012*bz,1-.01*bz]}))}
     JIG=null}
+  else if(rearRollOffset(m)){
+    const face=m.face<0?-1:1,a=(m.dive?m.spin:m.ang)*face,roll=rearRollOffset(m);
+    // Body-rooted yaw under the real airborne pitch. No changes to collision,
+    // simulation, or camera; use the full costumed turnaround silhouette.
+    ctx.rotate(a+Math.PI/2*face);ctx.scale(.62*face,.62);
+    JIG=jigOpts(j,.62*face,.62,a+Math.PI/2*face);
+    drawSpin((6+roll)*Math.PI/12,{t:time,face:'scream',hip:0,psi:0,dir:1,cape:0});
+    JIG=null;
+  }
   else if(m.dive){const face=m.face<0?-1:1,a=m.spin*face;
     const sc=Number.isFinite(m.diveAge)?.62+.02*Math.max(0,1-m.diveAge/.12):.62;
     ctx.rotate(a);ctx.scale(sc*face,sc);
@@ -4153,13 +4172,17 @@ function drawEnd(){
   ctx.fillStyle='rgba(8,10,20,.72)';ctx.fillRect(0,0,W,H);const win=state==='win';
   const P=W<700,y0=P?Math.round(H*.5-230):190,tx=P?W/2:W/2+80;
   ctx.save();ctx.translate(P?W/2:W/2-250,P?y0+200:H/2+20);ctx.scale(.9,.9);
-  if(win){const ph=time*14,sw=Math.sin(ph);                 // butt-wiggle victory dance, with a little hop
-    ctx.translate(0,-Math.abs(Math.sin(time*7))*10);
-    JIG={bo:[-Math.sin(ph-1.2)*2.5,Math.cos(ph*.5)*1.5],ro:[sw*5.5,-Math.abs(Math.cos(ph))*2],bs:[1,1]};
-    const vd=(level+(score|0))%3;   // which victory dance: butt wiggle, disco, or pin-up kisses
-    if(vd===1){JIG={bo:[sw*4,1],ro:[0,0],bs:[1,1]};drawManFrame(sw>0?'DANCE_A':'DANCE_B')}
-    else if(vd===2){JIG={bo:[sw*2,0],ro:[0,0],bs:[1,1]};drawManFrame(Math.sin(time*3)>.5?'BK_B':sw>0?'POSE_A':'POSE_B')}
-    else drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');JIG=null}
+  if(win){
+    // A full step-turn into the rear, a two-bar hip shuffle, and turn out.
+    // Timing comes from the presentation clock, not render FPS.
+    const q=(time%4+4)%4,ph=q*15,sw=Math.sin(ph);
+    ctx.translate(0,-Math.abs(Math.sin(q*7))*8);
+    JIG={bo:[-Math.sin(ph-1.2)*1.8,Math.cos(ph*.5)],ro:[sw*3,-Math.abs(Math.cos(ph))*1.5],bs:[1,1]};
+    if(q<.95||q>2.75&&q<3.7){const u=q<.95?q/.95:1-(q-2.75)/.95;drawSpin(Math.PI*Math.max(0,Math.min(1,u)),{t:time,hip:0,face:'cool',plant:1,cape:1});}
+    else if(q<=2.75){const e=Math.min(1,(q-.95)*8,(2.75-q)*8);drawSpin(Math.PI,{t:time,hip:sw*6*e,psi:sw*4*e,cl:sw*2.5*e,cr:-sw*2.5*e,cape:1,plant:1});}
+    else drawManFrame(q<3.85?'DANCE_A':'DANCE_B');
+    JIG=null}
+
   else{drawManFrame('SAD');                                  // sad pose, tears running down
     for(const sd of[-1,1])for(let k=0;k<2;k++){const f=(time*.9+k*.5+(sd>0?.17:0))%1;ctx.globalAlpha=1-f;ctx.fillStyle='#7fd4ff';ctx.beginPath();ctx.arc(sd*9.4,-18+f*30,2.3,0,7);ctx.fill();ctx.globalAlpha=1}}
   ctx.restore();

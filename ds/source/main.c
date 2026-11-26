@@ -1206,7 +1206,10 @@ static void draw_man(const View *v){
     if(m->mode == MAN_FLY) a = m->dive ? m->spin * face : m->ang * face;
     else if(m->mode == MAN_STUCK) a = rmul(mx_man_wobble(m), R(0.17));
     else if(m->mode == MAN_AIM && dragging) a = rmul(ratan2(MX_ANCHOR_Y - m->y, MX_ANCHOR_X - m->x), R(0.25));
-    spr_man_jr(v->buf, x, y, v->ppc, face, pose, frame, &jg, (int)rsin(a), (int)rcos(a));
+    int roll=mx_rear_roll_offset(m);
+    if(roll){real ar=a+rmul(R(1.57079632679),RI(face));
+      spr_man_frame_rot(v->buf,x,y,v->ppc,face,MSF_SPIN_6+roll,&jg,(int)rsin(ar),(int)rcos(ar));}
+    else spr_man_jr(v->buf, x, y, v->ppc, face, pose, frame, &jg, (int)rsin(a), (int)rcos(a));
   }
   if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY))
     spr_man_inflation(v->buf,x,y,v->ppc,face,(int)((m->inf*100)>>12),frame);

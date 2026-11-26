@@ -74,6 +74,7 @@ void gfx_wall(const View *v, int pal, int px, int py);
 enum { POSE_IDLE, POSE_FLY, POSE_DIVE, POSE_STUCK, POSE_DRAG, POSE_FLEX, POSE_SAD };
 /* the man's jiggle at the drawn zoom: belly (bx,by) and rear (rx,ry) offsets in pixels, squash sx/sy in 1/256 */
 typedef struct { int bx, by, rx, ry, sx, sy; } ManJig;
+void spr_man_frame_rot(u8 *b,int x,int y,int ppc,int face,int frame,const ManJig *jg,int sn,int cs);
 void spr_man_frame(u8 *b, int x, int y, int ppc, int face, int frame, const ManJig *jg);   /* frame = MSF_* */
 /* the towel (core/cloth.c) of the man whose centre is at x,y: pass 0 = the part behind him (draw before his sprite), 1 = the part in front */
 const short *spr_man_hand(int frame);          /* where the raised hand is in this frame (quarter design units x,y,z; x == CL_NONE: no towel) */

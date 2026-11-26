@@ -206,6 +206,7 @@ typedef struct {
      it when he flies left); spin is the belly-flop's tumble in radians.  Both are 0 outside flight.  mx_man_wobble() is the side-to-side
      rock after he sticks (about +-0.17 rad at first, gone in a second). */
   real spin, dive_age;  /* cosmetic ramp timer, saturated after 0.12 seconds */
+  real rear_t;         /* cosmetic rear-roll countdown, never used for contacts */
   real j_px, j_py, j_vx, j_vy;       /* previous position / estimated velocity */
 } MxMan;
 
@@ -281,6 +282,17 @@ static inline void mx_walk_punch_fx_point(const MxMan *m,int k,real *dx,real *dy
   const real x=MX_WALK_PUNCH_X+arc;
   *dx=m->face>0?x:-x;
   *dy=MX_WALK_PUNCH_Y+(k==-3?-MX_WALK_PUNCH_HH:k==3?MX_WALK_PUNCH_HH:k*R(2.0/3.0));
+}
+/* Side -> rear -> side, six 15-degree atlas steps per half turn.
+   Keep a short rear hold so the pose reads at handheld refresh rates.
+   A zero result preserves the original flight silhouette. */
+#define MX_REAR_ROLL_T R(0.4)
+static inline int mx_rear_roll_offset(const MxMan *m){
+  if(m->mode!=MAN_FLY||m->rear_t<=0||m->inf>0)return 0;
+  int k=rfloor(rmul(rclamp(MX_REAR_ROLL_T-m->rear_t,0,MX_REAR_ROLL_T),RI(60)));
+  if(k<1||k>=23)return 0;
+  if(k>12)k=23-k;
+  return k>6?6:k;
 }
 /* Avoid single-frame left/right sprite flips when flying near zero horizontal
    speed. The existing face byte is cosmetic until the player walks. */

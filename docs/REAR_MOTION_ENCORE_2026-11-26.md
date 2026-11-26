@@ -1,0 +1,3 @@
+# Rear motion encore
+
+A new costumed rear-view roll on actual rubber rebounds, ground skips and dive activation. A 24-tick cosmetic countdown drives the six existing 15-degree turnaround samples, with a rear hold and a return to the normal flying silhouette. Native DS/3DS/DC and web render their own body-rooted rotations; inflation takes precedence and leaving flight clears the countdown. Added a new rear shuffle idle and a 48-beat victory turn/shuffle/dance using both human and Wolfman atlas frames. No new textures, collision, physics impulses, scoring, save fields or map changes. Added native fixed/float and browser timing/bounds tests. Native hardware playthrough not yet verified.

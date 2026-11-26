@@ -24,6 +24,14 @@ function animationRegression(html,assert,section){
   for(let i=0;i<20;i++)boot.step(.01);near(m.spin,after,'dive rotation is timestep independent');
   assert(after>coarse,'dive continues tumbling');
  }
+ if(!section||section==='rear'){
+  const fn=new Function(cut('function rearRollOffset(','function tubeStep(')+'return rearRollOffset')();
+  const m={mode:'fly',inf:0,bel:0,rearT:.4};let last=0,peak=0,hold=0;
+  for(let k=0;k<30;k++){const o=fn(m);assert(o>=0&&o<=6);assert(Math.abs(o-last)<=1);if(o===6)hold++;peak=Math.max(peak,o);last=o;m.rearT=Math.max(0,m.rearT-1/60)}
+  assert(peak===6&&hold>=8&&last===0,'rear turn and hold complete');
+  m.rearT=.2;m.inf=.1;assert(fn(m)===0);m.inf=0;m.bel=.1;assert(fn(m)===0);m.bel=0;m.mode='stuck';assert(fn(m)===0);
+  assert(html.includes("name:'rear_shuffle'")&&html.includes('drawSpin((6+roll)*Math.PI/12'),'new idle and rear yaw are wired into live art');
+ }
  if(!section||section==='sling'){
   const start=html.indexOf('function slingBandPoint(');
   assert(start>=0,'elastic sling band pose exists');

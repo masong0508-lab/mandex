@@ -1401,7 +1401,7 @@ static void bounce_rubber(MxWorld *w){
       real k = rmul(RI(1) + R(0.92), vn);
       m->vx -= rmul(k, nx); m->vy -= rmul(k, ny);
       wob_kick(w, x, y, 5, rmul(nx, rmul(vn, R(0.55))), rmul(ny, rmul(vn, R(0.55))));
-      if(m->hitCd <= 0){ m->hitCd = R(0.1); w->bank_left = RI(2); ev(w, EV_BOUNCE, m->x, m->y, 0, -vn, 0); }
+      if(m->hitCd <= 0){ m->hitCd = R(0.1); m->rear_t=MX_REAR_ROLL_T; w->bank_left = RI(2); ev(w, EV_BOUNCE, m->x, m->y, 0, -vn, 0); }
       if(w->shake < R(2)) w->shake = R(2);
     }
   }
@@ -1534,7 +1534,7 @@ static void man_step(MxWorld *w, real dt){
     ev(w, EV_LAND, m->x, RI(MX_ROWS), skip, rsqrt(sp2), 0);
     if(sp2 > RI(1056) && w->shake < R(4)) w->shake = R(4);          /* over 32.5 cells/s (the browser's 260 px/s at 8 px a cell) shakes the screen, skip or stick */
     if(skip){
-      m->bounces++; m->vy = -rmul(m->vy, R(0.34)); m->vx = rmul(m->vx, R(0.72));
+      m->bounces++; m->rear_t=MX_REAR_ROLL_T; m->vy = -rmul(m->vy, R(0.34)); m->vx = rmul(m->vx, R(0.72));
       ev(w, EV_THUD, m->x, m->y, 0, R(0.5), 0);
       return;
     }
@@ -1629,7 +1629,7 @@ void mx_dive(MxWorld *w){
     return;
   }
   if(m->mode != MAN_FLY || m->dive) return;
-  m->dive = 1; m->spin = m->ang; m->dive_age = 0; m->vx = rmul(m->vx, R(0.4));
+  m->dive = 1; m->spin = m->ang; m->dive_age = 0; m->rear_t=MX_REAR_ROLL_T; m->vx = rmul(m->vx, R(0.4));
   if(m->vy < 0) m->vy = 0;
   m->vy += R(97.5);
   if(w->shake < R(3)) w->shake = R(3);
@@ -2891,7 +2891,8 @@ real mx_man_wobble(const MxMan *m){
 
 /* flight pose: pitch toward the path (eased like the browser's 15 % a frame), belly-flop spin */
 static void man_pose(MxMan *m, real dt){
-  if(m->mode != MAN_FLY){ m->ang = m->spin = m->dive_age = 0; return; }
+  if(m->mode != MAN_FLY){ m->ang = m->spin = m->dive_age = m->rear_t = 0; return; }
+  if(dt>0&&m->rear_t>0)m->rear_t=rclamp(m->rear_t-dt,0,MX_REAR_ROLL_T);
   if(m->dive){
     /* Integrate the 0.12s angular acceleration across the simulation tick.
        The ramp saturates; subsequent frames use the original tumble rate. */

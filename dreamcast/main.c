@@ -962,7 +962,9 @@ static void draw_all(void){
          and DCM_FR[-1], drawing stray art or crashing on Dreamcast. */
       if(m->mode == MAN_FLY) man_rot = (m->dive ? m->spin : m->ang) * face;
       else if(m->mode == MAN_STUCK) man_rot = mx_man_wobble(m) * 0.17f;
-      man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
+      int roll=mx_rear_roll_offset(m);
+      if(roll){man_rot+=1.57079632679f*face;draw_frame(MSF_SPIN_6+roll,x,y,face,Z_MAN,&jg);}
+      else man_with_towel(&tow_play, fr, x, y, face, Z_MAN, &jg);
       man_rot = 0;
     }
     if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){

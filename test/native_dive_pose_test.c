@@ -24,5 +24,17 @@ int main(void){
   real p=m->spin;man_pose(m,R(.03));
   pose_check(fabsf(RTOF(m->spin-p-rmul(R(.03),RI(14))))<.003f,"settled tumble rate unchanged");
   m->mode=MAN_STUCK;man_pose(m,R(.03));pose_check(m->spin==0&&m->ang==0,"landing clears airborne pose");
+  /* The rear-view accent must be bounded, time-based and never alter velocity,
+     body position, pressure, spin, hitboxes, score or save state. */
+  m->mode=MAN_FLY;m->inf=0;m->rear_t=MX_REAR_ROLL_T;int peak=0,shown=0,last=0;
+  for(int k=0;k<30;k++){
+    int o=mx_rear_roll_offset(m);pose_check(o>=0&&o<=6,"valid atlas offset");
+    if(o>peak)peak=o;if(o)shown++;
+    pose_check(abs(o-last)<=2,"adjacent yaw samples");last=o;
+    man_pose(m,R(1.0/60.0));
+  }
+  pose_check(peak==6&&shown>=18&&m->rear_t==0,"full rear hold and expiry");
+  m->rear_t=R(.2);m->inf=R(.5);pose_check(!mx_rear_roll_offset(m),"pressure silhouette takes priority");
+  m->inf=0;m->mode=MAN_STUCK;man_pose(m,R(.02));pose_check(!m->rear_t&&!mx_rear_roll_offset(m),"no rear roll while stuck");
   puts("NATIVE_DIVE_POSE_PASS");return 0;
 }

@@ -1169,7 +1169,9 @@ static void draw_man(const View *v){
   }
   { float a = 0;
     if(m->mode == MAN_FLY) a = (m->dive ? RTOF(m->spin) : RTOF(m->ang)) * face; else if(m->mode == MAN_STUCK) a = RTOF(mx_man_wobble(m)) * 0.17f;
-    if(a > 0.03f || a < -0.03f) blit_frame_rot(v->s, fr, x, y, p, face, a); else blit_frame(v->s, fr, x, y, p, face); }
+    int roll=mx_rear_roll_offset(m);
+    if(roll)blit_frame_rot(v->s,MSF_SPIN_6+roll,x,y,p,face,a+1.57079632679f*face);
+    else if(a > 0.03f || a < -0.03f) blit_frame_rot(v->s, fr, x, y, p, face, a); else blit_frame(v->s, fr, x, y, p, face); }
   if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){
     /* Small, lower-torso-only pressure volume (never a face-sized circle).
        Reuse the exact selected outfit/Wolfman skin in the existing 3-tone
