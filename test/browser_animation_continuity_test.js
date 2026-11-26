@@ -2,7 +2,7 @@
 const fs=require('fs'),path=require('path'),assert=require('assert');
 const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 function slice(a,b){const i=html.indexOf(a),j=html.indexOf(b,i+a.length);assert(i>=0&&j>i,a);return html.slice(i,j);}
-const source=slice('function walkTurnAngle(', 'function walkPunchFxStage(')+slice('function legIK(', '// the baked hand anchor')+slice('function ragXf(', 'function ragHit(')+slice('const actorMotion=', 'const rubbleCache=')+slice('const rubbleMotion=', 'function drawRubbleCached(');
+const source=slice('function walkTurnAngle(', 'function walkPunchFxStage(')+slice('function legIK(', '// the baked hand anchor')+slice('function jigSquashAmount(', 'function ragHit(')+slice('const actorMotion=', 'const rubbleCache=')+slice('const rubbleMotion=', 'function drawRubbleCached(');
 const test=new Function('assert', 'const V=8,time=0,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));let chunks=[],man;'+source+`
 const near=(a,b)=>assert(Math.abs(a-b)<1e-7);
 let planted=0;

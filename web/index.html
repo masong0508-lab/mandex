@@ -1382,7 +1382,7 @@ function walkStep(dt){const m=man,wasGround=!!m.gr;
   if(m.gr)m.stomp=false;
   if(m.padCd>0)m.padCd-=dt;
   if(m.gr&&!(m.padCd>0)){const by=Math.floor((m.y+WHH+2)/V);for(const o of[-4,0,4]){const bx=Math.floor((m.x+o)/V);if(inb(bx,by)&&grid[idx(bx,by)]===RUBBER){m.vy=stompLanding?-540:-470;m.gr=false;m.stomp=false;m.padCd=.3;m.ledgeGrace=0;m.jumpHold=0;SFX.boing();popText(m.x,m.y-34,stompLanding?'BOOST!':'BOING!','#ff7eb0',26);ring(m.x,m.y+WHH,40,'#ff9ec8');dust(m.x,m.y+WHH,5,8);break}}}
-  walkAnimTick(m,dt,wasGround,m.x-strideStartX);
+  walkAnimTick(m,dt,wasGround,m.x-strideStartX,dy/dt);
   if(m.gr&&Math.abs(m.vx)>60&&((time*9)|0)%2===0&&rnd()<.25)dust(m.x,m.y+WHH,1,6);
   for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<WHH+t.r-4)killTarget(t)}   // bump into a landlord and he is done for
 /* Match the console sprite turnaround: side -> rear -> opposite side.
@@ -1408,15 +1408,16 @@ function walkStrideStep(m){
 // generating an Object.assign clone every time the walking sprite is drawn.
 const WALK_SPIN_POSE={th:Math.PI/2,dir:1,ld:0,hip:0,psi:0,t:0,cape:1,quiff:1,capeTrail:0,face:'cool',
   arms:{L:[0,0,0,0,0,0],R:[0,0,0,0,0,0]},ad:[0,0],walkFeet:[{x:0,y:55,z:0,ang:0},{x:0,y:55,z:0,ang:0}],walkBob:0};
-function walkAnimTick(m,dt,wasGround,travel){
+function walkAnimTick(m,dt,wasGround,travel,impact=0){
   const approach=(v,target,rate)=>target+((v||0)-target)*Math.exp(-rate*dt);
   // Stride intensity is based on ACTUAL ground displacement. Wall pushing cannot run in place.
   const stride=m.gr?Math.min(1,Math.abs(travel)/Math.max(.001,dt*105)):0;
   m.animStride=approach(m.animStride,stride,stride>0?18:25);
-  m.animAir=approach(m.animAir,m.gr?0:1,22);
+  // Ground contact takes precedence over the air blend: no hovering soles.
+  m.animAir=m.gr?0:approach(m.animAir,1,22);
   m.animStomp=approach(m.animStomp,m.stomp?1:0,24);
-  if(!wasGround&&m.gr)m.animLand=1;
-  m.animLand=Math.max(0,(m.animLand||0)-dt*5.5);
+  if(!wasGround&&m.gr)m.animLand=clamp((Math.max(0,impact)-40)/480,.22,1);
+  else m.animLand=m.gr?Math.max(0,(m.animLand||0)-dt*5.5):0;
 }
 // One continuous closed step cycle: stance moves backward at ground speed,
 // the swing foot arcs forward without penetrating the floor. The other foot
@@ -1430,14 +1431,14 @@ function walkPose(m){
   const q=WALK_SPIN_POSE,punch=m.pT>0,turning=m.turn>0&&!punch;
   const face=turning?walkTurnFace(m.face,m.turn):m.face||1;
   const th=turning?walkTurnAngle(m.turn):Math.PI/2;
-  const phase=(m.gait||0)/(4*V),stride=clamp(m.animStride||0,0,1)*(turning?.15:1),air=clamp(m.animAir||0,0,1),land=clamp(m.animLand||0,0,1),slam=clamp(m.animStomp||0,0,1);
+  const phase=(m.gait||0)/(4*V),stride=clamp(m.animStride||0,0,1)*(turning?.15:1),air=m.gr?0:clamp(m.animAir||0,0,1),land=m.gr?clamp(m.animLand||0,0,1):0,slam=clamp(m.animStomp||0,0,1);
   // Punch hits immediately in the simulation. Show a full strike immediately,
   // then recover to guard over its actual 0.2-second contact window.
   const attack=punch?Math.pow(clamp(m.pT/.2,0,1),.65):0;
   const C=Math.cos(th),S=Math.sin(th),swing=Math.sin(phase*2*Math.PI)*stride;
   q.th=th;q.hip=swing*.9;q.psi=-3*swing;q.ld=-4*swing;q.t=time;
   q.face=m.hurtCd>.55?'dizzy':punch||slam>.5?'scream':'cool';q.capeTrail=12*stride+10*air+4*air*clamp(-(m.vy||0)/350,-1,1);
-  q.walkBob=4.5+stride*5+land*6+air*3+slam*3;
+  q.walkBob=4.5+stride*(4+Math.abs(swing)*1.5)+land*8+air*3+slam*3;
   for(let i=0;i<2;i++){
     const side=i?1:-1,f=q.walkFeet[i],sample=walkFootSample(phase+i*.5);
     const fall=clamp((m.vy||0)/350,-1,1),fore=sample[0]*20*stride*(1-air)+air*(side*(10-4*fall)*(1-slam));
@@ -1761,7 +1762,7 @@ function dive(){
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){burpBlast();return}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){const m=man;m.beaned=true;const sp=Math.hypot(m.vx,m.vy)||1;m.vx+=m.vx/sp*520;m.vy+=m.vy/sp*520-80;SFX.fart();shake=Math.max(shake,5);popText(m.x,m.y-34,'PFFFRRRT!','#b6e04a',30);
     for(let i=0;i<26;i++)P({k:6,x:m.x-m.vx*.03,y:m.y-m.vy*.03,vx:-m.vx*.35+(rnd()-.5)*160,vy:-m.vy*.35+(rnd()-.5)*160,l:.9+rnd()*.6,l0:1.5,s:6+rnd()*7,c:'#a6d63c'});ring(m.x,m.y,46,'#b6e04a');return}
-  if(man.mode==='fly'&&!man.dive){man.diveFace=man.face<0?-1:1;man.spin=man.ang*man.diveFace;man.dive=true;man.vx*=.4;man.vy=Math.max(man.vy,0)+780;SFX.pop();shake=Math.max(shake,3);ring(man.x,man.y,50,'#fff')}}
+  if(man.mode==='fly'&&!man.dive){man.diveFace=man.face<0?-1:1;man.spin=man.ang*man.diveFace;man.diveBlend=0;man.dive=true;man.vx*=.4;man.vy=Math.max(man.vy,0)+780;SFX.pop();shake=Math.max(shake,3);ring(man.x,man.y,50,'#fff')}}
 
 // =====================================================================
 //  TARGETS: grumpy landlords
@@ -1970,7 +1971,7 @@ function update(dt){
   if(man.mode==='fly'){
     for(let i=0;i<8&&man.mode==='fly';i++)manStep(dt/8);
     if(man.mode==='fly'){const m=man;m.face=flightFaceFor(m.vx,m.face);
-      m.ang+=(m.dive?0:(flightPitch(m.vx,m.vy)-m.ang)*(1-Math.pow(.85,dt*60)));if(m.dive)m.spin+=dt*14*(m.diveFace||1);
+      m.ang+=(m.dive?0:(flightPitch(m.vx,m.vy)-m.ang)*(1-Math.pow(.85,dt*60)));if(m.dive){m.spin+=dt*14*(m.diveFace||1);m.diveBlend=Math.min(1,(m.diveBlend||0)+dt*7);}
       m.gooT+=dt;if(m.gooT>.04){m.gooT=0;if(parts.length<fxLimit())parts.push({k:3,x:m.x-m.vx*.01,y:m.y-m.vy*.01,vx:-m.vx*.05+(rnd()-.5)*40,vy:(rnd()-.5)*40,l:.7,l0:.7,s:2+rnd()*2})}
       m.stT+=dt;if(m.stT>.2){m.stT=0;const a=m.dive?(m.spin||0):m.ang*(m.face||1),c=Math.cos(a),sn=Math.sin(a),f=m.dive?(m.diveFace||1):(m.face||1);   // signed local trail follows the painted silhouette
         P({k:6,x:m.x+(-30*f*c-8*sn),y:m.y+(-30*f*sn+8*c),vx:-m.vx*.04+(rnd()-.5)*20,vy:-12-rnd()*16,l:.9+rnd()*.4,l0:1.3,s:5+rnd()*3,c:'#a6d63c'})}
@@ -2430,7 +2431,7 @@ function drawSeatSide(f,t){
   if(f>.45){ctx.fillStyle='rgba(120,200,255,.85)';for(let k=0;k<2;k++){const sy=hy-10+((t*40+k*17)%26);ctx.beginPath();ctx.ellipse(hx+(k?-2:15),sy,1.6,2.4,0,0,6.3);ctx.fill()}}   // sweat
 }
 function drawSide(t,fk){
-  const fl=Math.sin(t*16),bo=JIG?JIG.bo:null,ro=JIG?JIG.ro:null,T=(q,f)=>{if(q){ctx.save();ctx.translate(q[0],q[1])}f();if(q)ctx.restore()};
+  const fl=Math.sin(t*16),bo=JIG?JIG.bo:null,ro=JIG?JIG.ro:null,tuck=JIG?JIG.flightTuck||0:0,T=(q,f)=>{if(q){ctx.save();ctx.translate(q[0],q[1])}f();if(q)ctx.restore()};
   ctx.beginPath();ctx.moveTo(10,-16);ctx.bezierCurveTo(-8,-30+fl*3,-30,-24+fl*5,-54,-32+fl*6);ctx.lineTo(-52,-8+fl*5);ctx.bezierCurveTo(-30,-6+fl*3,-8,0,6,-4);ctx.closePath();
   ctx.fillStyle=TOW;ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.stroke();ctx.strokeStyle=TOWS;ctx.lineWidth=3;
   for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(-6-k*10,-22+k*2+fl*2);ctx.lineTo(-8-k*10,-6+k*1.5+fl*2);ctx.stroke()}
@@ -2439,7 +2440,9 @@ function drawSide(t,fk){
     ctx.strokeStyle='#e33';ctx.lineWidth=1.4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(sx,sy-4);ctx.quadraticCurveTo(sx+1.2,sy,sx,sy+4);ctx.stroke();
     blob([pEll(ax-4,ay+1,6.5,3.2,'#8a5a2b',.5+fl*.3)],{ow:1.5,shc:'rgba(60,30,10,.4)',hl:0})};
   // far arm (darker, behind the torso): reaching forward with the other one, like a hero in flight
-  blob([pTap(12,-1,5.4,45,7+fl*2,4.2,SKD)],{ow:1.7,hl:0});blob([pEll(48,8+fl*2,5,4.7,SKD)],{ow:1.6,hl:0});
+  if(tuck>.01){const ex=32-2*tuck,ey=4+15*tuck,wx=45-17*tuck,wy=7+fl*2+4*tuck;
+    blob([pTap(12,-1,5.4,ex,ey,4.8,SKD),pTap(ex,ey,4.8,wx,wy,4.2,SKD),pEll(ex,ey,4.8,4.8,SKD)],{ow:1.7,hl:0});blob([pEll(wx+3,wy+1,5,4.7,SKD)],{ow:1.6,hl:0});
+  }else{blob([pTap(12,-1,5.4,45,7+fl*2,4.2,SKD)],{ow:1.7,hl:0});blob([pEll(48,8+fl*2,5,4.7,SKD)],{ow:1.6,hl:0});}
   {const LG=JIG&&JIG.legs,L0=LG?LG[0]:[-27,12+fl*2,-44,4+fl*4],L1=LG?LG[1]:[-24,16-fl*2,-42,13-fl*3];leg(-12,8,L0[0],L0[1],L0[2],L0[3],WORK?BRD:SKD);leg(-10,6,L1[0],L1[1],L1[2],L1[3],WORK?BR:SK)}
   {const f=INF,sl=(man&&man.mode==='fly')?Math.min(1,Math.hypot(man.vx||0,man.vy||0)/1100):0,   // sl: how fast he is going; the belly slumps back and down with it
    bsh=f>.02?[pEll(10+f*4-sl*f*1.5,-1+f*2,12+f*3,9+f*2),pEll(12+f*9-sl*f*4,4+f*6+sl*f*2,10+f*11,9+f*9+sl*f*1.5),pEll(-2+f*3-sl*f*2,8+f*3+sl*f,12+f*4,8+f*3)]:[];
@@ -2457,8 +2460,10 @@ function drawSide(t,fk){
     ctx.strokeStyle='rgba(110,10,32,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(-6,9,8,2.1,3.7);ctx.stroke();
     bandAlong([-22,-3],BG?[-2+INF*4,2+INF*6]:[-2,1],BG?[BG[0]+BG[2]*.6,BG[1]+BG[3]*.62]:[15,13],2.7,2)});                                                                                         // the waistband: a soft striped strip that follows the body
   blob([pTap(15,-8,8.4,28,-15,6.6)],{ow:1.8});                                                                       // neck + shoulder line: the head sits ON a body
-  blob([pTap(15,2,6.6,52,16+fl*2,4.8)],{ow:1.8});     // near arm: straight out in front, above the head
-  blob([pEll(55.5,17.5+fl*2,5.8,5.4)],{ow:1.6});ctx.strokeStyle='rgba(120,60,30,.55)';ctx.lineWidth=1;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(58,14+fl*2);ctx.lineTo(58,21+fl*2);ctx.moveTo(53,14+fl*2);ctx.lineTo(53,21+fl*2);ctx.stroke();   // a clenched fist
+  const hx=55.5-22*tuck,hy=17.5+fl*2+3*tuck;
+  if(tuck>.01){const ex=34-3*tuck,ey=9+17*tuck;blob([pTap(15,2,6.6,ex,ey,5.4),pTap(ex,ey,5.4,hx-3.5,hy-1.5,4.8),pEll(ex,ey,5.4,5.4)],{ow:1.8});}
+  else blob([pTap(15,2,6.6,52,16+fl*2,4.8)],{ow:1.8});
+  blob([pEll(hx,hy,5.8,5.4)],{ow:1.6});ctx.strokeStyle='rgba(120,60,30,.55)';ctx.lineWidth=1;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(hx+2.5,hy-3.5);ctx.lineTo(hx+2.5,hy+3.5);ctx.moveTo(hx-2.5,hy-3.5);ctx.lineTo(hx-2.5,hy+3.5);ctx.stroke();
   if(!NOHEAD){
   blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});blob([pEll(25.5,-16,3,4)],{ow:1.3,sd:1,hl:0});
   sideHair(31,-17,11.2);wolfEarS(31,-17);
@@ -3460,10 +3465,31 @@ function pSkin(P,fill){const p=new Path2D(),n=P.length;let x0=1e9,y0=1e9,x1=-1e9
 // gravity droops it, bone lengths hold, and joints are pushed out of solid voxels / the ground.  Landing in a wall, hands and feet rest on what is left.
 const RAG_ST=[[-21.5,-20.5,-40,-28,-57,-36],[21.5,-20.5,40,-28,57,-36],[-10,24,-17,39,-26,55],[10,24,17,39,26,55]];   // armL armR legL legR of the 'star' pose
 function ragFl(){const f=Math.sin(time*16);return[[-12,8,-27,12+f*2,-44,4+f*4],[-10,6,-24,16-f*2,-42,13-f*3]]}
-function ragXf(m){if(m.mode==='stuck'){const w=Math.sin(m.t*26)*Math.exp(-m.t*3.2),a=w*.17,bp=m.burpT>0?1+.07*Math.sin(time*38):1;return{k:'st',a,sx:.56*(1-w*.05)*bp,sy:.45*(1+w*.07)*bp,c:Math.cos(a),s:Math.sin(a)}}
-  if(m.mode==='fly'&&!m.dive){const face=m.face<0?-1:1,a=m.ang*face;return{k:'fl',face,a,sx:.64*face,sy:.64,c:Math.cos(a),s:Math.sin(a)}}return null}
-function rW(X,m,x,y){return[m.x+x*X.sx*X.c-y*X.sy*X.s,m.y+x*X.sx*X.s+y*X.sy*X.c]}
-function rL(X,m,x,y){const dx=x-m.x,dy=y-m.y;return[(dx*X.c+dy*X.s)/X.sx,(-dx*X.s+dy*X.c)/X.sy]}
+function jigSquashAmount(j){return j&&j.sq>.02?Math.min(.28,j.sq*.12*(1+.5*Math.max(0,j.fl||0))):0}
+function ragXf(m){
+  let k,face,a,sx,sy;
+  if(m.mode==='stuck'){
+    const wob=Math.sin(m.t*26)*Math.exp(-m.t*3.2),bp=m.burpT>0?1+.07*Math.sin(time*38):1;
+    k='st';a=wob*.17;sx=.56*(1-wob*.05)*bp;sy=.45*(1+wob*.07)*bp;
+  }else if(m.mode==='fly'){
+    k='fl';face=m.dive?(m.diveFace||m.face||1):(m.face<0?-1:1);
+    a=m.dive?(m.spin||0):m.ang*face;sx=.64*face;sy=.64;
+  }else return null;
+  const c=Math.cos(a),s=Math.sin(a),j=m.jg,q=jigSquashAmount(j);
+  let xx=c*sx,xy=-s*sy,yx=s*sx,yy=c*sy;
+  if(q){
+    // Stuck: R(a)*S*D. Flight: S*R(a)*D. Same as Canvas paint.
+    const u=Math.cos(j.sa||0),v=Math.sin(j.sa||0),kx=j.st?1+q:1-q,ky=j.st?1-q*.7:1+q*.8,
+      A=kx*u*u+ky*v*v,B=(kx-ky)*u*v,D=kx*v*v+ky*u*u;
+    if(k==='st'){xx=(c*A-s*B)*sx;xy=(c*B-s*D)*sy;yx=(s*A+c*B)*sx;yy=(s*B+c*D)*sy}
+    else{xx=(A*c+B*s)*sx;xy=(-A*s+B*c)*sy;yx=(B*c+D*s)*sx;yy=(-B*s+D*c)*sy}
+  }
+  return {k,face,a,sx,sy,c,s,xx,xy,yx,yy,det:xx*yy-xy*yx};
+}
+function rW(X,m,x,y){return[m.x+X.xx*x+X.xy*y,m.y+X.yx*x+X.yy*y]}
+function rL(X,m,x,y){const dx=x-m.x,dy=y-m.y;return[(X.yy*dx-X.xy*dy)/X.det,(X.xx*dy-X.yx*dx)/X.det]}
+function ragBoneLength(X,dx,dy){return Math.hypot(X.xx*dx+X.xy*dy,X.yx*dx+X.yy*dy)}
+function flightTuck(m){return Math.min(1,.82*(m.diveBlend||0)+.26*jigSquashAmount(m.jg)/.28)}
 function ragHit(p){if(!solidAt(p.x,p.y))return;const gx=Math.floor(p.x/V),gy=Math.floor(p.y/V);let bx=0,by=0,bd=1e9,nx=0,ny=0;
   for(let d=1;d<=3&&bd>=1e9;d++)for(const[ox,oy]of[[-1,0],[1,0],[0,-1],[0,1]]){const cx=gx+ox*d,cy=gy+oy*d;if(solidAt(cx*V+V/2,cy*V+V/2))continue;
     const tx=ox?(ox<0?(cx+1)*V-.5:cx*V+.5):p.x,ty=oy?(oy<0?(cy+1)*V-.5:cy*V+.5):p.y,dd=Math.hypot(tx-p.x,ty-p.y);if(dd<bd){bd=dd;bx=tx;by=ty;nx=ox;ny=oy}}
@@ -3471,14 +3497,14 @@ function ragHit(p){if(!solidAt(p.x,p.y))return;const gx=Math.floor(p.x/V),gy=Mat
   p.px=p.x-vx*.6;p.py=p.y-vy*.6}
 function ragStep(m,dt){const X=ragXf(m);if(!X){m.rg=null;return}
   dt=clamp(dt,1/240,1/20);const f60=dt*60;
-  const rest=X.k==='st'?RAG_ST:ragFl(),kr=(X.k==='st'?[.05,.035]:[.2,.14]).map(k=>1-Math.pow(1-k,f60)),gk=X.k==='st'?1:.3,sc=(Math.abs(X.sx)+Math.abs(X.sy))/2;
+  const rest=X.k==='st'?RAG_ST:ragFl(),kr=(X.k==='st'?[.05,.035]:[.2,.14]).map(k=>1-Math.pow(1-k,f60)),gk=X.k==='st'?1:.3;
   if(!m.rg||m.rg.k!==X.k||m.rg.face!==X.face)m.rg={k:X.k,face:X.face,P:rest.map(r=>{const t=rW(X,m,r[0],r[1]),f=X.k==='st'?.45:1;
     return[0,1,2].map(i=>{const q=rW(X,m,r[0]+(r[2*i]-r[0])*(i?f:0),r[1]+(r[2*i+1]-r[1])*(i?f:0));return{x:q[0],y:q[1],px:q[0],py:q[1]}})})};
   const pdt=m.rg.dt||dt;
   m.rg.P.forEach((c,ci)=>{const r=rest[ci],t=rW(X,m,r[0],r[1]);c[0].x=c[0].px=t[0];c[0].y=c[0].py=t[1];
     for(let j=1;j<3;j++){const p=c[j],q=rW(X,m,r[2*j],r[2*j+1]),dk=Math.pow(.97,f60)*dt/pdt,vx=(p.x-p.px)*dk,vy=(p.y-p.py)*dk;p.px=p.x;p.py=p.y;
       p.x+=vx+(q[0]-p.x)*kr[j-1];p.y+=vy+(q[1]-p.y)*kr[j-1]+G*gk*dt*dt}
-    const L1=Math.hypot(r[2]-r[0],r[3]-r[1])*sc,L2=Math.hypot(r[4]-r[2],r[5]-r[3])*sc;
+    const L1=ragBoneLength(X,r[2]-r[0],r[3]-r[1]),L2=ragBoneLength(X,r[4]-r[2],r[5]-r[3]);
     for(let it=0;it<4;it++){
       let dx=c[1].x-c[0].x,dy=c[1].y-c[0].y,d=Math.hypot(dx,dy)||1,e=(d-L1)/d;c[1].x-=dx*e;c[1].y-=dy*e;
       dx=c[2].x-c[1].x;dy=c[2].y-c[1].y;d=Math.hypot(dx,dy)||1;e=(d-L2)/d*.5;c[1].x+=dx*e;c[1].y+=dy*e;c[2].x-=dx*e;c[2].y-=dy*e;
@@ -3487,7 +3513,7 @@ function ragStep(m,dt){const X=ragXf(m);if(!X){m.rg=null;return}
   if(m.rg)m.rg.dt=dt}
 function ragOpts(o,m){const X=ragXf(m),r=m.rg;if(!o||!X||!r||r.k!==X.k)return;
   const L=r.P.map(c=>{const a=rL(X,m,c[1].x,c[1].y),b=rL(X,m,c[2].x,c[2].y);return[a[0],a[1],b[0],b[1]]});
-  if(X.k==='st'){o.armL=L[0];o.armR=L[1];o.legL=L[2];o.legR=L[3]}else o.legs=L}
+  if(X.k==='st'){o.armL=L[0];o.armR=L[1];o.legL=L[2];o.legR=L[3]}else{o.legs=L;o.flightTuck=flightTuck(m)}}
 // springs (cells) -> offsets in the figure's own drawing units (what drawFront/drawSide/drawBall expect)
 function jigOpts(j,sx,sy,ang){
   if(!j)return null;
@@ -3498,7 +3524,7 @@ function jigOpts(j,sx,sy,ang){
   const sk=j.sk.x.map((x,i)=>{const y=j.sk.y[i];return[(x*c-y*s)*K/sx,(x*s+y*c)*K/sy]});
   let mx=0,my=0,w=0;sk.forEach((p,i)=>{const f=1-SKPIN[i];mx+=p[0]*f;my+=p[1]*f;w+=f});   // the belly decor (navel, hair, shine) rides the free part of the skin
   return{bo:[mx/w,my/w],ro,bs,sk}}
-function jigSquash(j){if(j&&j.sq>.02){const k=j.sq*.12*(1+.5*(j.fl||0));ctx.rotate(j.sa);if(j.st)ctx.scale(1+k,1-k*.7);else ctx.scale(1-k,1+k*.8);ctx.rotate(-j.sa)}}
+function jigSquash(j){const k=jigSquashAmount(j);if(k){const a=j.sa||0;ctx.rotate(a);if(j.st)ctx.scale(1+k,1-k*.7);else ctx.scale(1-k,1+k*.8);ctx.rotate(-a)}}
 
 // =====================================================================
 //  IDLE GAGS (data).  A gag is a list of steps [frameName, seconds, fxName]; every frameName is a key of MAN_FRAMES.
@@ -3641,24 +3667,41 @@ function renderMan(){
     JIG=null}
   else if(m.dive){const face=m.diveFace||m.face||1,a=m.spin||0;
     ctx.rotate(a);ctx.scale(.64*face,.64);
-    JIG=jigOpts(j,.64*face,.64,a);INF=bgrow(stom(m));drawBall(time,'scream');INF=0;JIG=null}
+    JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=bgrow(stom(m));drawBall(time,'scream');INF=0;JIG=null}
   else{const face=m.face<0?-1:1,a=m.ang*face;
     ctx.rotate(a);ctx.scale(.64*face,.64);
     JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=bgrow(stom(m));drawSide(time,'scream');INF=0;JIG=null}
   ctx.restore()}
 const LORD_NEW=true;
 const LORD_SPRITES=new Map();
+function lordAnimationSample(t,quantized){
+  const kind=t.kind||'',wind=(t.wind||0)>0,sw=!wind&&(t.swing||0)>0,stun=(t.stun||0)>0;
+  const pan=(t.pan||0)>0&&!wind&&!sw&&!stun;
+  const fall=clamp((t.vy||0)/360,0,1),mv=fall>.25||stun?0:t.mv||0;
+  const ph=((t.wk||0)*2.2%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
+  const phase=mv?Math.round(ph*6/Math.PI)%12:0;
+  const windSpan=(kind==='thrower'||kind==='boss')?(t.b2?.4:.6):.36;
+  const windAmount=wind?clamp(1-(t.wind||0)/windSpan,0,1):0;
+  const swing=sw?clamp(t.swing,0,.35):0;
+  const windStage=wind?Math.round(windAmount*4):0,swingStage=sw?Math.max(1,Math.ceil(swing/.35*5)):0;
+  const fallStage=Math.round(fall*2),idleStage=!mv&&!wind&&!sw&&!stun&&!pan&&!fallStage?Math.floor((t.t||0)*3)%6:0;
+  const clock=quantized?(mv?phase*Math.PI/6/5.2:idleStage/3):(t.t||0);
+  return {kind,game:1,mv,wk:quantized?phase*Math.PI/6/2.2:(t.wk||0),
+    pan,wind,windAmount:quantized?windStage/4:windAmount,
+    swing:quantized?swingStage*.35/5:swing,stun,fall:quantized?fallStage/2:fall,
+    blink:t.blink<0?-1:1,clock,
+    key:[kind,mv?1:0,phase,pan?1:0,wind?1:0,windStage,swingStage,stun?1:0,fallStage,idleStage,t.blink<0?1:0].join('|')};
+}
 function drawCachedLord(t,kind,pan,wind,sw){
- const phase=t.mv?Math.round(((t.wk||0)*2.2%(Math.PI*2)+Math.PI*2)%(Math.PI*2)*6/Math.PI)%12:0;
- const swingStage=sw?Math.max(1,Math.min(4,Math.ceil((t.swing||0)*4/.35))):0;
- const pose=[kind,phase,!!t.mv,pan,wind,swingStage,t.stun>0,t.blink<0].join('|');
- let c=LORD_SPRITES.get(pose);if(!c){
-  c=mkCanvas(112,144);const old=ctx;ctx=c.getContext('2d');
-  try{ctx.translate(56,105);ctx.scale(-.54,.54);LWM=2.8;cgLordBig(phase*.24,{game:1,kind,mv:t.mv,wk:phase*Math.PI/6/2.2,pan,wind,swing:swingStage*.35/4,stun:t.stun>0,blink:t.blink<0?-1:1});}
-  finally{LWM=1;ctx=old;}
-  if(LORD_SPRITES.size>=96)LORD_SPRITES.delete(LORD_SPRITES.keys().next().value);LORD_SPRITES.set(pose,c);
- }
- ctx.drawImage(c,-28,15-52.5,56,72);
+  const o=lordAnimationSample(t,true),key=o.key;
+  let c=LORD_SPRITES.get(key);
+  if(!c){
+    c=mkCanvas(112,144);const old=ctx;ctx=c.getContext('2d');
+    try{ctx.translate(56,105);ctx.scale(-.54,.54);LWM=2.8;cgLordBig(o.clock,o);}
+    finally{LWM=1;ctx=old;}
+    if(LORD_SPRITES.size>=96)LORD_SPRITES.delete(LORD_SPRITES.keys().next().value);LORD_SPRITES.set(key,c);
+  }
+  ctx.drawImage(c,-28,15-52.5,56,72);
 }
 /* Offline-style caching: a single 56x56 halo replaces a radial gradient
    allocation for every live landlord on every render tick. */
@@ -3668,11 +3711,11 @@ const LORD_GLOW=mkCanvas(56,56);
  lx.fillStyle=g;lx.fillRect(0,0,56,56)}
 function drawLandlord(t){
   const kind=t.kind||'',pan=t.pan>0,wind=t.wind>0,sw=t.swing>0,hop=pan?-Math.abs(Math.sin(t.t*18))*3:0,bob=pan||t.mv?0:Math.sin(t.t*5)*.8,fc=t.face||1;
-  const step=t.mv?Math.sin(t.wk*2.2)*(t.mv>1?3.4:2.4):0,lean=t.mv>1?.12*fc:0;
-  ctx.save();ctx.translate(t.x,t.y+bob+hop);const SZ=kind==='boss'?1.38:1.14;ctx.scale(SZ*fc,SZ);if(lean)ctx.rotate(lean);
+  const step=t.mv?Math.sin(t.wk*2.2)*(t.mv>1?3.4:2.4):0,lean=t.stun>0?-.13*clamp(t.stun/.6,0,1):t.mv>1?.085:0;
+  ctx.save();ctx.translate(t.x,t.y+bob+hop);const SZ=kind==='boss'?1.38:1.14;ctx.scale(SZ*fc,SZ);if(lean){ctx.translate(0,15);ctx.rotate(lean);ctx.translate(0,-15);}
   if(LORD_NEW&&perf.cache){if(perf.detail)ctx.drawImage(LORD_GLOW,-28,-32);drawCachedLord(t,kind,pan,wind,sw);}
   else if(LORD_NEW){ctx.save();ctx.drawImage(LORD_GLOW,-28,-32);   // cached glow, no per-actor gradient allocation
-  ctx.translate(0,15);ctx.scale(-.27,.27);LWM=2.8;try{cgLordBig(t.t||0,{game:1,kind,mv:t.mv,wk:t.wk,pan,wind,swing:sw?Math.max(t.swing,.001):0,stun:t.stun>0,blink:t.blink})}finally{LWM=1}ctx.restore()}
+  ctx.translate(0,15);ctx.scale(-.27,.27);LWM=2.8;try{const o=lordAnimationSample(t,false);cgLordBig(o.clock,o)}finally{LWM=1}ctx.restore()}
   else{
   // little shoes (they only show when he is on the move)
   if(t.mv||wind||sw){ctx.fillStyle='#111';ctx.fillRect(-5+step,11.5,5,2.6);ctx.fillRect(1-step,11.5,5,2.6)}
@@ -3710,7 +3753,7 @@ function drawLandlord(t){
     ctx.restore();
   }
   if(wind&&(t.kind==='thrower'||t.kind==='boss')){ctx.save();ctx.translate(t.x,t.y-42);ctx.fillStyle='#ffd23f';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-3,-9);ctx.lineTo(3,-9);ctx.lineTo(1.5,2);ctx.lineTo(-1.5,2);ctx.closePath();ctx.stroke();ctx.fill();ctx.beginPath();ctx.arc(0,6,1.8,0,7);ctx.fill();ctx.restore()}}
-function drawCases(){for(const c of cases){ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.rot);ctx.fillStyle='#7a4a22';ctx.fillRect(-7,-5,14,10);ctx.strokeStyle='#3a220c';ctx.lineWidth=1.2;ctx.strokeRect(-7,-5,14,10);ctx.fillStyle='#ffd23f';ctx.fillRect(-1,-1.5,2,3);ctx.strokeRect(-3,-7.5,6,2.5);ctx.restore()}}
+function drawCases(){for(const c of cases){const visual=sceneRenderOffset(c,rubbleAlpha,40);ctx.save();ctx.translate(c.x+visual.x,c.y+visual.y);ctx.rotate(c.rot+visual.rot);ctx.fillStyle='#7a4a22';ctx.fillRect(-7,-5,14,10);ctx.strokeStyle='#3a220c';ctx.lineWidth=1.2;ctx.strokeRect(-7,-5,14,10);ctx.fillStyle='#ffd23f';ctx.fillRect(-1,-1.5,2,3);ctx.strokeRect(-3,-7.5,6,2.5);ctx.restore()}}
 
 // =====================================================================
 //  DRAW
@@ -3892,6 +3935,15 @@ function actorRenderOffset(m,alpha){
   if(Math.abs(dx)>40||Math.abs(dy)>40)return p;
   p.x=dx*(1-alpha);p.y=dy*(1-alpha);return p;
 }
+const sceneMotion=new WeakMap(),sceneOffset={x:0,y:0,rot:0};
+function snapshotSceneActors(){
+  for(const t of targets)if(t.alive)recordSceneActor(t);
+  for(const c of cases)recordSceneActor(c);
+}
+function recordSceneActor(a){let p=sceneMotion.get(a);if(!p){p={x:0,y:0,rot:0};sceneMotion.set(a,p)}p.x=a.x;p.y=a.y;p.rot=a.rot||0;}
+function sceneRenderOffset(a,alpha,maxDelta){const out=sceneOffset,p=sceneMotion.get(a);out.x=out.y=out.rot=0;
+  if(!p||alpha>=1||Math.abs(p.x-a.x)>maxDelta||Math.abs(p.y-a.y)>maxDelta)return out;
+  const k=1-alpha;out.x=(p.x-a.x)*k;out.y=(p.y-a.y)*k;out.rot=(p.rot-(a.rot||0))*k;return out;}
 const rubbleCache=new WeakMap();
 const rubbleMotion=new WeakMap(),rubblePoseScratch={x:0,y:0,ang:0};let rubbleAlpha=1;
 function snapshotRubble(){for(const ch of chunks){let a=rubbleMotion.get(ch);if(!a){a={x:0,y:0,ang:0};rubbleMotion.set(ch,a)}a.x=ch.x;a.y=ch.y;a.ang=ch.ang;}}
@@ -3981,7 +4033,7 @@ function draw(){
   const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';
   for(const t of targets)if(t.alive){
     if(camOn&&(t.x<rubbleX0-70||t.x>rubbleX1+70||t.y<rubbleY0-80||t.y>rubbleY1+80))continue;
-    const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);
+    const[tx,ty]=targetOffset(t),visual=sceneRenderOffset(t,rubbleAlpha,24);ctx.save();ctx.translate(tx+visual.x,ty+visual.y);drawLandlord(t);
     // A compact locator above the surviving actor, positioned in the same
     // transformed world coordinate system as the actual landlord artwork.
     if(lastTargetVisible && t.collapseRolled!==2)
@@ -4586,6 +4638,7 @@ function cgSpark(x,y,r,c){ctx.fillStyle=c||'#fff';ctx.beginPath();ctx.moveTo(x,y
 let LWM=1;   // outline multiplier, so the small in-game sprite keeps readable outlines
 function cgLordBig(t,o){o=o||{};const kind=o.kind||'',game=!!o.game,mvg=game?(o.mv?1:0):1,ph=game?(o.wk||0)*2.2:t*5.2,st=Math.sin(ph)*mvg,bob=game?(mvg?Math.abs(Math.sin(ph))*-2.2:0):Math.abs(Math.sin(ph))*-2.2,
   bl=game?(o.blink<0):((t*1.3%3.1)>2.98),sneer=.5+.5*Math.sin(t*2.3),pan=!!o.pan,wind=!!o.wind,sw=!!o.swing,stun=!!o.stun,wave=game?(sw?1:Math.sin(t*3.2)*.3):Math.sin(t*6.5),strike=sw?Math.pow(clamp((o.swing||0)/.35,0,1),.65):0;
+  const fall=game?clamp(o.fall||0,0,1):0,load=game&&wind?clamp(o.windAmount==null?1:o.windAmount,0,1):0;
   const SUC={bat:'#2f5d3a',thrower:'#3a4a7a',boss:'#1c1c24',sprinter:'#7a5a1c',healer:'#f4f4f4',shield:'#33413f'}[kind]||'#4a5568',
    BND={bat:'#2a8a2a',thrower:'#3a6ad1',boss:'#ffd23f',sprinter:'#ffd23f',healer:'#2fbf4a',shield:'#8a8f99'}[kind]||'#d12b2b',
    SUD=kind==='healer'?'#d6dae2':'rgba(0,0,0,0)';const SK='#f2c7a1';
@@ -4593,7 +4646,7 @@ function cgLordBig(t,o){o=o||{};const kind=o.kind||'',game=!!o.game,mvg=game?(o.
   const sh=(c,a)=>{const n=parseInt(c.slice(1),16);return `rgb(${Math.max(0,(n>>16)-a)},${Math.max(0,((n>>8)&255)-a)},${Math.max(0,(n&255)-a)})`};const SUk=sh(SUC,0),SUd=sh(SUC,26);
   const lim=(x0,y0,x1,y1,w,fill)=>{ctx.strokeStyle=CO;ctx.lineWidth=(w+3)*(LWM>1?1.3:1);ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();ctx.strokeStyle=fill;ctx.lineWidth=w;ctx.stroke()};
   // legs and shoes
-  for(const q of[-1,1]){const a=ph+(q>0?Math.PI:0),sp=Math.sin(a)*mvg,lf=Math.max(0,Math.cos(a))*mvg;const fx=q*5+sp*8,fy=-3-lf*5;lim(q*5,-36,fx,fy-4,8.5,'#2d3340');cgE(fx+2,fy+1,8,3.8,'#15151c',1.6)}
+  for(const q of[-1,1]){const a=ph+(q>0?Math.PI:0),sp=Math.sin(a)*mvg,lf=Math.max(0,Math.cos(a))*mvg;const fx=q*5+sp*8+fall*q*5,fy=-3-lf*5-fall*(q>0?9:5);lim(q*5,-36+(game?bob:0),fx,fy-4,8.5,'#2d3340');cgE(fx+2,fy+1,8,3.8,'#15151c',1.6)}
   ctx.translate(0,bob);
   // far arm
   if(pan){lim(13,-66,22,-88+Math.sin(t*23)*2,7,SUd);cgE(22,-91+Math.sin(t*23)*2,3.5,3.5,SK,1.4)}else{lim(13,-66,17-st*4,-46,7,SUd);cgE(17-st*4,-43,3.5,3.5,SK,1.4)}
@@ -4605,11 +4658,12 @@ function cgLordBig(t,o){o=o||{};const kind=o.kind||'',game=!!o.game,mvg=game?(o.
   // near arm and what it holds
   let hx,hy;
   if(pan){hx=-22;hy=-88+Math.sin(t*23+1)*2;lim(-14,-66,-19,-78,7.5,SUk);lim(-19,-78,hx,hy,6.6,SUk)}
-  else if(wind&&(kind==='thrower'||kind==='boss')){hx=-9;hy=-92;lim(-14,-66,-20,-80,7.5,SUk);lim(-20,-80,hx,hy,6.6,SUk)}
+  else if(wind&&(kind==='thrower'||kind==='boss')){const u=game?load*load*(3-2*load):1,ex=-17-3*u,ey=-52-28*u;hx=-27+18*u;hy=-59-33*u;lim(-14,-66,ex,ey,7.5,SUk);lim(ex,ey,hx,hy,6.6,SUk)}
+  else if(game&&wind){const u=load*load*(3-2*load),ex=-17+11*u,ey=-52-10*u;hx=-27+33*u;hy=-59-10*u;lim(-14,-66,ex,ey,7.5,SUk);lim(ex,ey,hx,hy,6.6,SUk)}
   else if(sw){const ex=-17-5*strike,ey=-52-10*strike;hx=ex-10-3*strike;hy=-59-3*strike;lim(-14,-66,ex,ey,7.5,SUk);lim(ex,ey,hx,hy,6.6,SUk)}
   else{const ex=-17+wave*1.4;hx=ex-10;hy=-59+wave*3;lim(-14,-66,ex,-52,7.5,SUk);lim(ex,-52,hx,hy,6.6,SUk)}
-  if(!pan){ctx.save();ctx.translate(hx-2,hy-3);
-    if(kind==='thrower'||kind==='boss'){ctx.rotate(wind?-.5:sw?.9:.1);cgR(-9,-6,18,13,'#7a4a22',1.6,2);cgR(-3,-9,6,3,'#3a220c',1,1);cgR(-1.6,-1.5,3.2,4,'#ffd23f',.8)}   // briefcase
+  if(!pan&&!(game&&sw&&(kind==='thrower'||kind==='boss'))){ctx.save();ctx.translate(hx-2,hy-3);
+    if(kind==='thrower'||kind==='boss'){ctx.rotate(wind?(game?.1-.6*load:-.5):sw?.9:.1);cgR(-9,-6,18,13,'#7a4a22',1.6,2);cgR(-3,-9,6,3,'#3a220c',1,1);cgR(-1.6,-1.5,3.2,4,'#ffd23f',.8)}   // briefcase
     else if(kind==='bat'){ctx.rotate(sw?-1.2+(.35-Math.min(.35,o.swing||0))/.35*2.6:-.3);cgP([-1.5,2,1.5,2,3.4,-28,-3.4,-28],'#b97a3c',1.4);cgR(-2.2,0,4.4,6,'#5a3414',1,1)}   // club
     else if(kind!=='healer'){ctx.rotate(-.5+wave*.18);cgR(-8,-13,16,20,'#fbfbf4',1.5,1);ctx.strokeStyle='#9aa';ctx.lineWidth=1;for(const y of[-9,-5,-1,3]){ctx.beginPath();ctx.moveTo(-5,y);ctx.lineTo(5,y);ctx.stroke()}cgE(0,5,2.4,2.4,'#c43a3a',.8)}   // papers
     ctx.restore()}
@@ -6147,7 +6201,7 @@ function loop(t){
   const start=performance.now(),ticks=webSimSteps(raw);let sim=0,rendered=false;
   try{
     layoutTick();
-    for(let i=0;i<ticks;i++){const playing=state==='play';if(playing&&i===ticks-1){snapshotRubble();snapshotActor();}update(WEB_SIM_DT);if(playing)sim++;}
+    for(let i=0;i<ticks;i++){const playing=state==='play';if(playing&&i===ticks-1){snapshotRubble();snapshotActor();snapshotSceneActors();}update(WEB_SIM_DT);if(playing)sim++;}
     rubbleAlpha=state==='play'?clamp(webSimCarry/WEB_SIM_DT,0,1):1;
     camTick(Math.min(.067,raw));musUpdate();
     const cap=state==='play'||state==='win'||state==='lose'?perf.fps:Math.min(perf.fps,30),period=1/cap;
