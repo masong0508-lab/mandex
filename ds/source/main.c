@@ -1403,8 +1403,9 @@ static void draw_objective_edge(const View *v){
 static void top_hud(u8 *b){
   const char *nm = mx_level_name(world.level);
   gfx_rect(b, 0, 0, 256, 11, C_UIBG); gfx_rect(b, 0, 11, 256, 1, C_UILINE);
-  gfx_text(b, 4, 3, "LV", C_GOLD, 1); gfx_text(b, 14, 3, gfx_int(world.level + 1), C_GOLD, 1);
-  gfx_text(b, 24, 3, nm, C_WHITE, 1);
+  gfx_text(b,4,3,"LV",C_GOLD,1);
+  const char *lv=gfx_int(world.level+1);int namex=14+gfx_text_w(lv,1)+2;
+  gfx_text(b,14,3,lv,C_GOLD,1);gfx_text(b,namex,3,nm,C_WHITE,1);
   const char *sc = gfx_int(disp_score);
   gfx_text(b, 252 - gfx_text_w(sc, 1), 3, sc, C_GOLD, 1);
   gfx_text(b, 252 - gfx_text_w(sc, 1) - 6, 3, "$", C_GOLD2, 1);
