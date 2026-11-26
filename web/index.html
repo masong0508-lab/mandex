@@ -4443,6 +4443,29 @@ function drawToasts(dt){
 // ---------- screens ----------
 const UISTATES=['menu','select','ach','outfit','options','ending'];
 let selTab=0,trialDistrict=0;
+// The district summary is derived from existing saves; no new save fields.
+function trialDistrictProgress(d,stars=PD.stars){
+  const first=TRIAL_START+d*20;let cleared=0,earned=0,next=-1;
+  for(let i=first;i<Math.min(first+20,LEVELS.length);i++){
+    const n=Math.max(0,Math.min(3,Math.floor(Number(stars[i])||0)));
+    if(n)cleared++;else if(next<0)next=i;
+    earned+=n;
+  }
+  return {cleared,earned,next};
+}
+function trialBrief(i){
+  const a=TRIAL_META[i-TRIAL_START];
+  return a ? (a[13]?'WALK':'FLING')+' / '+a[12]+' MEN / '+a[7]+' TARGETS' : '';
+}
+function trialNextUnfinished(d){
+  const progress=trialDistrictProgress(d);
+  if(progress.next>=0)startStory(progress.next);
+}
+function trialTextFit(s,x,y,maxWidth,size,color){
+  ctx.font='bold '+size+'px "Trebuchet MS",Impact,sans-serif';
+  while(size>10&&ctx.measureText(s).width>maxWidth){size--;ctx.font='bold '+size+'px "Trebuchet MS",Impact,sans-serif';}
+  txt(s,x,y,size,color,'center');
+}
 function goMenu(){state='menu';hits=[]}
 function goSelect(){state='select';hits=[]}
 function startStory(i){testing=false;if(i>=TRIAL_START){selTab=4;trialDistrict=Math.floor((i-TRIAL_START)/20);load(i);return}selTab=i>=CH2?3:i>=CH1?2:0;if(i===0){startCut();return}if(i===CH2){startCut3();return}load(i)}
@@ -5418,7 +5441,7 @@ function mobileSelectItems(){
   if(selTab===0)return LEVELS.slice(0,CH1).map((q,i)=>({label:(i+1)+'. '+q.name,stars:PD.stars[i]||0,locked:!storyUnlocked(i),fn:()=>startStory(i)}));
   if(selTab===2)return LEVELS.slice(CH1,CH2).map((q,i)=>({label:(CH1+i+1)+'. '+q.name,stars:PD.stars[CH1+i]||0,locked:!ch2Unlocked(CH1+i),fn:()=>startStory(CH1+i)}));
   if(selTab===3)return LEVELS.slice(CH2,TRIAL_START).map((q,i)=>({label:(CH2+i+1)+'. '+q.name,stars:PD.stars[CH2+i]||0,locked:!ch3Unlocked(CH2+i),fn:()=>startStory(CH2+i)}));
-  if(selTab===4){const first=TRIAL_START+trialDistrict*20;return LEVELS.slice(first,first+20).map((q,k)=>({label:(k+1)+'. '+q.name,stars:PD.stars[first+k]||0,locked:false,fn:()=>startStory(first+k)}))}
+  if(selTab===4){const first=TRIAL_START+trialDistrict*20;return LEVELS.slice(first,first+20).map((q,k)=>({label:(k+1)+'. '+q.name,brief:trialBrief(first+k),stars:PD.stars[first+k]||0,locked:false,fn:()=>startStory(first+k)}))}
   const items=[{label:'+ CREATE NEW LEVEL',fn:()=>openEditor(false)},
     {label:'IMPORT LEVEL CODE',fn:importCode}];
   PD.custom.forEach((q,i)=>items.push({label:(i+1)+'. '+q.n,custom:true,i,fn:()=>startCustom(i)}));
@@ -5432,18 +5455,24 @@ function drawMobileSelect(){
   if(selTab===4){
     btn(12,201,82,43,'<',()=>{trialDistrict=(trialDistrict+7)%8;WEB_UI.page.select=0},{size:18});
     txt(TRIAL_DISTRICTS[trialDistrict].toUpperCase(),W/2,220,18,'#ffd23f','center');
-    txt((trialDistrict+1)+' / 8 DISTRICTS',W/2,239,12,'#fff','center');
+    const p=trialDistrictProgress(trialDistrict);
+    txt((trialDistrict+1)+'/8  |  '+p.cleared+'/20 CLEARED  |  '+p.earned+'/60 ★',W/2,239,12,'#fff','center');
+    btn(12,250,W-24,38,p.next<0?'DISTRICT COMPLETE':'PLAY NEXT UNCLEARED TRIAL',()=>trialNextUnfinished(trialDistrict),{size:16,on:p.next>=0,disabled:p.next<0,col:'#7dff5a'});
     btn(W-94,201,82,43,'>',()=>{trialDistrict=(trialDistrict+1)%8;WEB_UI.page.select=0},{size:18});
   }
-  const items=mobileSelectItems(),top=selTab===4?256:208,rh=94,rowGap=8,cols=2,
-    visibleRows=Math.max(2,Math.floor((H-top-94)/(rh+rowGap))),size=visibleRows*cols,
+  const items=mobileSelectItems(),top=selTab===4?298:208,rh=94,rowGap=8,cols=2,
+    visibleRows=Math.max(1,Math.floor((H-top-94)/(rh+rowGap))),size=visibleRows*cols,
     page=mobilePage('select',items.length,size),start=page*size;
   for(let j=start;j<Math.min(items.length,start+size);j++){
     const it=items[j],k=j-start,x=12+(k%2)*264,y=top+Math.floor(k/2)*(rh+rowGap);
     const label=it.locked?'LOCKED':it.label;
-    btn(x,y,252,rh,label,()=>{if(!it.locked)it.fn();else SFX.pop()},
-        {size:it.label.length>19?12:15,on:!it.locked&&it.stars>=2});
-    if(!it.locked&&it.stars)txt('★'.repeat(it.stars),x+126,y+rh-8,15,'#ffd23f','center');
+    btn(x,y,252,rh,it.brief?'':label,()=>{if(!it.locked)it.fn();else SFX.pop()},
+        {size:it.label.length>19?12:15,on:!it.brief&&!it.locked&&it.stars>=2});
+    if(it.brief){
+      trialTextFit(label,x+126,y+30,234,17,'#fff');
+      trialTextFit(it.brief,x+126,y+54,234,13,'#bce7ff');
+      txt(it.stars?'★'.repeat(Math.min(3,it.stars)):'NOT CLEARED',x+126,y+rh-12,13,it.stars?'#ffd23f':'#b6bddb','center');
+    }else if(!it.locked&&it.stars)txt('★'.repeat(it.stars),x+126,y+rh-8,15,'#ffd23f','center');
     if(it.custom&&it.i!=null){
       btn(x+4,y+rh-44,76,40,'EDIT',()=>openEditor(false,it.i),{size:12});
       btn(x+86,y+rh-44,70,40,'SHARE',()=>exportCode(PD.custom[it.i]),{size:12});
@@ -5701,7 +5730,10 @@ function drawSelect(){
     txt(TRIAL_DISTRICTS[trialDistrict].toUpperCase()+'  '+(trialDistrict+1)+'/8',W/2,133,23,'#ffd23f','center');
     const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2;
     for(let k=0;k<20;k++){const i=first+k;tile(x0+(k%cols)*(tw+gx),151+Math.floor(k/cols)*70,tw,60,k+1,LEVELS[i].name,PD.stars[i]||0,false,()=>startStory(i))}
-    txt('160 TRIALS  |  ALL DISTRICTS OPEN  |  PICK A STRUCTURE AND PLAY',W/2,H-20,14,'#cfd','center');
+    const p=trialDistrictProgress(trialDistrict);
+    txt(p.cleared+'/20 CLEARED  |  '+p.earned+'/60 ★  |  160 TRIALS',W/2,455,15,'#cfd','center');
+    btn(W/2-176,469,352,38,p.next<0?'DISTRICT COMPLETE':'PLAY NEXT UNCLEARED TRIAL',()=>trialNextUnfinished(trialDistrict),{size:17,on:p.next>=0,disabled:p.next<0,col:'#7dff5a'});
+    txt('ALL DISTRICTS OPEN  |  CHOOSE ANY TRIAL',W/2,H-14,13,'#cfd','center');
   }else if(selTab===3){
     const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n3=TRIAL_START-CH2,th=60;
     txt('CHAPTER 3  -  THE WOLFMAN',W/2,134,24,'#9aa4d8','center','#10132a');
