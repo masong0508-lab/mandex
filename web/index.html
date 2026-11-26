@@ -1453,9 +1453,10 @@ function walkPose(m){
   // then recover to guard over its actual 0.2-second contact window.
   const attack=punch?Math.pow(clamp(m.pT/.2,0,1),.65):0;
   const C=Math.cos(th),S=Math.sin(th),swing=Math.sin(phase*2*Math.PI)*stride;
-  q.th=th;q.hip=swing*.9;q.psi=-3*swing;q.ld=-4*swing;q.t=time;
-  q.face=m.hurtCd>.55?'dizzy':punch||slam>.5?'scream':'cool';q.capeTrail=12*stride+10*air+4*air*clamp(-(m.vy||0)/350,-1,1);
-  q.walkBob=4.5+stride*(4+Math.abs(swing)*1.5)+land*8+air*3+slam*3;
+  const hurt=punch?0:clamp(((m.hurtCd||0)-.32)/.48,0,1),guardLean=hurt*Math.sin(hurt*Math.PI*.5);
+  q.th=th;q.hip=swing*.9-guardLean*2;q.psi=-3*swing+guardLean*5;q.ld=-4*swing-guardLean*6;q.hr=-guardLean*8;q.t=time;
+  q.face=hurt>.28?'queasy':punch||slam>.5?'scream':'cool';q.capeTrail=12*stride+10*air+4*air*clamp(-(m.vy||0)/350,-1,1);
+  q.walkBob=4.5+stride*(4+Math.abs(swing)*1.5)+land*8+air*3+slam*3+guardLean*3;
   for(let i=0;i<2;i++){
     const side=i?1:-1,f=q.walkFeet[i],sample=walkFootSample(phase+i*.5);
     const fall=clamp((m.vy||0)/350,-1,1),fore=sample[0]*20*stride*(1-air)+air*(side*(10-4*fall)*(1-slam));
@@ -1467,6 +1468,7 @@ function walkPose(m){
     a[0]=side*(27-guard*7);a[1]=-7-guard*5-air*10;a[2]=armSwing*.55+guard*24+air*7;
     a[3]=side*(27-guard*8);a[4]=8-guard*11-air*21;a[5]=armSwing+guard*52+air*13;
     if(slam>.01){a[1]-=slam*6;a[4]-=slam*8;a[5]-=slam*8;}
+    if(hurt>.01){a[0]+=side*hurt*4;a[1]-=hurt*7;a[2]+=hurt*6;a[3]-=side*hurt*5;a[4]-=hurt*15;a[5]+=hurt*10;}
   }
   return face;
 }
@@ -1500,7 +1502,7 @@ function drawWalkMan(m){
   // solved through the hips and knees, never by moving the planted feet.
   ctx.save();ctx.translate(m.x,m.y+WHH-64.4*sc);
   ctx.scale(visualFace<0?-sc:sc,sc);
-  if(!m.gr){ctx.translate(0,24);ctx.rotate(m.stomp?0:clamp(m.vy/1400,-.12,.12));ctx.translate(0,-24);}
+  if(!m.gr){ctx.translate(0,24);ctx.rotate(m.stomp?0:clamp((m.vy||0)/1400,-.12,.12));ctx.translate(0,-24);}
   JIG=null;drawSpin(q.th,q);
   ctx.restore();
   // Keep the attack cue on the live hitbox even during a rear-facing turn.
@@ -2089,8 +2091,8 @@ function update(dt){
   shake*=.9;
   if(state==='win'){endT+=dt;if(endT>.34){endT=0;SFX.wig()}}
   if(state==='play'){
-    if(aliveTargets()===0){winT+=dt;if(winT>1.6){state='win';score+=men*3000;SFX.ding();onWin()}}
-    else if(men===0&&man.mode==='none'){loseT+=dt;if((!busy()&&loseT>1.8)||loseT>15)state='lose'}}
+    if(aliveTargets()===0){winT+=dt;if(winT>1.6){state='win';resultStart=time;endT=0;score+=men*3000;SFX.ding();onWin()}}
+    else if(men===0&&man.mode==='none'){loseT+=dt;if((!busy()&&loseT>1.8)||loseT>15){state='lose';resultStart=time}}}
 }
 
 // =====================================================================
@@ -2999,12 +3001,21 @@ function spinSway(thDeg,psiDeg,hipSway){
   return{bob,shx,F:FT}}
 // two-bone leg: hip H and ankle A (3D), the knee bends toward `pole`
 function legIK(H,A,pole,l1,l2){
-  let d=[A[0]-H[0],A[1]-H[1],A[2]-H[2]],D=Math.hypot(d[0],d[1],d[2]);const mx=l1+l2-.15;let Ac=A;
-  if(D<1e-6){d=[0,.15,0];D=.15;Ac=[H[0],H[1]+.15,H[2]];}
-  if(D>mx){const k=mx/D;d=d.map(v=>v*k);D=mx;Ac=[H[0]+d[0],H[1]+d[1],H[2]+d[2]]}
-  const u=d.map(v=>v/D),a=(l1*l1-l2*l2+D*D)/(2*D),h=Math.sqrt(Math.max(0,l1*l1-a*a)),pd=pole[0]*u[0]+pole[1]*u[1]+pole[2]*u[2];
-  let q=[pole[0]-pd*u[0],pole[1]-pd*u[1],pole[2]-pd*u[2]];const ql=Math.hypot(q[0],q[1],q[2])||1;q=q.map(v=>v/ql);
-  return{K:[H[0]+u[0]*a+q[0]*h,H[1]+u[1]*a+q[1]*h,H[2]+u[2]*a+q[2]*h],A:Ac}}
+  let d=[A[0]-H[0],A[1]-H[1],A[2]-H[2]],D=Math.hypot(...d);
+  const lo=Math.max(.15,Math.abs(l1-l2)+.05),hi=Math.max(lo,l1+l2-.15);
+  const u=D>1e-6?d.map(v=>v/D):[0,1,0],dist=Math.max(lo,Math.min(hi,D));
+  const Ac=Math.abs(dist-D)<1e-8?A:[H[0]+u[0]*dist,H[1]+u[1]*dist,H[2]+u[2]*dist];
+  const a=(l1*l1-l2*l2+dist*dist)/(2*dist),h=Math.sqrt(Math.max(0,l1*l1-a*a));
+  const pd=pole[0]*u[0]+pole[1]*u[1]+pole[2]*u[2];
+  let q=[pole[0]-pd*u[0],pole[1]-pd*u[1],pole[2]-pd*u[2]],ql=Math.hypot(...q);
+  if(ql<1e-6){
+    // Select the least aligned Cartesian axis and project it onto the knee plane.
+    const i=Math.abs(u[0])<=Math.abs(u[1])&&Math.abs(u[0])<=Math.abs(u[2])?0:Math.abs(u[1])<=Math.abs(u[2])?1:2;
+    q=[-u[i]*u[0],-u[i]*u[1],-u[i]*u[2]];q[i]+=1;ql=Math.hypot(...q);
+  }
+  const k=h/ql;
+  return{K:[H[0]+u[0]*a+q[0]*k,H[1]+u[1]*a+q[1]*k,H[2]+u[2]*a+q[2]*k],A:Ac}
+}
 // the baked hand anchor (design units, no arm wave) of every frame that carries a towel: the consoles pin their cloth to it.
 // For the spin it is where drawSpin puts the raised fist: 30 out from the body centre, turned by th, plus the sway (shx) and crouch (bob) of the step-turn.
 const TOWEL_HAND=(()=>{const r=v=>Math.round(v*1000)/1000+0,H={};
@@ -3463,7 +3474,7 @@ function updParts(dt){
     if((p.k===0||p.k===3)&&solidAt(p.x,p.y)){p.x=ox;p.y=oy;p.vx*=-.4;p.vy*=-.3}}
   let n=0;for(let i=0;i<parts.length;i++)if(parts[i].l>0)parts[n++]=parts[i];parts.length=n;}
 function updTexts(dt){for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=28*dt;if(t.t>t.l)texts.splice(i,1)}}
-let endT=0;
+let endT=0,resultStart=0;
 function drawParts(){
   for(const p of parts){const a=p.l/p.l0;
     if(p.k===0){ctx.globalAlpha=Math.min(1,p.l);ctx.fillStyle=p.c;ctx.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s)}
@@ -4239,19 +4250,54 @@ function drawHUD(){
   if(state==='play'){btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});btn(W-145,3,42,28,'SET',openSettings,{size:12});}
   if(state==='win'||state==='lose')drawEnd()}
 function star(x,y,r,on){ctx.fillStyle=on?'#ffd23f':'#3a3f55';ctx.strokeStyle='#000';ctx.lineWidth=3;ctx.beginPath();for(let i=0;i<10;i++){const a=-1.5708+i*.6283,rr=i%2?r*.45:r;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.closePath();ctx.stroke();ctx.fill()}
+// Result-screen animation. Every loop returns to its first pose and keeps
+// the original body rig, clothing and planted feet. Angles are in degrees.
+const RESULT_READY={yaw:0,hip:0,bob:4,head:0,face:'cool',L:[-33,-8,2,-30,13,5],R:[33,-8,2,30,13,5]};
+const RESULT_POSES={
+ ready:RESULT_READY,
+ brace:{yaw:0,hip:0,bob:10,head:3,face:'base',L:[-38,-5,4,-27,15,10],R:[38,-5,4,27,15,10]},
+ salute:{yaw:16,hip:-1,bob:4,head:-7,face:'base',L:[-34,-6,2,-25,8,5],R:[39,-30,8,13,-53,20]},
+ cheer:{yaw:0,hip:0,bob:3,head:0,face:'bliss',L:[-39,-33,3,-43,-58,8],R:[39,-33,3,43,-58,8]},
+ cheerL:{yaw:-18,hip:-2,bob:5,head:8,face:'bliss',L:[-43,-29,7,-46,-52,9],R:[34,-12,2,32,4,8]},
+ cheerR:{yaw:18,hip:2,bob:5,head:-8,face:'bliss',L:[-34,-12,2,-32,4,8],R:[43,-29,7,46,-52,9]},
+ point:{yaw:-20,hip:-2,bob:4,head:6,face:'base',L:[-40,-17,7,-55,-25,16],R:[34,-8,2,27,9,5]},
+ pointR:{yaw:20,hip:2,bob:4,head:-6,face:'base',L:[-34,-8,2,-27,9,5],R:[40,-17,7,55,-25,16]},
+ defeated:{yaw:0,hip:0,bob:10,head:8,face:'queasy',L:[-29,-3,2,-22,19,4],R:[29,-3,2,22,19,4]},
+ steady:{yaw:-8,hip:-1,bob:6,head:-3,face:'base',L:[-36,-12,5,-27,-25,13],R:[36,-12,5,27,-25,13]}
+};
+// Three victories: salute, overhead cheer, and a two-sided flourish.
+// Defeat moves from slumped posture to a composed ready stance, then rests.
+const RESULT_CLIPS=[
+ [[0,'ready'],[.22,'brace'],[.72,'salute'],[1.55,'salute'],[2.02,'point'],[2.65,'ready']],
+ [[0,'ready'],[.23,'brace'],[.62,'cheer'],[1.0,'cheerL'],[1.38,'cheer'],[1.76,'cheerR'],[2.14,'cheer'],[2.75,'ready']],
+ [[0,'ready'],[.24,'brace'],[.78,'point'],[1.35,'point'],[1.9,'pointR'],[2.45,'pointR'],[3.02,'ready']],
+ [[0,'defeated'],[.6,'defeated'],[1.22,'steady'],[1.85,'ready'],[2.4,'ready']]
+];
+const RESULT_POSE={th:0,hip:0,ld:0,hr:0,psi:0,t:0,face:'cool',cape:1,quiff:1,capeTrail:0,
+  arms:{L:[0,0,0,0,0,0],R:[0,0,0,0,0,0]},
+  walkFeet:[{x:-15,y:55,z:0,ang:0},{x:15,y:55,z:0,ang:0}],walkBob:4};
+function resultMotionSample(win,elapsed,variant=0){
+  const id=win?((variant%3)+3)%3:3,clip=RESULT_CLIPS[id],duration=clip[clip.length-1][0];
+  const t=win?Math.max(0,elapsed)%duration:Math.min(duration,Math.max(0,elapsed));
+  let i=0;while(i+1<clip.length-1&&t>clip[i+1][0])i++;
+  const a=RESULT_POSES[clip[i][1]],b=RESULT_POSES[clip[i+1][1]],u=clamp((t-clip[i][0])/(clip[i+1][0]-clip[i][0]),0,1),s=u*u*(3-2*u);
+  const q=RESULT_POSE,lerp=(x,y)=>x+(y-x)*s;
+  q.th=lerp(a.yaw,b.yaw)*Math.PI/180;q.hip=lerp(a.hip,b.hip);q.walkBob=lerp(a.bob,b.bob);
+  q.hr=lerp(a.head,b.head);q.ld=-q.th*12;q.psi=-q.th*4;q.t=t;
+  q.face=s<.5?a.face:b.face;
+  for(const hand of ['L','R'])for(let k=0;k<6;k++)q.arms[hand][k]=lerp(a[hand][k],b[hand][k]);
+  return q;
+}
+function drawResultActor(win,elapsed,variant){
+  const q=resultMotionSample(win,elapsed,variant);
+  ctx.save();ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(0,65,27,4.5,0,0,6.2832);ctx.fill();
+  JIG=null;drawSpin(q.th,q);ctx.restore();
+}
 function drawEnd(){
   ctx.fillStyle='rgba(8,10,20,.72)';ctx.fillRect(0,0,W,H);const win=state==='win';
   const P=W<700,y0=P?Math.round(H*.5-230):190,tx=P?W/2:W/2+80;
   ctx.save();ctx.translate(P?W/2:W/2-250,P?y0+200:H/2+20);ctx.scale(.9,.9);
-  if(win){const ph=time*14,sw=Math.sin(ph);                 // butt-wiggle victory dance, with a little hop
-    ctx.translate(0,-Math.abs(Math.sin(time*7))*10);
-    JIG={bo:[-Math.sin(ph-1.2)*2.5,Math.cos(ph*.5)*1.5],ro:[sw*5.5,-Math.abs(Math.cos(ph))*2],bs:[1,1]};
-    const vd=(level+(score|0))%3;   // which victory dance: butt wiggle, disco, or pin-up kisses
-    if(vd===1){JIG={bo:[sw*4,1],ro:[0,0],bs:[1,1]};drawManFrame(sw>0?'DANCE_A':'DANCE_B')}
-    else if(vd===2){JIG={bo:[sw*2,0],ro:[0,0],bs:[1,1]};drawManFrame(Math.sin(time*3)>.5?'BK_B':sw>0?'POSE_A':'POSE_B')}
-    else drawManFrame(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C');JIG=null}
-  else{drawManFrame('SAD');                                  // sad pose, tears running down
-    for(const sd of[-1,1])for(let k=0;k<2;k++){const f=(time*.9+k*.5+(sd>0?.17:0))%1;ctx.globalAlpha=1-f;ctx.fillStyle='#7fd4ff';ctx.beginPath();ctx.arc(sd*9.4,-18+f*30,2.3,0,7);ctx.fill();ctx.globalAlpha=1}}
+  drawResultActor(win,Math.max(0,time-resultStart),level+(score|0));
   ctx.restore();
   txt(win?'EVICTION COMPLETE!':'THE LANDLORDS LIVE...',tx,y0,P?32:38,win?'#7dff5a':'#ff6a6a','center');
   if(win){const st=men>=2?3:men>=1?2:1;for(let i=0;i<3;i++)star(P?tx-70+i*70:W/2-10+i*70,y0+70,28,i<st)}
@@ -4278,14 +4324,15 @@ function drawTitle(){
 // =====================================================================
 function pt(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
 function retry(){load(level,CL&&CL.custom?CL:undefined)}
-function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else if(level+1===CH1)startCutEnd(1);else if(level+1===CH2)startCutEnd(2);else{state='ending';endScroll=0;hits=[]}}
+function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else if(level+1===CH1)startCutEnd(1);else if(level+1===CH2)startCutEnd(2);else{state='ending';resultStart=time;endScroll=0;hits=[]}}
 let endScroll=0;
 const CREDITS=['MANDEX','THE LANDLORD SMASHER','','Every landlord has been evicted.','The neighbourhood is free.','Rent is cancelled.','','STARRING','The Man  -  as himself','His Towel  -  as the cape','The Belly  -  stunts and special effects','','LANDLORDS HARMED','all of them','','Thank you for playing!'];
 function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);endScroll+=frameDt*26;const PT=W<700,cx=PT?W/2:W/2+190;
   ctx.save();ctx.beginPath();ctx.rect(0,PT?H*.5:60,W,PT?H*.5-80:H-150);ctx.clip();CREDITS.forEach((l,i)=>{const y=H-80+i*34-endScroll%(CREDITS.length*34+H-140);txt(l,cx,y,i<2?(PT?24:30):(l===l.toUpperCase()?20:17),i<2?'#ffd23f':(l===l.toUpperCase()?'#ff7eb0':'#fff'),'center')});ctx.restore();
-  ctx.save();ctx.translate(PT?W/2:W/2-260,PT?H*.3:H/2+40);ctx.scale(1.5,1.5);const ph=time*10,sw=Math.sin(ph),seg=Math.floor(time/4)%3;ctx.translate(0,-Math.abs(Math.sin(time*5))*8);
-  JIG={bo:[sw*4,Math.cos(ph)*1.5],ro:[sw*5,0],bs:[1,1]};drawManFrame(seg===0?(sw>0?'DANCE_A':'DANCE_B'):seg===1?(sw>.33?'BACK_R':sw<-.33?'BACK_L':'BACK_C'):(Math.sin(time*3)>.4?'BK_B':sw>0?'POSE_A':'POSE_B'));JIG=null;ctx.restore();
-  if(rnd()<.25)P({k:rnd()<.5?12:13,x:rnd()*W,y:H+10,vx:(rnd()-.5)*30,vy:-60-rnd()*60,l:3,l0:3,s:5+rnd()*5,ph:rnd()*6});if(rnd()<.3)P({k:13,x:rnd()*W,y:rnd()*H,vx:0,vy:0,l:.7,l0:1,s:5+rnd()*6,ph:0});
+  ctx.save();ctx.translate(PT?W/2:W/2-260,PT?H*.3:H/2+40);ctx.scale(1.5,1.5);
+  drawResultActor(true,Math.max(0,time-resultStart),Math.floor(Math.max(0,time-resultStart)/12));ctx.restore();
+  // Decorative stars stay within the existing FX cap and advance in simulation time.
+  if(perf.fx>90&&rnd()<.15)P({k:13,x:rnd()*W,y:rnd()*H,vx:0,vy:-8,l:.7,l0:1,s:5+rnd()*5,ph:0});
   drawParts();btn(W-150,H-56,130,40,'MENU',goMenu,{size:16,on:true})}
 function backFromPlay(){if(testing){openEditor(true);return}goSelect()}
 cv.addEventListener('pointerdown',e=>{

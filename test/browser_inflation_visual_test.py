@@ -39,7 +39,19 @@ with sync_playwright() as p:
           }
         }
       }
-      return {frames:counts.length,min:Math.min(...counts),max:Math.max(...counts)};
+      let resultFrames=0;
+      for(const tier of [0,3]){
+        perfTier=tier;perfApply();
+        for(const win of [true,false])for(let variant=0;variant<3;variant++)for(const t of [0,.22,.6,1.1,1.9,2.5,3.1]){
+          ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);
+          ctx.save();ctx.translate(480,250);drawResultActor(win,t,variant);ctx.restore();
+          const pixels=ctx.getImageData(380,140,200,220).data;let n=0;
+          for(let i=3;i<pixels.length;i+=4)if(pixels[i]>127)n++;
+          if(n<100||n>30000)throw Error('bad result silhouette '+win+' '+variant+' '+t);
+          resultFrames++;
+        }
+      }
+      return {frames:counts.length,resultFrames,min:Math.min(...counts),max:Math.max(...counts)};
     }""")
     assert not errors,errors
     print("INFLATION_CANVAS_PASS",result)
