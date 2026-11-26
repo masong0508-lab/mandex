@@ -2323,7 +2323,8 @@ static void pad(MxWorld *w, int x, int y, int ww){
   MxPad *p = &w->pads[w->npads++]; p->x = (uint8_t)x; p->y = (uint8_t)y; p->w = (uint8_t)ww;
 }
 
-static const char *NAMES[MX_NUM_LEVELS] = {
+#include "trial_levels.h"
+static const char *NAMES[MX_TRIAL_START] = {
   "Suburban Eviction", "Duplex Dilemma", "Tower Block Tussle", "Castle Foreclosure", "Corporate Takeover",
   "Bouncy Castle", "Sandcastle Shakedown",
   "Glass House Party", "Steel Mill Standoff", "Twin Peaks", "Domino Drive", "Rubber Ducky Resort", "TNT Pyramid",
@@ -2334,8 +2335,12 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   /* chapter 3: the Wolfman */
   "Full Moon Rising", "Howling Heights", "Flea Market", "Fang Street", "Bad Moon Brick", "Wolf Pack Lofts", "Moonlit Mortgage", "Claw Foreclosure", "Growl Gardens", "Night Shift",
   "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord"};
-static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
-const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
+static const int MEN[MX_TRIAL_START] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
+const char *mx_level_name(int l){
+  if(l<0 || l>=MX_NUM_LEVELS)return "Unknown Level";
+  return l<MX_TRIAL_START?NAMES[l]:MX_TRIALS[l-MX_TRIAL_START].name;
+}
+static int level_men(int l){return l<MX_TRIAL_START?MEN[l]:MX_TRIALS[l-MX_TRIAL_START].men;}
 /* Compact ROM-only guidance; each hint fits a 256-pixel DS banner. */
 const char *mx_level_tactic(int l){
   static const char *const early[MX_CH3_START]={
@@ -2389,6 +2394,7 @@ const char *mx_level_tactic(int l){
     "NIGHT ALLEY: DUMP THE SANDBAGS", "NIGHT ALLEY: CRACK THE GLASS ROOF"
   };
   if(l<0 || l>=MX_NUM_LEVELS)return "EVICT EVERY LANDLORD";
+  if(l>=MX_TRIAL_START)return MX_TRIALS[l-MX_TRIAL_START].tip;
   if(l<MX_CH3_START)return early[l];
   int i=l-MX_CH3_START;
   if(i==0)return "WOLFMAN: LANDLORDS HAVE HEALTH BARS";
@@ -2499,7 +2505,24 @@ static void build_ch3(MxWorld *w, int i){
   }
 }
 
+/* Decode only the chosen trial into the existing world, no allocation or
+ * raw maps resident in the console's working memory. */
+static void build_trial(MxWorld *w,int index){
+  const MxTrialLevel *t=&MX_TRIALS[index];
+  const uint8_t *p=MX_TRIAL_DATA+t->rect_off;
+  for(int i=0;i<t->rect_n;i++,p+=5)rect_fill(w,p[0],p[1],p[2],p[3],p[4]);
+  p=MX_TRIAL_DATA+t->room_off;
+  for(int i=0;i<t->room_n;i++,p+=5)room(w,p[0],p[1],p[2],p[3],p[4]);
+  p=MX_TRIAL_DATA+t->target_off;
+  for(int i=0;i<t->target_n;i++,p+=4)tgtr(w,p[0],p[1],p[2],p[3]);
+  p=MX_TRIAL_DATA+t->pad_off;
+  for(int i=0;i<t->pad_n;i++,p+=3)pad(w,p[0],p[1],p[2]);
+  p=MX_TRIAL_DATA+t->tube_off;
+  for(int i=0;i<t->tube_n;i++,p+=4)tube(w,RI(p[0]),RI(p[1]),RI(p[2]),RI(p[3]));
+  w->walk=t->walk;
+}
 static void build(MxWorld *w, int l){
+  if(l>=MX_TRIAL_START){build_trial(w,l-MX_TRIAL_START);return;}
   if(l >= MX_CH3_START){ build_ch3(w, l - MX_CH3_START); return; }
   const int W_ = MX_WOOD, B = MX_BRICK, S = MX_STONE, ST = MX_STEEL, RU = MX_RUBBER;
   switch(l){
@@ -2769,10 +2792,10 @@ static void load_level(MxWorld *w, int level, int district){
   w->dz_lo = MX_ROWS * MX_COLS; w->dz_hi = -1;
   w->bh_lo = 0; w->bh_hi = MX_ROWS + 3;               /* bhead starts zeroed, not -1: the first step clears all of it */
   w->valve_ok = keep_valve; w->collapse = keep_collapse;
-  level %= MX_NUM_LEVELS;
+  level = level < 0 ? 0 : level % MX_NUM_LEVELS;
   w->substeps = first ? SUBSTEPS : keep_sub;
   w->wob_enabled = first ? 1 : keep_wob;
-  w->level = level; w->district = district; w->state = MX_PLAY; w->men = MEN[level]; w->banner = R(2.4);
+  w->level = level; w->district = district; w->state = MX_PLAY; w->men = level_men(level); w->banner = R(2.4);
   build(w, level);
   for(int r = 0; r < w->nrooms; r++){ const MxRoom *rm = &w->rooms[r]; for(int y = rm->y; y < rm->y + rm->h; y++) for(int x = rm->x; x < rm->x + rm->w; x++) w->paper[IDX(x, y)] = (uint8_t)(rm->pal + 1); }
   unclip_targets(w);
