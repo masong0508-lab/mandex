@@ -15,6 +15,11 @@ with sync_playwright() as p:
       load(0); const counts=[];
       for(const tier of [0,3]){
         perfTier=tier;perfApply();
+        ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);
+        drawValveSupport(36,420,480);
+        const support=ctx.getImageData(12,375,50,105).data;
+        let solid=0;for(let i=3;i<support.length;i+=4)if(support[i]>127)solid++;
+        if(solid<50)throw Error('station support missing');
         for(const mode of ['seated','aim','fly','stuck','drink']){
           for(const f of [0,.25,.6,.95,2.2,20]){
             for(const ph of mode==='drink'?[1,2,3,4,5]:[0]){
