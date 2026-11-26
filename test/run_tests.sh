@@ -85,6 +85,17 @@ echo "--- Browser manual camera: pointer ownership, pinch, pan, zoom and cancell
 if command -v node >/dev/null 2>&1;then node browser_manual_camera_test.js;fi
 echo "--- Browser content expansion: six starter structures, landing poses and zoom-aware particle rendering ---"
 if command -v node >/dev/null 2>&1;then node browser_camera_expansion_test.js;fi
+echo "--- Browser motion animation: dive, sling, mirrored ragdoll, attacks and impact ---"
+if command -v node >/dev/null 2>&1;then node browser_animation_motion_test.js;fi
+echo "--- Browser world animation: live pads, tubes, moving TNT, and shockwave easing ---"
+if command -v node >/dev/null 2>&1;then node browser_world_animation_test.js;fi
+echo "--- Native dive motion: float and fixed angular acceleration ---"
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core native_dive_pose_test.c -lm -o "native_dive_pose_$mode"
+  "./native_dive_pose_$mode"
+done
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
 if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
 echo "--- Browser custom levels: safe 360-column finale transition ---"
