@@ -88,7 +88,7 @@ const env={
   OUTFITS:Array.from({length:16},(_,i)=>({id:'look'+i,n:'Outfit '+i})),
   outfitCur:{n:'Classic Red'},PD:{stars:{},ach:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
   LEVELS:Array.from({length:60},(_,i)=>({name:'District Building '+i})),
-  CH1:20,CH2:40,selTab:0,CONTRACT_ITEMS:Array.from({length:72},(_,i)=>({label:'Contract '+i,stars:0,locked:false,fn:()=>{}})),
+  CH1:20,CH2:40,selTab:-1,CONTRACTS:Array.from({length:72},(_,i)=>({id:i,name:'Contract '+i})),CONTRACT_FAMILIES:Array.from({length:18},(_,i)=>({n:'District '+i})),CONTRACT_MODES:['Open','Bank','Chain','Guard'].map(n=>({n})),contractStars:()=>0,startContract:()=>{},
   GUIDES:['OFF','SHORT','FULL'],SHAKES:[['OFF',0],['LOW',.5],['FULL',1]],
   OPT:()=>({}),optVol:()=>.8,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
   btn:(x,y,w,h,label,fn,o)=>records.push({x,y,w,h,label,fn}),
@@ -107,7 +107,7 @@ const methods=new Function('env','with(env){'+mobile+
 let total=0;
 function inspect(kind){
   records.length=0;env.state=kind;methods[kind]();
-  assert(records.length>=(kind==='ach'||kind==='outfit'?1:4),kind+' should provide touch controls');
+  assert(records.length>=(kind==='ach'||kind==='outfit'||kind==='select'?1:4),kind+' should provide touch controls');
   for(const r of records){
     assert(r.w>=40&&r.h>=35,kind+' touch button too small: '+r.label);
     assert(r.x>=0&&r.y>=0&&r.x+r.w<=env.W+1&&r.y+r.h<=env.H+1,
@@ -118,7 +118,7 @@ function inspect(kind){
 for(const height of [760,960,1170]){
   env.H=height;env.W=540;
   inspect('menu');
-  for(const tab of [0,1,2,3,4]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
+  for(const tab of [-1,-2,0,1,2,3,4]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
   inspect('ach');inspect('outfit');
   const before=settingsOpened;methods.options();assert.strictEqual(settingsOpened,before+1,'portrait settings opens the responsive DOM dialog');
 }

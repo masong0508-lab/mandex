@@ -2,8 +2,8 @@
 const fs=require('fs'),path=require('path'),assert=require('assert');
 const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 function slice(a,b){const i=html.indexOf(a),j=html.indexOf(b,i+a.length);assert(i>=0&&j>i,a);return html.slice(i,j);}
-const source=slice('function walkTurnAngle(', 'function walkPunchFxStage(')+slice('function legIK(', '// the baked hand anchor')+slice('function ragXf(', 'function ragHit(')+slice('const rubbleMotion=', 'function drawRubbleCached(');
-const test=new Function('assert', 'const V=8,time=0,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));let chunks=[];'+source+`
+const source=slice('function walkTurnAngle(', 'function walkPunchFxStage(')+slice('function legIK(', '// the baked hand anchor')+slice('function ragXf(', 'function ragHit(')+slice('const actorMotion=', 'const rubbleCache=')+slice('const rubbleMotion=', 'function drawRubbleCached(');
+const test=new Function('assert', 'const V=8,time=0,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));let chunks=[],man;'+source+`
 const near=(a,b)=>assert(Math.abs(a-b)<1e-7);
 let planted=0;
 for(let i=0;i<96;i++){
@@ -17,5 +17,6 @@ for(const face of [-1,1]){
  m.mode='fly';m.ang=.4;m.x=250;m.y=180;const X=ragXf(m);near(X.sx,.64*face);const w=rW(X,m,-12,8),r=rL(X,m,w[0],w[1]);near(r[0],-12);near(r[1],8);
 }
 let ch={x:20,y:30,ang:Math.PI-.1};chunks=[ch];snapshotRubble();ch.x=24;ch.y=34;ch.ang=-Math.PI+.1;rubbleAlpha=.5;let r=rubbleRenderPose(ch);near(r.x,22);near(r.y,32);near(r.ang,Math.PI);near(ch.ang,-Math.PI+.1);
+man={mode:'fly',x:10,y:20};snapshotActor();man.x=30;man.y=28;let shift=actorRenderOffset(man,.5);near(shift.x,-10);near(shift.y,-4);near(man.x,30);man.x=100;near(actorRenderOffset(man,.5).x,0);man.mode='walk';near(actorRenderOffset(man,0).x,0);snapshotActor();man.x=103;man.pT=.2;near(actorRenderOffset(man,0).x,0);
 return planted;`)(assert);
 console.log('BROWSER_ANIMATION_CONTINUITY_PASS planted='+test+' mirrored_flight=2 rubble_wrap=1');

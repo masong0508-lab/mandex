@@ -55,8 +55,12 @@ check(CHUNK_HASH.size===0&&CHUNK_BUCKET_POOL.every(b=>b.length===0),
 function large(count,cols){
  COLS=cols;grid=new Uint8Array(COLS*ROWS);
  const points=[];for(let i=0;i<count;i++)points.push([(i%COLS)*V+4,Math.floor(i/COLS)*V+4]);
- chunks=[body(5,points,true)];stepChunks(0);
+ chunks=[body(5,points,true),body(6,[[4,4]],true)];stepChunks(0);
 }
+// The single-body fast path must not allocate self-only hash buckets.
+const poolBefore=CHUNK_BUCKET_POOL.length;
+chunks=[body(5,Array.from({length:2105},(_,i)=>[(i%120)*V+4,Math.floor(i/120)*V+4]),true)];stepChunks(0);
+check(CHUNK_BUCKET_POOL.length===poolBefore,'single body does not allocate buckets');
 large(2105,120);
 check(CHUNK_BUCKET_POOL.length===CHUNK_BUCKET_CACHE_MAX,
       'cache stays capped under dense rubble');
