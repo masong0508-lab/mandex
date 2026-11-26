@@ -39,6 +39,19 @@ with sync_playwright() as p:
           }
         }
       }
+      let wardrobeFrames=0;
+      for(const tier of [0,3]){
+        perfTier=tier;perfApply();
+        for(const mode of ['aim','fly','walk','stuck','seated']){
+          load(20);man.mode=mode==='seated'?'aim':mode;man.x=480;man.y=270;
+          man.seated=mode==='seated';man.vlv=man.seated;man.chug=null;man.inf=.5;man.bel=0;man.infVisual=inflationTarget(.5);man.pop=0;man.ang=.1;man.face=1;man.t=.2;man.a=1;man.vy=0;man.gr=true;man.gait=0;man.turn=0;
+          function pixels(used){valveUsedThisLevel=used;ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);renderMan();if(OUTFIT_RUMPLED)throw Error('garment scope leaked');return ctx.getImageData(380,140,200,240).data}
+          const a=pixels(false),b=pixels(true);let diff=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])diff++;
+          if(diff<4)throw Error('missing garment variant: '+mode+' '+tier);
+          wardrobeFrames++;
+          load(20);if(valveUsedThisLevel)throw Error('level wardrobe not reset');
+        }
+      }
       let resultFrames=0;
       for(const tier of [0,3]){
         perfTier=tier;perfApply();
@@ -51,7 +64,7 @@ with sync_playwright() as p:
           resultFrames++;
         }
       }
-      return {frames:counts.length,resultFrames,min:Math.min(...counts),max:Math.max(...counts)};
+      return {frames:counts.length,resultFrames,wardrobeFrames,min:Math.min(...counts),max:Math.max(...counts)};
     }""")
     assert not errors,errors
     print("INFLATION_CANVAS_PASS",result)

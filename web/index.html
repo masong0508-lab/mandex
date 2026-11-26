@@ -651,8 +651,14 @@ function drawTubes(){
 function bodyClear(cx,row){for(let y=row-5;y<=row-1;y++)for(let x=cx-2;x<=cx+2;x++)if(inb(x,y)&&grid[idx(x,y)])return false;return row>=ROWS-1||(inb(cx,row+1)&&!!grid[idx(cx,row+1)])}
 function unclipTargets(){for(const t of targets){const row=Math.floor(t.y/V+.875+1e-9),cx=Math.floor(t.x/V);if(bodyClear(cx,row))continue;
   for(let d=1;d<=3;d++){let pick=0;if(bodyClear(cx-d,row))pick=-d;else if(bodyClear(cx+d,row))pick=d;if(pick){t.x+=pick*V;t.hx=t.x;break}}}}
+let valveUsedThisLevel=false,OUTFIT_RUMPLED=false;
+function resetLevelWardrobe(){valveUsedThisLevel=false;OUTFIT_RUMPLED=false}
+function noteValveUse(m){
+  if(!m||m.mode!=='aim'||!(m.seated||m.vlv)||valveUsedThisLevel)return false;
+  valveUsedThisLevel=true;return true;
+}
 function load(l,custom){
-  CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
+  resetLevelWardrobe();CAM.reset=true;level=custom?-1:l;CL=custom||LEVELS[l];setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
   /* The air valve and every tool begin unequipped for each new level;
      a previously saved AIR choice cannot obstruct the very next shot. */
@@ -1155,7 +1161,8 @@ function explodeMan(){const m=man;ST().pops++;pdTouch();men--;
   for(let i=0;i<26;i++)chip(m.x,m.y,['#e0243a','#ffffff','#f2c7a1','#ff9ec8'][i%4],(rnd()-.5)*520,-rnd()*420);
   for(let i=0;i<16;i++)P({k:6,x:m.x,y:m.y,vx:(rnd()-.5)*300,vy:(rnd()-.5)*300,l:.8,l0:.8,s:8+rnd()*8,c:'#cfe9ff'});
   shake=16;flash=.55;SFX.boom();popText(Math.max(110,m.x),m.y-56,'POP!!','#ff5a5a',50);popText(Math.max(110,m.x),m.y-18,'-1 MAN','#fff',24);m.mode='done'}
-function airTick(m,dt){   // backed onto the valve: hold to fill, hold too long and he goes pop
+function airTick(m,dt){   // air station: hold to fill; existing pressure limit is unchanged
+  noteValveUse(m);
   {const add=dt/3.6;if(OPT().noBurst&&m.inf>=1)m.bel=Math.max(0,Math.min(stomCap()-m.inf,(m.bel||0)+add));else m.inf=Math.min(1,m.inf+add)}m.airT+=dt;
   if(m.airT>.07){m.airT=0;SFX.hiss();P({k:6,x:VX+(rnd()-.5)*10,y:VY+16,vx:(rnd()-.5)*70,vy:-30-rnd()*50,l:.5,l0:.5,s:3+rnd()*3,c:'#cfe9ff'});
     if(stom(m)>.5){SFX.creak(Math.min(1,stom(m)))}
@@ -1187,12 +1194,20 @@ function drawValveSupport(x,y,ground){
   ctx.fillStyle='#475a70';ctx.fillRect(g.footX-4,g.footY,20,4);ctx.fillStyle='#a9b9c8';ctx.fillRect(g.footX-4,g.footY,20,1.5);
   ctx.restore();
 }
+function drawValveHousing(x,y,active){
+  ctx.save();ctx.lineJoin='round';ctx.lineWidth=1.5;ctx.strokeStyle='#202936';
+  // Sealed housing with a flat padded top and side-facing indicator.
+  ctx.fillStyle='#53697f';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x-10,y-2,20,16,4);else ctx.rect(x-10,y-2,20,16);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#273746';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x-13,y-3,26,5,2);else ctx.rect(x-13,y-3,26,5);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#a7bccd';ctx.fillRect(x-8,y+3,3,8);
+  ctx.fillStyle=active?'#8ee3a0':'#768494';ctx.fillRect(x+4,y+5,4,4);ctx.restore();
+}
 function drawValve(){
   if(!toolOn('valve'))return;
   const m=man,f=m.mode==='aim'?Math.min(1,stom(m)):0,t=time,open=valveOpen();
   ctx.save();ctx.lineCap='round';if(!open)ctx.globalAlpha=.38;
   drawValveSupport(VX,VY,GY);
-  // --- sprite: bolted base plate, shaded steel pipe with flanges, brass nozzle with hose clamp, ticked pressure gauge, hand wheel ---
+  // --- sprite: bolted base, enclosed air housing, pressure gauge, hand wheel ---
   const rr=(x,y,w,h,r,fill)=>{ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ctx.rect(x,y,w,h);ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.stroke()};
   const topY=VY+14,pipe=ctx.createLinearGradient(VX-6,0,VX+6,0);pipe.addColorStop(0,'#4a526a');pipe.addColorStop(.35,'#b4bdd4');pipe.addColorStop(1,'#444b61');
   rr(VX-20,GY-9,40,9,2,'#3d4452');ctx.fillStyle='#6b7590';ctx.fillRect(VX-18,GY-8,36,2);                  // base plate + top highlight
@@ -1200,9 +1215,7 @@ function drawValve(){
   ctx.fillStyle=pipe;ctx.fillRect(VX-6,topY,12,GY-9-topY);ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.strokeRect(VX-6,topY,12,GY-9-topY);   // pipe
   rr(VX-10,GY-22,20,7,2,'#59627a');rr(VX-10,topY+10,20,7,2,'#59627a');                                       // flanges
   ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(VX-9,GY-21,18,1.5);ctx.fillRect(VX-9,topY+11,18,1.5);
-  const br=ctx.createLinearGradient(VX-8,0,VX+8,0);br.addColorStop(0,'#c9731a');br.addColorStop(.4,'#ffd27a');br.addColorStop(1,'#a85a10');
-  ctx.beginPath();ctx.moveTo(VX-9,topY);ctx.lineTo(VX+9,topY);ctx.lineTo(VX+4,VY+1);ctx.lineTo(VX-4,VY+1);ctx.closePath();ctx.fillStyle=br;ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.stroke();   // brass nozzle
-  rr(VX-5.5,VY-2,11,4,1.5,'#8a94ad');ctx.fillStyle='#10131c';ctx.beginPath();ctx.ellipse(VX,VY-1,2.6,1,0,0,7);ctx.fill();   // tip + bore
+  drawValveHousing(VX,VY,open&&m.mode==='aim'&&(m.seated||m.vlv));
   const gx=VX-22,gy=VY+42,gr=12;                                                                               // pressure gauge
   ctx.fillStyle='#59627a';ctx.fillRect(gx+gr-2,gy-2,10,4);ctx.strokeRect(gx+gr-2,gy-2,10,4);                    // stub to the pipe
   ctx.fillStyle='#c9ced9';ctx.beginPath();ctx.arc(gx,gy,gr,0,7);ctx.fill();ctx.stroke();                         // bezel
@@ -1219,7 +1232,7 @@ function drawValve(){
   ctx.strokeStyle='#ff8a96';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,9,3.6,5);ctx.stroke();
   ctx.fillStyle='#c9ced9';ctx.beginPath();ctx.arc(0,0,3,0,7);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();
   ctx.fillStyle='#59627a';ctx.fillRect(VX+5,VY+40,8,4);ctx.strokeRect(VX+5,VY+40,8,4);   // stub to the wheel
-  if(open&&f>.02){ctx.globalAlpha=Math.min(.7,f);ctx.fillStyle='#cfe9ff';ctx.beginPath();ctx.ellipse(VX,VY-6-(t*40%8),3+f*3,2+f*2,0,0,7);ctx.fill();ctx.globalAlpha=1}   // puff at the tip
+  if(open&&f>.02){ctx.globalAlpha=Math.min(.7,f);ctx.fillStyle='#cfe9ff';ctx.beginPath();ctx.ellipse(VX+14+(t*40%8),VY+11,3+f*3,2+f*2,0,0,7);ctx.fill();ctx.globalAlpha=1}   // side vent
   if(open&&dragging&&m.mode==='aim'&&!m.seated){const[pwx,pwy]=toWorld(mouseX,mouseY),near=Math.hypot(pwx-VX,pwy-VY)<VPULL;ctx.globalAlpha=(near?.9:.45)+.1*Math.sin(t*8);ctx.strokeStyle='#cfe9ff';ctx.lineWidth=2.5;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(VX,VY-2,VGRAB*.5+(near?3*Math.sin(t*10):0),0,7);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1}   // ghost seat while a pull is in hand
   if(!open){ctx.globalAlpha=.8;txt('LOCKED',VX,VY-12,11,'#aab','center');txt('beat 3 levels',VX,VY-26,10,'#889','center');ctx.globalAlpha=.38}
   else if(m.mode==='aim'&&!m.seated&&!dragging&&stom(m)<.001){ctx.globalAlpha=.6+.4*Math.sin(t*4);txt('TAP: AIR VALVE',VX,VY-12,11,'#fff','center');ctx.globalAlpha=1}
@@ -2431,6 +2444,20 @@ function sideHair(cx,cy,r,o){o=o||{};   // one recognizable swept crown from the
   ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(cx+r*.12,cy-r*.8,r*.3,r*.13,-.15,0,6.3);ctx.fill();
   ctx.strokeStyle=HAIR;ctx.lineWidth=1.15;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(cx-r*.74,cy-r*(.5+k*.04));ctx.quadraticCurveTo(cx-r*.1+k*r*.07,cy-r*(1.12-k*.03),cx+r*.62,cy-r*(.62-k*.02));ctx.stroke()}
   ctx.restore()}
+function wardrobeBandOffset(x,width){
+  if(!OUTFIT_RUMPLED||THONG||!(width>0))return 0;
+  const u=Math.max(-1,Math.min(1,x/width));
+  return .9*Math.sin(u*5.2)*(.35+.65*Math.abs(u));
+}
+function drawWardrobeFolds(x,y,sx,sy){
+  if(!OUTFIT_RUMPLED||THONG)return;
+  ctx.save();ctx.translate(x,y);ctx.scale(sx,sy);ctx.lineCap='round';ctx.lineWidth=.95;
+  ctx.strokeStyle=BRD;ctx.beginPath();
+  ctx.moveTo(-4,-2);ctx.quadraticCurveTo(-1,0,3,3);
+  ctx.moveTo(-3,2);ctx.quadraticCurveTo(0,3,4,5);ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=.8;
+  ctx.beginPath();ctx.moveTo(-3,-3);ctx.quadraticCurveTo(0,-1,3,1);ctx.stroke();ctx.restore();
+}
 function drawFront(pose,fk,t,o){
   o=jigMerge(o);
   const sw=Math.sin(t*4);
@@ -2456,7 +2483,8 @@ function drawFront(pose,fk,t,o){
    blob([{p:bp,fill:BR,bb:[-27,10,27,37]}],THONG?{ow:1.8}:{ow:1.8,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});}
   ctx.fillStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.ellipse(-15,23,2.8,6,.3,0,6.3);ctx.ellipse(15,23,2.8,6,-.3,0,6.3);ctx.fill();
   if(!THONG&&!WORK){ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-5,29);ctx.lineTo(-5,21);ctx.lineTo(0,26);ctx.lineTo(5,21);ctx.lineTo(5,29);ctx.stroke();}   // no logo on the thong
-  if(WORK)workBeltF();else{const yc=x=>13+4.6*(1-(x/21)*(x/21));blob([ribbonPoly(-21,21,yc,3.1,24,'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(-21,21,yc,3.1,5.4,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
+  if(WORK)workBeltF();else{const yc=x=>13+4.6*(1-(x/21)*(x/21))+wardrobeBandOffset(x,21);blob([ribbonPoly(-21,21,yc,3.1,24,'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});ribbonStripes(-21,21,yc,3.1,5.4,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
+  drawWardrobeFolds(-17,21,1,1);drawWardrobeFolds(17,21,-1,1);
   if(SQ>.04)ctx.restore();
   if(THONG){gluteCreases();thongFront()}
   if(o&&o.ro)ctx.restore();
@@ -2517,6 +2545,7 @@ function drawSeatSide(f,t,a){
    ctx.restore()}
   // boxers: the rear on the nozzle, waistband striped, the belly hangs over it
   blob([pEll(-4,-8,14,10,BR),pEll(6,-4,12,7,BR)].concat(f>.05?[pEll(C[0]+1,C[1]+C[3]*.2,C[2]*.92,C[3]*1.05,BR)]:[]),{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
+  drawWardrobeFolds(4,-8,.85,.7);
   if(f>.05)bandAlong([B[0]-B[2]*.4,B[1]+B[3]*.78],[B[0]+B[2]*.1,B[1]+B[3]*.98],[B[0]+B[2]*.8,B[1]+B[3]*.5],2.3,2);   // waistband rides the stretched belly
   ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-10,-11,3.2,2.4,-.5,0,6.3);ctx.fill();
   ctx.strokeStyle='#ffd23f';ctx.lineWidth=1.6;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-6,-3);ctx.lineTo(-6,-9);ctx.lineTo(-2,-5);ctx.lineTo(2,-9);ctx.lineTo(2,-3);ctx.stroke();
@@ -2571,6 +2600,7 @@ function drawSide(t,fk){
   T(ro,()=>{const BG=INF>.02?flyBellyGeo(INF):null;blob([pEll(-13,6,13.5,11.5,BR),pEll(3,10,14,6.5,BR)].concat(BG?[pEll(BG[0],BG[1]+BG[3]*.5,BG[2]*.82,BG[3]*.55,BR)]:[]),{ow:1.9,shc:'rgba(100,8,30,.38)',hlc:'rgba(255,190,200,.32)'});
     ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(-16,2,3.6,2.6,-.5,0,6.3);ctx.fill();
     ctx.strokeStyle='rgba(110,10,32,.5)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(-6,9,8,2.1,3.7);ctx.stroke();
+    drawWardrobeFolds(-14,5,.82,.75);
     bandAlong([-22,-3],BG?[-2+INF*4,2+INF*6]:[-2,1],BG?[BG[0]+BG[2]*.6,BG[1]+BG[3]*.62]:[15,13],2.7,2)});                                                                                         // the waistband: a soft striped strip that follows the body
   blob([pTap(15,-8,8.4,28,-15,6.6)],{ow:1.8});                                                                       // neck + shoulder line: the head sits ON a body
   const hx=55.5-22*tuck,hy=17.5+fl*2+3*tuck;
@@ -2931,7 +2961,8 @@ function drawBack(pose,t,o){o=jigMerge(o)||{};const bo=o.bo||[0,0],ro=o.ro||[0,0
     ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*1.4,20);ctx.quadraticCurveTo(bx+q*6,20.4,bx+q*8.6,26.5);ctx.stroke()}
   }
   if(WORK)workVestB(sh);
-  {const yc=x=>14+1.5*(1-Math.pow((x-bx)/24.5,2)),xa=bx-24.5,xb=bx+24.5;blob([ribbonPoly(xa,xb,yc,3.9,26,WORK?'#6b4423':'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});if(!WORK)ribbonStripes(xa,xb,yc,3.9,6.2,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
+  {const yc=x=>14+1.5*(1-Math.pow((x-bx)/24.5,2))+wardrobeBandOffset(x-bx,24.5),xa=bx-24.5,xb=bx+24.5;blob([ribbonPoly(xa,xb,yc,3.9,26,WORK?'#6b4423':'#fff8f2',.3)],{ow:1.4,shc:'rgba(120,100,140,.38)',hl:0});if(!WORK)ribbonStripes(xa,xb,yc,3.9,6.2,'rgba(224,36,58,.85)')}   // the waistband: a curved, rippled strip of cloth
+  drawWardrobeFolds(bx-20,19,1,.85);drawWardrobeFolds(bx+20,19,-1,.85);
   if(THONG)thongBack(bx,cy0,cl,cr);
   if(!THONG&&!WORK){ctx.fillStyle='#f2f2f2';ctx.strokeStyle='#aaa';ctx.lineWidth=.8;ctx.fillRect(bx-4,19,8,5);ctx.strokeRect(bx-4,19,8,5);ctx.fillStyle=BR;ctx.fillRect(bx-2,21,4,1.3)}
   if(puff){ctx.strokeStyle=BRD;ctx.lineWidth=1.4;for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(bx+q*21,22);ctx.quadraticCurveTo(bx+q*25,28,bx+q*22,36);ctx.stroke()}
@@ -3214,6 +3245,7 @@ function drawSpin(th,o){
     }
     dec([r],q*5.2,23.5,()=>{ctx.strokeStyle='rgba(110,10,32,.55)';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-q*3.8,-3.5);ctx.quadraticCurveTo(q*.8,-3.1,q*3.4,3);ctx.stroke()},{back:1});
     dec([r],q*7,19,()=>{ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();ctx.ellipse(0,0,2.6,5.4,q*.4,0,6.3);ctx.fill()});
+    if(OUTFIT_RUMPLED){dec([r],q*17,19,()=>drawWardrobeFolds(0,0,q<0?1:-1,.7));dec([r],q*17,19,()=>drawWardrobeFolds(0,0,q<0?1:-1,.7),{back:1})}
   };
   if(Math.abs(S2)<.45)add(hipsR.d,()=>{blob([pe(hipsR),pe(chk[0]),pe(chk[1])],RED);logo();deco(chk[0],-1);deco(chk[1],1)});        // front or back: one soft mass of cloth
   else{add(hipsR.d,()=>{blob([pe(hipsR)],RED);logo()});chk.forEach((r,n)=>add(r.d,()=>{blob([pe(r)],RED);deco(r,n?1:-1)}))}     // from the side the near cheek keeps its outline over the far one
@@ -3221,7 +3253,7 @@ function drawSpin(th,o){
   add(bandR.d,()=>{                                                                                                         // the waistband: the visible half of a ring, a rippled ribbon that is lower where it comes toward us
     const pts=[];for(let i=0;i<48;i++){const f=i/48*6.2832,sn=Math.sin(f),cs=Math.cos(f),X=bandR.a*sn*C2+(bandR.z+bandR.c*cs)*S2,Z=-bandR.a*sn*S2+(bandR.z+bandR.c*cs)*C2;if(Z>-1.5)pts.push([X,Z])}
     pts.sort((u,v)=>u[0]-v[0]);if(pts.length>3){const hw=THONG?.9:2.7,T=[],B=[];
-      pts.forEach(([X,Z],k)=>{const u=k/(pts.length-1),h=hw*(1-.2*Math.pow(2*u-1,4)),y=bandR.py+2.6*Z/bandR.c+.35*Math.sin(X*.85+1);T.push([bandR.ox+X,y-h]);B.push([bandR.ox+X,y+h*.9])});
+      pts.forEach(([X,Z],k)=>{const u=k/(pts.length-1),h=hw*(1-.2*Math.pow(2*u-1,4)),y=bandR.py+2.6*Z/bandR.c+.35*Math.sin(X*.85+1)+wardrobeBandOffset(X,bandR.rx);T.push([bandR.ox+X,y-h]);B.push([bandR.ox+X,y+h*.9])});
       blob([pPoly(T.concat(B.reverse()),THONG?TG:'#fff8f2')],{ow:1.3,shc:'rgba(120,100,140,.38)',hl:0});
       ctx.save();ctx.strokeStyle='rgba(224,36,58,.85)';ctx.lineWidth=1.25;ctx.lineCap='round';
       for(let k=1;!THONG&&k<T.length-1;k+=2){const a=T[k],b=B[B.length-1-k];ctx.beginPath();ctx.moveTo(a[0],a[1]+.5);ctx.quadraticCurveTo((a[0]+b[0])/2+.4,(a[1]+b[1])/2,b[0],b[1]-.4);ctx.stroke()}ctx.restore()}
@@ -3770,6 +3802,8 @@ function gagFx(Q,name){if(!name)return;const f=GAGFX[name];if(f)f(Q)}
 function titleTick(dt){updParts(dt);updTexts(dt)}
 
 function renderMan(){
+  const previous=OUTFIT_RUMPLED;OUTFIT_RUMPLED=valveUsedThisLevel;
+  try{
   const m=man;if(m.mode==='none'||m.mode==='wait'||m.mode==='done')return;
   const j=m.jg||null;
   if(m.mode==='stuck'){ctx.save();ctx.globalAlpha=m.a;drawGooSplat(m.t,m.x,m.y);ctx.translate(m.x,m.y);
@@ -3796,7 +3830,9 @@ function renderMan(){
   else{const face=m.face<0?-1:1,a=m.ang*face;
     ctx.rotate(a);ctx.scale(.64*face,.64);
     JIG=jigOpts(j,.64*face,.64,a);ragOpts(JIG,m);INF=infl.fill;INF_ASPECT=infl.aspect||0;drawSide(time,'scream');INF=INF_ASPECT=0;JIG=null}
-  ctx.restore()}
+  ctx.restore();
+  }finally{OUTFIT_RUMPLED=previous}
+}
 const LORD_NEW=true;
 const LORD_SPRITES=new Map();
 function lordAnimationSample(t,quantized){
@@ -4395,7 +4431,7 @@ cv.addEventListener('pointerdown',e=>{
   if(state==='lose'){retry();return}
   const[wx,wy]=toWorld(x,y);
   if(man.mode==='aim'&&toolOn('burp')&&!man.chug&&!man.seated&&pw.left.burp>0&&Math.abs(wx-STX)<48&&wy>GY-62){sodaHold=true;startChug();if(!man.chug)sodaHold=false;try{cv.setPointerCapture(e.pointerId)}catch(_){}return}   // tap the soda stand: he hops over and chugs
-  if(man.mode==='aim'&&!man.chug&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(wx-VX,wy-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}   // tap the valve: he sits and fills; drag him off to fire
+  if(man.mode==='aim'&&!man.chug&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(wx-VX,wy-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;noteValveUse(man);SFX.valveCrack();return}   // tap the valve: he sits and fills; drag him off to fire
   if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
@@ -4412,7 +4448,7 @@ cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
     }
     return;
   }
-  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
+  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;noteValveUse(man);SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
   if(vOn&&dv<VPULL){const k=.9*(VPULL-dv)/(VPULL-VGRAB);man.x+=(VX-man.x)*k;man.y+=(VY-man.y)*k}});   // nearing the valve the sling stretches on back toward it (power stays a full pull), then he drops onto it
 cv.addEventListener('pointerup',e=>{
   if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId){
