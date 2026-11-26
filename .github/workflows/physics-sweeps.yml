@@ -1,0 +1,39 @@
+name: Exhaustive physics playthrough sweeps
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: float
+            flags: ""
+          - name: fixed
+            flags: "-DMX_FIXED"
+          - name: fixed-no-wobble
+            flags: "-DMX_FIXED -DSWEEP_NOWOB"
+          - name: float-collapse
+            flags: "-DSWEEP_COLLAPSE"
+          - name: fixed-collapse
+            flags: "-DMX_FIXED -DSWEEP_COLLAPSE"
+          - name: float-collapse-48
+            flags: "-DMX_MAX_CHUNKS=48 -DSWEEP_COLLAPSE"
+    name: Sweep ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and exercise every level, 80 seeds each
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r -a flags <<< "${{ matrix.flags }}"
+          gcc -std=gnu99 -O2 -Icore "${flags[@]}" core/mx.c test/sweep.c -lm -o /tmp/sweep
+          /tmp/sweep
