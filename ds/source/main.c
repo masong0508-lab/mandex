@@ -1453,7 +1453,8 @@ static void top_hud(u8 *b){
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                      /* walk levels: the clock, and what the buttons do */
     int k = gfx_clamp((int)((world.man.wt * 100 / MX_WALK_T) >> 12), 0, 100);
     gfx_rect(b, 4, 36, 82, 7, C_UIBG); gfx_rect(b, 5, 37, 80, 5, C_DARK); gfx_rect(b, 5, 37, k * 80 / 100, 5, k > 30 ? C_GOO : C_RED);
-    gfx_text_o(b, 90, 36, "TIME", C_WHITE, C_BLACK, 1);
+    gfx_text_o(b,90,36,"TIME",C_WHITE,C_BLACK,1);
+    gfx_text_o(b,110,36,gfx_int(mx_walk_seconds_left(&world.man)),k>30?C_WHITE:C_RED,C_BLACK,1);
     gfx_text_c(b, 128, 183, DS_WALK_HELP, C_WHITE, C_BLACK, 1);
   }
   toast_tick();
