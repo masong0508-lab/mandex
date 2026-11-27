@@ -866,24 +866,29 @@ static MxChunk *chunk_slot(MxWorld *w){
   return v;
 }
 
+/* Four-bit border mask in the existing right, left, down, up order.
+ * Linear neighbor offsets avoid reconstructing row*width per edge. */
+static inline unsigned support_border(int x,int y){
+  return (x==MX_COLS-1?1u:0u)|(x==0?2u:0u)|(y==MX_ROWS-1?4u:0u)|(y==0?8u:0u);
+}
 static MX_HOT void support_pass(MxWorld *w){
   w->need_support = 0;
   memset(w->hb, 255, sizeof w->hb);
   unsigned head = 0, tail = 0;
   const unsigned QM = 8191;
-  static const int DX[4] = {1, -1, 0, 0}, DY[4] = {0, 0, 1, -1};
+  static const int OFF[4] = {1,-1,MX_COLS,-MX_COLS};
   for(int x = 0; x < MX_COLS; x++){
     int i = IDX(x, MX_ROWS - 1);
     if(w->grid[i]){ w->hb[i] = 0; w->queue[tail++ & QM] = (uint16_t)i; }
   }
   while(head != tail){
     int i = w->queue[head++ & QM], x = i % MX_COLS, y = i / MX_COLS, h = w->hb[i];
+    const unsigned blocked=support_border(x,y)|w->brk[i];
     for(int d = 0; d < 4; d++){
-      int nx = x + DX[d], ny = y + DY[d];
-      if(!INB(nx, ny) || ((w->brk[i] >> d) & 1)) continue;
-      int j = IDX(nx, ny), m = w->grid[j];
-      if(!m) continue;
-      int nh = DY[d] == -1 ? 0 : h + 1;
+      if(blocked&(1u<<d))continue;
+      int j=i+OFF[d],m=w->grid[j];
+      if(!m)continue;
+      int nh=d==3?0:h+1;
       if(nh < w->hb[j] && nh <= MATS[m].lim + (w->anch[j] ? 8 : 0) && tail - head < QM){
         w->hb[j] = (uint8_t)nh; w->queue[tail++ & QM] = (uint16_t)j;
       }
@@ -906,11 +911,11 @@ static MX_HOT void support_pass(MxWorld *w){
           c->lx = RI(x); c->ly = RI(y); c->m = w->grid[a]; c->h = w->hp[a]; c->dead = 0;
         } else oversized = 1;
       }
+      const unsigned blocked=support_border(x,y)|w->brk[a];
       for(int d = 0; d < 4; d++){
-        int nx = x + DX[d], ny = y + DY[d];
-        if(!INB(nx, ny)) continue;
-        int j = IDX(nx, ny);
-        if(w->grid[j] && w->grid[j] != MX_SAND && w->hb[j] == 255 && !w->vis[j] && !((w->brk[a] >> d) & 1)){ w->vis[j] = 1; w->stack[sp++] = (uint16_t)j; }
+        if(blocked&(1u<<d))continue;
+        int j=a+OFF[d];
+        if(w->grid[j] && w->grid[j]!=MX_SAND && w->hb[j]==255 && !w->vis[j]){w->vis[j]=1;w->stack[sp++]=(uint16_t)j;}
       }
     }
     if(!ch) continue;                   /* no slot: retry when a sleeper settles */
@@ -925,12 +930,11 @@ static MX_HOT void support_pass(MxWorld *w){
     /* mark boundary voxels while the component is still in the grid */
     for(int k = 0; k < n; k++){
       MxCell *c = &ch->cells[k];
-      int gx = rfloor(c->lx), gy = rfloor(c->ly), e = 0;
-      for(int d = 0; d < 4 && !e; d++){
-        int nx = gx + DX[d], ny = gy + DY[d];
-        if(!INB(nx, ny) || !w->grid[IDX(nx, ny)] ||
-           w->hb[IDX(nx, ny)] != 255 ||
-           (oversized && w->vis[IDX(nx, ny)] != 2)) e = 1;
+      int gx=rfloor(c->lx),gy=rfloor(c->ly),gi=IDX(gx,gy);
+      int e=support_border(gx,gy)!=0;
+      for(int d=0;d<4&&!e;d++){
+        int j=gi+OFF[d];
+        if(!w->grid[j]||w->hb[j]!=255||(oversized&&w->vis[j]!=2))e=1;
       }
 #ifdef MX_NO_EDGE
       e = 1;
@@ -3106,13 +3110,12 @@ void mx_update(MxWorld *w, real dt){
   man_pose(m, dt);
 
   if(w->state == MX_PLAY){
-    int nch = busy_count(w);
     if(mx_targets_alive(w) == 0){
       w->winT += dt;
       if(w->winT > R(1.6) && w->district + 1 < mx_level_stage_count(w->level)){ hq_next_district(w); return; }
       if(w->winT > R(1.6)){ w->state = MX_WIN; w->score += w->men * 3000; ev(w, EV_WIN, 0, 0, 0, 0, 0); }
     } else if(w->men == 0 && m->mode == MAN_NONE){
-      if(nch == 0){
+      if(busy_count(w) == 0){
         w->loseT += dt;
         if(w->loseT > R(1.8)){ w->state = MX_LOSE; ev(w, EV_LOSE, 0, 0, 0, 0, 0); }
       } else {
