@@ -28,6 +28,48 @@ int main(void){
     }
     CHECK(!mi_active(&m));
   }
+  /* The same RNG seed chooses the same ordinary gag in both modes.
+     A selected burp alone becomes the Golden Cels feast performance;
+     retaining GAG_BURP as last prevents immediate repeats. */
+  int feast_choices=0;
+  for(unsigned seed=1;seed<=512;seed++){
+    MiState classic={0},cel={0};
+    mi_reset(&classic);
+    classic.last=-1;classic.rng=seed;classic.wait=1;
+    cel=classic;
+    mi_update(&classic);
+    mi_update_style(&cel,1);
+    CHECK(classic.rng==cel.rng&&classic.last==cel.last);
+    if(classic.gag==GAG_BURP){
+      CHECK(cel.gag==GAG_FEAST&&cel.last==GAG_BURP);
+      feast_choices++;
+    }else CHECK(cel.gag==classic.gag&&cel.fx==classic.fx);
+  }
+  CHECK(feast_choices>0);
+  const MiStep expected[]={
+    {MSF_IDLE_A,11,FX_NONE},{MSF_IDLE_B,21,FX_NONE},
+    {MSF_BELLY_A,25,FX_SLAP},{MSF_BELLY_B,8,FX_NONE},
+    {MSF_BURP_A,19,FX_GRUNT},{MSF_BURP_B,36,FX_BURP},
+    {MSF_FLEX_A,15,FX_NONE},{MSF_POSE_A,24,FX_SPARKLE},
+    {MSF_IDLE_A,21,FX_NONE}
+  };
+  MiState feast={0};mi_reset(&feast);feast.gag=GAG_FEAST;
+  feast.last=GAG_BURP;feast.fx=MI_GAGS[GAG_FEAST][0].fx;
+  unsigned feast_ticks=0;
+  for(unsigned i=0;i<sizeof expected/sizeof expected[0];i++){
+    for(int t=0;t<expected[i].ticks;t++){
+      CHECK(feast.gag==GAG_FEAST&&feast.step==(int)i);
+      CHECK(mi_frame(&feast,0)==expected[i].frame);
+      CHECK(feast.fx==(t==0?expected[i].fx:FX_NONE));
+      /* A style change never splices a half-played animation. */
+      mi_update_style(&feast,feast_ticks<80);feast_ticks++;
+    }
+  }
+  CHECK(feast_ticks==180&&!mi_active(&feast)&&feast.last==GAG_BURP);
+  mi_reset(&feast);feast.wait=1;mi_update_style(&feast,1);
+  CHECK(feast.gag!=GAG_FEAST&&feast.gag!=GAG_BURP);
+  mi_reset(&feast);CHECK(!mi_active(&feast)&&feast.fx==FX_NONE);
+  printf("NATIVE_FEAST_PASS choices=%d ticks=%u\n",feast_choices,feast_ticks);
   printf("NATIVE_CEL_MOTION_PASS full_turns=4 ticks=%u\n",ticks);
   return 0;
 }
