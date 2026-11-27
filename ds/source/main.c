@@ -20,6 +20,7 @@
 #include <string.h>
 #include "mx.h"
 #include "mx_meta.h"
+#include "mx_trial_nav.h"
 #include "mx_options_menu.h"
 #include "mx_tool_feedback.h"
 #include "mx_objective.h"
@@ -1894,6 +1895,8 @@ static void title_bottom(View *v){
   gfx_text(v->buf, 256 - 4 - gfx_text_w("/25", 1), 183, "/25", C_UILINE, 1);
   gfx_text_c(v->buf, 128, 46, mx_outfit(outfit_sel)->name, C_PINK, C_BLACK, 1);
   if(cheat_t > 0) gfx_text_c(v->buf, 128, 56, stats.unlock_all ? "CHEAT: ALL LEVELS OPEN" : "CHEAT OFF", C_GOLD, C_BLACK, 1);
+  panel(v->buf,40,64,176,18);
+  gfx_text_c(v->buf,128,69,"B / TAP: NEXT UNCLEARED TRIAL",C_WHITE,C_UIBG,1);
 }
 
 /* ---------------------------------------------------------------------- main */
@@ -2036,7 +2039,12 @@ int main(void){
         for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } }
         apply_outfit(outfit_sel); sfx_play(SFX_CLICK, 64);
       }
-      if(down & (KEY_UP|KEY_DOWN)){sel_level=mx_trial_district_step(sel_level,(down&KEY_DOWN)?1:-1);load_level(sel_level);sfx_play(SFX_CLICK,64);}
+      if(!opt_open&&!ach_open&&!out_open&&((down&KEY_B)||((down&KEY_TOUCH)&&hit(&t,40,64,176,18)))){
+        int next=mx_trial_next_unfinished(&stats,sel_level);
+        if(next>=0&&next!=sel_level){sel_level=next;load_level(sel_level);}
+        sfx_play(SFX_CLICK,next>=0?64:24);
+        down&=~(KEY_TOUCH|KEY_A|KEY_START);
+      }else if(down & (KEY_UP|KEY_DOWN)){sel_level=mx_trial_district_step(sel_level,(down&KEY_DOWN)?1:-1);load_level(sel_level);sfx_play(SFX_CLICK,64);}
       else if(ch){ sel_level = (sel_level + ch + MX_NUM_LEVELS) % MX_NUM_LEVELS; load_level(sel_level); sfx_play(SFX_CLICK, 64); }
       else if(((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)) && !mx_level_unlocked(&stats, sel_level)) sfx_play(SFX_CLICK, 24);
       else if((down & (KEY_A | KEY_START)) || ((down & KEY_TOUCH) && t.py > 48)){

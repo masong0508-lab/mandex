@@ -25,6 +25,7 @@
 #include "mx_snd.h"
 extern u16 gfx_pal[256]; void gfx_init(void);      /* ds/source/gfx.c (built with -DMX_FIXED as its own unit; only the palette is used here) */
 #include "mx_meta.h"
+#include "mx_trial_nav.h"
 #include "mx_options_menu.h"
 static MxOptions console_opt;
 static MxOptMenu opt_menu;
@@ -1618,7 +1619,11 @@ int main(void){
     if(opt_open){options_input(down,t.px,t.py);}
     else if((app==ST_TITLE||app==ST_PAUSE)&&((down&KEY_X)||((down&KEY_TOUCH)&&app==ST_TITLE&&t.py>=204))){opt_open=1;mx_opt_open(&opt_menu);}
     else if(app == ST_TITLE){
-      if(down & (KEY_UP|KEY_DOWN)){sel=mx_trial_district_step(sel,(down&KEY_DOWN)?1:-1);load_level(sel);}
+      if((down&KEY_B)||((down&KEY_TOUCH)&&t.px>=32&&t.px<288&&t.py>=42&&t.py<78)){
+        int next=mx_trial_next_unfinished(&stats,sel);
+        if(next>=0&&next!=sel){sel=next;load_level(sel);}
+        down&=~(KEY_TOUCH|KEY_A|KEY_START);
+      }else if(down & (KEY_UP|KEY_DOWN)){sel=mx_trial_district_step(sel,(down&KEY_DOWN)?1:-1);load_level(sel);}
       else if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
       else if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } apply_outfit(outfit_sel); n3_save_sync(); }
@@ -1869,7 +1874,11 @@ int main(void){
         textc(&bot,160,204,"TAP TOOL  /  X CYCLE  /  R USE AIR",1,RGB(255,210,63));
       }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
-    } else if(app == ST_TITLE){textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));rect(&bot,0,204,320,36,RGB(20,27,46));textc(&bot,160,218,"X / TAP: OPTIONS",2,RGB(255,210,63));}
+    } else if(app == ST_TITLE){
+      textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));
+      rect(&bot,32,42,256,36,RGB(20,27,46));rect(&bot,32,42,256,2,RGB(255,210,63));
+      textc(&bot,160,55,"B / TAP: NEXT UNCLEARED TRIAL",1,RGB(255,255,255));
+      rect(&bot,0,204,320,36,RGB(20,27,46));textc(&bot,160,218,"X / TAP: OPTIONS",2,RGB(255,210,63));}
     if(opt_open)draw_options();
     { unsigned long long end=osGetTime();
       n3_draw_ms_last=end>=n3_draw_begin?(unsigned)(end-n3_draw_begin):0;
