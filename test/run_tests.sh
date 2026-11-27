@@ -439,6 +439,7 @@ for mode in 0 1; do
   DS_CHUNK_VIS_PROBE=1 ./ds_chunk_view_$mode > ds_chunk_view_$mode.txt
   if [ "$mode" -eq 1 ]; then
     DS_RUBBLE_DAMAGE_PROBE=1 ./ds_chunk_view_$mode
+    DS_CEL_PROBE=1 ./ds_chunk_view_$mode
   fi
 done
 cmp ds_chunk_view_0.txt ds_chunk_view_1.txt
@@ -490,6 +491,7 @@ gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/sh
 N3DS_RUBBLE_DAMAGE_PROBE=1 ./n3ds_render
 N3DS_TILE_CLIP_PROBE=1 ./n3ds_render
 N3DS_PRESSURE_PROBE=1 ./n3ds_render
+N3DS_CEL_PROBE=1 ./n3ds_render
 echo "--- 3DS silhouette, outfit colors and antialiased rotated edges ---"
 for config in base lit smooth; do
   case "$config" in
