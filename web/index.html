@@ -887,19 +887,30 @@ function webLightingDetail(o){return o.lighting==='full'||(o.lighting!=='lite'&&
 function webLightingLabel(o){return o.lighting==='full'?'FULL':o.lighting==='lite'?'LITE':'AUTO'}
 function cycleWebLighting(o){o.lighting=o.lighting==='full'?'lite':o.lighting==='lite'?'auto':'full'}
 function fxLimit(){return webFxCap}
+// Use wall-clock CPU occupancy instead of individual draw costs. A
+// 30FPS cap alternates expensive draws and cheap RAF callbacks; a high
+// refresh display has less CPU time per callback than a 60Hz display.
+let webPerfSpan=0,webPerfCpu=0,webPerfLate=0;
+function resetWebPerfSample(){
+  webPerfBad=webPerfGood=webPerfSpan=webPerfCpu=webPerfLate=0;
+}
 function webPerfSample(o,elapsed,cpu,playing){
-  if(webProfile(o)!=='auto'||!playing||!(elapsed>0)||elapsed>.25){
-    webPerfBad=webPerfGood=0;return false;
+  if(webProfile(o)!=='auto'||!playing||!(elapsed>0)||elapsed>.25||!Number.isFinite(cpu)||cpu<0){
+    resetWebPerfSample();return false;
   }
-  // Sustained CPU overload or delayed RAFs, with recovery hysteresis.
-  const bad=cpu>23||elapsed>.043,good=cpu<10&&elapsed<.025;
-  webPerfBad=bad?webPerfBad+elapsed:Math.max(0,webPerfBad-elapsed*.5);
-  webPerfGood=good?webPerfGood+elapsed:0;
-  if(webPerfBad>=.75&&webPerfTier<2){webPerfTier++;webPerfBad=webPerfGood=0;return true}
-  if(webPerfGood>=6&&webPerfTier>0){webPerfTier--;webPerfBad=webPerfGood=0;return true}
+  webPerfSpan+=elapsed;webPerfCpu+=cpu/1000;
+  if(elapsed>.043)webPerfLate+=elapsed;
+  if(webPerfSpan<.25-1e-9)return false;
+  const span=webPerfSpan,load=webPerfCpu/span,late=webPerfLate/span;
+  webPerfSpan=webPerfCpu=webPerfLate=0;
+  const bad=load>.82||late>.4,good=load<.62&&late<.1;
+  webPerfBad=bad?webPerfBad+span:Math.max(0,webPerfBad-span*.5);
+  webPerfGood=good?webPerfGood+span:0;
+  if(webPerfBad>=.75-1e-9&&webPerfTier<2){webPerfTier++;resetWebPerfSample();return true}
+  if(webPerfGood>=6-1e-9&&webPerfTier>0){webPerfTier--;resetWebPerfSample();return true}
   return false;
 }
-function cycleWebProfile(o){o.performance=WEB_PROFILES[(WEB_PROFILES.indexOf(webProfile(o))+1)%WEB_PROFILES.length];webPerfBad=webPerfGood=0}
+function cycleWebProfile(o){o.performance=WEB_PROFILES[(WEB_PROFILES.indexOf(webProfile(o))+1)%WEB_PROFILES.length];resetWebPerfSample()}
 function cycleWebCap(o){o.renderCap=WEB_FRAME_CAPS[(WEB_FRAME_CAPS.indexOf(o.renderCap||0)+1)%WEB_FRAME_CAPS.length]}
 function cycleWebScale(o){o.renderScale=WEB_SCALES[(WEB_SCALES.indexOf(o.renderScale||0)+1)%WEB_SCALES.length]}
 function cycleWebFX(o){if(o.ecoFX===undefined)o.ecoFX=true;else if(o.ecoFX===true)o.ecoFX=false;else delete o.ecoFX;webEcoFX=o.ecoFX===true}
@@ -1146,6 +1157,9 @@ function jointBreakLimit(i,j,m,mj){
   if(hp[i]*2<=MAT[m].hp||hp[j]*2<=MAT[mj].hp)return lim*.85;
   return lim;
 }
+// Use the exact smallest severely damaged fracture threshold. Strains
+// below this cannot break any joint, so skip the HP/material reads.
+const WOB_MIN_JOINT=MAT.slice(1).reduce((min,m)=>Math.min(min,m.ymax*.70),Infinity);
 // Rebuild a row-major occupied list during the unavoidable spring sweep.
 // Reuse it for integration and fracture checks; no per-tick heap arrays.
 // A world resize is the only time this scratch storage changes capacity.
@@ -1173,8 +1187,8 @@ function wobStep(dt){
   for(let k=0;k<occupied;k++){const i=WOB_ACTIVE[k],m=grid[i];if(!m)continue;
     const x=i%COLS,y=(i/COLS)|0;
     for(let d=0;d<3;d+=2){const j=d===0?(x+1<COLS?i+1:-1):i+COLS;if(j<0||((brk[i]>>d)&1))continue;const mj=grid[j];if(!mj)continue;
-      const s=Math.abs(ox[j]-ox[i])+Math.abs(oy[j]-oy[i]),lim=jointBreakLimit(i,j,m,mj);
-      if(s>lim){brk[i]|=1<<d;brk[j]|=1<<(d^1);needSupport=true;if(crackEv<4){crackEv++;crackFx(x,y,m,d)}}}}
+      const s=Math.abs(ox[j]-ox[i])+Math.abs(oy[j]-oy[i]);
+      if(s>WOB_MIN_JOINT&&s>jointBreakLimit(i,j,m,mj)){brk[i]|=1<<d;brk[j]|=1<<(d^1);needSupport=true;if(crackEv<4){crackEv++;crackFx(x,y,m,d)}}}}
   if(maxv<.6&&maxo<.03){if(++wobQuiet>20){ox.fill(0);oy.fill(0);ovx.fill(0);ovy.fill(0);wobOn=false;wobQuiet=0}}else wobQuiet=0}
 // sand: no cohesion - falls straight down and slides off slopes steeper than 45 degrees
 function sandStep(){let moved=false;const par=sandT&1;
@@ -4188,7 +4202,12 @@ function drawLandlord(t){
     ctx.restore();
   }
   if(wind&&(t.kind==='thrower'||t.kind==='boss')){ctx.save();ctx.translate(t.x,t.y-42);ctx.fillStyle='#ffd23f';ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-3,-9);ctx.lineTo(3,-9);ctx.lineTo(1.5,2);ctx.lineTo(-1.5,2);ctx.closePath();ctx.stroke();ctx.fill();ctx.beginPath();ctx.arc(0,6,1.8,0,7);ctx.fill();ctx.restore()}}
-function drawCases(){for(const c of cases){ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.rot);ctx.fillStyle='#7a4a22';ctx.fillRect(-7,-5,14,10);ctx.strokeStyle='#3a220c';ctx.lineWidth=1.2;ctx.strokeRect(-7,-5,14,10);ctx.fillStyle='#ffd23f';ctx.fillRect(-1,-1.5,2,3);ctx.strokeRect(-3,-7.5,6,2.5);ctx.restore()}}
+// Paint-only bounds. Expand the viewport, rather than subtracting a
+// radius from the actor position, to retain exact grazing-edge equality.
+function worldVisualVisible(x,y,r,x0,x1,y0,y1){
+  return !(x<x0-r||x>x1+r||y<y0-r||y>y1+r);
+}
+function drawCases(x0,x1,y0,y1){for(const c of cases){if(x0!==undefined&&!worldVisualVisible(c.x,c.y,14,x0,x1,y0,y1))continue;ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.rot);ctx.fillStyle='#7a4a22';ctx.fillRect(-7,-5,14,10);ctx.strokeStyle='#3a220c';ctx.lineWidth=1.2;ctx.strokeRect(-7,-5,14,10);ctx.fillStyle='#ffd23f';ctx.fillRect(-1,-1.5,2,3);ctx.strokeRect(-3,-7.5,6,2.5);ctx.restore()}}
 
 // =====================================================================
 //  DRAW
@@ -4545,16 +4564,23 @@ function draw(){
     }
     ctx.restore();
   }
+  // Conservative bounds cover all landlord art, attacks, HP and marker
+  // text. Include the real wobble offset and maximum camera shake; the
+  // screen-space last-target locator remains active outside the view.
+  const actorCull=camOn,actorX0=CAM.x-paperShake,actorX1=CAM.x+W/CAM.z+paperShake,
+    actorY0=CAM.y-paperShake,actorY1=CAM.y+H/CAM.z+paperShake;
   const lastTargetVisible=state==='play'&&objectiveSnapshot().phase==='last';
   for(const t of targets)if(t.alive){
-    const[tx,ty]=targetOffset(t);ctx.save();ctx.translate(tx,ty);drawLandlord(t);
+    const[tx,ty]=targetOffset(t);
+    if(actorCull&&!worldVisualVisible(t.x+tx,t.y+ty,128,actorX0,actorX1,actorY0,actorY1))continue;
+    ctx.save();ctx.translate(tx,ty);drawLandlord(t);
     // A compact locator above the surviving actor, positioned in the same
     // transformed world coordinate system as the actual landlord artwork.
     if(lastTargetVisible && t.collapseRolled!==2)
       txt('LAST',t.x,t.y-63,12,'#ff9ec8','center');
     ctx.restore();
   }
-  if(cases.length)drawCases();
+  if(cases.length){if(actorCull)drawCases(actorX0,actorX1,actorY0,actorY1);else drawCases()}
   if(man&&man.mode==='aim'&&man.stun>0){const q=Math.sin(time*14);txt('DAZED...',SX,SY-48+q*2,16,'#ffd23f','center');for(let i=0;i<3;i++){const a=time*7+i*2.1;txt('*',SX+Math.cos(a)*18,SY-28+Math.sin(a)*5,18,'#fff','center')}}
   if(tubes.length)drawTubes();
   if(pads.length)drawPads();
@@ -6865,7 +6891,7 @@ function webSimSteps(elapsed){
 let last=performance.now(),frameDt=.016,webLastDraw=-Infinity,webNextDraw=-Infinity,webDrawCap=0,webDrawState='',webDrawMode='',webDrawW=0,webDrawH=0;
 function webNextPaint(t,cap,next,force){const period=1000/cap;return force?t+period:Math.max(t-period,next)+period}
 document.addEventListener('visibilitychange',()=>{
-  last=performance.now();webLastDraw=webNextDraw=-Infinity;webSimCarry=0;webPerfBad=webPerfGood=0;
+  last=performance.now();webLastDraw=webNextDraw=-Infinity;webSimCarry=0;resetWebPerfSample();
   if(document.hidden)musUpdate();
 });
 function loop(t){

@@ -65,6 +65,8 @@ jobs:
         run: node test/browser_cel_character_test.js
       - name: Walking HUD, objectives and portrait spacing
         run: node test/browser_objective_test.js
+      - name: Adaptive refresh pacing, viewport actors and fracture thresholds
+        run: node test/browser_viewport_performance_test.js
       - name: Shaking camera debris visibility and draw work
         run: node test/browser_rubble_draw_test.js
       - name: Shattered debris stops contacting during its solver step

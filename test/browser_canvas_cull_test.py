@@ -48,7 +48,8 @@ HARNESS = r"""
   const patches = [
     ['const paperCull=camOn,', 'const paperCull=false,'],
     ['const tileCull=camOn,', 'const tileCull=false,'],
-    ['const rubbleCull=camOn,', 'const rubbleCull=false,']
+    ['const rubbleCull=camOn,', 'const rubbleCull=false,'],
+    ['const actorCull=camOn,', 'const actorCull=false,']
   ];
   let referenceSource = source;
   for (const [from, to] of patches) {
@@ -131,6 +132,26 @@ HARNESS = r"""
   function addEdgeFixtures() {
     const x0 = CAM.x, x1 = x0 + W / CAM.z;
     const y0 = CAM.y, y1 = y0 + H / CAM.z;
+    // All landlord types, windup/swing poses, HP/marker text and rotating
+    // briefcases at fractional viewport edges and far outside the camera.
+    const base=targets[0], kinds=['','walker','bat','thrower','boss','shield','sprinter','healer'];
+    if(base)for(let k=0;k<kinds.length;k++){
+      const d=[-170,-128,-90,-24,24,90,128,170][k];
+      for(const [x,y] of [[x0+d,(y0+y1)/2],[x1-d,(y0+y1)/2],
+                          [(x0+x1)/2,y0+d],[(x0+x1)/2,y1-d]]){
+        targets.push({...base,x,y,alive:true,kind:kinds[k],face:k%2?1:-1,
+          t:k*.19,wk:k*.4,mv:k%3,pan:k%3===0?.2:0,wind:k%3===1?.25:0,
+          swing:k%3===2?.2:0,hpMax:3,hp:2,armor:k===5?1:0,
+          collapseRolled:k%2?2:0});
+        cases.push({x,y,rot:k*.47});
+      }
+    }
+    for(let k=0;k<16;k++){
+      const d=[-15,-14,-10,-1,0,1,10,15][k%8];
+      for(const [x,y] of [[x0+d,(y0+y1)/2],[x1-d,(y0+y1)/2],
+                          [(x0+x1)/2,y0+d],[(x0+x1)/2,y1-d]])
+        cases.push({x,y,rot:k*Math.PI/8});
+    }
     // Wide multi-cell fragments exercise both whole-chunk and individual-cell
     // rejection, all materials/damage states, and dead-cell skipping.
     for (let k = 0; k < 48; k++) {
@@ -237,7 +258,7 @@ def main():
     if args.out_dir:
         args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    report = {"comparison": "complete production draw() RGBA; paper/tile/rubble culling disabled in reference",
+    report = {"comparison": "complete production draw() RGBA; paper/tile/rubble/actor culling disabled in reference",
               "samples": []}
     errors = []
 
