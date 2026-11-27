@@ -760,9 +760,9 @@ function unclipTargets(){for(const t of targets){const row=Math.floor(t.y/V+.875
 function load(l,custom){
   const phase=arguments.length>2?arguments[2]:0,carry=arguments[3]||null;
   resetPlayInput();CAM.manual=false;CAM.reset=true;CAM.snap=true;CAM.hold=0;level=custom?-1:l;CL=custom||LEVELS[l];
-  if(!custom&&l>=640&&l<660){
-    const d=Math.max(0,Math.min(2,phase|0)),layout=LEVELS[l-40+20*d];
-    CL={...layout,name:LEVELS[l].name,relayPhase:d};
+  if(!custom&&(l>=640&&l<660||l>=1080&&l<LEVELS.length)){
+    const n=l>=1080?6:3,d=Math.max(0,Math.min(n-1,phase|0)),layout=LEVELS[l-20*(n-1)+20*d];
+    CL={...layout,name:LEVELS[l].name,relayPhase:d,relayCount:n};
   }
   const oldCols=COLS;
   setWorld(CL.cols||120);if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE&&oldCols===COLS)buildBG();
@@ -812,10 +812,10 @@ function zoneAdvance(move=true){
   return !!paid;
 }
 function relayAdvance(){
-  if(CL.relayPhase==null||CL.relayPhase>=2)return false;
+  if(CL.relayPhase==null||CL.relayPhase>=CL.relayCount-1)return false;
   const next=CL.relayPhase+1,carry={men:men+6,score:score+3000,shownScore,combo,comboPeak,comboLeft,lv:{...lv}};
   load(level,undefined,next,carry);
-  flash=.25;SFX.wooo&&SFX.wooo();popText(SX,SY-56,'STAGE '+(next+1)+'/3  +6 MEN','#7dff5a',24);
+  flash=.25;SFX.wooo&&SFX.wooo();popText(SX,SY-56,'STAGE '+(next+1)+'/'+(level>=1080?6:3)+'  +6 MEN','#7dff5a',24);
   return true;
 }
 function nextMan(){
@@ -4633,7 +4633,7 @@ function shotReadiness(m){
 function drawHUD(){
   drawWalkHUD();
   const P=W<700;ctx.fillStyle='rgba(15,18,30,.72)';ctx.fillRect(0,0,W,P?62:34);ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(0,0,W,2);
-  {const nm=`${CL.custom?'CUSTOM':'LV '+(level+1)}  ${CL.name.toUpperCase()}${CL.relayPhase!=null?' '+(CL.relayPhase+1)+'/3':CL.slings?' '+(slingK+1)+'/3':''}`;let sz=18;{while(sz>11){ctx.font=`bold ${sz}px "Trebuchet MS",Impact,sans-serif`;if(ctx.measureText(nm).width<=(P?285:250))break;sz--}}txt(nm,12,24,sz,'#ffd23f','left')}
+  {const nm=`${CL.custom?'CUSTOM':'LV '+(level+1)}  ${CL.name.toUpperCase()}${CL.relayPhase!=null?' '+(CL.relayPhase+1)+'/'+CL.relayCount:CL.slings?' '+(slingK+1)+'/3':''}`;let sz=18;{while(sz>11){ctx.font=`bold ${sz}px "Trebuchet MS",Impact,sans-serif`;if(ctx.measureText(nm).width<=(P?285:250))break;sz--}}txt(nm,12,24,sz,'#ffd23f','left')}
   const objective=objectiveSnapshot(),lb=objective.remaining;
   txt(`LANDLORDS ${lb}/${objective.total}`,P?12:Math.max(430,300+men*Math.min(20,230/Math.max(1,men))+24),P?54:24,18,lb?'#ff8a8a':'#7dff5a','left');
   if(state==='play'&&tntLiveFuses>0){
@@ -4647,7 +4647,7 @@ function drawHUD(){
   if(state==='play'){
     // Never mistake the wreckage meter for the win condition. In portrait
     // and landscape the objective lives below the header, not over controls.
-    const label=objective.phase==='secure'&&CL.relayPhase!=null&&CL.relayPhase<2?'NEXT STAGE':objectiveLabel(objective);
+    const label=objective.phase==='secure'&&CL.relayPhase!=null&&CL.relayPhase<CL.relayCount-1?'NEXT STAGE':objectiveLabel(objective);
     const note=objective.phase==='evict'?`${label} ${lb}/${objective.total}`:
       objective.phase==='last'&&objective.direction?
       `${label} ${objective.direction<0?'<':'>'}`:label;
@@ -4692,7 +4692,7 @@ function drawHUD(){
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
-  if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);trialTextFit(CL.name+(CL.relayPhase!=null?'  STAGE '+(CL.relayPhase+1)+'/3':''),W/2,180,W-30,32,'#fff');trialTextFit(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,W-30,20,'#ffd23f');ctx.globalAlpha=1}
+  if(banner>0&&state==='play'){ctx.globalAlpha=Math.min(1,banner);trialTextFit(CL.name+(CL.relayPhase!=null?'  STAGE '+(CL.relayPhase+1)+'/'+CL.relayCount:''),W/2,180,W-30,32,'#fff');trialTextFit(CL.tip||'Evict landlords. Falling TNT may survive!',W/2,214,W-30,20,'#ffd23f');ctx.globalAlpha=1}
   if(CAM.on&&state==='play'&&man.mode==='aim'&&dragging){const q=toScreen(man.x,man.y);if(q[0]<14){const yy=clamp(q[1],90,H-110);ctx.save();ctx.fillStyle='rgba(15,18,30,.78)';ctx.strokeStyle='#fff';ctx.lineWidth=2;rrect(4,yy-18,64,36,10);ctx.fill();ctx.stroke();ctx.fillStyle='#ffd23f';ctx.beginPath();ctx.moveTo(12,yy);ctx.lineTo(24,yy-9);ctx.lineTo(24,yy+9);ctx.closePath();ctx.fill();ctx.restore();txt('YOU',48,yy+5,13,'#fff','center')}}
   if(state==='play'){
     btn(W-232,3,84,28,testing?'EDITOR':'MENU',backFromPlay,{size:13});
@@ -5159,19 +5159,24 @@ function drawToasts(dt){
 
 // ---------- screens ----------
 const UISTATES=['menu','select','ach','outfit','options','ending'];
-let selTab=0,trialDistrict=0;
+let selTab=0,trialDistrict=0,trialDirectoryPage=0;
+const trialDistrictSize=d=>Math.max(0,Math.min(20,LEVELS.length-TRIAL_START-d*20));
 // The district summary is derived from existing saves; no new save fields.
 function drawDistrictDirectory(portrait){
   const count=TRIAL_DISTRICTS.length,cols=portrait?3:5,margin=portrait?12:28,gap=8;
-  const rows=Math.ceil(count/cols),top=portrait?203:112,foot=60;
+  const per=portrait?15:20,pages=Math.ceil(count/per),page=Math.max(0,Math.min(pages-1,trialDirectoryPage)),first=page*per,last=Math.min(count,first+per);
+  const rows=Math.ceil((last-first)/cols),top=portrait?203:112,foot=88;
   const w=(W-margin*2-gap*(cols-1))/cols,h=Math.min(portrait?61:62,Math.floor((H-top-foot-gap*(rows-1))/rows));
-  for(let i=0;i<count;i++){
-    const x=margin+i%cols*(w+gap),y=top+Math.floor(i/cols)*(h+gap),p=trialDistrictProgress(i);
+  for(let i=first;i<last;i++){
+    const k=i-first,x=margin+k%cols*(w+gap),y=top+Math.floor(k/cols)*(h+gap),p=trialDistrictProgress(i);
     btn(x,y,w,h,'',()=>{trialDistrict=i;WEB_UI.districtPicker=false;WEB_UI.page.select=0},{on:i===trialDistrict});
     trialTextFit(TRIAL_DISTRICTS[i],x+w/2,y+Math.min(23,h*.43),w-12,portrait?14:16,'#fff');
-    txt(p.cleared+'/20  |  '+p.earned+'/60 ★',x+w/2,y+h-9,12,'#cfd','center');
+    txt(p.cleared+'/'+trialDistrictSize(i)+'  |  '+p.earned+'/'+(trialDistrictSize(i)*3)+' ★',x+w/2,y+h-9,12,'#cfd','center');
   }
-  btn(W/2-110,H-52,220,40,'BACK TO TRIALS',()=>{WEB_UI.districtPicker=false},{size:15});
+  btn(12,H-84,88,30,'< PAGE',()=>{trialDirectoryPage=Math.max(0,page-1)},{size:12,disabled:page===0});
+  txt((page+1)+' / '+pages,W/2,H-63,15,'#fff','center');
+  btn(W-100,H-84,88,30,'PAGE >',()=>{trialDirectoryPage=Math.min(pages-1,page+1)},{size:12,disabled:page===pages-1});
+  btn(W/2-110,H-48,220,36,'BACK TO TRIALS',()=>{WEB_UI.districtPicker=false},{size:15});
 }
 function trialDistrictProgress(d,stars=PD.stars){
   const first=TRIAL_START+d*20;let cleared=0,earned=0,next=-1;
@@ -5184,6 +5189,7 @@ function trialDistrictProgress(d,stars=PD.stars){
 }
 function trialBrief(i){
   const a=TRIAL_META[i-TRIAL_START];
+  if(i>=1080&&i<LEVELS.length)return '6 STAGES / WALK + FLING';
   if(i>=640&&i<660)return '3 STAGES / WALK + FLING';
   return a ? (a[13]?'WALK':'FLING')+' / '+a[12]+' MEN / '+a[7]+' TARGETS' : '';
 }
@@ -6196,11 +6202,11 @@ function drawMobileSelect(){
   if(selTab===4){
     if(WEB_UI.districtPicker){drawDistrictDirectory(true);return}
     btn(12,201,82,43,'<',()=>{trialDistrict=(trialDistrict+TRIAL_DISTRICTS.length-1)%TRIAL_DISTRICTS.length;WEB_UI.page.select=0},{size:18});
-    btn(100,201,W-200,43,'',()=>{WEB_UI.districtPicker=true},{size:14});
+    btn(100,201,W-200,43,'',()=>{trialDirectoryPage=Math.floor(trialDistrict/(W<700?15:20));WEB_UI.districtPicker=true},{size:14});
     trialTextFit(TRIAL_DISTRICTS[trialDistrict].toUpperCase(),W/2,217,W-216,16,'#ffd23f');
     txt('TAP FOR DISTRICTS',W/2,232,11,'#cfd','center');
     const p=trialDistrictProgress(trialDistrict);
-    txt((trialDistrict+1)+'/'+TRIAL_DISTRICTS.length+'  |  '+p.cleared+'/20 CLEARED  |  '+p.earned+'/60 ★',W/2,247,11,'#fff','center');
+    txt((trialDistrict+1)+'/'+TRIAL_DISTRICTS.length+'  |  '+p.cleared+'/'+trialDistrictSize(trialDistrict)+' CLEARED  |  '+p.earned+'/'+(trialDistrictSize(trialDistrict)*3)+' ★',W/2,247,11,'#fff','center');
     const next=p.next>=0?p.next:trialNextUnfinishedIndex(trialDistrict);
     btn(12,254,W-24,38,trialResumeLabel(p,next),()=>trialNextUnfinished(trialDistrict),{size:16,on:next>=0,disabled:next<0,col:'#7dff5a'});
     btn(W-94,201,82,43,'>',()=>{trialDistrict=(trialDistrict+1)%TRIAL_DISTRICTS.length;WEB_UI.page.select=0},{size:18});
@@ -6479,10 +6485,10 @@ function drawSelect(){
     const first=TRIAL_START+trialDistrict*20;
     btn(62,112,120,30,'< DISTRICT',()=>{trialDistrict=(trialDistrict+TRIAL_DISTRICTS.length-1)%TRIAL_DISTRICTS.length},{size:13});
     btn(W-182,112,120,30,'DISTRICT >',()=>{trialDistrict=(trialDistrict+1)%TRIAL_DISTRICTS.length},{size:13});
-    btn(190,112,W-380,30,'',()=>{WEB_UI.districtPicker=true},{size:15});
+    btn(190,112,W-380,30,'',()=>{trialDirectoryPage=Math.floor(trialDistrict/(W<700?15:20));WEB_UI.districtPicker=true},{size:15});
     trialTextFit(TRIAL_DISTRICTS[trialDistrict].toUpperCase()+'  '+(trialDistrict+1)+'/'+TRIAL_DISTRICTS.length+'  ·  CHOOSE',W/2,133,W-410,18,'#ffd23f');
     const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2;
-    for(let k=0;k<20;k++){const i=first+k;tile(x0+(k%cols)*(tw+gx),151+Math.floor(k/cols)*70,tw,60,k+1,LEVELS[i].name,PD.stars[i]||0,false,()=>startStory(i))}
+    for(let k=0;k<trialDistrictSize(trialDistrict);k++){const i=first+k;tile(x0+(k%cols)*(tw+gx),151+Math.floor(k/cols)*70,tw,60,k+1,LEVELS[i].name,PD.stars[i]||0,false,()=>startStory(i))}
     const p=trialDistrictProgress(trialDistrict);
     txt(p.cleared+'/20 CLEARED  |  '+p.earned+'/60 ★  |  '+(LEVELS.length-TRIAL_START)+' TRIALS',W/2,455,15,'#cfd','center');
     const next=p.next>=0?p.next:trialNextUnfinishedIndex(trialDistrict);
