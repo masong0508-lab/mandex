@@ -2101,9 +2101,9 @@ static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg, i
 static void walk_punch(MxWorld *w){
   MxMan *m = &w->man;
   real cx = m->x + (m->face > 0 ? MX_WALK_PUNCH_X : -MX_WALK_PUNCH_X), cy = m->y + MX_WALK_PUNCH_Y;
-  int run = rabs(m->vx) > R(12.5);
+  int run = (m->face > 0 ? m->vx : -m->vx) > R(12.5);
   int parried=0;
-  real d = walk_hit(w, cx, cy, MX_WALK_PUNCH_HW, MX_WALK_PUNCH_HH, RI(run ? 24 : 16), &parried);
+  real d = walk_hit(w, cx, cy, run ? R(2.25) : MX_WALK_PUNCH_HW, MX_WALK_PUNCH_HH, RI(run ? 24 : 16), &parried);
   m->pT = R(0.2); m->pCd = R(0.3);
   ev(w, EV_PUNCH, cx, cy, run, d, RI(parried));
   if(d > 0){ if(w->shake < RI(3)) w->shake = RI(3); wob_kick(w, rfloor(cx), rfloor(cy), 4, m->face > 0 ? R(0.9) : -R(0.9), 0); }
