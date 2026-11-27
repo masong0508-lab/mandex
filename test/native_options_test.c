@@ -14,5 +14,24 @@ int main(void){
  for(int p=0;p<4;p++)for(int sh=0;sh<3;sh++)for(int b0=0;b0<32;b0++){o.profile=p;o.shake=sh;o.eco=b0&1;o.no_guide=(b0>>1)&1;o.music_off=(b0>>2)&1;o.sfx_off=(b0>>3)&1;o.monitor=(b0>>4)&1;o.collapse=1;o.tool=MX_TOOL_QUAKE;o.nofight=1;
  int n=mx_meta_pack_opt(&a,0,&o,data,sizeof data);CHECK(n==MX_SAVE_MAX);CHECK(mx_meta_unpack_opt(&b,&outfit,&q,data,n));CHECK(!memcmp(&o,&q,sizeof o));}
  mx_opt_page(&m,3);mx_opt_pick(&m,1);CHECK(mx_opt_activate(&o,&m,0,1)==MX_O_NONE);CHECK(mx_opt_activate(&o,&m,0,1)==MX_O_CHANGED);CHECK(!o.profile&&!o.eco&&!o.shake&&!o.no_guide&&!o.music_off&&!o.sfx_off&&!o.monitor);
- puts("NATIVE_OPTIONS_PASS 384 preference combinations, page wrapping, confirmation and reset");return 0;
+ mx_opt_page(&m,MX_OPT_AUDIO);mx_opt_pick(&m,2);CHECK(mx_opt_id(&m,2)==MX_O_ART);
+ CHECK(!mx_art_unlocked(&a)&&!strcmp(mx_opt_value(&o,&m,MX_O_ART,1),"LOCKED"));
+ CHECK(mx_opt_activate(&o,&m,0,1)==MX_O_NONE&&!o.art_style);
+ for(int i=0;i<MX_STORY_LEVELS-1;i++)a.stars[i]=1;
+ a.stars[MX_NUM_LEVELS-1]=3;a.unlock_all=1;
+ CHECK(!mx_art_unlocked(&a));o.art_style=1;
+ int n=mx_meta_pack_opt(&a,0,&o,data,sizeof data);CHECK(n==MX_SAVE_MAX&&!(data[n-6]&64));
+ CHECK(mx_meta_unpack_opt(&b,&outfit,&q,data,n)&&!q.art_style);
+ a.stars[MX_STORY_LEVELS-1]=1;o.art_style=0;m.art_available=mx_art_unlocked(&a);
+ CHECK(m.art_available&&!strcmp(mx_opt_value(&o,&m,MX_O_ART,1),"CLASSIC"));
+ CHECK(mx_opt_activate(&o,&m,0,1)==MX_O_CHANGED&&mx_art_active(&a,&o));
+ CHECK(!strcmp(mx_opt_value(&o,&m,MX_O_ART,1),"GOLDEN CELS"));
+ n=mx_meta_pack_opt(&a,12,&o,data,sizeof data);
+ CHECK(n==MX_SAVE_MAX&&(data[n-6]&64)&&mx_meta_unpack_opt(&b,&outfit,&q,data,n));
+ CHECK(outfit==12&&q.art_style&&mx_art_active(&b,&q));
+ CHECK(mx_opt_activate(&o,&m,0,1)==MX_O_CHANGED&&!o.art_style);
+ uint8_t skin[3]={244,183,142},original[3];memcpy(original,skin,3);mx_art_color(skin);
+ CHECK(memcmp(skin,original,3)&&skin[0]>=skin[1]&&skin[1]>=skin[2]);
+ mx_options_default(&q);CHECK(!q.art_style);
+ puts("NATIVE_OPTIONS_PASS 384 preference combinations, chapter gate, art save, palette, reset");return 0;
 }
