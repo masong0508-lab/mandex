@@ -22,7 +22,8 @@ assert "if(x < -p*12" in n3
 assert "float step=(t&&t->mv)?" in dc
 assert "if(wind){" in dc
 assert "LORD_GLOW=mkCanvas(56,56)" in web
-actor=web[web.index("function drawLandlord(t){"):web.index("function drawCases(){")]
+start=web.index("function drawLandlord(t){")
+actor=web[start:web.index("function drawCases(",start)]
 assert "ctx.drawImage(LORD_GLOW,-28,-32)" in actor
 assert "createRadialGradient(" not in actor  # no per-enemy gradient allocation
 assert "bob=pan||t.mv?0" in actor

@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compile identical old/new wallpaper paths for DS host profiling
         run: |
           for fast in 0 1; do
@@ -66,7 +66,7 @@ jobs:
               print(f'Level {l+1:02}: old {ref:.2f}us, cached {new:.2f}us, delta {gain:+.2f}% — pixel identical')
           pathlib.Path('out/ds-fac-ab/paired-host-report.txt').write_text('\n'.join(lines)+'\n')
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-ds-facade-cache-ab-host
           path: out/ds-fac-ab/paired-host-report.txt

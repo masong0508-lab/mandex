@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 20
     container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build Mandex 3DS homebrew
         run: |
           export DEVKITPRO=${DEVKITPRO:-/opt/devkitpro}
@@ -26,7 +26,7 @@ jobs:
           make -C 3ds
           test -s 3ds/mandex.3dsx
           test -s 3ds/mandex.elf
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-3ds-pr
           path: |

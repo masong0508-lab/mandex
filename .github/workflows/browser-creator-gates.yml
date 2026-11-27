@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Node version
         run: node --version
       - name: Canonical MX1 codes, UTF-8 names and malicious import rejection
@@ -35,6 +35,8 @@ jobs:
         run: node test/browser_orientation_test.js
       - name: Captured multitouch and camera safety
         run: node test/browser_multitouch_test.js
+      - name: Direct gadget chooser, stock and modal touch isolation
+        run: node test/browser_tool_picker_test.js
       - name: Shared walk controls and collision memory
         run: node test/browser_walk_memory_test.js
       - name: Portrait walking focus and bounded camera transitions
@@ -65,6 +67,8 @@ jobs:
         run: node test/browser_cel_character_test.js
       - name: Walking HUD, objectives and portrait spacing
         run: node test/browser_objective_test.js
+      - name: Adaptive refresh pacing, viewport actors and fracture thresholds
+        run: node test/browser_viewport_performance_test.js
       - name: Shaking camera debris visibility and draw work
         run: node test/browser_rubble_draw_test.js
       - name: Shattered debris stops contacting during its solver step
@@ -74,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -86,11 +90,13 @@ jobs:
         run: python3 test/browser_canvas_cull_test.py --out-dir out/browser-canvas
       - name: Exercise live keyboard, slingshot and orientation input
         run: python3 test/browser_input_smoke.py --out-dir out/browser-canvas/input
+      - name: Exercise live gadget selection, pause and stock consumption
+        run: python3 test/browser_tool_picker_live.py --out-dir out/browser-canvas/tools
       - name: Render Golden Cels character poses and verify Classic restoration
         run: python3 test/browser_cel_character_live.py --out-dir out/browser-canvas/character
       - name: Real three-stage circuits, HQ rewards and walking transit
         run: python3 test/browser_relay_circuit_test.py --out-dir out/browser-canvas/relays
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: mandex-browser-canvas-review

@@ -418,6 +418,8 @@ class Smoke:
         require(parried['active_cases'] == 0 and parried['score'] == 150 and
                 parried['hurt_cooldown'] == 0 and parried['punch'] > 0,
                 'Trusted punch failed to parry a real briefcase', parried)
+        require(0.95 < parried['wt'] - before['wt'] <= 1.001,
+                'Parry failed to award its bounded one-second reward', [before, parried])
         self.screenshot('13-gameplay-briefcase-parry')
         followup = self.continuous(6)[0][-1]
         require(followup['active_cases'] == 0 and followup['score'] == 150 and

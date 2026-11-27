@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Per-charge fuse and warning integrity (float, DS fixed)
         run: |
           for mode in float fixed; do

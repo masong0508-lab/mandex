@@ -424,7 +424,7 @@ static void on_events(void){
       part_free_hint = 0;
 #endif   /* Landlord HQ: next district, fresh men */
       popup(60, 20, world.district == 1 ? "DISTRICT 2 OF 3!" : "DISTRICT 3 OF 3!", RGB(255, 210, 63)); break;
-    case EV_BONK: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, e->m == 2 ? "PARRY! +150" : "BONK!", RGB(255, 210, 63)); break;
+    case EV_BONK: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, e->m == 2 ? (e->a>0?"PARRY +150 / +1S":"PARRY! +150") : "BONK!", RGB(255, 210, 63)); break;
     default: break;
     }
   }

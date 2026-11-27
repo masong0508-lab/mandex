@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build float and fixed-point gameplay profilers
         run: |
           gcc -std=gnu99 -O2 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float
@@ -136,7 +136,7 @@ jobs:
             print(line);results.append(line)
           pathlib.Path('out/gameplay-profiles/repeated-median-ab.txt').write_text('\n'.join(results)+'\n')
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-gameplay-host-profiles
           path: out/gameplay-profiles/*.txt

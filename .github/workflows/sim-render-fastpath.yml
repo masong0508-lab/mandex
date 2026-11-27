@@ -10,6 +10,7 @@ on:
       - "ds/source/gfx.c"
       - "test/bench.c"
       - "test/wob_state_digest.c"
+      - "test/wob_joint_threshold_test.c"
       - "test/ds_render.c"
       - "test/rot_sprite_parity_test.c"
       - ".github/workflows/sim-render-fastpath.yml"
@@ -24,7 +25,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - name: Compare fracture decisions at every material and damage threshold
+        run: |
+          set -eu
+          for mode in float fixed; do
+            flags=""
+            if [ "$mode" = fixed ]; then flags="-DMX_FIXED"; fi
+            gcc -std=gnu99 -O2 -Wall -Wno-unused-function $flags -Icore test/wob_joint_threshold_test.c -lm -o /tmp/wob_joint_threshold
+            /tmp/wob_joint_threshold
+          done
       - name: Compile original and optimized simulation paths for fixed/float
         run: |
           for mode in float fixed; do
@@ -32,12 +42,12 @@ jobs:
             test "$mode" = fixed && defs="-DMX_FIXED"
             for variant in before after; do
               ref=""
-              test "$variant" = before && ref="-DMX_WOB_JOINT_MASK=0 -DMX_LORD_AI_DIST_CULL=0 -DMX_LORD_RUBBLE_AABB=0 -DMX_LORD_DANGER_SPATIAL_FIRST=0"
+              test "$variant" = before && ref="-DMX_WOB_JOINT_EARLY_REJECT=0 -DMX_WOB_JOINT_MASK=0 -DMX_LORD_AI_DIST_CULL=0 -DMX_LORD_RUBBLE_AABB=0 -DMX_LORD_DANGER_SPATIAL_FIRST=0"
               gcc -std=gnu99 -O2 $defs $ref -Icore core/mx.c test/wob_state_digest.c -lm -o /tmp/sim_${mode}_${variant}_digest
               gcc -std=gnu99 -O2 $defs $ref -Icore core/mx.c test/bench.c -lm -o /tmp/sim_${mode}_${variant}_bench
             done
           done
-      - name: Verify exact whole-world state over 60 levels x 360 frames, both modes
+      - name: Verify exact whole-world state over all 660 levels x 360 frames, both modes
         run: |
           for mode in float fixed; do
             /tmp/sim_${mode}_before_digest > /tmp/world-${mode}-before
@@ -61,6 +71,36 @@ jobs:
             b=statistics.median(t for t,c in times['after'])
             assert {c for v in times.values() for t,c in v}.__len__()==1, 'simulation changed!'
             print(f'SIM_AB mode={mode} reference_ms={a:.2f} optimized_ms={b:.2f} improvement_pct={(a-b)*100/a:.2f}')
+          PY
+
+      - name: Isolate conservative fracture rejection and compare complete simulation state
+        run: |
+          set -eu
+          for mode in float fixed; do
+            flags=""
+            if [ "$mode" = fixed ]; then flags="-DMX_FIXED"; fi
+            for variant in 0 1; do
+              gcc -std=gnu99 -O2 $flags -DMX_WOB_JOINT_EARLY_REJECT=$variant -Icore core/mx.c test/wob_state_digest.c -lm -o "/tmp/joint_${mode}_${variant}_digest"
+              gcc -std=gnu99 -O2 $flags -DMX_WOB_JOINT_EARLY_REJECT=$variant -Icore core/mx.c test/bench.c -lm -o "/tmp/joint_${mode}_${variant}_bench"
+              "/tmp/joint_${mode}_${variant}_digest" > "/tmp/joint_${mode}_${variant}.txt"
+            done
+            diff -u "/tmp/joint_${mode}_0.txt" "/tmp/joint_${mode}_1.txt"
+            cat "/tmp/joint_${mode}_1.txt"
+          done
+          python3 - <<'PY'
+          import re,statistics,subprocess
+          for mode in ('fixed','float'):
+            timings={0:[],1:[]};hashes=set()
+            for turn in range(3):
+              for variant in ((0,1) if turn%2==0 else (1,0)):
+                line=subprocess.check_output([f'/tmp/joint_{mode}_{variant}_bench','--quiet','360'],text=True)
+                m=re.search(r'TOTAL ([0-9.]+) ms.*checksum (\d+)',line)
+                assert m,line
+                timings[variant].append(float(m.group(1)))
+                hashes.add(m.group(2))
+            assert len(hashes)==1,(mode,hashes)
+            a,b=map(statistics.median,(timings[0],timings[1]))
+            print(f'WOB_JOINT_AB mode={mode} reference_ms={a:.2f} optimized_ms={b:.2f} gain_pct={(a-b)*100/a:.2f} [host only]')
           PY
 
       - name: Isolate rubble AABB cost and prove exact contact-physics state parity
@@ -126,12 +166,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build real DS main-loop harness with reference and optimized render flags
         run: |
           for variant in before after; do
             defs=""
-            test "$variant" = before && defs="-DMX_DS_DAMAGE_THRESH=0 -DMX_DS_VOXEL_EMPTY4=0 -DMX_DS_ELLIPSE_SYMMETRY=0 -DMX_DS_ROT_INCREMENTAL=0 -DMX_WOB_JOINT_MASK=0 -DMX_LORD_AI_DIST_CULL=0 -DMX_LORD_RUBBLE_AABB=0 -DMX_LORD_DANGER_SPATIAL_FIRST=0"
+            test "$variant" = before && defs="-DMX_DS_DAMAGE_THRESH=0 -DMX_DS_VOXEL_EMPTY4=0 -DMX_DS_ELLIPSE_SYMMETRY=0 -DMX_DS_ROT_INCREMENTAL=0 -DMX_WOB_JOINT_EARLY_REJECT=0 -DMX_WOB_JOINT_MASK=0 -DMX_LORD_AI_DIST_CULL=0 -DMX_LORD_RUBBLE_AABB=0 -DMX_LORD_DANGER_SPATIAL_FIRST=0"
             gcc -std=gnu99 -O2 -Wno-unused-function -DMX_FIXED -DMX_DS_PROFILE_HOST $defs \
               -Itest/stubs -Icore -Iart -Ids/source \
               test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c \
@@ -190,7 +230,7 @@ jobs:
             p0=get(a,ph);p1=get(b,ph)
             print(f'DS_AB level={level+1} pixels=IDENTICAL old_frame_us={x:.2f} new_frame_us={y:.2f} total_gain_pct={(x-y)*100/x:.2f} old_top_us={t0:.2f} new_top_us={t1:.2f} old_physics_us={p0:.2f} new_physics_us={p1:.2f}')
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sim-render-fastpath-host-metrics
