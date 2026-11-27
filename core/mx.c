@@ -1959,7 +1959,7 @@ static void upd_cases(MxWorld *w, real dt){
        countered, not just on the exact button-down frame. */
     if(!dead && m->mode==MAN_WALK && m->pT>0){
       real hx=m->x+(m->face>0?MX_WALK_PUNCH_X:-MX_WALK_PUNCH_X), hy=m->y+MX_WALK_PUNCH_Y;
-      if(rabs(c->x-hx)<MX_WALK_PUNCH_HW+R(0.75) && rabs(c->y-hy)<MX_WALK_PUNCH_HH+R(0.75)){
+      if(rabs(c->x-hx)<(m->charge_punch?R(2.25):MX_WALK_PUNCH_HW)+R(0.75) && rabs(c->y-hy)<MX_WALK_PUNCH_HH+R(0.75)){
         parry_case(w,c);continue;
       }
     }
@@ -2037,7 +2037,7 @@ static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
   mx_flight_face_update(m);
   if(m->face != -1) m->face = 1;
-  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->parry_time_used=0; m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=m->jump_buffer=0;m->jump_latched=m->walk_safe=0;m->walk_jam=0;
+  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->parry_time_used=0; m->charge_punch=0; m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=m->jump_buffer=0;m->jump_latched=m->walk_safe=0;m->walk_jam=0;
   m->in_ax = 0; m->in_jump = m->in_punch = m->in_stomp = 0;
   m->x=rclamp(m->x,WHW+R(.25),RI(MX_COLS)-WHW-R(.25));m->y=rclamp(m->y,WHH,RI(MX_ROWS)-WHH);
   int ok = !wblocked(w, m->x, m->y);
@@ -2104,7 +2104,7 @@ static void walk_punch(MxWorld *w){
   int run = (m->face > 0 ? m->vx : -m->vx) > R(12.5);
   int parried=0;
   real d = walk_hit(w, cx, cy, run ? R(2.25) : MX_WALK_PUNCH_HW, MX_WALK_PUNCH_HH, RI(run ? 24 : 16), &parried);
-  m->pT = R(0.2); m->pCd = R(0.3);
+  m->charge_punch = (uint8_t)run; m->pT = R(0.2); m->pCd = R(0.3);
   ev(w, EV_PUNCH, cx, cy, run, d, RI(parried));
   if(d > 0){ if(w->shake < RI(3)) w->shake = RI(3); wob_kick(w, rfloor(cx), rfloor(cy), 4, m->face > 0 ? R(0.9) : -R(0.9), 0); }
 }
