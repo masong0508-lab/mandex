@@ -293,8 +293,10 @@ static int man_fur;                                                          /* 
 /* Four tiny pressure-art colors follow recolor_man, not the original
    flesh tone when Wolfman fur or another skin variant is selected. */
 static uint32 belly_tone[4];
+static int cel_active;
 static void recolor_man(int o){
   if(!tx_man) return;
+  int cel=mx_art_active(&stats,&console_opt);
   uint8_t sh[6][3], sk[4][3]; mx_outfit_shades(o, sh); int fur = mx_outfit_skin(o, sk);
   size_t tot = (size_t)DCT_MAN_W * DCT_MAN_H;
   unsigned short *tmp = (unsigned short *)malloc(tot * 2);
@@ -324,11 +326,17 @@ static void recolor_man(int o){
       nr = nr > 255 ? 255 : nr; ng = ng > 255 ? 255 : ng; nb = nb > 255 ? 255 : nb;
       v = (unsigned short)((a << 12) | ((nr >> 4) << 8) | ((ng >> 4) << 4) | (nb >> 4));
     }
+    if(cel&&a){
+      uint8_t ink[3]={(uint8_t)(((v>>8)&15)*17),(uint8_t)(((v>>4)&15)*17),(uint8_t)((v&15)*17)};
+      mx_art_color(ink);
+      v=(unsigned short)((a<<12)|((ink[0]>>4)<<8)|((ink[1]>>4)<<4)|(ink[2]>>4));
+    }
     tmp[i] = v;
   }
   pvr_txr_load(tmp, tx_man, (uint32)(tot * 2));
   free(tmp);
-  man_fur = fur;
+  man_fur = fur;cel_active=cel;
+  if(cel)for(int k=0;k<4;k++)mx_art_color(sk[k]);
   for(int k=0;k<4;k++)
     belly_tone[k]=argb(sk[k][0],sk[k][1],sk[k][2],255);
 }
@@ -595,10 +603,15 @@ static void draw_title(void){
 
 /* ---- the world ---- */
 static int variant(int x, int y){ return (x * 5 + y * 3 + (x >> 2)) & 3; }
+static uint32 cel_tile_tint(int m){
+  if(!cel_active)return WHITE;
+  static const uint8_t tint[MX_NMAT][3]={{255,255,255},{255,228,214},{255,220,218},{232,230,255},{223,240,255},{255,230,218},{225,235,255},{255,220,235},{255,234,206}};
+  return argb(tint[m][0],tint[m][1],tint[m][2],255);
+}
 static void tile(float px, float py, int m, int v, int d, float z){
   int t = ((m - 1) * 4 + v) * 3 + d;
   float tx = DCA_TILE_X + (t & 15) * DCA_TILE_S + 1, ty = DCA_TILE_Y + (t >> 4) * DCA_TILE_S + 1;
-  tquad(&hdr_atl, 512, 512, px, py, PXC + 0.35f, PXC + 0.35f, tx, ty, 16, 16, z, WHITE);
+  tquad(&hdr_atl, 512, 512, px, py, PXC + 0.35f, PXC + 0.35f, tx, ty, 16, 16, z, cel_tile_tint(m));
 }
 static void tile_rot(float cx, float cy, float ca, float sa, int m, int v, int d, float z){      /* a block of a flying chunk, turned */
   int t = ((m - 1) * 4 + v) * 3 + d;
@@ -606,7 +619,8 @@ static void tile_rot(float cx, float cy, float ca, float sa, int m, int v, int d
   float u0 = tx / 512, v0 = ty / 512, u1 = (tx + 16) / 512, v1 = (ty + 16) / 512, h = PXC * 0.5f + 0.2f;
   float ex[4] = { -h, h, -h, h }, ey[4] = { -h, -h, h, h }, uu[4] = { u0, u1, u0, u1 }, vv[4] = { v0, v0, v1, v1 };
   use(&hdr_atl);
-  for(int k = 0; k < 4; k++) vtx(cx + ex[k] * ca - ey[k] * sa, cy + ex[k] * sa + ey[k] * ca, z, uu[k], vv[k], WHITE, k == 3);
+  uint32 tint=cel_tile_tint(m);
+  for(int k = 0; k < 4; k++) vtx(cx + ex[k] * ca - ey[k] * sa, cy + ex[k] * sa + ey[k] * ca, z, uu[k], vv[k], tint, k == 3);
 }
 /* A rotated voxel has half-side (PXC/2 + .2) = 2.7 pixels.
    Even at 45 degrees its axis extent stays below 3.82 px. Reject cells
@@ -831,9 +845,9 @@ static void draw_all(void){
   shx = shy = 0;
   if(world.shake > 0.05f){float scale=console_opt.shake==2?0:console_opt.shake==1?.3f:.6f;shx=(frand()-.5f)*world.shake*scale;shy=(frand()-.5f)*world.shake*scale;}
   /* backdrop: sky, drifting clouds, hills / city / ground + the sling post */
-  tquad(&hdr_bga, DCT_BGA_W, DCT_BGA_H, 0, 0, 640, 480, 0, 0, 512, 256, Z_BG, WHITE);
+  tquad(&hdr_bga, DCT_BGA_W, DCT_BGA_H, 0, 0, 640, 480, 0, 0, 512, 256, Z_BG, cel_active?argb(255,200,188,255):WHITE);
   draw_clouds();
-  tquad(&hdr_bgb, DCT_BGB_W, DCT_BGB_H, 0, 0, 1024, 512, 0, 0, 1024, 512, Z_BGB, WHITE);
+  tquad(&hdr_bgb, DCT_BGB_W, DCT_BGB_H, 0, 0, 1024, 512, 0, 0, 1024, 512, Z_BGB, cel_active?argb(255,224,206,255):WHITE);
   draw_rooms();
   draw_facades();
   const MxMan *m = &world.man;
@@ -1232,8 +1246,11 @@ static void dc_end_input(uint32 pressed){
 }
 
 static void opt_change(int dir){
+  opt_menu.art_available=mx_art_unlocked(&stats);
+  int old_art=console_opt.art_style;
   int action=mx_opt_activate(&console_opt,&opt_menu,dir,on_title);
-  if(action==MX_O_ERASE){mx_meta_init(&stats);outfit_sel=0;outfit_seen=1;toast_nq=0;toast_id=-1;toast_t=0;title_lv=0;recolor_man(0);outfit_scan(1);load_level(0);}
+  if(action==MX_O_ERASE){mx_meta_init(&stats);console_opt.art_style=0;outfit_sel=0;outfit_seen=1;toast_nq=0;toast_id=-1;toast_t=0;title_lv=0;recolor_man(0);outfit_scan(1);load_level(0);}
+  if(old_art!=console_opt.art_style)recolor_man(outfit_sel);
   nofight=console_opt.nofight;mus_pref=!console_opt.music_off;
   mx_set_fight(&world,!nofight);mx_set_collapse(&world,console_opt.collapse);
   if(action==MX_O_SAVE_NOW||action==MX_O_ERASE)dc_save_sync();
@@ -1250,9 +1267,10 @@ static void options_input(uint32 pressed){
   else if(pressed&CONT_DPAD_RIGHT)opt_change(1);
 }
 static void draw_options(void){
+  opt_menu.art_available=mx_art_unlocked(&stats);
   quad(0,0,640,480,Z_BG,argb(255,15,18,30));text("MANDEX OPTIONS",320,12,35,argb(255,255,210,63),1,Z_HUD);
   for(int i=0;i<4;i++){quad(i*160+5,57,150,34,Z_HUD,argb(255,i==opt_menu.page?65:29,37,80));text(mx_opt_tabs[i],i*160+80,62,21,WHITE,1,Z_HUD+1);}
-  for(int i=0;i<mx_opt_rows(&opt_menu);i++){int id=mx_opt_id(&opt_menu,i),y=100+i*70;uint32 col=i==opt_menu.row?argb(255,255,210,63):argb(255,176,192,213);quad(20,y,600,64,Z_HUD,argb(255,30,38,61));quad(20,y,600,2,Z_HUD+1,col);text(mx_opt_names[id],32,y+7,21,col,0,Z_HUD+2);text(mx_opt_value(&console_opt,&opt_menu,id,on_title),608,y+7,21,WHITE,2,Z_HUD+2);text(mx_opt_desc[id],32,y+35,17,argb(255,182,197,218),0,Z_HUD+2);}
+  for(int i=0;i<mx_opt_rows(&opt_menu);i++){int id=mx_opt_id(&opt_menu,i),y=100+i*70;uint32 col=i==opt_menu.row?argb(255,255,210,63):argb(255,176,192,213);quad(20,y,600,64,Z_HUD,argb(255,30,38,61));quad(20,y,600,2,Z_HUD+1,col);text(mx_opt_names[id],32,y+7,21,col,0,Z_HUD+2);text(mx_opt_value(&console_opt,&opt_menu,id,on_title),608,y+7,21,WHITE,2,Z_HUD+2);text(id==MX_O_ART&&opt_menu.art_available?"CEL PAINT / ORIGINAL LOOK":mx_opt_desc[id],32,y+35,17,argb(255,182,197,218),0,Z_HUD+2);}
   if(opt_menu.page==MX_OPT_PERF)text(console_opt.profile==3?"MINIMAL FX / FULL SIMULATION":"PROFILE FX / FULL SIMULATION",320,387,18,argb(255,125,255,90),1,Z_HUD+2);
 #if defined(__sh__) && !defined(MX_DC_NO_VMU)
   if(opt_menu.page==MX_OPT_DATA)text(dc_save_status<0?"VMU WRITE FAILED":dc_save_status?"VMU SAVE OK":"NO SAVE CONFIRMED",320,320,18,argb(255,125,255,90),1,Z_HUD+2);
