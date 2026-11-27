@@ -736,6 +736,7 @@ typedef struct {
 static const uint8_t MX_TRIAL_DATA[] = {
 ${Array.from({length:Math.ceil(commands.length/32)},(_,i)=>"  "+commands.slice(i*32,(i+1)*32).join(",")).join(",\n")}
 };
+static const uint16_t MX_METRO_TOWER_FEET[7][3] = {${internalLevels.map(l=>"{"+l.towerFeet.join(",")+"}").join(",")}};
 static const MxTrialLevel MX_TRIALS[] = {
 ${rows}
 };
@@ -757,6 +758,7 @@ const TRIAL_START=LEVELS.length;
 const TRIAL_BYTES=${packed};
 const TRIAL_META=${JSON.stringify(table.map(t=>[t.name,t.tip,t.off,t.rects,t.roomOff,t.rooms,t.targetOff,t.targets,t.padOff,t.pads,t.tubeOff,t.tubes,t.men,t.walk]))};
 const TRIAL_DISTRICTS=${JSON.stringify(publicLevels.filter((_,i)=>i%20===0).map(l=>l.district))};
+const METRO_TOWER_FEET=${JSON.stringify(internalLevels.map(l=>l.towerFeet))};
 function buildTrial(i){
   const a=TRIAL_META[i],digit=c=>c>=65&&c<=90?c-65:c>=97&&c<=122?c-71:c>=48&&c<=57?c+4:c===43?62:63,read=j=>{
     const off=Math.floor(j/3)*4,part=j%3,p=digit(TRIAL_BYTES.charCodeAt(off+part)),q=digit(TRIAL_BYTES.charCodeAt(off+part+1));

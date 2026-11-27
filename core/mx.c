@@ -2961,7 +2961,9 @@ static void hq_next_district(MxWorld *w){
   ev(w, EV_DISTRICT, 0, 0, d, RI(mx_stage_bonus(level)), 0);
 }
 
-const char *mx_stage_tactic(const MxWorld *w){return mx_level_tactic(mx_stage_source(w->level,w->district));}
+const char *mx_stage_name(const MxWorld *w){int l=mx_stage_source(w->level,w->district);return w->level==MX_MOUNTAIN_LEVEL?MX_TRIALS[l-MX_TRIAL_START].name:mx_level_name(w->level);}
+int mx_metro_tower_height(const MxWorld *w){return w->level==MX_MOUNTAIN_LEVEL&&w->district>=0&&w->district<MX_METRO_STAGES?MX_METRO_TOWER_FEET[w->district][2]:0;}
+const char *mx_stage_tactic(const MxWorld *w){int l=mx_stage_source(w->level,w->district);return l>=MX_METRO_START&&l<MX_METRO_START+MX_METRO_STAGES?MX_TRIALS[l-MX_TRIAL_START].tip:mx_level_tactic(l);}
 void mx_set_wobble_budget(MxWorld *w, int cells){ w->wob_budget = cells < 0 ? 0 : cells; if(!cells) w->wob_shift = 0; }
 void mx_set_substeps(MxWorld *w, int n){ w->substeps = n < 2 ? 2 : n > 4 ? 4 : n; }
 void mx_preview_point(const MxWorld *w, real t, real *ox, real *oy){

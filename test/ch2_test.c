@@ -40,10 +40,10 @@ int main(void){
   CHECK(mx_level_stage_count(1079)==1&&mx_level_stage_count(1080)==6&&mx_level_stage_count(1098)==6,"grand relay boundary");
   for(int l=1080;l<1099;l++)for(int d=0;d<6;d++) CHECK(mx_stage_source(l,d)==l-100+20*d,"grand relay stage mapping");
   CHECK(mx_trial_district_step(0,-1)==1100&&mx_trial_district_step(1109,1)==0,"partial district navigation wraps");
-  CHECK(mx_level_stage_count(1098)==6&&mx_level_stage_count(1099)==1&&mx_level_stage_count(1108)==1&&mx_level_stage_count(1109)==11,"mountain stage boundaries");
-  for(int d=0;d<11;d++)CHECK(mx_stage_source(1109,d)==1099+d,"mountain stage mapping");
+  CHECK(mx_level_stage_count(1098)==6&&mx_level_stage_count(1099)==1&&mx_level_stage_count(1108)==1&&mx_level_stage_count(1109)==18,"mountain stage boundaries");
+  for(int d=0;d<18;d++)CHECK(mx_stage_source(1109,d)==(d<7?1110+d:1099+d-7),"metro and mountain stage mapping");
   { static MxWorld mountain; mx_load(&mountain,1109); CHECK(mountain.walk&&mountain.district==0&&mountain.ntubes>=1,"first mountain sector");
-    mountain.district=10; mountain.man.x=RI(105); mountain.man.y=RI(6); mountain.man.mode=MAN_FLY; mx_summit_visit(&mountain);CHECK(mx_summit_needed(&mountain),"flyover is not a summit visit");
+    mountain.district=17; mountain.man.x=RI(105); mountain.man.y=RI(6); mountain.man.mode=MAN_FLY; mx_summit_visit(&mountain);CHECK(mx_summit_needed(&mountain),"flyover is not a summit visit");
     mountain.man.mode=MAN_WALK;mx_summit_visit(&mountain);CHECK(!mx_summit_needed(&mountain)&&mountain.summit_reached,"on-foot summit visit");
     mx_load(&mountain,1109);CHECK(!mountain.summit_reached,"retry clears summit visit"); }
 

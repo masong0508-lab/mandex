@@ -1044,7 +1044,7 @@ static void draw_all(void){
   char buf[64], nm[40]; int n = 0;
   for(const char *q = mx_level_name(world.level); *q && n < 38; q++) nm[n++] = (*q >= 'a' && *q <= 'z') ? *q - 32 : *q;
   nm[n] = 0;
-  if(world.level==MX_MOUNTAIN_LEVEL)snprintf(buf,sizeof buf,"LV 1110 %d/%d  %d FT",world.district+1,MX_MOUNTAIN_STAGES,mx_mountain_altitude(&world));
+  if(world.level==MX_MOUNTAIN_LEVEL)snprintf(buf,sizeof buf,"LV 1110 %d/%d  %s %d FT",world.district+1,MX_MOUNTAIN_STAGES,mx_metro_tower_height(&world)?"ROOF":"ALT",mx_metro_tower_height(&world)?mx_metro_tower_height(&world):mx_mountain_altitude(&world));
   else if(mx_level_stage_count(world.level)>1)snprintf(buf,sizeof buf,"LV %d %s %d/%d",world.level+1,nm,world.district+1,mx_level_stage_count(world.level));
   else snprintf(buf, sizeof buf, "LV %d  %s", world.level + 1, nm);
   text(buf, 12, 26, 16, argb(255, 210, 63, 255), 0, Z_HUD + 0.1f);

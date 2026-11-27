@@ -432,10 +432,12 @@ static inline int mx_tube_pulse_stage(const MxTube *t){
 #define MX_GRAND_RELAY_END 1099
 #define MX_MOUNTAIN_START 1099
 #define MX_MOUNTAIN_LEVEL 1109
-#define MX_MOUNTAIN_STAGES 11
+#define MX_METRO_START MX_NUM_LEVELS /* internal packed map IDs, never selectable or saved */
+#define MX_METRO_STAGES 7
+#define MX_MOUNTAIN_STAGES (MX_METRO_STAGES+11)
 static inline int mx_level_stage_count(int l){return l==MX_MOUNTAIN_LEVEL?MX_MOUNTAIN_STAGES:l>=MX_GRAND_RELAY_START&&l<MX_GRAND_RELAY_END?6:l==MX_HQ_LEVEL||(l>=MX_RELAY_START&&l<MX_RELAY_END)?3:1;}
 static inline int mx_stage_source(int l,int d){
-  if(l==MX_MOUNTAIN_LEVEL)return MX_MOUNTAIN_START+(d<0?0:d>=MX_MOUNTAIN_STAGES?MX_MOUNTAIN_STAGES-1:d);
+  if(l==MX_MOUNTAIN_LEVEL){int p=d<0?0:d>=MX_MOUNTAIN_STAGES?MX_MOUNTAIN_STAGES-1:d;return p<MX_METRO_STAGES?MX_METRO_START+p:MX_MOUNTAIN_START+p-MX_METRO_STAGES;}
   if(l>=MX_GRAND_RELAY_START&&l<MX_GRAND_RELAY_END)return l-100+20*(d<0?0:d>5?5:d);
   if(l>=MX_RELAY_START&&l<MX_RELAY_END)return l-40+20*(d<0?0:d>2?2:d);
   return l;
@@ -443,7 +445,9 @@ static inline int mx_stage_source(int l,int d){
 static inline int mx_stage_bonus(int l){return l>=MX_RELAY_START?MX_RELAY_BONUS_MEN:MX_HQ_BONUS_MEN;}
 static inline int mx_summit_needed(const MxWorld *w){return w->level==MX_MOUNTAIN_LEVEL&&w->district==MX_MOUNTAIN_STAGES-1&&!w->summit_reached;}
 static inline void mx_summit_visit(MxWorld *w){if(mx_summit_needed(w)&&w->man.mode==MAN_WALK&&w->man.x>=RI(96)&&w->man.x<=RI(113)&&w->man.y<=RI(9))w->summit_reached=1;}
-static inline int mx_mountain_altitude(const MxWorld *w){return w->level==MX_MOUNTAIN_LEVEL?200*(w->district+1):w->level>=MX_MOUNTAIN_START?200*(w->level-MX_MOUNTAIN_START+1):0;}
+static inline int mx_mountain_altitude(const MxWorld *w){return w->level==MX_MOUNTAIN_LEVEL?(w->district<MX_METRO_STAGES?0:200*(w->district-MX_METRO_STAGES+1)):w->level>=MX_MOUNTAIN_START?200*(w->level-MX_MOUNTAIN_START+1):0;}
+const char *mx_stage_name(const MxWorld *w);
+int mx_metro_tower_height(const MxWorld *w);
 const char *mx_stage_tactic(const MxWorld *w);
 void mx_load(MxWorld *w, int level);
 void mx_update(MxWorld *w, real dt);          /* dt ~ 1/60 s */

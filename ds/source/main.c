@@ -1410,7 +1410,7 @@ static void draw_objective_edge(const View *v){
   gfx_text_c(v->buf,edge.x,edge.y-5,label,C_PINK,C_BLACK,1);
 }
 static void top_hud(u8 *b){
-  const char *nm = mx_level_name(world.level==MX_MOUNTAIN_LEVEL?mx_stage_source(world.level,world.district):world.level);
+  const char *nm = mx_stage_name(&world);
   gfx_rect(b, 0, 0, 256, 11, C_UIBG); gfx_rect(b, 0, 11, 256, 1, C_UILINE);
   gfx_text(b,4,3,"LV",C_GOLD,1);
   const char *lv=gfx_int(world.level+1);int namex=14+gfx_text_w(lv,1)+2;
