@@ -9,10 +9,10 @@ name: ROMs
 on:
   push:
     branches: [main]
-    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/pack_cel_atlas.py", "tools/gen_manspr.py", "tools/gen_dc_art.py", "test/native_atlas_selection_test.c", "tools/validate_ds_smoke.py", "tools/run_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
+    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/pack_cel_atlas.py", "tools/gen_manspr.py", "tools/gen_dc_art.py", "test/native_atlas_selection_test.c", "test/ch2_test.c", "test/save_test.c", "test/vmu_save_test.c", "test/native_trial_pack_test.c", "test/browser_walk_jump_forgiveness_test.js", "test/browser_creator_codec_test.js", "tools/validate_ds_smoke.py", "tools/run_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
   pull_request:
     branches: [main]
-    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/pack_cel_atlas.py", "tools/gen_manspr.py", "tools/gen_dc_art.py", "test/native_atlas_selection_test.c", "tools/validate_ds_smoke.py", "tools/run_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
+    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/pack_cel_atlas.py", "tools/gen_manspr.py", "tools/gen_dc_art.py", "test/native_atlas_selection_test.c", "test/ch2_test.c", "test/save_test.c", "test/vmu_save_test.c", "test/native_trial_pack_test.c", "test/browser_walk_jump_forgiveness_test.js", "test/browser_creator_codec_test.js", "tools/validate_ds_smoke.py", "tools/run_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
   workflow_dispatch:
 
 # Only the newest commit should occupy heavy build/emulator resources.
@@ -21,6 +21,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  gameplay-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify campaign geometry, walking and legacy saves before packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          for mode in float fixed; do
+            flags=()
+            if [ "$mode" = fixed ]; then flags+=(-DMX_FIXED); fi
+            gcc -std=gnu99 -O2 -Wno-unused-function -DMX_LEVEL_LOCKS "${flags[@]}" -Icore test/native_trial_pack_test.c core/mx_meta.c -lm -o /tmp/trial_pack
+            /tmp/trial_pack
+            for probe in ch2_test save_test vmu_save_test; do
+              gcc -std=gnu99 -O2 -Wno-unused-function "${flags[@]}" -Icore core/mx.c core/mx_meta.c "test/$probe.c" -lm -o "/tmp/$probe"
+              "/tmp/$probe"
+            done
+          done
+          node test/browser_walk_jump_forgiveness_test.js
+          node test/browser_creator_codec_test.js
+
   cel-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -164,7 +186,7 @@ jobs:
           if-no-files-found: warn
 
   package:
-    needs: [ds, dreamcast, n3ds, smoke-ds]
+    needs: [ds, dreamcast, n3ds, smoke-ds, gameplay-gates]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -181,15 +203,22 @@ jobs:
       - uses: actions/download-artifact@v8
         with: { name: mandex-3ds, path: pack/3ds }
       - name: Zip all console builds and standalone browser game
+        shell: bash
         run: |
+          set -euo pipefail
           cp web/index.html pack/mandex.html
           cd pack && ls -la && ls -la 3ds
           printf 'MANDEX ALL-PORT BUILDS (commit %s, hardware FPS not verified)\n\nPLAYABLE FILES:\n  mandex.nds             Nintendo DS: DraStic / melonDS / DeSmuME / flashcart\n  mandex_nosound.nds     Nintendo DS: same game with sound disabled\n  mandex.cdi             Dreamcast disc image: Flycast / redream\n  3ds/mandex.3dsx        Nintendo 3DS homebrew launcher (not a .3ds cartridge ROM)\n  mandex.html            Browser: open directly as a local standalone web page\n\nDEVELOPER / DIAGNOSTIC FILES:\n  mandex.elf             Dreamcast developer loader\n  3ds/mandex.elf         3DS developer binary\n  stage0_red_crt.nds     Early-boot diagnostic ROM\n  stage1_red.nds         Early-boot diagnostic ROM\n  stage2_green.nds       Early-boot diagnostic ROM\n  stage4_yellow.nds      Early-boot diagnostic ROM\n\nConsole binaries are automated builds, not guaranteed hardware-validated.\n' "${{ github.sha }}" > README.txt
-          zip -9 ../mandex-roms.zip mandex.nds mandex_nosound.nds stage0_red_crt.nds stage1_red.nds stage2_green.nds stage4_yellow.nds mandex.cdi mandex.elf 3ds/mandex.3dsx 3ds/mandex.elf mandex.html README.txt
+          files=(mandex.nds mandex_nosound.nds stage0_red_crt.nds stage1_red.nds stage2_green.nds stage4_yellow.nds mandex.cdi mandex.elf 3ds/mandex.3dsx 3ds/mandex.elf mandex.html README.txt)
+          for f in "${files[@]}"; do test -s "$f"; done
+          sha256sum "${files[@]}" > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          zip -9 ../mandex-roms.zip "${files[@]}" SHA256SUMS
+          unzip -tq ../mandex-roms.zip
       - uses: actions/upload-artifact@v4
-        with: { name: mandex-roms, path: mandex-roms.zip }
+        with: { name: mandex-roms, path: mandex-roms.zip, if-no-files-found: error }
       - uses: actions/upload-artifact@v4
-        with: { name: mandex-web, path: pack/mandex.html }
+        with: { name: mandex-web, path: pack/mandex.html, if-no-files-found: error }
 
   n3ds:
     needs: cel-runtime
