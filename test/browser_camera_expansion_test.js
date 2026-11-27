@@ -89,6 +89,60 @@ function expansionRegression(html,assert,section){
    make.man.gr=false;make.man.vy=-1;const before=make.pitch();make.man.vy=1;const after=make.pitch();
    assert(before!==null&&after!==null&&Math.abs(after-before)<.01,'smooth air pitch through apex');
  }
+
+ if(!section||section==='wallpaper'){
+   const original=html.includes('function drawWallpaper(');
+   assert(original,'camera bounded wallpaper renderer is missing');
+   const render=new Function(`
+     let COLS=360;const ROWS=60,V=8;let paper=new Uint8Array(COLS*ROWS),grid=new Uint8Array(COLS*ROWS),CEL_ACTIVE=false,paperTorn=false;
+     const interiors=Array.from({length:5},(_,i)=>({p:'room'+i})),celRoomColor=p=>'cel-'+p;
+     let calls=[],lo=0,hi=COLS,reads=0;const idx=(x,y)=>y*COLS+x;
+     const ctx={fillStyle:'',fillRect(x,y,w,h){calls.push([this.fillStyle,x,y,w,h])}};
+     ${cut('function drawWallpaper(','function drawRoomDetails(')}
+     function reference(xlo,xhi,ylo,yhi){
+       for(let y=ylo;y<yhi;y++){let x=0;while(x<COLS){const n=paper[idx(x,y)];if(!n||grid[idx(x,y)]){x++;continue}let x2=x;while(x2<COLS&&paper[idx(x2,y)]===n&&!grid[idx(x2,y)])x2++;
+         if(x2<=xlo||x>=xhi){x=x2;continue}
+         ctx.fillStyle=CEL_ACTIVE?celRoomColor(interiors[n-1].p):interiors[n-1].p;ctx.fillRect(x*V,y*V,(x2-x)*V,V);
+         ctx.fillStyle='rgba(0,0,0,.07)';for(let k=0;k<(x2-x)*V;k+=16)ctx.fillRect(x*V+k,y*V,8,V);
+         if(!paper[idx(x,y+1)]||y+1>=ROWS){ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x*V,(y+1)*V-5,(x2-x)*V,5)}
+         if(paperTorn){ctx.fillStyle='rgba(70,47,40,.48)';if(x>0&&!paper[idx(x-1,y)])ctx.fillRect(x*V,y*V,2,V);
+           if(x2<COLS&&!paper[idx(x2,y)])ctx.fillRect(x2*V-2,y*V,2,V)}
+         x=x2}}
+     }
+     let seed=781;
+     const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
+     function fixture(width,pattern){
+       COLS=width;const p=new Uint8Array(COLS*ROWS),g=new Uint8Array(COLS*ROWS);
+       for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+         const i=y*COLS+x;p[i]=pattern===0?1:pattern===1?(x<20||x>COLS-20?0:1+(x/31|0)%5):rnd()<.12?0:1+(x/13|0)%5;
+         if(pattern===2&&rnd()<.13)g[i]=2;
+       }
+       // Count property reads through the exact array index path.
+       paper=new Proxy(p,{get(a,k){if(typeof k==='string'&&/^\\d+$/.test(k))reads++;return a[k]}});
+       grid=new Proxy(g,{get(a,k){if(typeof k==='string'&&/^\\d+$/.test(k))reads++;return a[k]}});
+     }
+     function run(fn,x0,x1,y0,y1,cel,torn){
+       calls=[];reads=0;CEL_ACTIVE=cel;paperTorn=torn;fn(x0,x1,y0,y1);
+       // Production cull boundaries include two-cell padding; compare
+       // every overlapping original paint rectangle in its original order.
+       return {all:calls.length,reads,visible:calls.filter(a=>a[1]+a[3]>x0*V&&a[1]<x1*V)};
+     }
+     return {fixture,reference:(...a)=>run(reference,...a),optimized:(...a)=>run(drawWallpaper,...a)};
+   `)();
+   let cases=0,oldCalls=0,newCalls=0,oldReads=0,newReads=0;
+   for(const width of [120,360])for(const pattern of [0,1,2]){
+     render.fixture(width,pattern);
+     for(const [x0,x1] of [[0,width],[1,20],[20,47],[Math.floor(width*.6),Math.floor(width*.6)+24],[width-21,width]])for(const cel of [false,true])for(const torn of [false,true]){
+       const a=render.reference(x0,x1,3,58,cel,torn),b=render.optimized(x0,x1,3,58,cel,torn);
+       assert(JSON.stringify(a.visible)===JSON.stringify(b.visible),'visible wallpaper paint order changed '+[width,pattern,x0,x1,cel,torn]);
+       assert(b.all<=a.all,'extra wallpaper paint calls');
+       if(x0!==0||x1!==width){oldCalls+=a.all;newCalls+=b.all;oldReads+=a.reads;newReads+=b.reads;}
+       cases++;
+     }
+   }
+   assert(newCalls<oldCalls*.6&&newReads<oldReads*.7,'camera culling must materially reduce paint and grid reads');
+   console.log('WALLPAPER_CULL_PASS cases='+cases+' paint='+oldCalls+'->'+newCalls+' reads='+oldReads+'->'+newReads);
+ }
  return 'WEB_EXPANSION_PASS '+(section||'starters particles animation');
 }
 console.log(expansionRegression(fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8'),assert));
