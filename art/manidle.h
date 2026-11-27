@@ -12,7 +12,7 @@
 
 enum { FX_NONE, FX_SLAP, FX_BOING, FX_GRUNT, FX_BURP, FX_FART, FX_FLICK, FX_YAWN, FX_SNORE, FX_SNIFF, FX_WHOOSH, FX_TAUNT, FX_EEK, FX_SNAP, FX_WHEW, FX_KISS, FX_SPARKLE, FX_DISCO, FX_POP, FX_COUNT };
 enum { GAG_BELLY, GAG_WIGGLE, GAG_SCRATCH, GAG_BURP, GAG_FART, GAG_PICK, GAG_YAWN, GAG_CAPE, GAG_KISS, GAG_PINUP, GAG_DISCO, GAG_PECS, GAG_SHIMMY, GAG_HOWL, GAG_REAR_SHUFFLE, GAG_COUNT,
-       GAG_OOPS };                  /* GAG_COUNT = the pickable gags (and the "asleep" marker); GAG_OOPS is only ever a rare version of the cape taunt */
+       GAG_OOPS, GAG_FEAST };                  /* GAG_COUNT = the pickable gags (and the "asleep" marker); GAG_OOPS is only ever a rare version of the cape taunt */
 
 typedef struct { unsigned char frame, ticks, fx; } MiStep;
 
@@ -22,7 +22,7 @@ typedef struct { unsigned char frame, ticks, fx; } MiStep;
  * Both sweeps fit the existing fixed-width animation table. */
 #define MI_TURN_IN { MSF_SPIN_0, 5, FX_WHOOSH }, { MSF_SPIN_1, 3, 0 }, { MSF_SPIN_2, 3, 0 }, { MSF_SPIN_3, 3, 0 }, { MSF_SPIN_4, 3, 0 }, { MSF_SPIN_5, 3, 0 }, { MSF_SPIN_6, 3, 0 }, { MSF_SPIN_7, 3, 0 }, { MSF_SPIN_8, 3, 0 }, { MSF_SPIN_9, 3, 0 }, { MSF_SPIN_10, 3, 0 }, { MSF_SPIN_11, 3, 0 }, { MSF_SPIN_12, 5, 0 }
 #define MI_TURN_OUT { MSF_SPIN_R11, 3, FX_WHOOSH }, { MSF_SPIN_R10, 3, 0 }, { MSF_SPIN_R9, 3, 0 }, { MSF_SPIN_R8, 3, 0 }, { MSF_SPIN_R7, 3, 0 }, { MSF_SPIN_R6, 3, 0 }, { MSF_SPIN_R5, 3, 0 }, { MSF_SPIN_R4, 3, 0 }, { MSF_SPIN_R3, 3, 0 }, { MSF_SPIN_R2, 3, 0 }, { MSF_SPIN_R1, 3, 0 }, { MSF_SPIN_0, 5, 0 }
-static const MiStep MI_GAGS[GAG_OOPS + 1][MI_MAXSTEPS] = {
+static const MiStep MI_GAGS[GAG_FEAST + 1][MI_MAXSTEPS] = {
   /* belly bounce: slap, jiggle, slap... */
   MI_STEPS({ MSF_IDLE_A, 10, 0 }, { MSF_BELLY_A, 6, FX_SLAP }, { MSF_BELLY_B, 6, 0 }, { MSF_BELLY_A, 6, FX_SLAP }, { MSF_BELLY_B, 6, 0 },
            { MSF_BELLY_A, 6, FX_SLAP }, { MSF_BELLY_B, 8, 0 }, { MSF_IDLE_A, 10, 0 }),
@@ -89,6 +89,14 @@ static const MiStep MI_GAGS[GAG_OOPS + 1][MI_MAXSTEPS] = {
            { MSF_SPIN_R11, 3, FX_WHOOSH }, { MSF_SPIN_R10, 3, 0 }, { MSF_SPIN_R9, 3, 0 },
            { MSF_SPIN_R8, 3, 0 }, { MSF_SPIN_R7, 3, 0 }, { MSF_SPIN_R6, 3, 0 }, { MSF_SPIN_R5, 3, 0 }, { MSF_SPIN_R4, 3, 0 }, { MSF_SPIN_R3, 3, 0 },
            { MSF_SPIN_R2, 3, 0 }, { MSF_SPIN_R1, 3, 0 }, { MSF_SPIN_0, 4, 0 }, { MSF_CAPE_A, 18, 0 }, { MSF_IDLE_A, 12, 0 }),
+  /* Golden Cels counterpart of the browser's feast performance.
+     The existing native sprite frames provide anticipation, contact,
+     breathing, relief and a proud finishing pose without new atlas RAM. */
+  MI_STEPS({MSF_IDLE_A,11,FX_NONE},{MSF_IDLE_B,21,FX_NONE},
+           {MSF_BELLY_A,25,FX_SLAP},{MSF_BELLY_B,8,FX_NONE},
+           {MSF_BURP_A,19,FX_GRUNT},{MSF_BURP_B,36,FX_BURP},
+           {MSF_FLEX_A,15,FX_NONE},{MSF_POSE_A,24,FX_SPARKLE},
+           {MSF_IDLE_A,21,FX_NONE}),
 };
 static const MiStep MI_SLEEP[3] = { { MSF_SLEEP_A, 44, FX_SNORE }, { MSF_SLEEP_B, 44, 0 }, { 0, 0, 0 } };
 
@@ -121,7 +129,7 @@ static const MiStep *mi_cur(const MiState *s){
 }
 
 /* call once per 60 Hz tick while he is idle in the sling */
-static void mi_update(MiState *s){
+static void mi_update_style(MiState *s, int golden_cels){
   s->fx = FX_NONE;
   s->total++;
   if(s->gag < 0){
@@ -129,6 +137,7 @@ static void mi_update(MiState *s){
     if(++s->quiet >= s->wait){
       int g; do g = mi_rand(s, GAG_COUNT); while(g == s->last);
       s->last = g; if(g == GAG_CAPE && mi_rand(s, MI_OOPS_ODDS) == 0) g = GAG_OOPS;
+      if(golden_cels && g == GAG_BURP) g = GAG_FEAST;
       s->gag = g; s->step = 0; s->t = 0; s->fx = MI_GAGS[g][0].fx;
     }
     return;
@@ -144,6 +153,9 @@ static void mi_update(MiState *s){
     s->fx = st->fx;
   }
 }
+
+/* Classic entry point retained for standalone native tests and callers. */
+static inline void mi_update(MiState *s){ mi_update_style(s, 0); }
 
 /* the frame to draw; `ph` is a free-running tick counter (for the little belly sway while truly idle) */
 static int mi_frame(const MiState *s, int ph){
