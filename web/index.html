@@ -1146,11 +1146,18 @@ function jointBreakLimit(i,j,m,mj){
   if(hp[i]*2<=MAT[m].hp||hp[j]*2<=MAT[mj].hp)return lim*.85;
   return lim;
 }
+// Rebuild a row-major occupied list during the unavoidable spring sweep.
+// Reuse it for integration and fracture checks; no per-tick heap arrays.
+// A world resize is the only time this scratch storage changes capacity.
+let WOB_ACTIVE=new Uint32Array(0);
+const WOB_NEIGHBORS=[0,0,0,0];
 function wobStep(dt){
   for(let m=1;m<MAT.length;m++)FD[m]=Math.max(0,1-MAT[m].damp*dt);
-  const NB=[0,0,0,0];
+  if(WOB_ACTIVE.length!==grid.length)WOB_ACTIVE=new Uint32Array(grid.length);
+  const NB=WOB_NEIGHBORS;let occupied=0;
   for(let y=0;y<ROWS-1;y++){const lean=LEANK*(ROWS-1-y);
     for(let x=0;x<COLS;x++){const i=y*COLS+x,m=grid[i];if(!m)continue;
+      WOB_ACTIVE[occupied++]=i;
       const bk=brk[i],Ki=MAT[m].K;let ax=0,ay=0;
       NB[0]=x+1<COLS?i+1:-1;NB[1]=x>0?i-1:-1;NB[2]=i+COLS;NB[3]=y>0?i-COLS:-1;
       for(let d=0;d<4;d++){const j=NB[d];if(j<0||((bk>>d)&1))continue;const mj=grid[j];if(!mj)continue;
@@ -1160,10 +1167,11 @@ function wobStep(dt){
       ovx[i]=clamp((ovx[i]+(ax*a+(lean-HOMEK)*ox[i])*dt)*f,-WOB_VMAX,WOB_VMAX);
       ovy[i]=clamp((ovy[i]+(ay*a-HOMEK*oy[i])*dt)*f,-WOB_VMAX,WOB_VMAX)}}
   let maxv=0,maxo=0;
-  for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS;x++){const i=y*COLS+x;if(!grid[i])continue;
+  for(let k=0;k<occupied;k++){const i=WOB_ACTIVE[k];
     ox[i]=clamp(ox[i]+ovx[i]*dt,-WOB_OMAX,WOB_OMAX);oy[i]=clamp(oy[i]+ovy[i]*dt,-WOB_OMAX,WOB_OMAX);
     const sv=Math.abs(ovx[i])+Math.abs(ovy[i]),so=Math.abs(ox[i])+Math.abs(oy[i]);if(sv>maxv)maxv=sv;if(so>maxo)maxo=so}
-  for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS;x++){const i=y*COLS+x,m=grid[i];if(!m)continue;
+  for(let k=0;k<occupied;k++){const i=WOB_ACTIVE[k],m=grid[i];if(!m)continue;
+    const x=i%COLS,y=(i/COLS)|0;
     for(let d=0;d<3;d+=2){const j=d===0?(x+1<COLS?i+1:-1):i+COLS;if(j<0||((brk[i]>>d)&1))continue;const mj=grid[j];if(!mj)continue;
       const s=Math.abs(ox[j]-ox[i])+Math.abs(oy[j]-oy[i]),lim=jointBreakLimit(i,j,m,mj);
       if(s>lim){brk[i]|=1<<d;brk[j]|=1<<(d^1);needSupport=true;if(crackEv<4){crackEv++;crackFx(x,y,m,d)}}}}
