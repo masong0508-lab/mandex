@@ -1,8 +1,23 @@
 name: Exhaustive physics playthrough sweeps
 on:
+  # The sweep builds only core/mx.c and test/sweep.c. Keep it for all
+  # native simulation, generated level data, sweep harness and CI changes;
+  # browser/UI/atlas-only work uses its dedicated regression workflows.
   pull_request:
+    paths:
+      - "core/**"
+      - "content/**"
+      - "test/sweep*"
+      - "tools/trial_pack.js"
+      - ".github/workflows/physics-sweeps.yml"
   push:
     branches: [main]
+    paths:
+      - "core/**"
+      - "content/**"
+      - "test/sweep*"
+      - "tools/trial_pack.js"
+      - ".github/workflows/physics-sweeps.yml"
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
