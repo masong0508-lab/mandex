@@ -451,7 +451,8 @@ function generateTrials(){
     "sand": 0,
     "walk": 1
   }
-].concat([{label:"Mount Mandex",prefix:"Mountain",wall:6,floor:6,roof:7,kind:[1,2,4,6],tip:"CLIMB THE CITY",tnt:1,pad:1,tube:1,sand:0,walk:2}]));
+].concat([{label:"Mount Mandex",prefix:"Mountain",wall:6,floor:6,roof:7,kind:[1,2,4,6],tip:"CLIMB THE CITY",tnt:1,pad:1,tube:1,sand:0,walk:2},{label:"Metro Mandex",prefix:"Metro",wall:6,floor:6,roof:7,kind:[1,2,4,6],tip:"ENTER THE CITY TOWERS",tnt:1,pad:1,tube:1,sand:0,walk:2}]));
+  const metroNames=["South Gate Borough","Old Financial Strip","Harbor Towers","Glass Midtown","Transit Core","Upper Skyline","Canyon of Towers"],metroHeights=[[500,750,900],[650,1000,1200],[800,1200,1500],[900,1400,1600],[1000,1500,1750],[1200,1650,1900],[1400,1800,2000]];
   const mountainNames=["Foothill Gate","Lower City","Railway Terrace","Market Slope","Canyon Exchange","Tower Foundations","Skyline Rise","Cloudline Towers","High Alpine District","Crown Approach","Mount Mandex: The Summit"],mountainTips=["BREAK THE FOOTHILL SUPPORTS","CLEAR THE LOWER CITY BLOCKS","CLIMB THE RAIL TERRACES","BANK ABOVE THE MARKET","RIDE TUBES OVER THE CANYON","BREAK THE TOWER FOUNDATIONS","DIVE WITH QUAKE INTO THE SKYLINE","USE BEANS TO RECOVER IN THE AIR","PARRY THE ALPINE GUARDS","CLIMB THE CROWN TERRACES","EVICT ALL; WALK THROUGH THE SUMMIT TUBE"];
   const shapes=["Court","Stacks","Bridge","Terrace"];
   const palettes=["#e8d3a8","#d7dfe9","#d2b6b4","#b9d6be"];
@@ -460,8 +461,9 @@ function generateTrials(){
   for(let district=0;district<groups.length;district++)for(let shape=0;shape<4;shape++)for(let tier=0;tier<5;tier++){
     if(district===51&&shape===3&&tier===4)continue; // final district has 19 maps
     if(district===52&&shape*5+tier>=11)continue;
+    if(district===53&&shape*5+tier>=7)continue;
     const sector=shape*5+tier;
-    const g=groups[district],grid=new Uint8Array(WIDTH*HEIGHT),targets=[],rooms=[],pads=[],tubes=[],houses=[];
+    const g=groups[district],grid=new Uint8Array(WIDTH*HEIGHT),targets=[],rooms=[],pads=[],tubes=[],houses=[],entries=[];
     const get=(x,y)=>grid[y*WIDTH+x];
     function fill(x,y,w,h,m){
       if(x<28||y<0||x+w>WIDTH||y+h>HEIGHT||w<1||h<1)fail("invalid rectangle "+[district,shape,tier,x,y,w,h,m]);
@@ -494,7 +496,15 @@ function generateTrials(){
     // Four different silhouettes per district; difficulty changes heights,
     // widths, spans and occupied floors, not just enemy count or names.
     const x=32+((district*3+tier)%5),fh=8+(tier%3)*2;
-    if(district===52){
+    if(district===53){
+      const p=sector,fa=2+p%2,fb=4+p%2,fc=5+(p>=3?1:0);
+      const A=house(31+p%2,20,fa,8,p%2?4:6,6,7),B=house(58,22,fb,8,6,6,7),C=house(89,24,fc,8,6,6,6);
+      for(const H of [A,B,C]){fill(H.x+H.w-2,56,2,2,5);}
+      for(const H of [A,B]){fill(H.x+3,H.top,4,1,7);pads.push([H.x+3,H.top,4]);}
+      tubes.push([29,54,47,Math.max(4,A.top-4)]);tubes.push([53,54,68,Math.max(4,B.top-4)]);tubes.push([83,54,102,Math.max(4,C.top-4)]);
+      // Vary the grounded entrance lane without changing the active grid size.
+      fill(28,59,1,1,1+p);
+    }else if(district===52){
       // One active 120x60 slice of the rising city. Buildings stand on
       // destructible rock terraces rather than indestructible scenery.
       const p=sector,mid=50-2*(p%3),high=p===10?42:44-2*(p%4);
@@ -636,9 +646,14 @@ function generateTrials(){
       const d=district-30,h=1+d%3,hh=1+Math.floor(d/3)%3,mat=1+Math.floor(d/9);
       fill(28,60-h,1,h,mat);fill(29,60-hh,1,hh,mat);
     }
-    const name=district===52?mountainNames[sector]:g.prefix+" "+shapes[shape]+" "+(tier+1);
-    const tip=district===52?mountainTips[sector]:district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
-    const men=district===52?Math.min(18,targets.length+5):Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
+    if(district===27||district===28||district>=52){
+      // Five clear cells fit the on-foot collision hull. Keep the other wall,
+      // slab and central column intact; the support flood below verifies them.
+      for(const H of houses){const x=H.x,y=H.base-5;fill(x,y,2,5,0);entries.push([x,y,2,5]);}
+    }
+    const name=district===53?metroNames[sector]:district===52?mountainNames[sector]:g.prefix+" "+shapes[shape]+" "+(tier+1);
+    const tip=district===53?"ENTER TOWERS; ROOFS UP TO "+metroHeights[sector][2]+" FT":district===52?mountainTips[sector]:district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
+    const men=district>=52?Math.min(18,targets.length+5):Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
     const walk=(district===5||district===7)&&tier>=2 || district===8&&tier>=3 || district>=9&&(g.walk===2||!!g.walk&&tier>=2);
     if(targets.length<2||targets.length>20||rooms.length>20||pads.length>3||tubes.length>3)fail("entity cap "+name);
     const keys=new Set();
@@ -673,7 +688,7 @@ function generateTrials(){
     let occupied=0;for(let i=0;i<grid.length;i++)if(grid[i]){occupied++;if(!seen[i])fail("floating voxel "+name+" "+i)}
     const rows=Array.from({length:HEIGHT},(_,y)=>Array.from(grid.subarray(y*WIDTH,(y+1)*WIDTH)).join(''));
     const key=rows.join('');if(distinct.has(key))fail("duplicate geometry "+name);distinct.add(key);
-    levels.push({id:60+levels.length,name,district:g.label,tip,men,walk,rows,targets,rooms,pads,tubes,occupied});
+    levels.push({id:60+levels.length,name,district:g.label,tip,men,walk,rows,targets,rooms,pads,tubes,occupied,...(entries.length?{entries}:{}),...(district===53?{towerFeet:metroHeights[sector],internal:true}:{})});
   }
   return levels;
 }
@@ -699,8 +714,9 @@ function emitTrials(levels){
     return {off,rects:rects.length,roomOff,rooms:l.rooms.length,targetOff,targets:l.targets.length,padOff,pads:l.pads.length,tubeOff,tubes:l.tubes.length,name:l.name,tip:l.tip,men:l.men,walk:l.walk?1:0};
   };
   for(const l of levels)table.push(collect(l));
-  for(let d=0;d<levels.length/20;d++){
-    const rows=levels.slice(d*20,(d+1)*20);
+  const publicLevels=levels.filter(l=>!l.internal),internalLevels=levels.filter(l=>l.internal);
+  for(let d=0;d<publicLevels.length/20;d++){
+    const rows=publicLevels.slice(d*20,(d+1)*20);
     districts.push(JSON.stringify({format:"MXTRIAL1",width:WIDTH,height:HEIGHT,district:rows[0].district,levels:rows},null,1)+"\n");
   }
   const rows=table.map(t=>`  {${JSON.stringify(t.name)},${JSON.stringify(t.tip)},${t.off},${t.rects},${t.roomOff},${t.rooms},${t.targetOff},${t.targets},${t.padOff},${t.pads},${t.tubeOff},${t.tubes},${t.men},${t.walk}}`).join(",\n");
@@ -740,7 +756,7 @@ ${rows}
 const TRIAL_START=LEVELS.length;
 const TRIAL_BYTES=${packed};
 const TRIAL_META=${JSON.stringify(table.map(t=>[t.name,t.tip,t.off,t.rects,t.roomOff,t.rooms,t.targetOff,t.targets,t.padOff,t.pads,t.tubeOff,t.tubes,t.men,t.walk]))};
-const TRIAL_DISTRICTS=${JSON.stringify(levels.filter((_,i)=>i%20===0).map(l=>l.district))};
+const TRIAL_DISTRICTS=${JSON.stringify(publicLevels.filter((_,i)=>i%20===0).map(l=>l.district))};
 function buildTrial(i){
   const a=TRIAL_META[i],digit=c=>c>=65&&c<=90?c-65:c>=97&&c<=122?c-71:c>=48&&c<=57?c+4:c===43?62:63,read=j=>{
     const off=Math.floor(j/3)*4,part=j%3,p=digit(TRIAL_BYTES.charCodeAt(off+part)),q=digit(TRIAL_BYTES.charCodeAt(off+part+1));
@@ -752,10 +768,11 @@ function buildTrial(i){
   for(let k=a[8],end=k+a[9]*3;k<end;k+=3)pads.push({x:read(k)*V,y:read(k+1)*V,w:read(k+2)*V});
   for(let k=a[10],end=k+a[11]*4;k<end;k+=4)tube('#ffb45d',read(k)*V,read(k+1)*V,read(k+2)*V,read(k+3)*V,0);
 }
-TRIAL_META.forEach((a,i)=>LEVELS.push({name:a[0],tip:a[1],men:a[12],walk:!!a[13],build(){buildTrial(i)}}));
+function trialLayout(i){const a=TRIAL_META[i];return {name:a[0],tip:a[1],men:a[12],walk:!!a[13],build(){buildTrial(i)}};}
+for(let i=0;i<${publicLevels.length};i++)LEVELS.push(trialLayout(i));
 // END MANDEX TRIAL DATA
 `;
-  return {header,web,districts,commandBytes:commands.length,occupied:levels.reduce((n,l)=>n+l.occupied,0)};
+  return {header,web,districts,city:JSON.stringify({format:"MXTRIAL1",width:WIDTH,height:HEIGHT,district:"Metro Mandex",levels:internalLevels},null,1)+"\n",commandBytes:commands.length,occupied:levels.reduce((n,l)=>n+l.occupied,0)};
 }
 if(typeof module!=='undefined')module.exports={generateTrials,emitTrials};
 
@@ -766,6 +783,7 @@ if(typeof require==='function'&&require.main===module){
   const out=emitTrials(generateTrials());
   const dir=path.join(root,'content/trials');fs.mkdirSync(dir,{recursive:true});
   out.districts.forEach((d,i)=>fs.writeFileSync(path.join(dir,'district-'+(i+1)+'.json'),d));
+  fs.writeFileSync(path.join(dir,'metro-finale.json'),out.city);
   fs.writeFileSync(path.join(root,'core/trial_levels.h'),out.header);
   const webPath=path.join(root,'web/index.html'),html=fs.readFileSync(webPath,'utf8');
   const a=html.indexOf('// BEGIN MANDEX TRIAL DATA'),marker='// END MANDEX TRIAL DATA';
