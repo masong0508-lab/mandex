@@ -82,6 +82,23 @@ jobs:
           python3 tools/ppm_to_png.py docs/art-review/turnaround.ppm
           test -s docs/art-review/turnaround.png
           test -s docs/art-review/turnaround.txt
+      - name: Export isolated Golden Cels native artwork on manual request
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          MX_CEL_PREVIEW_DIR: ${{ runner.temp }}/mandex-cel-art
+        run: |
+          python3 tools/gen_manspr.py
+          python3 tools/gen_dc_art.py
+          test -s "$MX_CEL_PREVIEW_DIR/manspr-cel-preview.h"
+          test -s "$MX_CEL_PREVIEW_DIR/dcart-cel-preview.h"
+      - name: Upload alternate native artwork for review
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mandex-golden-cels-native-preview
+          path: ${{ runner.temp }}/mandex-cel-art
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload reviewable artwork (never push to main from a PR)
         # Preserve generated sprites for visual diagnosis even if a validation
         # assertion fails after both bakers have successfully produced art.
