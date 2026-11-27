@@ -4,7 +4,7 @@
 const fs=require('fs'),path=require('path'),assert=require('assert');
 const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 const start=html.indexOf('// ---------- CHAPTER 3: the Wolfman');
-const end=html.indexOf('const chEnd=',start);
+const end=html.indexOf('// BEGIN MANDEX TRIAL DATA',start);
 assert(start>=0&&end>start,'live chapter-three constructor exists');
 const chapter=html.slice(start,end);
 const ROWS=60;

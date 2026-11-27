@@ -39,6 +39,20 @@ jobs:
         run: node test/browser_walk_memory_test.js
       - name: Portrait walking focus and bounded camera transitions
         run: node test/browser_walk_camera_test.js
+      - name: Owned aiming, manual pan and pinch zoom
+        run: node test/browser_manual_camera_test.js
+      - name: Creator expansion, landing pose and effect visibility
+        run: node test/browser_camera_expansion_test.js
+      - name: Player and enemy animation motion continuity
+        run: node test/browser_animation_motion_test.js
+      - name: Interactive world and destruction animation feedback
+        run: node test/browser_world_animation_test.js
+      - name: Landscape creator selection, pagination and trial navigation
+        run: node test/browser_landscape_select_test.js
+      - name: Touch-only end of walking life and remaining-time display
+        run: node test/browser_walk_finish_test.js
+      - name: Complete trial pack generation and decoder parity
+        run: node test/trial_pack_test.js
       - name: Counterpunch interrupts and multi-hit recovery
         run: node test/browser_combat_recovery_test.js
       - name: Stomp-pad boost and held-button ascent
@@ -47,6 +61,8 @@ jobs:
         run: node test/browser_tool_feedback_test.js
       - name: Character pose turnaround and punch timing
         run: node test/browser_turn_pose_test.js
+      - name: Golden Cels character shape, movement and facial acting
+        run: node test/browser_cel_character_test.js
       - name: Walking HUD, objectives and portrait spacing
         run: node test/browser_objective_test.js
       - name: Shaking camera debris visibility and draw work
@@ -70,6 +86,10 @@ jobs:
         run: python3 test/browser_canvas_cull_test.py --out-dir out/browser-canvas
       - name: Exercise live keyboard, slingshot and orientation input
         run: python3 test/browser_input_smoke.py --out-dir out/browser-canvas/input
+      - name: Render Golden Cels character poses and verify Classic restoration
+        run: python3 test/browser_cel_character_live.py --out-dir out/browser-canvas/character
+      - name: Real three-stage circuits, HQ rewards and walking transit
+        run: python3 test/browser_relay_circuit_test.py --out-dir out/browser-canvas/relays
       - uses: actions/upload-artifact@v4
         if: always()
         with:

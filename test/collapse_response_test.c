@@ -30,7 +30,51 @@ static MxChunk *body(int n,real x,real y,int rest){
   a->wx=x;a->wy=y;a->lx=a->ly=0;a->edge=1;
   recompute(c);return c;
 }
+/* Independent pre-optimization BFS, including the native bounded ring. */
+static uint8_t reference_hb[MX_COLS*MX_ROWS];
+static uint16_t reference_queue[8192];
+static void reference_support(void){
+  const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
+  unsigned head=0,tail=0;
+  memset(reference_hb,255,sizeof reference_hb);
+  for(int x=0;x<MX_COLS;x++){
+    int i=IDX(x,MX_ROWS-1);
+    if(W.grid[i]){reference_hb[i]=0;reference_queue[tail++&8191]=(uint16_t)i;}
+  }
+  while(head!=tail){
+    int i=reference_queue[head++&8191],x=i%MX_COLS,y=i/MX_COLS,h=reference_hb[i];
+    for(int d=0;d<4;d++){
+      int nx=x+dx[d],ny=y+dy[d];
+      if(!INB(nx,ny)||((W.brk[i]>>d)&1))continue;
+      int j=IDX(nx,ny),m=W.grid[j],nh=dy[d]==-1?0:h+1;
+      if(m&&nh<reference_hb[j]&&nh<=MATS[m].lim+(W.anch[j]?8:0)&&tail-head<8191){
+        reference_hb[j]=(uint8_t)nh;reference_queue[tail++&8191]=(uint16_t)j;
+      }
+    }
+  }
+}
+static uint32_t rng=0x4e97b2e;
+static unsigned random_byte(void){rng=rng*1664525u+1013904223u;return rng>>24;}
+static void support_parity(void){
+  const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
+  for(int y=0;y<MX_ROWS;y++)for(int x=0;x<MX_COLS;x++)for(int d=0;d<4;d++)
+    CHECK(!!(support_border(x,y)&(1u<<d))==!INB(x+dx[d],y+dy[d]),"border mask must prevent row wrap and out-of-bounds");
+  for(int fixture=0;fixture<15;fixture++){
+    scene();
+    for(int y=0;y<MX_ROWS;y++)for(int x=0;x<MX_COLS;x++){
+      int i=IDX(x,y);
+      if(random_byte()<(unsigned)(fixture%5*60+15)){
+        put(x,y,random_byte()%2?MX_WOOD:MX_STEEL);
+        W.anch[i]=(uint8_t)(random_byte()<64);
+      }
+      if(random_byte()<(unsigned)(fixture/5*90))W.brk[i]=(uint8_t)(random_byte()&15u);
+    }
+    reference_support();support_pass(&W);
+    CHECK(!memcmp(reference_hb,W.hb,sizeof reference_hb),"linear traversal changed ground reach or broken-joint propagation");
+  }
+}
 int main(void){
+  support_parity();
   CHECK(MX_CHUNK_CELLS==512,"the DS rigid-body memory ceiling changed");
   scene();
   for(int y=10;y<30;y++)for(int x=45;x<75;x++)put(x,y,MX_WOOD);

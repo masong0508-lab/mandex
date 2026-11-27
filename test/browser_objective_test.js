@@ -70,7 +70,8 @@ const walkBegin=web.indexOf('const WALK_BUTTONS=');
 const walkEnd=web.indexOf('function manStep(',walkBegin);
 assert(walkBegin>=0&&walkEnd>walkBegin,'production walking HUD block exists');
 const paintWalkHUD=new Function('W','H','portrait',`
-  const KEYS={},man={mode:'walk',wt:22.5},state='play',WALK_T=45;
+  const KEYS={},man={mode:'walk',wt:22.5},state='play',WALK_T=45,men=3;
+  const btn=()=>{};
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),isPortrait=()=>portrait;
   const fills=[],buttons=[],texts=[];
   const ctx={fillRect(x,y,w,h){fills.push({x,y,w,h})},fill(){},stroke(){}};

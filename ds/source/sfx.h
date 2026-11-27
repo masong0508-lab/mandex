@@ -5,6 +5,7 @@
 enum { SFX_CRUNCH, SFX_LAUNCH, SFX_DIVE, SFX_THUD, SFX_BOOM, SFX_SPLAT, SFX_TARGET, SFX_POP, SFX_WIN, SFX_LOSE, SFX_CLICK, SFX_STRETCH, SFX_CRACK, SFX_BOUNCE, SFX_SLAP, SFX_BOING, SFX_GRUNT, SFX_BURP, SFX_FART, SFX_FLICK, SFX_YAWN, SFX_SNORE, SFX_WHOOSH, SFX_TAUNT, SFX_EEK, SFX_WHEW, SFX_COUNT };
 
 void sfx_init(void);
+void sfx_set_enabled(int enabled);
 void sfx_play(int id, int pan);        /* pan 0..127 (64 = centre) */
 void sfx_tick(void);                   /* one 60 Hz step; kept for test/libnds compatibility */
 void sfx_tick_steps(int elapsed);      /* advance real-time sound clock, bounded after a missed VBlank */

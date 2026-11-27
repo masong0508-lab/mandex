@@ -47,6 +47,7 @@ HARNESS = r"""
   const source = draw.toString();
   const patches = [
     ['const paperCull=camOn,', 'const paperCull=false,'],
+    ['const tileCull=camOn,', 'const tileCull=false,'],
     ['const rubbleCull=camOn,', 'const rubbleCull=false,']
   ];
   let referenceSource = source;
@@ -56,7 +57,7 @@ HARNESS = r"""
     referenceSource = referenceSource.replace(from, to);
   }
   // Global lexical game variables remain visible to the reference function.
-  // All other rendering, including the existing standing-tile cull, is intact.
+  // All other rendering is intact; reference also draws all standing tiles.
   const reference = new Function('return (' + referenceSource + ')')();
   const nativeDrawImage = ctx.drawImage, nativeFillRect = ctx.fillRect;
   let counts = null;
@@ -117,6 +118,12 @@ HARNESS = r"""
       // Use real room/paper rendering, including torn seams and furniture.
       for (const rm of interiors)
         paperHit(rm.x + Math.floor(rm.w / 3), rm.y + Math.floor(rm.h / 2));
+      // Exercise masonry displaced by the largest legal spring wobble.
+      // The reference draws every tile, so both row and column edges matter.
+      wobOn=true;
+      for(let i=0;i<grid.length;i++)if(grid[i]){
+        ox[i]=(i%3-1)*WOB_OMAX;oy[i]=((i/3|0)%3-1)*WOB_OMAX;
+      }
       addEdgeFixtures();
     }
     return stats();
@@ -230,7 +237,7 @@ def main():
     if args.out_dir:
         args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    report = {"comparison": "complete production draw() RGBA; only paper/rubble culling disabled in reference",
+    report = {"comparison": "complete production draw() RGBA; paper/tile/rubble culling disabled in reference",
               "samples": []}
     errors = []
 

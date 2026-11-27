@@ -81,6 +81,42 @@ echo "--- Browser: bounded collision hashing, repeated contacts and no stale rub
 if command -v node >/dev/null 2>&1;then node browser_collision_hash_test.js;fi
 echo "--- Browser walking camera: portrait focus, zoom bounds and world edges ---"
 if command -v node >/dev/null 2>&1;then node browser_walk_camera_test.js;fi
+echo "--- Browser manual camera: pointer ownership, pinch, pan, zoom and cancellation ---"
+if command -v node >/dev/null 2>&1;then node browser_manual_camera_test.js;fi
+echo "--- Browser content expansion: six starter structures, landing poses and zoom-aware particle rendering ---"
+if command -v node >/dev/null 2>&1;then node browser_camera_expansion_test.js;fi
+echo "--- Browser motion animation: dive, sling, mirrored ragdoll, attacks and impact ---"
+if command -v node >/dev/null 2>&1;then node browser_animation_motion_test.js;fi
+echo "--- Browser world animation: live pads, tubes, moving TNT, and shockwave easing ---"
+if command -v node >/dev/null 2>&1;then node browser_world_animation_test.js;fi
+echo "--- Browser landscape custom-level paging and actions ---"
+if command -v node >/dev/null 2>&1;then node browser_landscape_select_test.js;node browser_walk_finish_test.js;fi
+echo "--- Native fractured-pad and tube pulse animation ---"
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wall $flags -I../core native_prop_animation_test.c ../core/mx.c -lm -o "native_prop_animation_$mode"
+  "./native_prop_animation_$mode"
+done
+echo "--- Trial expansion: raw asset, native table and browser decoder parity ---"
+if command -v node >/dev/null 2>&1;then node trial_pack_test.js;node browser_options_parity_test.js;node browser_blast_effects_test.js;node browser_collapse_hotpath_test.js;fi
+for opts_flags in '' '-DMX_FIXED'; do
+  gcc -std=gnu99 -O2 $opts_flags -I../core native_options_test.c ../core/mx_meta.c -lm -o /tmp/mx_native_opts
+  /tmp/mx_native_opts
+done
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function -DMX_LEVEL_LOCKS $flags -I../core native_trial_pack_test.c ../core/mx_meta.c -lm -o "native_trial_pack_$mode"
+  "./native_trial_pack_$mode"
+done
+echo "--- Native dive motion: float and fixed angular acceleration ---"
+for mode in float fixed;do
+  flags=""
+  test "$mode" = fixed && flags="-DMX_FIXED"
+  gcc -std=gnu99 -O2 -Wno-unused-function $flags -I../core native_dive_pose_test.c -lm -o "native_dive_pose_$mode"
+  "./native_dive_pose_$mode"
+done
 echo "--- Browser portrait/landscape layouts, touch hitboxes and editor panning ---"
 if command -v node >/dev/null 2>&1;then node browser_orientation_test.js;fi
 echo "--- Browser custom levels: safe 360-column finale transition ---"
@@ -176,7 +212,10 @@ for mode in float fixed; do
   defs=""
   test "$mode" = fixed && defs="-DMX_FIXED"
   gcc -std=gnu99 -O2 -Wno-unused-function $defs -I../core chunk_contact_lifetime_test.c -lm -o chunk_contact_lifetime_$mode
-  ./chunk_contact_lifetime_$mode
+  normal=$(./chunk_contact_lifetime_$mode); echo "$normal"
+  gcc -std=gnu99 -O2 -Wno-unused-function $defs -DMX_REFERENCE_CHUNK_HASH -DMX_REFERENCE_STATIC_CONTACTS -I../core chunk_contact_lifetime_test.c -lm -o chunk_contact_reference_$mode
+  reference=$(./chunk_contact_reference_$mode); echo "$reference"
+  test "${normal##*live_trace=}" = "${reference##*live_trace=}"
 done
 if command -v node >/dev/null 2>&1;then node browser_dead_rubble_test.js;fi
 echo "--- BANK SHOT trick bonus: true rubber rebound, direct eviction only, 2s expiry (fixed/float) ---"
@@ -232,7 +271,8 @@ gcc -std=c99 -O2 -Wall -I../core ../core/mx.c pose_test.c -lm -o pose_float && .
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c pose_test.c -lm -o pose_fixed && ./pose_fixed | tail -n 1
 echo "--- wobble / block-kind physics (fixed point): sway, snaps, topple, sand, rubber ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DKICKV=10 -I../core wobble_test.c -lm -o wobble_test && ./wobble_test
-echo "--- robustness sweep (560 random shot sequences per math mode; must never hang) ---"
+if [ "${MX_SWEEPS_IN_MATRIX:-0}" != 1 ]; then
+echo "--- robustness sweep (80 random sequences for each stage; phase and life watchdogs) ---"
 gcc -std=gnu99 -O2 -I../core ../core/mx.c sweep.c -lm -o sweep_float && ./sweep_float
 gcc -std=gnu99 -O2 -DMX_FIXED -I../core ../core/mx.c sweep.c -lm -o sweep_fixed && ./sweep_fixed
 echo "--- same sweep with the wobble lattice switched off (the DS falls back to this under load) ---"
@@ -241,6 +281,9 @@ echo "--- same sweep with collapsible buildings ON (rubble sleeps as solids unti
 gcc -std=gnu99 -O2 -DSWEEP_COLLAPSE -I../core ../core/mx.c sweep.c -lm -o sweep_collapse_float && ./sweep_collapse_float
 gcc -std=gnu99 -O2 -DMX_FIXED -DSWEEP_COLLAPSE -I../core ../core/mx.c sweep.c -lm -o sweep_collapse_fixed && ./sweep_collapse_fixed
 gcc -std=gnu99 -O2 -DMX_MAX_CHUNKS=48 -DSWEEP_COLLAPSE -I../core ../core/mx.c sweep.c -lm -o sweep_collapse_48 && ./sweep_collapse_48
+else
+  echo "--- exhaustive robustness configurations run in independent CI jobs ---"
+fi
 echo "--- collapsible buildings: off = nothing sleeps, on = rubble sleeps, set_collapse(0) wakes it, level end welds everything back (float, fixed, 48-body pool) ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c collapse_test.c -lm -o collapse_float && ./collapse_float | grep -v "^ok:"
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c collapse_test.c -lm -o collapse_fixed && ./collapse_fixed | grep -v "^ok:"
@@ -396,6 +439,7 @@ for mode in 0 1; do
   DS_CHUNK_VIS_PROBE=1 ./ds_chunk_view_$mode > ds_chunk_view_$mode.txt
   if [ "$mode" -eq 1 ]; then
     DS_RUBBLE_DAMAGE_PROBE=1 ./ds_chunk_view_$mode
+    DS_CEL_PROBE=1 ./ds_chunk_view_$mode
   fi
 done
 cmp ds_chunk_view_0.txt ds_chunk_view_1.txt
@@ -447,6 +491,7 @@ gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/sh
 N3DS_RUBBLE_DAMAGE_PROBE=1 ./n3ds_render
 N3DS_TILE_CLIP_PROBE=1 ./n3ds_render
 N3DS_PRESSURE_PROBE=1 ./n3ds_render
+N3DS_CEL_PROBE=1 ./n3ds_render
 echo "--- 3DS silhouette, outfit colors and antialiased rotated edges ---"
 for config in base lit smooth; do
   case "$config" in

@@ -1,0 +1,3 @@
+# Cascade Works
+
+20 new stages in a ninth trial district, 240 total. Four silhouettes with five tiers each, explosive lower supports, rubber roofs, pneumatic transfers in bridge and terrace stages, and eight walking trials. The map generator validates unique connected geometry, material span and clear supported targets. Existing IDs 0–219 are retained. The extra 7,709 packed bytes are shared by native and browser. Native title selectors show district completion and stars. Browser navigation derives district count and fixes source-extraction harness coverage. Save payload increases to 1,276 bytes within the existing 1,536-byte journal blocks. Native and browser CI still required.

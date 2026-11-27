@@ -11,6 +11,7 @@ static int story_done(const MxStats *s){ int n = 0; for(int i = 0; i < MX_STORY_
 static int three_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_STORY_LEVELS; i++) n += s->stars[i] >= 3; return n; }
 static int total_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_LEVELS; i++) n += s->stars[i]; return n; }
 int mx_valve_unlocked(const MxStats *s){ return story_done(s) >= MX_VALVE_UNLOCK_LEVELS; }
+int mx_art_unlocked(const MxStats *s){return story_done(s)==MX_STORY_LEVELS;}
 int mx_ach_count(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_ACH; i++) n += (s->ach >> i) & 1; return n; }
 
 typedef struct { const char *n, *d; } AchDef;
@@ -150,7 +151,7 @@ int mx_level_unlocked(const MxStats *s, int level){
    * or the default all-open configuration. */
   if(level < 0 || level >= MX_NUM_LEVELS) return 0;
 #ifdef MX_LEVEL_LOCKS
-  return s->unlock_all || level < 3 || (level < MX_NUM_LEVELS && s->stars[level - 1] > 0);
+  return s->unlock_all || level >= MX_TRIAL_START || level < 3 || s->stars[level - 1] > 0;
 #else
   (void)s; (void)level; return 1;
 #endif
@@ -190,12 +191,12 @@ uint32_t mx_crc32(const uint8_t *p, int n){
 static void put32(uint8_t *p, uint32_t v){ p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
 static uint32_t get32(const uint8_t *p){ return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24; }
 #define SAVE_NCOUNT 11
-#define SAVE_HDR 6
+#define SAVE_HDR 7
 #define SAVE_PW (SAVE_HDR + 4 * SAVE_NCOUNT)       /* 50 */
 #define SAVE_STARS (SAVE_PW + 16)                  /* 66 */
-static int save_size(int nlev, int ver){ return SAVE_STARS + nlev + 4 + 1 + 4 * nlev + (ver >= 2 ? 1 : 0) + 4; }
+static int save_size(int nlev, int ver){ return SAVE_STARS - (ver<4) + nlev + 4 + 1 + 4 * nlev + (ver >= 2 ? 1 : 0) + (ver >= 3 ? 1 : 0) + 4; }
 
-void mx_options_default(MxOptions *o){ o->collapse = 0; o->tool = MX_TOOL_NONE; o->nofight = 0; }
+void mx_options_default(MxOptions *o){ memset(o,0,sizeof *o); }
 const char *mx_tool_name(int t){
   static const char *const N[MX_NUM_TOOLS] = { "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE" };
   return t >= 0 && t < MX_NUM_TOOLS ? N[t] : "?";
@@ -207,7 +208,7 @@ int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t
   const int n = save_size(MX_NUM_LEVELS, MX_SAVE_VERSION);
   if(!s || !out || cap < n) return 0;
   const int *cnt[SAVE_NCOUNT] = { &s->kills, &s->cells, &s->booms, &s->maxChain, &s->shots, &s->flops, &s->wins, &s->oneShots, &s->bestScore, &s->inflated, &s->pops };
-  memcpy(out, "MXS1", 4); out[4] = MX_SAVE_VERSION; out[5] = (uint8_t)MX_NUM_LEVELS;
+  memcpy(out, "MXS1", 4); out[4] = MX_SAVE_VERSION; out[5] = (uint8_t)MX_NUM_LEVELS; out[6]=(uint8_t)(MX_NUM_LEVELS>>8);
   for(int i = 0; i < SAVE_NCOUNT; i++) put32(out + SAVE_HDR + 4 * i, *cnt[i] < 0 ? 0u : (uint32_t)*cnt[i]);
   for(int i = 0; i < 4; i++) put32(out + SAVE_PW + 4 * i, s->pw[i] < 0 ? 0u : (uint32_t)s->pw[i]);
   uint8_t *p = out + SAVE_STARS;
@@ -216,23 +217,26 @@ int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t
   *p++ = (uint8_t)(outfit >= 0 && outfit < MX_NUM_OUTFITS ? outfit : 0);
   for(int i = 0; i < MX_NUM_LEVELS; i++){ put32(p, s->best[i]); p += 4; }
   { MxOptions o; mx_options_default(&o); if(opt) o = *opt;
-    *p++ = (uint8_t)((o.collapse ? 1 : 0) | ((o.tool < MX_NUM_TOOLS ? o.tool : MX_TOOL_NONE) << 1) | (o.nofight ? 16 : 0)); }
+    *p++ = (uint8_t)((o.collapse ? 1 : 0) | ((o.tool < MX_NUM_TOOLS ? o.tool : MX_TOOL_NONE) << 1) | (o.nofight ? 16 : 0) | (o.monitor ? 32 : 0) | (mx_art_active(s,&o)?64:0));
+    *p++ = (uint8_t)((o.profile<4?o.profile:0) | (o.eco?4:0) | ((o.shake<3?o.shake:0)<<3) | (o.no_guide?32:0) | (o.music_off?64:0) | (o.sfx_off?128:0)); }
   put32(p, mx_crc32(out, (int)(p - out)));
   return n;
 }
 
 int mx_meta_unpack(MxStats *s, int *outfit, const uint8_t *in, int len){ return mx_meta_unpack_opt(s, outfit, 0, in, len); }
 int mx_meta_unpack_opt(MxStats *s, int *outfit, MxOptions *opt, const uint8_t *in, int len){
-  if(!s || !outfit || !in || len < SAVE_HDR) return 0;
+  if(!s || !outfit || !in || len < 6) return 0;
   if(memcmp(in, "MXS1", 4) != 0 || in[4] < 1 || in[4] > MX_SAVE_VERSION) return 0;
-  const int ver = in[4], nl = in[5], n = save_size(nl, ver);
+  const int ver=in[4]; if(ver>=4&&len<7)return 0;
+  const int hdr=ver>=4?7:6, nl=in[5]+(ver>=4?(int)in[6]*256:0), n=save_size(nl,ver);
+  if(nl<1)return 0;
   if(len < n) return 0;
   if(mx_crc32(in, n - 4) != get32(in + n - 4)) return 0;
   /* everything below is validated: nothing can fail from here, so *s is only ever written whole */
   int *cnt[SAVE_NCOUNT] = { &s->kills, &s->cells, &s->booms, &s->maxChain, &s->shots, &s->flops, &s->wins, &s->oneShots, &s->bestScore, &s->inflated, &s->pops };
-  for(int i = 0; i < SAVE_NCOUNT; i++){ uint32_t v = get32(in + SAVE_HDR + 4 * i); *cnt[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
-  for(int i = 0; i < 4; i++){ uint32_t v = get32(in + SAVE_PW + 4 * i); s->pw[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
-  const uint8_t *st = in + SAVE_STARS, *p = st + nl;
+  for(int i = 0; i < SAVE_NCOUNT; i++){ uint32_t v = get32(in + hdr + 4 * i); *cnt[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
+  for(int i = 0; i < 4; i++){ uint32_t v = get32(in + hdr + 44 + 4 * i); s->pw[i] = (int)(v > 0x7FFFFFFFu ? 0x7FFFFFFFu : v); }
+  const uint8_t *st = in + hdr + 60, *p = st + nl;
   for(int i = 0; i < MX_NUM_LEVELS; i++) s->stars[i] = i < nl ? (uint8_t)(st[i] > 3 ? 3 : st[i]) : 0;
   s->ach = get32(p) & ((1u << MX_NUM_ACH) - 1u); p += 4;
   *outfit = *p < MX_NUM_OUTFITS ? *p : 0; p++;
@@ -240,7 +244,8 @@ int mx_meta_unpack_opt(MxStats *s, int *outfit, MxOptions *opt, const uint8_t *i
   p += 4 * nl;
   if(opt){
     mx_options_default(opt);
-    if(ver >= 2){ int b = *p; opt->collapse = (uint8_t)(b & 1); int t = (b >> 1) & 7; opt->tool = (uint8_t)(t < MX_NUM_TOOLS ? t : MX_TOOL_NONE); opt->nofight = (uint8_t)((b >> 4) & 1); }
+    if(ver >= 2){ int b = *p; opt->collapse = (uint8_t)(b & 1); int t = (b >> 1) & 7; opt->tool = (uint8_t)(t < MX_NUM_TOOLS ? t : MX_TOOL_NONE); opt->nofight = (uint8_t)((b >> 4) & 1); if(ver>=3)opt->monitor=(b>>5)&1; if(ver>=4&&mx_art_unlocked(s))opt->art_style=(b>>6)&1; }
+    if(ver>=3){int b=p[1];opt->profile=b&3;opt->eco=(b>>2)&1;opt->shake=(b>>3)&3;if(opt->shake==3)opt->shake=0;opt->no_guide=(b>>5)&1;opt->music_off=(b>>6)&1;opt->sfx_off=(b>>7)&1;}
   }
   s->lv_booms = s->lv_shots = 0; s->seen_st_inflated = s->seen_st_pops = 0;
   for(int i = 0; i < 4; i++) s->seen_pw[i] = 0;

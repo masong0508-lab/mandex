@@ -29,6 +29,9 @@ import gen_manspr as G                       # the man frame list, blob table an
 HTML = G.HTML
 OUT_H = os.path.join(HERE, "..", "art", "dcart.h")
 OUT_PNG = os.path.join(HERE, "..", "docs", "dc_art_sheet.png")
+if G.CEL_PREVIEW_DIR:
+    OUT_H = os.path.join(G.CEL_PREVIEW_DIR, "dcart-cel-preview.h")
+    OUT_PNG = os.path.join(G.CEL_PREVIEW_DIR, "dc-art-sheet-cel-preview.png")
 K = 1.6                                     # man sprite pixels per screen pixel-of-the-old-art
 SS = 2                                      # supersample for the man
 CX, CY = 480, 300
@@ -139,6 +142,7 @@ def main():
         pg.on("pageerror", lambda e: errs.append(str(e)))
         pg.goto("file://" + HTML)
         pg.wait_for_timeout(300)
+        G.activate_cel_preview(pg)
         meta = pg.evaluate("MAN_FRAMES")
         pg.evaluate("NOTOWEL = true")
 
@@ -161,9 +165,12 @@ def main():
           ctx.imageSmoothingEnabled = false;
           for (let m = 1; m <= 8; m++) for (let v = 0; v < 4; v++) for (let d = 0; d < 3; d++) { const t = ((m - 1) * 4 + v) * 3 + d, x = (t % c) * S, y = Math.floor(t / c) * S;
             ctx.save(); ctx.beginPath(); ctx.rect(x, y, S, S); ctx.clip();
-            ctx.drawImage(SPR[m][v][d], x + 1, y + 1, 16, 16);                  // 2x nearest
-            ctx.drawImage(SPR[m][v][d], 0, 0, 1, 8, x, y + 1, 1, 16); ctx.drawImage(SPR[m][v][d], 7, 0, 1, 8, x + 17, y + 1, 1, 16);   // clamp the edges so filtering never pulls in a neighbour
-            ctx.drawImage(SPR[m][v][d], 0, 0, 8, 1, x + 1, y, 16, 1); ctx.drawImage(SPR[m][v][d], 0, 7, 8, 1, x + 1, y + 17, 16, 1);
+            const tile=SPR[m][v][d],tw=tile.width,th=tile.height,edge=Math.max(1,Math.round(tw/16));
+            ctx.drawImage(tile, x + 1, y + 1, 16, 16);
+            // Edge texels must sample the full 24px Cel source (or the
+            // original 8px Classic source), never an interior stripe.
+            ctx.drawImage(tile, 0, 0, edge, th, x, y + 1, 1, 16); ctx.drawImage(tile, tw-edge, 0, edge, th, x + 17, y + 1, 1, 16);
+            ctx.drawImage(tile, 0, 0, tw, edge, x + 1, y, 16, 1); ctx.drawImage(tile, 0, th-edge, tw, edge, x + 1, y + 17, 16, 1);
             ctx.restore(); }
           return cv.toDataURL('image/png'); }""")
         t_pos = atl.put(tiles)

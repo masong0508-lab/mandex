@@ -21,5 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compiler version
         run: gcc --version
-      - name: Run every host test
+      - name: Run host integration tests (exhaustive sweeps have their own matrix)
+        env:
+          MX_SWEEPS_IN_MATRIX: '1'
         run: sh test/run_tests.sh

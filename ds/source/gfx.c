@@ -838,6 +838,10 @@ void gfx_cloth(u8 *b, const Cloth *c, int x, int y, int ppc, int f, int pass){
   }
 }
 
+void spr_man_frame_rot(u8 *b,int x,int y,int ppc,int f,int frame,const ManJig *jg,int sn,int cs){
+  if(frame<0||frame>=MSF_NBASE)return;
+  blit_frame_rot(b,MFR(frame),x,y,ppc,f,jg,sn,cs);
+}
 void spr_man_frame(u8 *b, int x, int y, int ppc, int f, int frame, const ManJig *jg){
   blit_frame(b, MFR(frame), x, y, ppc, f, 0, jg);
 }

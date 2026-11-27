@@ -83,14 +83,14 @@ const ctx=new Proxy({measureText:s=>({width:String(s).length*10})},{
 });
 const env={
   W:540,H:960,ctx,WEB_UI:{portrait:true,page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0},
-  state:'menu',time:1,frameDt:.016,muted:false,webEcoFX:false,
+  state:'menu',time:1,frameDt:.016,muted:false,webEcoFX:false,frameMeterVisible:false,armReset:0,armProg:0,isPortrait:()=>env.W===540,
   hits:records,ACH:Array.from({length:17},(_,i)=>({id:'a'+i,n:'Achievement '+i,d:'Earn '+i})),
   OUTFITS:Array.from({length:16},(_,i)=>({id:'look'+i,n:'Outfit '+i})),
   outfitCur:{n:'Classic Red'},PD:{stars:{},ach:{},custom:Array.from({length:6},(_,i)=>({n:'User level '+i,id:i})),own:{}},
-  LEVELS:Array.from({length:60},(_,i)=>({name:'District Building '+i})),
-  CH1:20,CH2:40,selTab:0,
+  LEVELS:Array.from({length:660},(_,i)=>({name:'District Building '+i})),
+  CH1:20,CH2:40,TRIAL_START:60,TRIAL_DISTRICTS:Array.from({length:30},(_,i)=>'District '+i),trialDistrict:0,selTab:0,TRIAL_META:Array.from({length:600},()=>['Trial','TIP',0,0,0,0,0,4,0,0,0,0,6,0]),
   GUIDES:['OFF','SHORT','FULL'],SHAKES:[['OFF',0],['LOW',.5],['FULL',1]],
-  OPT:()=>({}),optVol:()=>.8,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
+  OPT:()=>({}),optVol:()=>.8,celArt:()=>false,artUnlocked:()=>false,cycleArtStyle:()=>false,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
   btn:(x,y,w,h,label,fn,o)=>records.push({x,y,w,h,label,fn}),
   panel:()=>{},txt:()=>{},drawSlamScene:()=>{},drawManFrame:()=>{},
   goMenu:()=>{},goSelect:()=>{},startStory:()=>{},startCustom:()=>{},
@@ -101,7 +101,9 @@ const env={
   storyUnlocked:()=>true,ch2Unlocked:()=>true,ch3Unlocked:()=>true,
   SFX:{pop:()=>{},ding:()=>{}},performance:{now:()=>0}
 };
-const methods=new Function('env','with(env){'+mobile+
+const trialHelpers=extract('function drawDistrictDirectory(', 'function goMenu()');
+const perfHelpers=extract('const WEB_PROFILES=', 'function chip(');
+const methods=new Function('env','with(env){'+perfHelpers+trialHelpers+mobile+
   'return {menu:drawMobileMenu,select:drawMobileSelect,ach:drawMobileAchievements,'+
   'outfit:drawMobileOutfits,options:drawMobileOptions}};')(env);
 let total=0;
@@ -118,9 +120,10 @@ function inspect(kind){
 for(const height of [760,960,1170]){
   env.H=height;env.W=540;
   inspect('menu');
-  for(const tab of [0,1,2,3]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
+  for(const tab of [0,1,2,3,4]){env.selTab=tab;env.WEB_UI.page.select=0;inspect('select')}
+  env.selTab=4;env.WEB_UI.districtPicker=true;inspect('select');env.WEB_UI.districtPicker=false;
   inspect('ach');inspect('outfit');
-  for(const page of [0,1]){env.WEB_UI.page.options=page;inspect('options')}
+  for(const page of [0,1,2,3]){env.WEB_UI.page.options=page;inspect('options')}
 }
 assert(html.includes('WEB_UI.gesture={id:e.pointerId,x,y,screen:state}'),
  'portrait menu activation must defer to pointerup so swipes do not fire buttons');

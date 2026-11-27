@@ -25,6 +25,10 @@
 #include "mx_snd.h"
 extern u16 gfx_pal[256]; void gfx_init(void);      /* ds/source/gfx.c (built with -DMX_FIXED as its own unit; only the palette is used here) */
 #include "mx_meta.h"
+#include "mx_options_menu.h"
+static MxOptions console_opt;
+static MxOptMenu opt_menu;
+static int opt_open, was_aim;
 #include "mx_save_journal.h"
 #include <sys/stat.h>
 #include "manspr.h"                                /* the same pixel-art man as the DS and Dreamcast ports (generated from the web game) */
@@ -88,7 +92,7 @@ static void music_update(int want){                       /* the theme loops on 
 }
 static void sound_tick(void){ for(int i = 0; i < SFX_COUNT; i++) if(snd_cool[i] > 0) snd_cool[i]--; }
 void sfx_play(int id, int pan){
-  if(!snd_ok || id < 0 || id >= SFX_COUNT || snd_cool[id] > 0) return;
+  if(console_opt.sfx_off || !snd_ok || id < 0 || id >= SFX_COUNT || snd_cool[id] > 0) return;
   snd_cool[id] = mx_snd_cooldown(id);
   int c = snd_next++ % 7;
   float mix[12] = { 0 }; mix[0] = 0.45f * (127 - pan) / 64.0f; mix[1] = 0.45f * pan / 64.0f; if(mix[0] > 0.6f) mix[0] = 0.6f; if(mix[1] > 0.6f) mix[1] = 0.6f;
@@ -111,6 +115,7 @@ static unsigned char man_pal[MS_NPAL][3];              /* the man's palette, re-
 #endif
 static u32 man_tone[3][MS_NPAL];   /* regular, warm-facing edge, cool trailing edge */
 static int man_tone_ready; /* standalone sprite host tools may draw before game init */
+static int cel_active;
 /* This cache is initialized before the later software rasterizer's RGB macro
    is declared. Keep the packer local and byte-order-identical. */
 static inline u32 man_rgb(int r,int g,int b){
@@ -132,6 +137,8 @@ static void apply_outfit(int o){
   memcpy(man_pal, MS_PAL, sizeof man_pal);
   for(int k = 0; k < 6; k++) for(int c = 0; c < 3; c++) man_pal[idx[k]][c] = sh[k][c];
   for(int k = 0; k < 4; k++) for(int c = 0; c < 3; c++) man_pal[1 + k][c] = sk[k][c];
+  cel_active=mx_art_active(&stats,&console_opt);
+  if(cel_active)for(int k=0;k<MS_NPAL;k++)mx_art_color(man_pal[k]);
   man_tone_prepare(); /* update the exact worn outfit's highlights once, not every frame */
 }
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
@@ -165,18 +172,18 @@ static void n3_save_load(void){
     if(!mx_journal_unpack(&trial, &o, &opt, &generation, buf, (int)n)) continue;
     if(n3_save_slot >= 0 && !mx_journal_newer(generation, n3_save_generation)) continue;
     n3_save_slot = i; n3_save_generation = generation;
-    stats = trial; outfit_sel = o; nofight = opt.nofight;
+    stats = trial; outfit_sel = o; console_opt=opt; nofight=opt.nofight; mus_pref=!opt.music_off;
     n3_save_status = 1;
   }
   if(n3_save_slot >= 0){
-    MxOptions opt; mx_options_default(&opt); opt.nofight = (uint8_t)nofight;
+    MxOptions opt=console_opt; opt.nofight=(uint8_t)nofight; opt.music_off=!mus_pref;
     n3_saved_len = mx_meta_pack_opt(&stats, outfit_sel, &opt,
                                    n3_saved_payload, sizeof n3_saved_payload);
   }
 }
 static void n3_save_sync(void){
   uint8_t payload[MX_SAVE_MAX], record[MX_JOURNAL_MAX];
-  MxOptions opt; mx_options_default(&opt); opt.nofight = (uint8_t)nofight;
+  MxOptions opt=console_opt; opt.nofight=(uint8_t)nofight; opt.music_off=!mus_pref;
   int n = mx_meta_pack_opt(&stats, outfit_sel, &opt, payload, sizeof payload);
   if(!n || (n == n3_saved_len && !memcmp(payload, n3_saved_payload, n))) return;
   int slot = n3_save_slot == 0 ? 1 : 0;
@@ -411,7 +418,7 @@ static void on_events(void){
     case EV_SURVIVOR:
       for(int k=0;k<6;k++)spawn(x,y,(rand()%11-5)*.2f,-(rand()%6)*.25f,22,RGB(245,211,124));
       popup(x,y-9,"SOMEHOW ALIVE!",RGB(255,210,63)); break;
-    case EV_DISTRICT: cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1; dragging = 0; pad_used = 0; memset(parts, 0, sizeof parts); part_high_water = 0;
+    case EV_DISTRICT: cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1; dragging = 0; pad_used = 0;was_aim=0;valve_equipped=0;world.valve_ok=0; memset(parts, 0, sizeof parts); part_high_water = 0;
 #if MX_N3DS_PARTICLE_HINT
       part_free_hint = 0;
 #endif   /* Landlord HQ: next district, fresh men */
@@ -697,7 +704,8 @@ static void draw_sky(const View *v){
   int night=world.level>=MX_CH3_START;
   snowcap_prepare();
   for(int y = 0; y < gy; y += 2){ float t = (float)y / (gy > 1 ? gy : 1), r, g, b;           /* #3d8fe8 -> #8ccaf7 -> #ffeccb: the web's warm horizon */
-    if(night){r=11+30*t;g=16+28*t;b=41+42*t;}
+    if(cel_active){r=night?35+125*t:87+159*t;g=night?28+79*t:84+130*t;b=night?57+53*t:119+42*t;}
+    else if(night){r=11+30*t;g=16+28*t;b=41+42*t;}
     else if(t<.55f){float u=t/.55f;r=61+(140-61)*u;g=143+(202-143)*u;b=232+(247-232)*u;}
     else{float u=(t-.55f)/.45f;r=140+(255-140)*u;g=202+(236-202)*u;b=247+(203-247)*u;}
     rect(s,0,y,s->w,2,RGB((int)r,(int)g,(int)b)); }
@@ -791,7 +799,9 @@ static void tile_build(int p){
         float wx = (xx + 1 < x1 ? xx + 1 : x1) - (xx > x0 ? xx : x0), wy = (yy + 1 < y1 ? yy + 1 : y1) - (yy > y0 ? yy : y0), w = wx * wy, *q = T[yy * 8 + xx];
         sr += q[0] * q[3] * w; sg += q[1] * q[3] * w; sb += q[2] * q[3] * w; sa += q[3] * w; sw += w; }
       float al = sa / sw, r = sa > 0 ? sr / sa : 0, g2 = sa > 0 ? sg / sa : 0, b2 = sa > 0 ? sb / sa : 0;
-      tcol[slot][m][v][d][j * 8 + i] = RGB((int)r, (int)g2, (int)b2); talp[slot][m][v][d][j * 8 + i] = (u8)(al * 255 + .5f); }
+      uint8_t ink[3]={(uint8_t)r,(uint8_t)g2,(uint8_t)b2};
+      if(cel_active)mx_art_color(ink);
+      tcol[slot][m][v][d][j * 8 + i] = RGB(ink[0],ink[1],ink[2]); talp[slot][m][v][d][j * 8 + i] = (u8)(al * 255 + .5f); }
   }
   tile_ready |= 1u << slot;
 }
@@ -895,8 +905,9 @@ static void draw_cells(const View *v){
       const MxCell *a = &ch->cells[k];
       if(a->dead) continue;
       const int sx=VX(v,RTOF(a->wx))-p/2, sy=VY(v,RTOF(a->wy))-p/2;
+      const int fuse=mx_fuse_visual(a);
 #if MX_N3DS_RUBBLE_CULL
-      if(sx+p<=0 || sx>=sw || sy+p<=0 || sy>=sh)continue;
+      if(sx+p<=0 || sx>=sw || sy+p<=0 || sy>=sh+(fuse?3:0))continue;
 #endif
 #if MX_N3DS_RUBBLE_DAMAGE
       const float health=RTOF(a->h)*minv[a->m];
@@ -911,6 +922,10 @@ static void draw_cells(const View *v){
         (int)(256 * g_dim)
 #endif
       );
+      if(fuse){
+        rect(v->s,sx,sy-2,p,1,fuse==2?RGB(255,72,42):RGB(255,190,52));
+        px(v->s,sx+p/2,sy-3,RGB(255,247,210));
+      }
     }
   }
 }
@@ -1109,12 +1124,18 @@ static void draw_cases(const View *v){
   }
 }
 static void draw_pads(const View *v){
-  int p = v->ppc, bob = (frame >> 3) & 3;
-  for(int i = 0; i < world.npads; i++){
-    const MxPad *pd = &world.pads[i];
-    int cx = VX(v, pd->x + pd->w * .5f), cy = VY(v, (float)pd->y);
-    for(int k = 0; k < 3; k++){ int yy = cy - p * (3 + 3 * k) - bob; u32 c = k == 0 ? RGB(255, 255, 255) : k == 1 ? RGB(255, 158, 200) : RGB(255, 110, 150);
-      line(v->s, cx - p * 5 / 4, yy + p / 2, cx, yy - p / 2, c); line(v->s, cx, yy - p / 2, cx + p * 5 / 4, yy + p / 2, c); }
+  int p=v->ppc;
+  for(int i=0;i<world.npads;i++){
+    const MxPad *pd=&world.pads[i];int first,span=mx_pad_live_run(&world,pd,&first);
+    if(!span)continue;
+    int cx=VX(v,first+span*.5f),cy=VY(v,(float)pd->y);
+    int half=span*p/2;if(half>p*5/4)half=p*5/4;
+    for(int k=0;k<3;k++){
+      int q=mx_pad_phase(world.time,k),yy=cy-2*p-q*6*p/60;
+      u32 col=q<10||q>=50?RGB(220,100,145):q<20||q>=40?RGB(255,158,200):RGB(255,255,255);
+      line(v->s,cx-half,yy+p/2,cx,yy-p/2,col);
+      line(v->s,cx,yy-p/2,cx+half,yy+p/2,col);
+    }
   }
 }
 static void draw_man(const View *v){
@@ -1159,7 +1180,9 @@ static void draw_man(const View *v){
   }
   { float a = 0;
     if(m->mode == MAN_FLY) a = (m->dive ? RTOF(m->spin) : RTOF(m->ang)) * face; else if(m->mode == MAN_STUCK) a = RTOF(mx_man_wobble(m)) * 0.17f;
-    if(a > 0.03f || a < -0.03f) blit_frame_rot(v->s, fr, x, y, p, face, a); else blit_frame(v->s, fr, x, y, p, face); }
+    int roll=mx_rear_roll_offset(m);
+    if(roll)blit_frame_rot(v->s,MSF_SPIN_6+roll,x,y,p,face,a+1.57079632679f*face);
+    else if(a > 0.03f || a < -0.03f) blit_frame_rot(v->s, fr, x, y, p, face, a); else blit_frame(v->s, fr, x, y, p, face); }
   if(m->inf > 0 && (m->mode == MAN_AIM || m->mode == MAN_FLY)){
     /* Small, lower-torso-only pressure volume (never a face-sized circle).
        Reuse the exact selected outfit/Wolfman skin in the existing 3-tone
@@ -1208,6 +1231,14 @@ static void draw_tubes(const View *v){
     disc(s, ax, ay, p * 15 / 4, RGB(200, 154, 58)); disc(s, ax, ay, p * 13 / 4, c); disc(s, ax, ay, p * 11 / 4, RGB(42, 33, 24)); disc(s, ax, ay, p, c); disc(s, ax, ay, p / 2 + 1, RGB(42, 33, 24));
     rect(s, bx - p * 19 / 4, by - p * 3 / 2, p * 4, p * 3, RGB(200, 150, 58)); rect(s, bx - p * 9 / 2, by - p * 5 / 4, p * 7 / 2, p * 5 / 8 + 1, RGB(255, 224, 138));
     rect(s, bx - p * 3 / 4, by - p * 13 / 8, p * 3 / 2, p * 13 / 4, c);
+    int stage=mx_tube_pulse_stage(t);
+    if(stage){
+      int r=p*4+(12-stage)*p/8,dist=p+(12-stage)*p/2;
+      u32 glow=stage>=6?RGB(255,255,255):RGB(255,210,63);
+      rect(s,ax-r,ay-1,2,2,glow);rect(s,ax+r-1,ay-1,2,2,glow);
+      rect(s,ax-1,ay-r,2,2,glow);rect(s,ax-1,ay+r-1,2,2,glow);
+      line(s,bx+dist,by-p,bx+dist,by+p,glow);
+    }
   }
 }
 static void draw_sling(const View *v){
@@ -1234,6 +1265,7 @@ static real n3_aim_x[39], n3_aim_y[39];
 static int n3_aim_frame = -1, n3_aim_count;
 #endif
 static void draw_aim(const View *v){
+  if(console_opt.no_guide)return;
   if(world.man.mode != MAN_AIM || !dragging) return;
 #if MX_N3DS_AIM_CACHE
   if(n3_aim_frame != frame){
@@ -1271,6 +1303,7 @@ static unsigned n3_particles_rasterized; /* host diagnostic; zero runtime cost *
 #endif
 static void draw_parts(const View *v){
   for(int i = 0; i < (MX_N3DS_PARTICLE_BOUNDS ? part_high_water : NP); i++) if(parts[i].life > 0){
+    if(i%mx_opt_fx_stride(&console_opt))continue;
     const Part *q = &parts[i]; int x = VX(v, q->x), y = VY(v, q->y), k = v->ppc >= 4 ? 2 : 1;
 #if MX_N3DS_PARTICLE_VIEW_CULL
     /* Hearts are <=10 px wide and glints have <=9 px arms.
@@ -1362,11 +1395,14 @@ static void draw_hud(const View *camera){
   rect(&top, 0, 0, 400, 24, RGB(15, 18, 30)); rect(&top, 0, 0, 400, 12, RGB(24, 28, 46)); rect(&top, 0, 23, 400, 1, RGB(255, 210, 63));
   char b[48];
   text(&top, 6, 8, "LV", 2, RGB(255, 210, 63)); itoa_(world.level + 1, b); text(&top, 30, 8, b, 2, RGB(255, 210, 63));
-  text(&top, 56, 8, mx_level_name(world.level), 2, RGB(255, 255, 255));
+  int namex=world.level>=99?70:56;
+  text(&top,namex,8,mx_level_name(world.level),world.man.mode==MAN_WALK||mx_level_stage_count(world.level)>1?1:2,RGB(255,255,255));
+  if(mx_level_stage_count(world.level)>1){snprintf(b,sizeof b,"STAGE %d/3",world.district+1);text(&top,144,18,b,1,RGB(255,210,63));}
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                               /* walk levels: the clock */
     int k = (int)(RTOF(world.man.wt) * 100.0f / MX_WALK_T); if(k < 0) k = 0; if(k > 100) k = 100;
     rect(&top, 250, 6, 142, 12, RGB(255, 255, 255)); rect(&top, 251, 7, 140, 10, RGB(40, 40, 50)); rect(&top, 251, 7, k * 140 / 100, 10, k > 30 ? RGB(125, 255, 90) : RGB(255, 74, 74));
-    text(&top, 206, 8, "TIME", 1, RGB(255, 255, 255));
+    snprintf(b,sizeof b,"%ds",mx_walk_seconds_left(&world.man));
+    text(&top,206,8,b,1,k>30?RGB(255,255,255):RGB(255,100,100));
   }
   rect(&top, 5, 29, 123, 13, RGB(18, 24, 42));
   rect(&top, 5, 29, 123, 1, RGB(255, 210, 63));
@@ -1436,7 +1472,7 @@ static void draw_hud(const View *camera){
      world.man.mode==MAN_AIM && !dragging){
     rect(&top,45,60,310,27,RGB(19,23,38));
     rect(&top,45,60,310,2,RGB(255,210,63));
-    textc(&top,200,68,mx_level_tactic(world.level),1,RGB(255,210,63));
+    textc(&top,200,68,mx_stage_tactic(&world),1,RGB(255,210,63));
   }
   if(toast_t > 0 && toast_id >= 0){                                          /* achievement popup: drops in, gold frame, star badge, time bar */
     int t = toast_t, off = t < 10 ? (10 - t) * 5 : t > 140 ? (t - 140) * 5 : 0, y = 24 - off, x = 84, w = 232, h = 36;
@@ -1491,13 +1527,47 @@ static int pause3_touch_at(int x,int y){
   return -1;
 }
 static void load_level(int l){
-  mx_load(&world, l); mx_set_fight(&world, !nofight); mx_meta_level_start(&stats, &world); valve_equipped=0; world.valve_ok=0;
+  mx_load(&world, l); mx_set_collapse(&world,console_opt.collapse); mx_set_fight(&world, !nofight); was_aim=0; mx_meta_level_start(&stats, &world); valve_equipped=0; world.valve_ok=0;
   memset(parts, 0, sizeof parts); part_high_water=0; memset(pops, 0, sizeof pops); mi_reset(&mi);
 #if MX_N3DS_PARTICLE_HINT
   part_free_hint = 0;
 #endif
   cells0 = mx_cells_left(&world) ? mx_cells_left(&world) : 1;
   dragging = 0; pad_used = 0; pad_dx = pad_dy = 0; new_best = 0;
+}
+static void opt_change(int dir){
+  opt_menu.art_available=mx_art_unlocked(&stats);
+  int old_art=console_opt.art_style;
+  int action=mx_opt_activate(&console_opt,&opt_menu,dir,app==ST_TITLE);
+  if(action==MX_O_ERASE){mx_meta_init(&stats);console_opt.art_style=0;outfit_sel=0;outfit_seen=1;toast_nq=0;toast_t=0;toast_id=-1;sel=0;apply_outfit(0);outfit_scan(1);load_level(0);}
+  if(old_art!=console_opt.art_style){apply_outfit(outfit_sel);tile_ready=0;}
+  nofight=console_opt.nofight;mus_pref=!console_opt.music_off;
+  mx_set_fight(&world,!nofight);mx_set_collapse(&world,console_opt.collapse);
+  if(action==MX_O_SAVE_NOW||action==MX_O_ERASE)n3_save_sync();
+  sfx_play(SFX_CLICK,64);
+}
+static void options_input(u32 down,int x,int y){
+  if((down&KEY_B)||((down&KEY_TOUCH)&&x<70&&y>=210)){opt_open=0;opt_menu.confirm=0;n3_save_sync();return;}
+  if((down&KEY_TOUCH)&&y>=18&&y<38){mx_opt_page(&opt_menu,x/80);return;}
+  if((down&KEY_TOUCH)&&y>=42&&y<42+mx_opt_rows(&opt_menu)*39){mx_opt_pick(&opt_menu,(y-42)/39);opt_change(0);return;}
+  if(down&KEY_L)mx_opt_page(&opt_menu,opt_menu.page-1);
+  else if(down&KEY_R)mx_opt_page(&opt_menu,opt_menu.page+1);
+  else if(down&KEY_UP)mx_opt_move(&opt_menu,-1);
+  else if(down&KEY_DOWN)mx_opt_move(&opt_menu,1);
+  else if(down&KEY_A)opt_change(0);
+  else if(down&KEY_LEFT)opt_change(-1);
+  else if(down&KEY_RIGHT)opt_change(1);
+}
+static void draw_options(void){
+  opt_menu.art_available=mx_art_unlocked(&stats);
+  rect(&bot,0,0,320,240,RGB(15,18,30));textc(&bot,160,4,"MANDEX OPTIONS",1,RGB(255,210,63));
+  for(int i=0;i<4;i++){rect(&bot,i*80+2,18,76,20,i==opt_menu.page?RGB(65,85,130):RGB(28,34,54));textc(&bot,i*80+40,24,mx_opt_tabs[i],1,RGB(255,230,160));}
+  for(int i=0;i<mx_opt_rows(&opt_menu);i++){int id=mx_opt_id(&opt_menu,i),y=42+i*39;u32 c=i==opt_menu.row?RGB(255,210,63):RGB(165,184,213);rect(&bot,4,y,312,36,RGB(29,37,60));rect(&bot,4,y,312,1,c);text(&bot,9,y+5,mx_opt_names[id],1,c);textc(&bot,265,y+5,mx_opt_value(&console_opt,&opt_menu,id,app==ST_TITLE),1,RGB(255,255,255));text(&bot,9,y+20,id==MX_O_ART&&opt_menu.art_available?"CEL PAINT / ORIGINAL LOOK":mx_opt_desc[id],1,RGB(182,197,218));}
+  if(opt_menu.page==MX_OPT_PERF)textc(&bot,160,200,console_opt.profile==3?"FLAT TOP SCREEN / ECO FX":"SLIDER STEREO / PROFILE FX",1,RGB(125,255,90));
+#if defined(__3DS__) && !MX_N3DS_NO_SAVE
+  if(opt_menu.page==MX_OPT_DATA)textc(&bot,160,170,n3_save_status<0?"SD WRITE FAILED":n3_save_status?"SD SAVE OK":"NO SAVE CONFIRMED",1,RGB(125,255,90));
+#endif
+  text(&bot,5,214,"B BACK",1,RGB(255,210,63));textc(&bot,182,214,"L/R PAGE  UP/DOWN ROW",1,RGB(255,255,255));textc(&bot,160,228,"A CHANGE / CONFIRM   LEFT/RIGHT CYCLE",1,RGB(170,195,225));
 }
 static int was_state;
 /* Real wall-clock frame completion, sampled after VBlank. */
@@ -1517,7 +1587,7 @@ int main(void){
   gfxSetDoubleBuffering(GFX_TOP, true); gfxSetDoubleBuffering(GFX_BOTTOM, true);
   srand(1234);
   sound_init();
-  mx_meta_init(&stats);
+  mx_meta_init(&stats); mx_options_default(&console_opt);
   n3_save_load();
   apply_outfit(outfit_sel);
   gfx_init();                                         /* the shared DS drawing library builds its palette in RAM (used by the cutscenes) */
@@ -1545,11 +1615,14 @@ int main(void){
       n3_frame_complete(0);
       continue;
     }
-    if(app == ST_TITLE){
-      if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
-      if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
+    if(opt_open){options_input(down,t.px,t.py);}
+    else if((app==ST_TITLE||app==ST_PAUSE)&&((down&KEY_X)||((down&KEY_TOUCH)&&app==ST_TITLE&&t.py>=204))){opt_open=1;mx_opt_open(&opt_menu);}
+    else if(app == ST_TITLE){
+      if(down & (KEY_UP|KEY_DOWN)){sel=mx_trial_district_step(sel,(down&KEY_DOWN)?1:-1);load_level(sel);}
+      else if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
+      else if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
       if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } apply_outfit(outfit_sel); n3_save_sync(); }
-      if(down & KEY_Y){ nofight = !nofight; mx_set_fight(&world, !nofight); n3_save_sync(); }
+      if(down & KEY_Y){ nofight = !nofight; console_opt.nofight=nofight; mx_set_fight(&world, !nofight); n3_save_sync(); }
       if(down & (KEY_A | KEY_START | KEY_TOUCH)){
         if(sel == 0 && !intro_seen){ intro_seen = 1; intro_level = 0; app = ST_INTRO; intro_start(); }
         else if(sel == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_level = sel; app = ST_INTRO; intro_start_wolf(); }
@@ -1560,9 +1633,10 @@ int main(void){
       if((down & KEY_START) || choice==0) app=ST_PLAY;
       else if((down & KEY_SELECT) || choice==1){ load_level(world.level);app=ST_PLAY; }
       else if((down & KEY_B) || choice==2){ app=ST_TITLE;sel=world.level;load_level(sel); }
-      else if(down & KEY_Y) mus_pref=!mus_pref; /* dedicated pause music shortcut */
+      else if(down & KEY_Y){mus_pref=!mus_pref;console_opt.music_off=!mus_pref;} /* dedicated pause music shortcut */
     } else {
       MxMan *m = &world.man;
+      {int aim=m->mode==MAN_AIM&&world.state==MX_PLAY;if(aim&&!was_aim){int pw=mx_tool_power(console_opt.tool);if(pw&&world.pw_sel!=pw)mx_select_power(&world,pw);}was_aim=aim;}
       if((down & KEY_START) && world.state == MX_PLAY){
         /* Treat START as a pause-only action, not as an aim/attack input.
            In particular do not leave a dangling touch drag that launches
@@ -1581,7 +1655,7 @@ int main(void){
       /* Y controls music in aiming/flight, but remains PUNCH on foot.
          In pause use Y as well; on the title it controls landlord AI. */
       if((down & KEY_Y) && world.state==MX_PLAY &&
-         m->mode!=MAN_WALK)mus_pref=!mus_pref;
+         m->mode!=MAN_WALK){mus_pref=!mus_pref;console_opt.music_off=!mus_pref;}
       if((down&KEY_X)&&m->mode==MAN_AIM){
         int nx=world.pw_sel;
         for(int k=0;k<PW_COUNT;k++){nx=(nx+1)%PW_COUNT;if(nx==PW_NONE||world.pw_left[nx]>0)break;}
@@ -1667,7 +1741,7 @@ int main(void){
       }
       if(app == ST_PLAY){        /* idle gags: only while he waits in the sling and nobody is touching anything */
         if(world.man.mode == MAN_AIM && !dragging && !pad_used && world.banner <= 0 && world.state == MX_PLAY && !(down | held)){
-          mi_update(&mi); if(mi.fx) idle_fx(mi.fx, RTOF(world.man.x), RTOF(world.man.y));
+          mi_update_style(&mi,cel_active); if(mi.fx) idle_fx(mi.fx, RTOF(world.man.x), RTOF(world.man.y));
         } else mi_reset(&mi);
       }
       if(app == ST_PLAY) mx_update(&world, R(1.0 / 60.0));
@@ -1687,11 +1761,12 @@ int main(void){
     /* ---- draw ---- */
     unsigned long long n3_draw_begin=osGetTime();
     bot.fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, NULL, NULL); bot.w = 320; bot.h = 240;
-    float sl = osGet3DSliderState();                   /* the 3D slider: 0 = flat, 1 = full depth */
+    float sl = (console_opt.profile==3||opt_open)?0:osGet3DSliderState();                   /* the 3D slider: 0 = flat, 1 = full depth */
     gfxSet3D(sl > 0.03f);
     for(int eye = 0; eye < (sl > 0.03f ? 2 : 1); eye++){
     top.fb = gfxGetFramebuffer(GFX_TOP, eye ? GFX_RIGHT : GFX_LEFT, NULL, NULL); top.w = 400; top.h = 240;
-    draw_world_3d(&vt, eye ? 1 : -1, sl);
+    View shaken=vt;if(app==ST_PLAY&&!opt_open&&console_opt.shake!=2){int sh=(int)(RTOF(world.shake)*0.12f);if(sh>4)sh=4;if(console_opt.shake==1)sh/=2;shaken.ox+=(frame&1)?sh:-sh;shaken.oy+=(frame&2)?sh:-sh;}
+    draw_world_3d(&shaken, eye ? 1 : -1, sl);
     if(app == ST_TITLE){
       /* Poster framing: actual sprite art from the game, not substitute circles. */
       rect(&top, 10, 32, 380, 2, RGB(255, 210, 63));
@@ -1706,12 +1781,14 @@ int main(void){
       rect(&top, 140, 161, 120, 9, RGB(15, 18, 30));
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
+      if(sel>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel,&stars);snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/30  %d/20 CLEARED  %d/60 STARS",(sel-MX_TRIAL_START)/20+1,clear,stars);textc(&top,200,228,b,1,RGB(255,210,63));}
+      else textc(&top, 200, 228, "UP/DOWN: TRIAL DISTRICTS", 1, RGB(255, 210, 63));
       if(!snd_ok){ char sb[48]; sprintf(sb, "NO SOUND (ndsp %08X) - NEEDS dspfirm.cdc", (unsigned)snd_err); textc(&top, 200, 212, sb, 1, RGB(255, 90, 90)); }
 #if defined(__3DS__) && !MX_N3DS_NO_SAVE
       else if(n3_save_status < 0) textc(&top, 200, 212, "SD SAVE FAILED - CHECK CARD", 1, RGB(255, 90, 90));
       else if(n3_save_status > 0) textc(&top, 200, 212, "PROGRESS SAVED TO SD", 1, RGB(125, 255, 90));
 #endif
-      { char fb[48]; sprintf(fb, "Y: LANDLORDS FIGHT BACK  %s", nofight ? "OFF" : "ON"); textc(&top, 200, 190, fb, 1, nofight ? RGB(150, 150, 165) : RGB(125, 255, 90)); }
+      { char fb[48]; sprintf(fb, "X OPTIONS  /  Y FIGHT: %s", nofight ? "OFF" : "ON"); textc(&top, 200, 190, fb, 1, nofight ? RGB(150, 150, 165) : RGB(125, 255, 90)); }
       { char ob[64]; sprintf(ob, "L/R: OUTFIT - %s   ACH %d/%d", mx_outfit(outfit_sel)->name, mx_ach_count(&stats), MX_NUM_ACH); textc(&top, 200, 200, ob, 1, RGB(255, 126, 176)); }
     } else {
       draw_hud(&vt); draw_end();
@@ -1720,11 +1797,11 @@ int main(void){
         textc(&top,200,88,"PAUSED",3,RGB(255,210,63));
         textc(&top,200,116,"START RESUME",1,RGB(255,255,255));
         textc(&top,200,126,"SELECT RESTART  B MENU",1,RGB(255,255,255));
-        textc(&top,200,138,mus_pref?"Y MUSIC: ON":"Y MUSIC: OFF",1,RGB(255,210,63));
+        textc(&top,200,138,"X OPTIONS  /  Y MUSIC",1,RGB(255,210,63));
       }
     }
     /* An unobtrusive diagnostic in *both* eyes only while L+R is held. */
-    if((held&(KEY_L|KEY_R))==(KEY_L|KEY_R)){
+    if(console_opt.monitor || (!opt_open&&(held&(KEY_L|KEY_R))==(KEY_L|KEY_R))){
       char stats_line[48];
       snprintf(stats_line,sizeof stats_line,"FPS %d.%d SIM %d.%d",
         (int)n3_fps.render_x10/10,(int)n3_fps.render_x10%10,
@@ -1792,7 +1869,8 @@ int main(void){
         textc(&bot,160,204,"TAP TOOL  /  X CYCLE  /  R USE AIR",1,RGB(255,210,63));
       }
       if(world.man.mode == MAN_FLY && !world.man.dive && (frame & 32)) textc(&bot, 160, 12, "TAP = BELLY FLOP", 2, RGB(255, 255, 255));
-    } else if(app == ST_TITLE) textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));
+    } else if(app == ST_TITLE){textc(&bot,160,12,"TOUCH TO START",2,RGB(255,255,255));rect(&bot,0,204,320,36,RGB(20,27,46));textc(&bot,160,218,"X / TAP: OPTIONS",2,RGB(255,210,63));}
+    if(opt_open)draw_options();
     { unsigned long long end=osGetTime();
       n3_draw_ms_last=end>=n3_draw_begin?(unsigned)(end-n3_draw_begin):0;
       if(n3_draw_ms_last>n3_draw_ms_window)n3_draw_ms_window=n3_draw_ms_last;

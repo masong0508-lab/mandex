@@ -62,7 +62,13 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #endif
 #define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
-#define MX_NUM_LEVELS    60
+#define MX_TRIAL_START   60
+#define MX_TRIAL_COUNT   600
+#define MX_TRIAL_DISTRICT_SIZE 20
+#define MX_NUM_LEVELS    (MX_TRIAL_START + MX_TRIAL_COUNT)
+#if MX_NUM_LEVELS > 1500
+#error "Level count must fit the 8KB cartridge save budget"
+#endif
 #define MX_CH2_START     20      /* chapter 2: levels 20-39 */
 #define MX_CH3_START     40      /* chapter 3 (the Wolfman): levels 40-59 */
 #define MX_STORY_LEVELS  20      /* chapter 1: the story achievements and outfits count only these, so adding levels never moves earned goalposts */
@@ -136,6 +142,15 @@ typedef struct { uint8_t type, m; real x, y, a, b; } MxEvent;
 /* edge = this voxel touches empty space inside its chunk. Interior voxels can't be the first
    point of contact with anything, so the solver skips them (big win on large chunks). */
 typedef struct { real lx, ly, wx, wy, h; uint8_t m, dead, edge, fuse; } MxCell; /* fuse uses existing 24-byte padding */
+/* A fuse is a simulation countdown, not a render-frame counter. Every
+ * native port therefore shows the same warning phase, including at 30 Hz,
+ * when paused or when a frame is skipped. 0=hidden, 1=gold, 2=urgent red. */
+static inline int mx_fuse_visual(const MxCell *a){
+  if(a->dead||a->m!=MX_TNT||!a->fuse)return 0;
+  if(a->fuse<=8)return (a->fuse&1)?0:2;
+  return (a->fuse&2)?0:1;
+}
+
 
 /* Interior rooms (backdrop only): front-ends may draw wallpaper behind the voxels. */
 typedef struct { uint8_t x, y, w, h, pal; } MxRoom;
@@ -171,7 +186,7 @@ typedef struct { uint8_t x, y, w; } MxPad;                                  /* b
 /* Pneumatic tube (chapter 2): a man who flies within MX_TUBE_R of the mouth (ax,ay) is posted out of the nozzle (bx,by) at (vx,vy) cells/s. */
 #define MX_MAX_TUBES 3
 #define MX_TUBE_R    R(3.75)
-typedef struct { real ax, ay, bx, by, vx, vy; } MxTube;
+typedef struct { real ax, ay, bx, by, vx, vy; real pulse; } MxTube; /* visual transfer countdown only */
 
 typedef struct {
   int mode;            /* MAN_* */
@@ -182,7 +197,9 @@ typedef struct {
   real wt, pT, pCd, padCd, hurtCd, stun;
   /* Walking forgiveness: short coyote window after leaving a ledge, and
      short-hop release after an ordinary player jump. No new buffers. */
-  real ledge_grace, jump_hold;
+  real ledge_grace, jump_hold, jump_buffer;
+  real walk_safe_x, walk_safe_y, walk_jam; /* validated temporary recovery point, not a saved checkpoint */
+  uint8_t jump_latched, walk_safe;
   real gait;            /* cosmetic ground distance, modulo 4 cells; no renderer memory or save data */
   int8_t in_ax; uint8_t in_jump, in_punch, in_stomp;
   real tubeT, tubeCd;  /* just posted out of a tube: gravity is 10 % for tubeT seconds, no second tube for tubeCd seconds */
@@ -199,7 +216,8 @@ typedef struct {
   /* body pose (cosmetic, like the jiggle): in flight ang eases toward 0.6 x the path angle measured as if he faced +x (front-ends mirror
      it when he flies left); spin is the belly-flop's tumble in radians.  Both are 0 outside flight.  mx_man_wobble() is the side-to-side
      rock after he sticks (about +-0.17 rad at first, gone in a second). */
-  real spin;
+  real spin, dive_age;  /* cosmetic ramp timer, saturated after 0.12 seconds */
+  real rear_t;         /* cosmetic rear-roll countdown, never used for contacts */
   real j_px, j_py, j_vx, j_vy;       /* previous position / estimated velocity */
 } MxMan;
 
@@ -207,6 +225,14 @@ typedef struct {
    -1 = stationary/airborne (hold the actual side-on pose); 0..3 are
    the successive 1-cell phases of a grounded 4-cell stride. The core
    advances gait only by actual, collision-resolved horizontal motion. */
+/* Read the actual remaining walking seconds, including earned +3s bonuses.
+ * Integer ceiling avoids showing zero while the player can still move. */
+static inline int mx_walk_seconds_left(const MxMan *m){
+  if(m->mode!=MAN_WALK||m->wt<=0)return 0;
+  real t=rclamp(m->wt,0,RI(MX_WALK_T+15));
+  int whole=rfloor(t);
+  return whole+(t>RI(whole));
+}
 static inline int mx_walk_anim_phase(const MxMan *m){
   if(m->mode != MAN_WALK || !m->gr || rabs(m->vx) <= R(3)) return -1;
   return rfloor(m->gait) & 3;
@@ -267,6 +293,17 @@ static inline void mx_walk_punch_fx_point(const MxMan *m,int k,real *dx,real *dy
   const real x=MX_WALK_PUNCH_X+arc;
   *dx=m->face>0?x:-x;
   *dy=MX_WALK_PUNCH_Y+(k==-3?-MX_WALK_PUNCH_HH:k==3?MX_WALK_PUNCH_HH:k*R(2.0/3.0));
+}
+/* Side -> rear -> side, six 15-degree atlas steps per half turn.
+   Keep a short rear hold so the pose reads at handheld refresh rates.
+   A zero result preserves the original flight silhouette. */
+#define MX_REAR_ROLL_T R(0.4)
+static inline int mx_rear_roll_offset(const MxMan *m){
+  if(m->mode!=MAN_FLY||m->rear_t<=0||m->inf>0)return 0;
+  int k=rfloor(rmul(rclamp(MX_REAR_ROLL_T-m->rear_t,0,MX_REAR_ROLL_T),RI(60)));
+  if(k<1||k>=23)return 0;
+  if(k>12)k=23-k;
+  return k>6?6:k;
 }
 /* Avoid single-frame left/right sprite flips when flying near zero horizontal
    speed. The existing face byte is cosmetic until the player walks. */
@@ -351,6 +388,31 @@ typedef struct {
   uint8_t tnt_soonest;        /* ticks to earliest blast, zero when none */
 } MxWorld;
 
+/* Presentation-only helpers: no cached pad geometry or extra render buffers.
+   A fractured pad may have several pieces; mark the widest contiguous
+   rubber run rather than the empty midpoint. Leftmost wins ties. */
+static inline int mx_pad_live_run(const MxWorld *w,const MxPad *p,int *first){
+  int best=0,run=0;*first=p->x;
+  if(p->y>=MX_ROWS)return 0;
+  int end=p->x+p->w;
+  if(end>MX_COLS)end=MX_COLS;
+  for(int x=p->x;x<end;x++){
+    if(w->grid[p->y*MX_COLS+x]==MX_RUBBER){
+      if(++run>best){best=run;*first=x-run+1;}
+    }else run=0;
+  }
+  return best;
+}
+/* One-second continuous chevron loop, three evenly spaced phases.
+   Use only the fractional second to avoid large fixed-point products. */
+static inline int mx_pad_phase(real time,int k){
+  real frac=time-RI(rfloor(time));
+  return (rfloor(rmul(frac,RI(60)))+20*k)%60;
+}
+static inline int mx_tube_pulse_stage(const MxTube *t){
+  return t->pulse>0?1+rfloor(rmul(rclamp(t->pulse,0,R(0.45)),RI(24))):0;
+}
+
 /* Anchor of the sling, in cells. */
 #define MX_ANCHOR_X R(16)
 #define MX_ANCHOR_Y R(45.25)
@@ -359,6 +421,12 @@ typedef struct {
 #define MX_HQ_LEVEL        39
 #define MX_HQ_DISTRICTS    3
 #define MX_HQ_BONUS_MEN    4
+#define MX_RELAY_START     640 /* 20 circuits: stages 600+k, 620+k, 640+k */
+#define MX_RELAY_BONUS_MEN 6
+static inline int mx_level_stage_count(int l){return l==MX_HQ_LEVEL||(l>=MX_RELAY_START&&l<MX_NUM_LEVELS)?3:1;}
+static inline int mx_stage_source(int l,int d){return l>=MX_RELAY_START&&l<MX_NUM_LEVELS?l-40+20*(d<0?0:d>2?2:d):l;}
+static inline int mx_stage_bonus(int l){return l>=MX_RELAY_START?MX_RELAY_BONUS_MEN:MX_HQ_BONUS_MEN;}
+const char *mx_stage_tactic(const MxWorld *w);
 void mx_load(MxWorld *w, int level);
 void mx_update(MxWorld *w, real dt);          /* dt ~ 1/60 s */
 void mx_set_pull(MxWorld *w, real dx, real dy); /* drag offset from anchor, cells */
@@ -385,6 +453,12 @@ const char *mx_combo_taunt(int count);  /* compact adult-comedy stingers shared 
 int  mx_targets_alive(const MxWorld *w);
 int  mx_cells_left(const MxWorld *w);
 const char *mx_level_name(int level);
+static inline int mx_trial_district_step(int level,int dir){
+  if(level<MX_TRIAL_START)return dir>0?MX_TRIAL_START:MX_NUM_LEVELS-MX_TRIAL_DISTRICT_SIZE;
+  const int d=(level-MX_TRIAL_START)/MX_TRIAL_DISTRICT_SIZE;
+  if(dir>0)return d==MX_TRIAL_COUNT/MX_TRIAL_DISTRICT_SIZE-1?0:MX_TRIAL_START+(d+1)*MX_TRIAL_DISTRICT_SIZE;
+  return d==0?0:MX_TRIAL_START+(d-1)*MX_TRIAL_DISTRICT_SIZE;
+}
 const char *mx_level_tactic(int level); /* read-only stage guidance */
 void mx_set_wobble_budget(MxWorld *w, int cells);   /* handhelds: cap the lattice work per frame (0 = off); hits then wake fewer cells instead of stalling the frame */
 void mx_set_substeps(MxWorld *w, int n);       /* 2..4: physics steps per frame */

@@ -6,13 +6,16 @@
 #include <string.h>
 #include <stddef.h>
 #include "mx_meta.h"
+#include "mx_save_journal.h"
 static MxStats stats;
-static int outfit_sel, nofight;
+static int outfit_sel, nofight, mus_pref=1;
+static MxOptions console_opt;
 typedef int file_t;
 #define FILEHND_INVALID (-1)
 #define O_RDONLY 1
 #define O_WRONLY 2
-static unsigned char disk[2][512], exists[2];
+static unsigned char disk[2][MX_JOURNAL_DISK_BYTES], exists[2];
+static int disk_size[2];
 static int active=-1, mode, available=1, short_write;
 static int slot(const char *name){
   size_t n=strlen(name);
@@ -24,16 +27,16 @@ static file_t fs_open(const char *name, int flags){
   active=s;mode=flags;if(flags==O_WRONLY)exists[s]=1;
   return s;
 }
-static int fs_total(file_t f){return exists[f]?512:0;}
+static int fs_total(file_t f){return exists[f]?disk_size[f]:0;}
 static int fs_read(file_t f,void *buf,int count){
   if(!exists[f])return -1;
-  if(count>512)count=512;
+  if(count>disk_size[f])count=disk_size[f];
   memcpy(buf,disk[f],(size_t)count);return count;
 }
 static int fs_write(file_t f,const void *buf,int count){
-  if(short_write){memcpy(disk[f],buf,25);return 25;}
-  if(count>512)count=512;
-  memcpy(disk[f],buf,(size_t)count);return count;
+  if(short_write){memcpy(disk[f],buf,25);disk_size[f]=25;return 25;}
+  if(count>MX_JOURNAL_DISK_BYTES)count=MX_JOURNAL_DISK_BYTES;
+  memcpy(disk[f],buf,(size_t)count);disk_size[f]=count;return count;
 }
 static int fs_close(file_t f){(void)f;active=-1;return 0;}
 static int fs_unlink(const char *name){
@@ -75,6 +78,22 @@ int main(void){
   /* Card missing: saving fails safely, progress in RAM stays intact. */
   available=0;stats.wins=33;dc_save_sync();
   CHECK(dc_save_status==-1 && stats.wins==33);
+  /* Reconstruct a genuine version-2 legacy 60-level journal padded to
+     the old single VMU sector. The migration must preserve all old slots. */
+  available=1;memset(disk,0,sizeof disk);exists[0]=1;exists[1]=0;disk_size[0]=512;
+  uint8_t *old=disk[0],*payload=old+8;
+  memcpy(old,"MXJ1",4);mx_journal_put32(old+4,91);
+  memcpy(payload,"MXS1",4);payload[4]=2;payload[5]=60;
+  payload[66+59]=3;
+  mx_journal_put32(payload+66+60+5+4*59,123456);
+  mx_journal_put32(payload+372,mx_crc32(payload,372));
+  mx_journal_put32(old+384,mx_crc32(old,384));
+  mx_meta_init(&stats);dc_saved_len=0;dc_save_slot=-1;dc_save_load();
+  CHECK(dc_save_slot==0 && dc_save_generation==91 && stats.stars[59]==3 && stats.best[59]==123456);
+  CHECK(stats.stars[60]==0 && stats.best[599]==0);
+  stats.stars[599]=3;stats.best[599]=432100;console_opt.profile=3;console_opt.eco=1;console_opt.shake=2;mus_pref=0;dc_save_sync();
+  CHECK(dc_save_slot==1 && disk_size[1]==MX_JOURNAL_DISK_BYTES);
+  mx_meta_init(&stats);mx_options_default(&console_opt);mus_pref=1;dc_save_load();CHECK(stats.best[59]==123456 && stats.best[599]==432100 && console_opt.profile==3 && console_opt.eco && console_opt.shake==2 && !mus_pref);
   printf("vmu_save_test: %s\n",fail?"FAILED":"all passed");
   return fail!=0;
 }

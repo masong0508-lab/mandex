@@ -717,14 +717,15 @@ static void wobble_check(MxWorld *w){
 static void sand_step(MxWorld *w){
   int moved = 0, par = w->sand_t & 1;
   for(int y = MX_ROWS - 2; y >= 0; y--){
+    const int row=y*MX_COLS;
     for(int x = 0; x < MX_COLS; x++){
-      int i = IDX(x, y);
+      int i=row+x;
       if(w->grid[i] != MX_SAND) continue;
       int dst = -1;
       if(!w->grid[i + MX_COLS]) dst = i + MX_COLS;
       else for(int k = 0; k < 2 && dst < 0; k++){
-        int nx = x + ((k ^ par) ? 1 : -1);
-        if(nx >= 0 && nx < MX_COLS && !w->grid[IDX(nx, y)] && !w->grid[IDX(nx, y + 1)]) dst = IDX(nx, y + 1);
+        int dx=(k^par)?1:-1,nx=x+dx;
+        if(nx>=0&&nx<MX_COLS&&!w->grid[i+dx]&&!w->grid[i+MX_COLS+dx])dst=i+MX_COLS+dx;
       }
       if(dst < 0) continue;
       w->grid[dst] = MX_SAND; w->hp[dst] = w->hp[i]; w->anch[dst] = 0;
@@ -866,24 +867,29 @@ static MxChunk *chunk_slot(MxWorld *w){
   return v;
 }
 
+/* Four-bit border mask in the existing right, left, down, up order.
+ * Linear neighbor offsets avoid reconstructing row*width per edge. */
+static inline unsigned support_border(int x,int y){
+  return (x==MX_COLS-1?1u:0u)|(x==0?2u:0u)|(y==MX_ROWS-1?4u:0u)|(y==0?8u:0u);
+}
 static MX_HOT void support_pass(MxWorld *w){
   w->need_support = 0;
   memset(w->hb, 255, sizeof w->hb);
   unsigned head = 0, tail = 0;
   const unsigned QM = 8191;
-  static const int DX[4] = {1, -1, 0, 0}, DY[4] = {0, 0, 1, -1};
+  static const int OFF[4] = {1,-1,MX_COLS,-MX_COLS};
   for(int x = 0; x < MX_COLS; x++){
     int i = IDX(x, MX_ROWS - 1);
     if(w->grid[i]){ w->hb[i] = 0; w->queue[tail++ & QM] = (uint16_t)i; }
   }
   while(head != tail){
     int i = w->queue[head++ & QM], x = i % MX_COLS, y = i / MX_COLS, h = w->hb[i];
+    const unsigned blocked=support_border(x,y)|w->brk[i];
     for(int d = 0; d < 4; d++){
-      int nx = x + DX[d], ny = y + DY[d];
-      if(!INB(nx, ny) || ((w->brk[i] >> d) & 1)) continue;
-      int j = IDX(nx, ny), m = w->grid[j];
-      if(!m) continue;
-      int nh = DY[d] == -1 ? 0 : h + 1;
+      if(blocked&(1u<<d))continue;
+      int j=i+OFF[d],m=w->grid[j];
+      if(!m)continue;
+      int nh=d==3?0:h+1;
       if(nh < w->hb[j] && nh <= MATS[m].lim + (w->anch[j] ? 8 : 0) && tail - head < QM){
         w->hb[j] = (uint8_t)nh; w->queue[tail++ & QM] = (uint16_t)j;
       }
@@ -906,11 +912,11 @@ static MX_HOT void support_pass(MxWorld *w){
           c->lx = RI(x); c->ly = RI(y); c->m = w->grid[a]; c->h = w->hp[a]; c->dead = 0;
         } else oversized = 1;
       }
+      const unsigned blocked=support_border(x,y)|w->brk[a];
       for(int d = 0; d < 4; d++){
-        int nx = x + DX[d], ny = y + DY[d];
-        if(!INB(nx, ny)) continue;
-        int j = IDX(nx, ny);
-        if(w->grid[j] && w->grid[j] != MX_SAND && w->hb[j] == 255 && !w->vis[j] && !((w->brk[a] >> d) & 1)){ w->vis[j] = 1; w->stack[sp++] = (uint16_t)j; }
+        if(blocked&(1u<<d))continue;
+        int j=a+OFF[d];
+        if(w->grid[j] && w->grid[j]!=MX_SAND && w->hb[j]==255 && !w->vis[j]){w->vis[j]=1;w->stack[sp++]=(uint16_t)j;}
       }
     }
     if(!ch) continue;                   /* no slot: retry when a sleeper settles */
@@ -925,12 +931,11 @@ static MX_HOT void support_pass(MxWorld *w){
     /* mark boundary voxels while the component is still in the grid */
     for(int k = 0; k < n; k++){
       MxCell *c = &ch->cells[k];
-      int gx = rfloor(c->lx), gy = rfloor(c->ly), e = 0;
-      for(int d = 0; d < 4 && !e; d++){
-        int nx = gx + DX[d], ny = gy + DY[d];
-        if(!INB(nx, ny) || !w->grid[IDX(nx, ny)] ||
-           w->hb[IDX(nx, ny)] != 255 ||
-           (oversized && w->vis[IDX(nx, ny)] != 2)) e = 1;
+      int gx=rfloor(c->lx),gy=rfloor(c->ly),gi=IDX(gx,gy);
+      int e=support_border(gx,gy)!=0;
+      for(int d=0;d<4&&!e;d++){
+        int j=gi+OFF[d];
+        if(!w->grid[j]||w->hb[j]!=255||(oversized&&w->vis[j]!=2))e=1;
       }
 #ifdef MX_NO_EDGE
       e = 1;
@@ -951,20 +956,20 @@ static MX_HOT void support_pass(MxWorld *w){
       wob_zero(w, gi); clear_links(w, gi);
     }
     cx = rdiv(cx, M); cy = rdiv(cy, M);
-    real rad = 0, tq = 0, ti = 0, cvx = rdiv(mvx, M), cvy = rdiv(mvy, M);
+    real rad2 = 0, tq = 0, ti = 0, cvx = rdiv(mvx, M), cvy = rdiv(mvy, M);
     for(int k = 0; k < n; k++){
       MxCell *c = &ch->cells[k];
       real d = MATS[c->m].d, rx = c->lx + R(0.5) - cx, ry = c->ly + R(0.5) - cy;
       tq += rmul(d, rmul(rx, c->wy - cvy) - rmul(ry, c->wx - cvx)); ti += rmul(d, rmul(rx, rx) + rmul(ry, ry));
       c->lx = rx; c->ly = ry; c->wx = c->lx + cx; c->wy = c->ly + cy;
-      real r = rsqrt(rmul(c->lx, c->lx) + rmul(c->ly, c->ly));
-      if(r > rad) rad = r;
+      real r2 = rmul(c->lx, c->lx) + rmul(c->ly, c->ly);
+      if(r2 > rad2) rad2 = r2;
     }
     ch->rest = 0; ch->restT = 0;
     ch->active = 1; ch->count = n; ch->x = cx; ch->y = cy; ch->ang = 0;
     ch->vx = rclamp(cvx, -WOB_VMAX, WOB_VMAX); ch->vy = rclamp(cvy, -WOB_VMAX, WOB_VMAX);
     ch->w = ti > R(1) ? rclamp(rdiv(tq, ti), -RI(6), RI(6)) : 0;   /* the sway becomes a topple */
-    ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rad + R(1); ch->cs = RI(1); ch->sn = 0;
+    ch->sleep = ch->age = ch->hitCd = ch->wt = 0; ch->rad = rsqrt(rad2) + R(1); ch->cs = RI(1); ch->sn = 0;
     ch->px = cx; ch->py = cy; ch->pa = 0;
     ch->tnt_hit=-1;
     recompute(ch);
@@ -1028,9 +1033,14 @@ static MX_HOT void resolve_static(MxWorld *w, MxChunk *ch, MxCell *a, real nx, r
 }
 
 static MX_HOT void step_chunks(MxWorld *w, real dt){
-  int any = 0;
-  for(int c = 0; c < MX_MAX_CHUNKS; c++) if(w->chunks[c].active){ any = 1; break; }
-  if(!any) return;
+  int bodies=0;
+  for(int c=0;c<MX_MAX_CHUNKS;c++)if(w->chunks[c].active&&++bodies==2)break;
+  if(!bodies)return;
+#ifdef MX_REFERENCE_CHUNK_HASH
+  const int pair_contacts=1;
+#else
+  const int pair_contacts=bodies>1;
+#endif
   if(w->bh_hi >= w->bh_lo) memset(&w->bhead[w->bh_lo * (MX_COLS + 4)], 0xff, (size_t)(w->bh_hi - w->bh_lo + 1) * (MX_COLS + 4) * sizeof w->bhead[0]);
   int blo = MX_ROWS + 4, bhi = -1;
   for(int c = 0; c < MX_MAX_CHUNKS; c++){
@@ -1050,7 +1060,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         a->wx = ch->x + rmul(ch->cs, a->lx) - rmul(ch->sn, a->ly);
         a->wy = ch->y + rmul(ch->sn, a->lx) + rmul(ch->cs, a->ly);
       }
-      if(!a->edge) continue;
+      if(!a->edge||!pair_contacts)continue;
       int gx = rfloor(a->wx) + 2, gy = rfloor(a->wy) + 2;
       if(gx < 0) gx = 0;
       if(gx > MX_COLS + 3) gx = MX_COLS + 3;
@@ -1073,7 +1083,14 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
       int gx = rfloor(a->wx), gy = rfloor(a->wy);
       /* Cleanup follows all substeps. Keep the fatal contact's response,
        * but stop this cell's scan as soon as that response shatters it. */
-      for(int j = gy - 1; j <= gy + 1 && !a->dead; j++) for(int k = gx - 1; k <= gx + 1 && !a->dead; k++){
+      #ifdef MX_REFERENCE_STATIC_CONTACTS
+      const int left=gx-1,right=gx+1,top=gy-1,bottom=gy+1;
+#else
+      const real fx=a->wx-RI(gx),fy=a->wy-RI(gy);
+      const int left=gx-(fx<RC),right=gx+(RI(1)-fx<RC);
+      const int top=gy-(fy<RC),bottom=gy+(RI(1)-fy<RC);
+#endif
+      for(int j=top;j<=bottom&&!a->dead;j++)for(int k=left;k<=right&&!a->dead;k++){
         if(!solid_cell(w, k, j)) continue;
         real qx = rclamp(a->wx, RI(k), RI(k + 1)), qy = rclamp(a->wy, RI(j), RI(j + 1));
         real dx = a->wx - qx, dy = a->wy - qy, d2 = rmul(dx, dx) + rmul(dy, dy);
@@ -1094,7 +1111,7 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
         if(pen > RI(4)) pen = RI(4);
         resolve_static(w, ch, a, nx, ny, pen, k, j);
       }
-      if(a->dead) continue;
+      if(a->dead||!pair_contacts)continue;
       /* chunk vs chunk: circle-circle through the spatial buckets */
       int bx0 = gx + 1, by0 = gy + 1;
       for(int by = by0; by <= by0 + 2 && !a->dead; by++) for(int bx = bx0; bx <= bx0 + 2 && !a->dead; bx++){
@@ -1106,7 +1123,9 @@ static MX_HOT void step_chunks(MxWorld *w, real dt){
           if(oc < c && !och->rest) continue;     /* moving pairs are tested once (from the lower index); a sleeper is tested from whichever moving body reaches it */
           MxCell *o = &och->cells[id % MX_CHUNK_CELLS];
           if(o->dead) continue;
-          real dx = a->wx - o->wx, dy = a->wy - o->wy, d2 = rmul(dx, dx) + rmul(dy, dy);
+          real dx = a->wx - o->wx, dy = a->wy - o->wy;
+          if(rabs(dx)>=RI(1)||rabs(dy)>=RI(1))continue;
+          real d2=rmul(dx,dx)+rmul(dy,dy);
           if(d2 >= RI(1) || d2 < R(0.0005)) continue;
           real d = rsqrt(d2), nx = rdiv(dx, d), ny = rdiv(dy, d), pen = RI(1) - d;
           real rax = a->wx - ch->x, ray = a->wy - ch->y, rbx = o->wx - och->x, rby = o->wy - och->y;
@@ -1401,7 +1420,7 @@ static void bounce_rubber(MxWorld *w){
       real k = rmul(RI(1) + R(0.92), vn);
       m->vx -= rmul(k, nx); m->vy -= rmul(k, ny);
       wob_kick(w, x, y, 5, rmul(nx, rmul(vn, R(0.55))), rmul(ny, rmul(vn, R(0.55))));
-      if(m->hitCd <= 0){ m->hitCd = R(0.1); w->bank_left = RI(2); ev(w, EV_BOUNCE, m->x, m->y, 0, -vn, 0); }
+      if(m->hitCd <= 0){ m->hitCd = R(0.1); m->rear_t=MX_REAR_ROLL_T; w->bank_left = RI(2); ev(w, EV_BOUNCE, m->x, m->y, 0, -vn, 0); }
       if(w->shake < R(2)) w->shake = R(2);
     }
   }
@@ -1445,6 +1464,8 @@ static MX_HOT void man_plow(MxWorld *w){
     MxChunk *ch = &w->chunks[c];
     if(!ch->active) continue;
     real dx = ch->x - m->x, dy = ch->y - m->y, reach = ch->rad + MAN_R + R(0.5);
+    /* Fast axis rejection before squared fixed-point distances. */
+    if(rabs(dx)>reach || rabs(dy)>reach)continue;
     if(rmul(dx, dx) + rmul(dy, dy) > rmul(reach, reach)) continue;
     int hit = 0, cnt = 0; real ax = 0, ay = 0, lim = rmul(MAN_R + RC, MAN_R + RC);
     for(int i = 0; i < ch->count; i++){
@@ -1473,6 +1494,7 @@ static MX_HOT void man_plow(MxWorld *w){
     MxTarget *t = &w->targets[i];
     if(!t->alive) continue;
     real dx = t->x - m->x, dy = t->y - m->y, r = MAN_R + R(0.875) + R(0.25);
+    if(rabs(dx)>=r || rabs(dy)>=r)continue;
     if(rmul(dx, dx) + rmul(dy, dy) < rmul(r, r) && !bat_block(w, t)){
       w->bank_contact = 1;
       kill_target(w, t);
@@ -1510,12 +1532,12 @@ static void man_step(MxWorld *w, real dt){
     if(m->tubeT > 0) m->tubeT -= dt;
     if(m->tubeCd > 0) m->tubeCd -= dt;
     else for(int i = 0; i < w->ntubes; i++){
-      const MxTube *tb = &w->tubes[i];
+      MxTube *tb = &w->tubes[i];
       real dx = m->x - tb->ax, dy = m->y - tb->ay;
       if(rmul(dx, dx) + rmul(dy, dy) > rmul(MX_TUBE_R, MX_TUBE_R)) continue;
       ev(w, EV_TUBE, tb->ax, tb->ay, i, tb->bx, tb->by);
       m->x = tb->bx; m->y = tb->by; m->vx = tb->vx; m->vy = tb->vy; m->ang = 0;
-      m->tubeT = R(0.55); m->tubeCd = R(0.35);
+      m->tubeT = R(0.55); m->tubeCd = R(0.35); tb->pulse=R(0.45);
       if(w->shake < R(3)) w->shake = R(3);
       break;
     }
@@ -1531,7 +1553,7 @@ static void man_step(MxWorld *w, real dt){
     ev(w, EV_LAND, m->x, RI(MX_ROWS), skip, rsqrt(sp2), 0);
     if(sp2 > RI(1056) && w->shake < R(4)) w->shake = R(4);          /* over 32.5 cells/s (the browser's 260 px/s at 8 px a cell) shakes the screen, skip or stick */
     if(skip){
-      m->bounces++; m->vy = -rmul(m->vy, R(0.34)); m->vx = rmul(m->vx, R(0.72));
+      m->bounces++; m->rear_t=MX_REAR_ROLL_T; m->vy = -rmul(m->vy, R(0.34)); m->vx = rmul(m->vx, R(0.72));
       ev(w, EV_THUD, m->x, m->y, 0, R(0.5), 0);
       return;
     }
@@ -1608,7 +1630,7 @@ void mx_release(MxWorld *w){
     } }
   m->mode = MAN_FLY; m->gt = 0; w->men--;
   m->face = m->vx < 0 ? -1 : 1;
-  m->spin = 0; m->ang = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
+  m->spin = m->dive_age = 0; m->ang = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
   ev(w, EV_LAUNCH, m->x, m->y, 0, 0, 0);
 }
 void mx_select_power(MxWorld *w, int pw){
@@ -1626,7 +1648,7 @@ void mx_dive(MxWorld *w){
     return;
   }
   if(m->mode != MAN_FLY || m->dive) return;
-  m->dive = 1; m->vx = rmul(m->vx, R(0.4));
+  m->dive = 1; m->spin = m->ang; m->dive_age = 0; m->rear_t=MX_REAR_ROLL_T; m->vx = rmul(m->vx, R(0.4));
   if(m->vy < 0) m->vy = 0;
   m->vy += R(97.5);
   if(w->shake < R(3)) w->shake = R(3);
@@ -1929,25 +1951,74 @@ static int wblocked(const MxWorld *w, real x, real y){
     for(int k = 0; k < ch->count; k++){
       const MxCell *a = &ch->cells[k];
       if(a->dead || rabs(a->wx - x) > WHW + RC || rabs(a->wy - y) > WHH + RC) continue;
-      for(int i = 0; i < 3; i++) for(int j = 0; j < 5; j++) if(rabs(a->wx - xs[i]) < RC && rabs(a->wy - ys[j]) < RC) return 1;
+      /* Cartesian sample grid: X and Y hits are independent. Test each
+         axis once rather than rechecking X for all five Y samples. */
+      if(rabs(a->wx-xs[0])>=RC && rabs(a->wx-xs[1])>=RC && rabs(a->wx-xs[2])>=RC)continue;
+      for(int j=0;j<5;j++)if(rabs(a->wy-ys[j])<RC)return 1;
     }
   }
   return 0;
 }
 #define PX(n) rmul(RI(n), R(0.125))
+/* Never move a walker to a point that intersects the new rubble pose or
+   outside the stage. Recovery only runs after local escape failed. */
+static int walk_clear(const MxWorld *w,real x,real y){
+  return x>=WHW+R(.25)&&x<=RI(MX_COLS)-WHW-R(.25)&&y>=WHH&&y<=RI(MX_ROWS)-WHH&&!wblocked(w,x,y);
+}
+static int walk_place(MxWorld *w,real x,real y){
+  MxMan *m=&w->man;
+  if(!walk_clear(w,x,y))return 0;
+  m->x=x;m->y=y;m->vx=m->vy=0;m->gr=0;m->stomp=0;
+  m->ledge_grace=m->jump_hold=m->jump_buffer=m->walk_jam=0;
+  m->walk_safe=1;m->walk_safe_x=x;m->walk_safe_y=y;
+  return 1;
+}
+static int walk_rescue(MxWorld *w){
+  MxMan *m=&w->man;
+  if(m->walk_safe&&walk_place(w,m->walk_safe_x,m->walk_safe_y))return 1;
+  /* Sling-side entry lane is a fallback, not a free teleport on input.
+     A clear point can be found in nine bounded probes. */
+  for(int y=0;y<3;y++)for(int x=0;x<3;x++)
+    if(walk_place(w,RI(8+8*x),RI(MX_ROWS)-WHH-R(.25)-RI(y*6)))return 1;
+  return 0;
+}
+/* On-foot tube transfer shares the physical mouths with flight, but
+   preserves the walking life and tests the larger body at the exit.
+   Blocked exits do not spend time or teleport into a solid wall. */
+static void walk_tube_step(MxWorld *w,real dt){
+  MxMan *m=&w->man;
+  if(m->mode!=MAN_WALK||!w->ntubes||m->walk_jam>0)return;
+  if(m->tubeCd>0){m->tubeCd=rclamp(m->tubeCd-dt,0,RI(1));return;}
+  for(int i=0;i<w->ntubes;i++){
+    MxTube *tb=&w->tubes[i];
+    real dx=m->x-tb->ax,dy=m->y-tb->ay;
+    if(rabs(dx)>MX_TUBE_R||rabs(dy)>MX_TUBE_R||rmul(dx,dx)+rmul(dy,dy)>rmul(MX_TUBE_R,MX_TUBE_R))continue;
+    const real sx=m->walk_safe_x,sy=m->walk_safe_y;const int safe=m->walk_safe;
+    int ok=0;for(int k=0;k<=4;k++)if(walk_place(w,tb->bx,tb->by-RI(k))){ok=1;break;}
+    if(!ok){m->tubeCd=R(.20);return;}
+    m->walk_safe=safe;m->walk_safe_x=sx;m->walk_safe_y=sy;
+    m->vx=rclamp(tb->vx,R(-22),R(22));m->vy=R(-18.75);m->face=m->vx<0?-1:1;
+    m->tubeT=0;m->tubeCd=R(.85);tb->pulse=R(.45);
+    if(w->shake<R(3))w->shake=R(3);
+    ev(w,EV_TUBE,tb->ax,tb->ay,i,tb->bx,tb->by);return;
+  }
+}
 static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
   mx_flight_face_update(m);
   if(m->face != -1) m->face = 1;
-  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=0;
+  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=m->jump_buffer=0;m->jump_latched=m->walk_safe=0;m->walk_jam=0;
   m->in_ax = 0; m->in_jump = m->in_punch = m->in_stomp = 0;
+  m->x=rclamp(m->x,WHW+R(.25),RI(MX_COLS)-WHW-R(.25));m->y=rclamp(m->y,WHH,RI(MX_ROWS)-WHH);
   int ok = !wblocked(w, m->x, m->y);
-  for(int u = 1; u <= 110 && !ok; u++) if(!wblocked(w, m->x, m->y - PX(u))){ m->y -= PX(u); ok = 1; }
+  for(int u = 1; u <= 110 && !ok; u++) if(m->y-PX(u)>=WHH&&!wblocked(w,m->x,m->y-PX(u))){m->y-=PX(u);ok=1;}
   for(int r = 4; r <= 200 && !ok; r += 4) for(int a = 0; a < 16 && !ok; a++){           /* nearest free spot, preferring up */
     real an = -R(1.5708) + (a & 1 ? 1 : -1) * ((a + 1) / 2) * R(0.4);
     real qx = m->x + rmul(rcos(an), PX(r)), qy = m->y + rmul(rsin(an), PX(r));
-    if(!wblocked(w, qx, qy)){ m->x = qx; m->y = qy; ok = 1; }
+    if(walk_place(w,qx,qy))ok=1;
   }
+  if(!ok)ok=walk_rescue(w);
+  if(ok){m->walk_safe=1;m->walk_safe_x=m->x;m->walk_safe_y=m->y;}
   ev(w, EV_WALK, m->x, m->y, 0, 0, 0);
   if(w->shake < RI(4)) w->shake = RI(4);
 }
@@ -2026,9 +2097,16 @@ static void walk_step(MxWorld *w, real dt){
     int f = 0;
     for(int u = 2; u <= 80 && !f; u += 2) for(int k = 0; k < 3 && !f; k++){
       int sg = k == 0 ? 0 : k == 1 ? -1 : 1;
-      if(!wblocked(w, m->x + sg * PX(u), m->y - PX(u))){ m->x += sg * PX(u); m->y -= PX(u); f = 1; }
+      real qx=m->x+sg*PX(u),qy=m->y-PX(u);
+      if(walk_clear(w,qx,qy)){m->x=qx;m->y=qy;f=1;}
+    }
+    if(!f){
+      m->walk_jam+=dt;
+      if(m->walk_jam>=R(.25)&&walk_rescue(w)){ev(w,EV_WALK,m->x,m->y,1,0,0);}
+      else return; /* no input or punch through solid rubble while wedged */
     }
   }
+  m->walk_jam=0;
   /* Don't count a forced pop-out from rubble as a walking stride. */
   const real stride_start_x=m->x;
   int ax = m->in_ax;
@@ -2045,10 +2123,13 @@ static void walk_step(MxWorld *w, real dt){
   if(m->in_punch && m->pCd <= 0) walk_punch(w);
   /* Walkers get 0.1s to jump after leaving a ledge. A jump consumes the
      window immediately so it can never turn into a double jump. */
+  if(m->in_jump&&!m->jump_latched)m->jump_buffer=R(.12);
+  m->jump_latched=m->in_jump;
   if(m->gr) m->ledge_grace=R(0.1);
-  if(m->in_jump && (m->gr || m->ledge_grace > 0) && !m->stomp){
-    m->vy=R(-43.125); m->gr=0; m->ledge_grace=0; m->jump_hold=R(0.16);
+  if(m->jump_buffer>0 && (m->gr || m->ledge_grace > 0) && !m->stomp){
+    m->vy=R(-43.125); m->gr=0; m->ledge_grace=0; m->jump_hold=R(0.16);m->jump_buffer=0;
   }
+  else if(m->jump_buffer>0)m->jump_buffer=rclamp(m->jump_buffer-dt,0,R(.12));
   /* A tap makes a controllable short hop; holding jump keeps the original
      full-height trajectory. Only the player's jump sets this flag, so rubber
      pads, pneumatic tubes and other launches are never cut. */
@@ -2063,7 +2144,7 @@ static void walk_step(MxWorld *w, real dt){
      The existing cooldown protects ascent only; a ceiling or expiry gives
      the player stomp control again immediately. */
   if(m->in_stomp && !m->gr && !m->stomp && !(m->padCd > 0 && m->vy < 0)){
-    m->stomp=1; m->jump_hold=0; m->ledge_grace=0;
+    m->stomp=1; m->jump_hold=0; m->ledge_grace=0;m->jump_buffer=0;
     if(m->vy < RI(90)) m->vy=RI(90);
   }
   /* walk_slam() clears the impact pose before pad detection. Retain this
@@ -2112,7 +2193,7 @@ static void walk_step(MxWorld *w, real dt){
     m->gait += rabs(m->x-stride_start_x);
     if(m->gait >= RI(4)) m->gait -= RI(4);
   }
-  if(m->gr) m->stomp = 0;
+  if(m->gr){m->stomp=0;m->walk_safe=1;m->walk_safe_x=m->x;m->walk_safe_y=m->y;}
   if(m->padCd > 0) m->padCd -= dt;
   if(m->gr && !(m->padCd > 0)){
     int by = rfloor(m->y + WHH + R(0.25));
@@ -2120,7 +2201,7 @@ static void walk_step(MxWorld *w, real dt){
       int bx = rfloor(m->x + (k == 0 ? -R(0.5) : k == 1 ? 0 : R(0.5)));
       if(INB(bx, by) && w->grid[IDX(bx, by)] == MX_RUBBER){
         m->vy = stomp_landing ? R(-67.5) : R(-58.75); m->gr = 0; m->stomp = 0; m->padCd = R(0.3);
-        m->ledge_grace=m->jump_hold=0;
+        m->ledge_grace=m->jump_hold=m->jump_buffer=0;
         ev(w, EV_PAD, m->x, m->y + WHH, stomp_landing, 0, 0);
         break;
       }
@@ -2213,7 +2294,14 @@ static void upd_targets(MxWorld *w, real dt){
     for(int c = 0; c < MX_MAX_CHUNKS && t->alive; c++){
       MxChunk *ch = &w->chunks[c];
       if(!ch->active) continue;
+      /* Every voxel has zero impact speed if all three rigid-body velocity
+         components are zero. Still check rotating debris and any sleeper
+         that just received an impulse, regardless of its rest flag. */
+#ifndef MX_REFERENCE_STATIONARY_IMPACTS
+      if(!ch->vx&&!ch->vy&&!ch->w)continue;
+#endif
       real dx = ch->x - t->x, dy = ch->y - t->y, reach = ch->rad + r + R(0.5);
+      if(rabs(dx)>reach || rabs(dy)>reach)continue;
       if(rmul(dx, dx) + rmul(dy, dy) > rmul(reach, reach)) continue;
       for(int k = 0; k < ch->count; k++){
         MxCell *a = &ch->cells[k];
@@ -2323,7 +2411,8 @@ static void pad(MxWorld *w, int x, int y, int ww){
   MxPad *p = &w->pads[w->npads++]; p->x = (uint8_t)x; p->y = (uint8_t)y; p->w = (uint8_t)ww;
 }
 
-static const char *NAMES[MX_NUM_LEVELS] = {
+#include "trial_levels.h"
+static const char *NAMES[MX_TRIAL_START] = {
   "Suburban Eviction", "Duplex Dilemma", "Tower Block Tussle", "Castle Foreclosure", "Corporate Takeover",
   "Bouncy Castle", "Sandcastle Shakedown",
   "Glass House Party", "Steel Mill Standoff", "Twin Peaks", "Domino Drive", "Rubber Ducky Resort", "TNT Pyramid",
@@ -2334,8 +2423,12 @@ static const char *NAMES[MX_NUM_LEVELS] = {
   /* chapter 3: the Wolfman */
   "Full Moon Rising", "Howling Heights", "Flea Market", "Fang Street", "Bad Moon Brick", "Wolf Pack Lofts", "Moonlit Mortgage", "Claw Foreclosure", "Growl Gardens", "Night Shift",
   "Tail Spin", "Lunar Lease", "Pelt Place", "The Long Howl", "Scratch Post Towers", "Fur Ball Plaza", "Silver Bullet Row", "Midnight Eviction", "Pack Leader Penthouse", "Alpha Landlord"};
-static const int MEN[MX_NUM_LEVELS] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
-const char *mx_level_name(int l){ return NAMES[l % MX_NUM_LEVELS]; }
+static const int MEN[MX_TRIAL_START] = {5, 5, 6, 6, 7, 6, 7,  5, 7, 6, 6, 7, 6, 8, 8, 8, 7, 7, 6, 10,  6, 6, 4, 6, 6, 6, 6,  6, 6, 8, 8, 6, 7, 8, 6, 8,  6, 4, 7,  10,  5, 5, 5, 5, 5,  6, 6, 6, 6, 6,  7, 7, 7, 7, 7,  9, 9, 9, 9, 9};
+const char *mx_level_name(int l){
+  if(l<0 || l>=MX_NUM_LEVELS)return "Unknown Level";
+  return l<MX_TRIAL_START?NAMES[l]:MX_TRIALS[l-MX_TRIAL_START].name;
+}
+static int level_men(int l){return l<MX_TRIAL_START?MEN[l]:MX_TRIALS[l-MX_TRIAL_START].men;}
 /* Compact ROM-only guidance; each hint fits a 256-pixel DS banner. */
 const char *mx_level_tactic(int l){
   static const char *const early[MX_CH3_START]={
@@ -2389,6 +2482,7 @@ const char *mx_level_tactic(int l){
     "NIGHT ALLEY: DUMP THE SANDBAGS", "NIGHT ALLEY: CRACK THE GLASS ROOF"
   };
   if(l<0 || l>=MX_NUM_LEVELS)return "EVICT EVERY LANDLORD";
+  if(l>=MX_TRIAL_START)return MX_TRIALS[l-MX_TRIAL_START].tip;
   if(l<MX_CH3_START)return early[l];
   int i=l-MX_CH3_START;
   if(i==0)return "WOLFMAN: LANDLORDS HAVE HEALTH BARS";
@@ -2499,7 +2593,24 @@ static void build_ch3(MxWorld *w, int i){
   }
 }
 
+/* Decode only the chosen trial into the existing world, no allocation or
+ * raw maps resident in the console's working memory. */
+static void build_trial(MxWorld *w,int index){
+  const MxTrialLevel *t=&MX_TRIALS[index];
+  const uint8_t *p=MX_TRIAL_DATA+t->rect_off;
+  for(int i=0;i<t->rect_n;i++,p+=5)rect_fill(w,p[0],p[1],p[2],p[3],p[4]);
+  p=MX_TRIAL_DATA+t->room_off;
+  for(int i=0;i<t->room_n;i++,p+=5)room(w,p[0],p[1],p[2],p[3],p[4]);
+  p=MX_TRIAL_DATA+t->target_off;
+  for(int i=0;i<t->target_n;i++,p+=4)tgtr(w,p[0],p[1],p[2],p[3]);
+  p=MX_TRIAL_DATA+t->pad_off;
+  for(int i=0;i<t->pad_n;i++,p+=3)pad(w,p[0],p[1],p[2]);
+  p=MX_TRIAL_DATA+t->tube_off;
+  for(int i=0;i<t->tube_n;i++,p+=4)tube(w,RI(p[0]),RI(p[1]),RI(p[2]),RI(p[3]));
+  w->walk=t->walk;
+}
 static void build(MxWorld *w, int l){
+  if(l>=MX_TRIAL_START){build_trial(w,mx_stage_source(l,w->district)-MX_TRIAL_START);return;}
   if(l >= MX_CH3_START){ build_ch3(w, l - MX_CH3_START); return; }
   const int W_ = MX_WOOD, B = MX_BRICK, S = MX_STONE, ST = MX_STEEL, RU = MX_RUBBER;
   switch(l){
@@ -2769,10 +2880,10 @@ static void load_level(MxWorld *w, int level, int district){
   w->dz_lo = MX_ROWS * MX_COLS; w->dz_hi = -1;
   w->bh_lo = 0; w->bh_hi = MX_ROWS + 3;               /* bhead starts zeroed, not -1: the first step clears all of it */
   w->valve_ok = keep_valve; w->collapse = keep_collapse;
-  level %= MX_NUM_LEVELS;
+  level = level < 0 ? 0 : level % MX_NUM_LEVELS;
   w->substeps = first ? SUBSTEPS : keep_sub;
   w->wob_enabled = first ? 1 : keep_wob;
-  w->level = level; w->district = district; w->state = MX_PLAY; w->men = MEN[level]; w->banner = R(2.4);
+  w->level = level; w->district = district; w->state = MX_PLAY; w->men = level_men(mx_stage_source(level,district)); w->banner = R(2.4);
   build(w, level);
   for(int r = 0; r < w->nrooms; r++){ const MxRoom *rm = &w->rooms[r]; for(int y = rm->y; y < rm->y + rm->h; y++) for(int x = rm->x; x < rm->x + rm->w; x++) w->paper[IDX(x, y)] = (uint8_t)(rm->pal + 1); }
   unclip_targets(w);
@@ -2803,15 +2914,17 @@ static void load_level(MxWorld *w, int level, int district){
 void mx_load(MxWorld *w, int level){ load_level(w, level, 0); }
 /* Landlord HQ: the district is cleared; build the next one in the same grid, keeping the score, the men left (plus a bonus) and the session counters. */
 static void hq_next_district(MxWorld *w){
-  int men = w->men + MX_HQ_BONUS_MEN, score = w->score + 3000, d = w->district + 1;
+  const int level=w->level;
+  int men=w->men+mx_stage_bonus(level), score=w->score+3000, d=w->district+1;
   int inf = w->st_inflated, pops = w->st_pops, pw[4] = { w->st_pw[0], w->st_pw[1], w->st_pw[2], w->st_pw[3] };
   int combo = w->combo, peak = w->combo_peak; real combo_left = w->combo_left;
   uint32_t rng = w->rng;
-  load_level(w, MX_HQ_LEVEL, d);
-  w->men = men; w->score = score; w->combo = combo; w->combo_peak = peak; w->combo_left = combo_left; w->st_inflated = inf; w->st_pops = pops; for(int i = 0; i < 4; i++) w->st_pw[i] = pw[i]; w->rng ^= rng; w->banner = R(2.4);
-  ev(w, EV_DISTRICT, 0, 0, d, 0, 0);
+  load_level(w,level,d);
+  w->men = men; w->score = score; w->combo = combo; w->combo_peak = peak; w->combo_left = combo_left; w->st_inflated = inf; w->st_pops = pops; for(int i = 0; i < 4; i++) w->st_pw[i] = pw[i]; w->rng = rng; w->banner = R(2.4);
+  ev(w, EV_DISTRICT, 0, 0, d, RI(mx_stage_bonus(level)), 0);
 }
 
+const char *mx_stage_tactic(const MxWorld *w){return mx_level_tactic(mx_stage_source(w->level,w->district));}
 void mx_set_wobble_budget(MxWorld *w, int cells){ w->wob_budget = cells < 0 ? 0 : cells; if(!cells) w->wob_shift = 0; }
 void mx_set_substeps(MxWorld *w, int n){ w->substeps = n < 2 ? 2 : n > 4 ? 4 : n; }
 void mx_preview_point(const MxWorld *w, real t, real *ox, real *oy){
@@ -2864,8 +2977,22 @@ real mx_man_wobble(const MxMan *m){
 
 /* flight pose: pitch toward the path (eased like the browser's 15 % a frame), belly-flop spin */
 static void man_pose(MxMan *m, real dt){
-  if(m->mode != MAN_FLY){ m->ang = m->spin = 0; return; }
-  if(m->dive){ m->spin += rmul(dt, RI(14)); return; }
+  if(m->mode != MAN_FLY){ m->ang = m->spin = m->dive_age = m->rear_t = 0; return; }
+  if(dt>0&&m->rear_t>0)m->rear_t=rclamp(m->rear_t-dt,0,MX_REAR_ROLL_T);
+  if(m->dive){
+    /* Integrate the 0.12s angular acceleration across the simulation tick.
+       The ramp saturates; subsequent frames use the original tumble rate. */
+    const real ramp=R(0.12), age=rclamp(m->dive_age,0,ramp);
+    if(dt<=0)return;
+    const real part=rclamp(dt,0,ramp-age);
+    if(part>0){
+      const real mean=rdiv(age+rmul(part,R(0.5)),ramp);
+      m->spin+=rmul(rmul(RI(14),part),mean);
+    }
+    m->dive_age=age+part;
+    m->spin+=rmul(RI(14),dt-part);
+    return;
+  }
   real tgt = rmul(ratan2(m->vy, rabs(m->vx)), R(0.6));
   m->ang += rmul(tgt - m->ang, rclamp(rmul(dt, RI(9)), 0, RI(1)));
 }
@@ -2874,6 +3001,8 @@ static void man_pose(MxMan *m, real dt){
 void mx_update(MxWorld *w, real dt){
   MX_PH_MARK(0);
   w->nev = 0; w->crack_ev = 0; w->time += dt;
+  /* The brief transfer glow is visual wall-clock feedback, like the browser. */
+  for(int i=0;i<w->ntubes;i++)if(w->tubes[i].pulse>0)w->tubes[i].pulse=rclamp(w->tubes[i].pulse-dt,0,R(0.45));
   for(int c=0;c<MX_MAX_CHUNKS;c++)if(w->chunks[c].active&&w->chunks[c].has_tnt){w->chunks[c].tnt_impact=0;w->chunks[c].tnt_hit=-1;}
   if(w->support_cd > 0) w->support_cd--;
   if(w->freeze > 0){ w->freeze--; return; }
@@ -2929,7 +3058,7 @@ void mx_update(MxWorld *w, real dt){
     }
     if(m->t > R(2.6)){ ev(w, EV_POP, m->x, m->y, 0, 0, 0); end_run(w); }
   } else if(m->mode == MAN_WALK){
-    walk_step(w, dt);
+    walk_step(w, dt);walk_tube_step(w,dt);
   } else if(m->mode == MAN_WAIT){
     int nch = busy_count(w);
     w->waitT += dt;
@@ -2988,13 +3117,12 @@ void mx_update(MxWorld *w, real dt){
   man_pose(m, dt);
 
   if(w->state == MX_PLAY){
-    int nch = busy_count(w);
     if(mx_targets_alive(w) == 0){
       w->winT += dt;
-      if(w->winT > R(1.6) && w->level == MX_HQ_LEVEL && w->district < MX_HQ_DISTRICTS - 1){ hq_next_district(w); return; }
+      if(w->winT > R(1.6) && w->district + 1 < mx_level_stage_count(w->level)){ hq_next_district(w); return; }
       if(w->winT > R(1.6)){ w->state = MX_WIN; w->score += w->men * 3000; ev(w, EV_WIN, 0, 0, 0, 0, 0); }
     } else if(w->men == 0 && m->mode == MAN_NONE){
-      if(nch == 0){
+      if(busy_count(w) == 0){
         w->loseT += dt;
         if(w->loseT > R(1.8)){ w->state = MX_LOSE; ev(w, EV_LOSE, 0, 0, 0, 0, 0); }
       } else {

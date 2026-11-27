@@ -1,0 +1,43 @@
+name: Exhaustive physics playthrough sweeps
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [float, fixed, fixed-no-wobble, float-collapse, fixed-collapse, float-collapse-48]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        include:
+          - mode: float
+            flags: ""
+          - mode: fixed
+            flags: "-DMX_FIXED"
+          - mode: fixed-no-wobble
+            flags: "-DMX_FIXED -DSWEEP_NOWOB"
+          - mode: float-collapse
+            flags: "-DSWEEP_COLLAPSE"
+          - mode: fixed-collapse
+            flags: "-DMX_FIXED -DSWEEP_COLLAPSE"
+          - mode: float-collapse-48
+            flags: "-DMX_MAX_CHUNKS=48 -DSWEEP_COLLAPSE"
+    name: Sweep ${{ matrix.mode }} / shard ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and exercise assigned levels, 80 seeds each
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r -a flags <<< "${{ matrix.flags }}"
+          gcc -std=gnu99 -O2 -Icore "${flags[@]}" core/mx.c test/sweep.c -lm -o /tmp/sweep
+          gcc -std=c99 -Wall -Wextra -Werror test/sweep_shard_test.c -o /tmp/sweep_shard_test
+          /tmp/sweep_shard_test
+          /tmp/sweep --shard ${{ matrix.shard }} 8

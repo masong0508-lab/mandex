@@ -31,7 +31,9 @@ const collisionCode=between('function wBlocked(', 'function enterWalk(');
 assert(!collisionCode.includes('const xs=['),'walk broadphase makes no per-call sample arrays');
 assert(!collisionCode.includes('Math.hypot(ch.x-qx,ch.y-qy)<=radius'),
        'walk collider must use actual transformed debris rather than the centroid');
-assert(collisionCode.includes('Math.abs(a.wx-qx)'),'voxel-based walk hitbox retained');
+assert(collisionCode.includes('Math.abs(a.wx-x0)')&&collisionCode.includes('Math.abs(a.wx-x2)')&&
+       collisionCode.includes('Math.abs(a.wy-y0)')&&collisionCode.includes('Math.abs(a.wy-y4)'),
+       'voxel-based walking hitbox retains both axes and extreme sample points');
 const makeFast=new Function('chunks','solidAt','RC','WHW','WHH','Math',collisionCode+'\nreturn wBlocked;');
 let seed=0xc001d00d;
 function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}

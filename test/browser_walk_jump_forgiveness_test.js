@@ -10,7 +10,7 @@ const source=html.slice(a,end);
 const DT=1/60;
 function make({ground=true,mat=6}={}){
   const e={WHW:7,WHH:19,WALK_T:45,V:8,RC:4,COLS:120,ROWS:60,
-    WW:960,G:900,RUBBER:7,KEYS:{},chunks:[],targets:[],MAT:[],
+    WW:960,G:900,RUBBER:7,KEYS:{},chunks:[],targets:[],tubes:[],MAT:[],
     time:0,shake:0,grid:new Uint8Array(7200),hp:new Float32Array(7200),
     parts:[],events:[],man:{
       mode:'walk',walked:true,face:1,x:160,y:320-19-.24,vx:0,vy:0,
@@ -33,8 +33,8 @@ function make({ground=true,mat=6}={}){
   if(ground)for(let x=12;x<=35;x++){
     e.grid[e.idx(x,40)]=mat;e.hp[e.idx(x,40)]=150;
   }
-  const walkStep=new Function('e','with(e){'+source+'\nreturn walkStep;}')(e);
-  return {e,tick(keys={},dt=DT){
+  const {walkStep,wBlocked,walkTubeStep}=new Function('e','with(e){'+source+'\nreturn {walkStep,wBlocked,walkTubeStep};}')(e);
+  return {e,blocked:wBlocked,tube:walkTubeStep,tick(keys={},dt=DT){
     for(const k of Object.keys(e.KEYS))delete e.KEYS[k];
     Object.assign(e.KEYS,keys);
     e.time+=dt;
@@ -104,8 +104,36 @@ check(m.vy===-470&&m.jumpHold===0&&m.ledgeGrace===0,'ordinary pad launch unchang
 m=pad.tick();
 check(m.vy< -180,'released jump key must not weaken a rubber pad launch');
 
-check(html.includes('m.ledgeGrace=0;m.jumpHold=0;m.R=14'),
+check(html.includes('m.ledgeGrace=0;m.jumpHold=0;m.jumpBuffer=0'),
       'enterWalk resets timers for every player life');
+const buffered=make();buffered.e.man.gr=false;buffered.e.man.y-=1.6;buffered.e.man.vy=96;
+m=buffered.tick({Space:true});check(m.jumpBuffer>0,'pre-landing tap buffered');
+m=buffered.tick();check(m.vy<0&&m.jumpBuffer===0,'buffered release launches once after floor contact');
+const noRepeat=make();for(let i=0;i<120;i++)m=noRepeat.tick({Space:true});
+check(m.gr&&m.vy===0,'held jump does not auto-repeat');
+const jam=make();jam.e.man.walkSafe=true;jam.e.man.safeX=120;jam.e.man.safeY=320-19-.24;jam.e.man.x=640;jam.e.man.y=240;
+for(let y=15;y<45;y++)for(let x=65;x<96;x++)jam.e.grid[jam.e.idx(x,y)]=6;
+for(let i=0;i<20;i++)m=jam.tick();check(m.x<240,'bounded jam rescue finds last safe platform');
+const voxel=make({ground:false});
+const c={x:320,y:240,rad:160,cells:[{wx:320,wy:240,dead:false}]};
+voxel.e.chunks=[c];
+const cell=c.cells[0],xs=[313,320,327],ys=[221,230.5,240,249.5,258.99];
+for(let dx=-16;dx<=16;dx+=.5)for(let dy=-28;dy<=28;dy+=.5){
+  cell.wx=c.x+dx;cell.wy=c.y+dy;
+  const expected=xs.some(x=>ys.some(y=>Math.abs(cell.wx-x)<4&&Math.abs(cell.wy-y)<4));
+  check(voxel.blocked(c.x,c.y)===expected,'exact live rubble sample parity');
+}
+cell.wx=c.x;cell.wy=c.y;cell.dead=true;
+check(!voxel.blocked(c.x,c.y),'dead debris no longer blocks walking');
+const ceiling=make({ground:false});
+ceiling.e.man.x=16;ceiling.e.man.y=19;
+ceiling.e.man.walkSafe=true;ceiling.e.man.safeX=200;ceiling.e.man.safeY=160;
+for(let y=0;y<10;y++)for(let x=0;x<15;x++)ceiling.e.grid[ceiling.e.idx(x,y)]=6;
+ceiling.e.tubes=[{ax:16,ay:19,bx:560,by:160,r:26,ang:0,sp:480}];
+m=ceiling.tick();check(m.y===19&&m.x===16&&m.walkJam>0,'ceiling jam cannot escape above map');
+ceiling.tube(ceiling.e.man,DT);check(ceiling.e.man.x===16,'jammed walker cannot activate tube');
+for(let i=0;i<20;i++)m=ceiling.tick();
+check(m.x===200&&m.y>=19&&!ceiling.blocked(m.x,m.y),'ceiling jam restores a valid safe point');
 const sa=html.indexOf('<script>'),sb=html.indexOf('</script>',sa);
 new Function(html.slice(sa+8,sb));
 console.log('BROWSER_JUMP_FORGIVENESS_PASS cases='+checks+

@@ -35,7 +35,7 @@ int main(void){
     CHECK(walkers == 3 && throwers == 1 && W.targets[5].kind == LK_THROWER,
           "Rent Strike: three walkers plus one telegraphed parry challenge"); }
   mx_load(&W, 38); CHECK(W.ntargets == 6 && W.targets[0].kind == LK_BAT && W.targets[1].kind == LK_BAT && W.men == 7, "Sand Standoff: two bat guards, 6 landlords");
-  CHECK(MX_NUM_LEVELS == 60 && MX_CH3_START == 40 && strcmp(mx_level_name(39), "Landlord HQ") == 0 && strcmp(mx_level_name(36), "Mail Room Mayhem") == 0 && strcmp(mx_level_name(40), "Full Moon Rising") == 0 && strcmp(mx_level_name(59), "Alpha Landlord") == 0, "60 levels: chapter 2 ends with Landlord HQ, chapter 3 is 40-59");
+  CHECK(MX_TRIAL_START == 60 && MX_NUM_LEVELS == 660 && MX_CH3_START == 40 && strcmp(mx_level_name(39), "Landlord HQ") == 0 && strcmp(mx_level_name(36), "Mail Room Mayhem") == 0 && strcmp(mx_level_name(40), "Full Moon Rising") == 0 && strcmp(mx_level_name(59), "Alpha Landlord") == 0, "60 levels: chapter 2 ends with Landlord HQ, chapter 3 is 40-59");
 
   /* ---- a flight onto a walk level ends on his feet ---- */
   mx_load(&W, 22);

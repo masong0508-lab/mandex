@@ -49,28 +49,49 @@ int mx_outfit_skin(int i, uint8_t out[4][3]);      /* returns 1 when the outfit 
 
 /* ---- options (port 13): kept by each front-end, saved in the blob (version 2).  Default = collapse off / no gadget. The air valve must be armed in the gameplay toolbar. ---- */
 enum { MX_TOOL_NONE, MX_TOOL_VALVE, MX_TOOL_BEANS, MX_TOOL_TOWEL, MX_TOOL_SPLAT, MX_TOOL_TURBO, MX_TOOL_QUAKE, MX_NUM_TOOLS };   /* new tool IDs appended, preserving all save index meanings; fits bits 1-3 */
-typedef struct { uint8_t collapse, tool, nofight; } MxOptions;   /* collapse: collapsible buildings; tool: the start tool (MX_TOOL_*); nofight: 1 = landlords just stand there (default 0: they fight back) */
+typedef struct { uint8_t collapse, tool, nofight, profile, eco, shake, no_guide, music_off, sfx_off, monitor, art_style; } MxOptions;   /* collapse: collapsible buildings; tool: the start tool (MX_TOOL_*); nofight: 1 = landlords just stand there (default 0: they fight back) */
 void mx_options_default(MxOptions *o);
+int mx_art_unlocked(const MxStats *s);
+static inline int mx_art_active(const MxStats *s,const MxOptions *o){return o->art_style==1&&mx_art_unlocked(s);}
+/* Cel color key: stronger shadow separation, warm highlights, violet ink.
+   Preserve hue families and the exact silhouette/alpha of baked artwork. */
+static inline void mx_art_color(uint8_t rgb[3]){
+  int r=rgb[0],g=rgb[1],b=rgb[2],l=(r*3+g*5+b*2)/10;
+  int shadow=l<128? (128-l)/5:0,light=l>128?(l-128)/6:0;
+  int c[3]={r+light+7-shadow,g+light/2-4-shadow,b+shadow/2-7-light/2};
+  for(int k=0;k<3;k++)rgb[k]=(uint8_t)(c[k]<0?0:c[k]>255?255:c[k]);
+}
 const char *mx_tool_name(int tool);                      /* "NONE", "AIR VALVE", "BEANS", "TOWEL", "SPLAT", "TURBO", "QUAKE" */
 int mx_tool_power(int tool);                             /* the PW_* a start tool pre-arms before every launch, or PW_NONE (none / air valve) */
 
 /* ---- save blob (port 5): identical bytes from the float and fixed builds, no struct memcpy, no malloc ----
    all fields little-endian:
      0   "MXS1"                       magic
-     4   version (2; version 1 blobs are still read: they have no options byte and load the default options)
-     5   nlev                         number of levels the writer had (stars[] and best[] have this many entries)
-     6   11 x u32  kills cells booms maxChain shots flops wins oneShots bestScore inflated pops
-     50  4 x u32   pw[0..3]
-     66  nlev x u8 stars[]
+     4   version (4; v1-v3 saves remain readable)
+     5   nlev (u16 in v4, u8 previously)                         number of levels the writer had (stars[] and best[] have this many entries)
+     7   11 x u32  kills cells booms maxChain shots flops wins oneShots bestScore inflated pops
+     51  4 x u32   pw[0..3]
+     67  nlev x u8 stars[]
          u32       ach
          u8        outfit index
          nlev x u32 best[]
-         u8        options (version 2 only): bit 0 collapse, bits 1-3 start tool (MX_TOOL_*), bit 4 landlords-fight-back OFF (0 = on, so older saves load the default), bits 5-7 reserved (written 0, ignored)
+         u8        options (version 2 only): bit 0 collapse, bits 1-3 start tool (MX_TOOL_*), bit 4 landlords-fight-back OFF (0 = on, so older saves load the default), bit 5 monitor in v3; bit 6 Golden Cels in v4; bit 7 reserved
+         u8        presentation preferences (v3): profile bits 0-1, eco bit 2, shake bits 3-4, guide-off bit 5, music-off bit 6, SFX-off bit 7
          u32       CRC32 (IEEE) of every byte before it
    20 levels = 176 bytes (175 for a version 1 blob).  Not saved: unlock_all and the per-level transients (lv_*, seen_*).  A save with fewer or more levels than this build
    still loads (missing levels read as 0, extra ones are dropped); any other layout change must bump the version byte. */
-#define MX_SAVE_VERSION 2
-#define MX_SAVE_MAX (66 + MX_NUM_LEVELS + 4 + 1 + 4 * MX_NUM_LEVELS + 1 + 4)
+#define MX_SAVE_VERSION 4
+/* District summary for the native title selectors; derived, never serialized. */
+static inline int mx_trial_cleared(const MxStats *s,int level,int *stars){
+  int total=0,clear=0;
+  if(level>=MX_TRIAL_START&&level<MX_NUM_LEVELS){
+    int first=MX_TRIAL_START+((level-MX_TRIAL_START)/MX_TRIAL_DISTRICT_SIZE)*MX_TRIAL_DISTRICT_SIZE;
+    for(int i=first;i<first+MX_TRIAL_DISTRICT_SIZE;i++){int n=s->stars[i];if(n>3)n=3;total+=n;clear+=n>0;}
+  }
+  if(stars)*stars=total;
+  return clear;
+}
+#define MX_SAVE_MAX (67 + MX_NUM_LEVELS + 4 + 1 + 4 * MX_NUM_LEVELS + 2 + 4)
 uint32_t mx_crc32(const uint8_t *p, int n);
 /* returns the number of bytes written, or 0 if cap is too small */
 int mx_meta_pack(const MxStats *s, int outfit, uint8_t *out, int cap);                                  /* = mx_meta_pack_opt with the default options */

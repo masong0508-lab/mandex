@@ -11,7 +11,7 @@ static void ok(int cond,int level,const char *msg){
 }
 #define CELL(x,y) W.grid[(y)*MX_COLS+(x)]
 int main(void){
-  ok(MX_NUM_LEVELS==60 && MX_CH3_START==40,40,"save-compatible chapter indices");
+  ok(MX_TRIAL_START == 60 && MX_NUM_LEVELS == 660 && MX_CH3_START==40,40,"save-compatible chapter indices");
   for(int i=0;i<20;i++){
     int a0=48+(i%3)*4, aw=8+(i%4)*2;
     int b0=80+(i%2)*4, gap=b0-(a0+aw);

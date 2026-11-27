@@ -1,6 +1,6 @@
 /* Dreamcast: recoverable VMU progress in slot A1.
    Embedded once after the front-end's stats/outfit/nofight declarations.
-   Two independent 512-byte files alternate after wins and menu changes,
+   Two independent whole-block files alternate after wins and menu changes,
    so an interrupted VMU write cannot overwrite the last valid slot.
    No per-frame write or heap allocation.  No VMU = no save, never no game. */
 #ifndef MX_DC_VMU_SAVE_H
@@ -29,9 +29,10 @@ static void dc_save_load(void){
     file_t fd=fs_open(dc_save_paths[i],O_RDONLY);
     if(fd == FILEHND_INVALID)continue;
     int sz=fs_total(fd);
-    int got=sz >= MX_JOURNAL_MAX ? fs_read(fd,record,sizeof record) : 0;
+    int want=sz<(int)sizeof record?sz:(int)sizeof record;
+    int got=want>=14?fs_read(fd,record,want):0;
     fs_close(fd);
-    if(got != (int)sizeof record)continue;
+    if(got!=want||got<14)continue;
     if(record[0]=='M' && record[1]=='X' && record[2]=='J' && record[3]=='1'){
       uint32_t g=mx_journal_get32(record+4);
       if(!any_seen || mx_journal_newer(g,seen_generation)){
@@ -40,23 +41,24 @@ static void dc_save_load(void){
     }
     MxStats trial; mx_meta_init(&trial);
     MxOptions opt; int outf=0; uint32_t generation=0;
-    if(!mx_journal_unpack(&trial,&outf,&opt,&generation,record,sizeof record))
+    int used=mx_journal_record_size(record,got);
+    if(!used||!mx_journal_unpack(&trial,&outf,&opt,&generation,record,used))
       continue;
     if(dc_save_slot>=0 && !mx_journal_newer(generation,valid_generation))
       continue;
     valid_generation=generation;dc_save_slot=i;dc_save_status=1;
-    stats=trial;outfit_sel=outf;nofight=opt.nofight;
+    stats=trial;outfit_sel=outf;console_opt=opt;nofight=opt.nofight;mus_pref=!opt.music_off;
   }
   if(dc_save_slot>=0){
     dc_save_generation=any_seen ? seen_generation : valid_generation;
-    MxOptions opt; mx_options_default(&opt);opt.nofight=(uint8_t)nofight;
+    MxOptions opt=console_opt;opt.nofight=(uint8_t)nofight;opt.music_off=!mus_pref;
     dc_saved_len=mx_meta_pack_opt(&stats,outfit_sel,&opt,
                                  dc_saved_payload,sizeof dc_saved_payload);
   }
 }
 static void dc_save_sync(void){
-  uint8_t payload[MX_SAVE_MAX],disk[512];
-  MxOptions opt;mx_options_default(&opt);opt.nofight=(uint8_t)nofight;
+  uint8_t payload[MX_SAVE_MAX],disk[MX_JOURNAL_DISK_BYTES];
+  MxOptions opt=console_opt;opt.nofight=(uint8_t)nofight;opt.music_off=!mus_pref;
   int n=mx_meta_pack_opt(&stats,outfit_sel,&opt,payload,sizeof payload);
   if(!n || (dc_saved_len==n && !memcmp(payload,dc_saved_payload,n)))return;
   memset(disk,0,sizeof disk);
