@@ -4999,9 +4999,20 @@ function trialBrief(i){
   if(i>=640&&i<660)return '3 STAGES / WALK + FLING';
   return a ? (a[13]?'WALK':'FLING')+' / '+a[12]+' MEN / '+a[7]+' TARGETS' : '';
 }
+// Match the native B shortcut: start inside the selected district and
+// wrap once through remaining districts. Never change the save.
+function trialNextUnfinishedIndex(d,stars=PD.stars){
+  const n=LEVELS.length,first=TRIAL_START+Math.max(0,Math.min(TRIAL_DISTRICTS.length-1,d|0))*20;
+  for(let i=first;i<n;i++)if(!(Number(stars[i])>0))return i;
+  for(let i=TRIAL_START;i<first;i++)if(!(Number(stars[i])>0))return i;
+  return -1;
+}
 function trialNextUnfinished(d){
-  const progress=trialDistrictProgress(d);
-  if(progress.next>=0)startStory(progress.next);
+  const next=trialNextUnfinishedIndex(d);
+  if(next>=0)startStory(next);
+}
+function trialResumeLabel(p,next){
+  return p.next>=0?'PLAY NEXT UNCLEARED TRIAL':next>=0?'PLAY NEXT UNCLEARED DISTRICT':'ALL TRIALS CLEARED';
 }
 function trialTextFit(s,x,y,maxWidth,size,color){
   ctx.font='bold '+size+'px "Trebuchet MS",Impact,sans-serif';
@@ -6002,7 +6013,8 @@ function drawMobileSelect(){
     txt('TAP FOR DISTRICTS',W/2,232,11,'#cfd','center');
     const p=trialDistrictProgress(trialDistrict);
     txt((trialDistrict+1)+'/'+TRIAL_DISTRICTS.length+'  |  '+p.cleared+'/20 CLEARED  |  '+p.earned+'/60 ★',W/2,247,11,'#fff','center');
-    btn(12,254,W-24,38,p.next<0?'DISTRICT COMPLETE':'PLAY NEXT UNCLEARED TRIAL',()=>trialNextUnfinished(trialDistrict),{size:16,on:p.next>=0,disabled:p.next<0,col:'#7dff5a'});
+    const next=p.next>=0?p.next:trialNextUnfinishedIndex(trialDistrict);
+    btn(12,254,W-24,38,trialResumeLabel(p,next),()=>trialNextUnfinished(trialDistrict),{size:16,on:next>=0,disabled:next<0,col:'#7dff5a'});
     btn(W-94,201,82,43,'>',()=>{trialDistrict=(trialDistrict+1)%TRIAL_DISTRICTS.length;WEB_UI.page.select=0},{size:18});
   }
   const items=mobileSelectItems(),top=selTab===4?298:208,rh=94,rowGap=8,cols=2,
@@ -6285,7 +6297,8 @@ function drawSelect(){
     for(let k=0;k<20;k++){const i=first+k;tile(x0+(k%cols)*(tw+gx),151+Math.floor(k/cols)*70,tw,60,k+1,LEVELS[i].name,PD.stars[i]||0,false,()=>startStory(i))}
     const p=trialDistrictProgress(trialDistrict);
     txt(p.cleared+'/20 CLEARED  |  '+p.earned+'/60 ★  |  '+(LEVELS.length-TRIAL_START)+' TRIALS',W/2,455,15,'#cfd','center');
-    btn(W/2-176,469,352,38,p.next<0?'DISTRICT COMPLETE':'PLAY NEXT UNCLEARED TRIAL',()=>trialNextUnfinished(trialDistrict),{size:17,on:p.next>=0,disabled:p.next<0,col:'#7dff5a'});
+    const next=p.next>=0?p.next:trialNextUnfinishedIndex(trialDistrict);
+    btn(W/2-176,469,352,38,trialResumeLabel(p,next),()=>trialNextUnfinished(trialDistrict),{size:17,on:next>=0,disabled:next<0,col:'#7dff5a'});
     txt('ALL DISTRICTS OPEN  |  CHOOSE ANY TRIAL',W/2,H-14,13,'#cfd','center');
   }else if(selTab===3){
     const cols=5,tw=164,gx=10,x0=(W-(cols*tw+(cols-1)*gx))/2,y0=150,n3=TRIAL_START-CH2,th=60;
