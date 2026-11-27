@@ -46,6 +46,7 @@ static inline int vx(const View *v, real c){ return ((c * v->ppc) >> 12) - v->cx
 static inline int vy(const View *v, real c){ return ((c * v->ppc) >> 12) - v->cy; }
 
 void gfx_init(void);                                  /* palette, tiles, backgrounds */
+void gfx_set_man_art(int cel); /* select sprite geometry on art/outfit changes */
 void gfx_man_rim_palette(void);                       /* refresh existing palette from the worn outfit; no frame allocations */
 
 /* primitives (all clip) */

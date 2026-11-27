@@ -1628,7 +1628,7 @@ static void apply_art_palette(int active){
   }
 }
 static void apply_outfit(int o){
-  int cel=mx_art_active(&stats,&opt);apply_art_palette(cel);
+  int cel=mx_art_active(&stats,&opt);apply_art_palette(cel);gfx_set_man_art(cel);
   uint8_t sh[6][3]; mx_outfit_shades(o, sh);
   if(cel)for(int k=0;k<6;k++)mx_art_color(sh[k]);
   static const int idx[6] = { 5, 6, 7, 13, 14, 15 };

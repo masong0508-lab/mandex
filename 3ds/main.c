@@ -31,7 +31,7 @@ static MxOptMenu opt_menu;
 static int opt_open, was_aim;
 #include "mx_save_journal.h"
 #include <sys/stat.h>
-#include "manspr.h"                                /* the same pixel-art man as the DS and Dreamcast ports (generated from the web game) */
+#include "mx_cel_atlas.h"                                /* the same pixel-art man as the DS and Dreamcast ports (generated from the web game) */
 #include "manidle.h"                                /* his idle gags, victory dance */
 
 static MxWorld world;
@@ -468,7 +468,7 @@ static void blit_frame(Scr *s, int fr, int cx, int cy, int ppc, int face){
      rather than repeating the check for every color texel. */
   if(!man_tone_ready) apply_outfit(0);
   if(man_fur && fr < MSF_NBASE) fr += MSF_NBASE;                             /* the Wolfman's frames follow the human ones */
-  const MsFrame *f = &MS_FRAMES[fr];
+  const MsFrame *f = mx_man_frame(fr,cel_active);
   for(int sy = 0; sy < f->h; sy++){
     int dy = sy - f->ay, y0 = cy + fdiv4(dy * ppc), y1 = cy + fdiv4((dy + 1) * ppc);
     if(y1 <= y0) y1 = y0 + 1;
@@ -516,7 +516,7 @@ static unsigned man_rot_floor_calls,man_rot_opaque_pixels;
 static void blit_frame_rot(Scr *s, int fr, int cx, int cy, int ppc, int face, float a){
   if(!man_tone_ready) apply_outfit(0);
   if(man_fur && fr < MSF_NBASE) fr += MSF_NBASE;
-  const MsFrame *f=&MS_FRAMES[fr];
+  const MsFrame *f=mx_man_frame(fr,cel_active);
   float ca=cosf(a),sa=sinf(a),q=4.0f/ppc;
   float R=(float)ppc*0.25f*(f->w>f->h?f->w:f->h)*1.5f;
   int x0=cx-(int)R-1,x1=cx+(int)R+1,y0=cy-(int)R-1,y1=cy+(int)R+1;
@@ -1148,7 +1148,7 @@ static void draw_man(const View *v){
     int wf = MSF_SPIN_6 + (m->turn_ticks ? mx_walk_turn_offset(m) :
                               phase == 0 ? -1 : phase == 2 ? 1 : 0);
     int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
-    const MsFrame *f = &MS_FRAMES[wf + (man_fur ? MSF_NBASE : 0)];
+    const MsFrame *f = mx_man_frame(wf + (man_fur ? MSF_NBASE : 0),cel_active);
     int ground_y = VY(v, RTOF(m->y) + 2.375f);
     int fy = ground_y - (int)lroundf(RTOF(mx_walk_foot_lift(m)) * p);
     /* Keep a planted contact cue beneath the walking body while gait and

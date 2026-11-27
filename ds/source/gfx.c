@@ -8,6 +8,9 @@
 #include <string.h>
 #include "gfx.h"
 #include "manspr.h"
+#include "mx_cel_atlas.h"
+static int gfx_man_cel;
+void gfx_set_man_art(int cel){gfx_man_cel=cel!=0;}
 
 u16 gfx_pal[256];
 
@@ -813,11 +816,11 @@ static void blit_frame_rot(u8 *b, const MsFrame *fr, int x, int y, int ppc, int 
 
 /* design units (20.12) -> pixels at this zoom: the sprites are drawn at 0.36 px per unit at 4 px per cell, so 0.09 px per unit per ppc */
 extern int gfx_man_fur;
-#define MFR(fr) (&MS_FRAMES[(gfx_man_fur && (fr) < MSF_NBASE) ? (fr) + MSF_NBASE : (fr)])   /* the Wolfman's head frames follow the human ones */
+#define MFR(fr) mx_man_frame((gfx_man_fur && (fr) < MSF_NBASE) ? (fr) + MSF_NBASE : (fr),gfx_man_cel)   /* the Wolfman's head frames follow the human ones */
 
 static int cpx(real v, int ppc){ return (int)((((int64_t)v * (ppc * 369)) + (1LL << 23)) >> 24); }
 
-const short *spr_man_hand(int frame){ return MS_HAND[frame]; }
+const short *spr_man_hand(int frame){ return mx_man_hand(frame,gfx_man_cel); }
 
 void gfx_cloth(u8 *b, const Cloth *c, int x, int y, int ppc, int f, int pass){
   ClothQuad q[CL_NQ];
@@ -926,7 +929,7 @@ void spr_man_inflation(u8 *b,int x,int y,int ppc,int face,int pressure,int tick)
 }
 
 void spr_man_bust(u8 *b, int x, int y, int ppc){         /* head + shoulders only, for the HUD strip */
-  blit_frame(b, &MS_FRAMES[MSF_IDLE_B], x, y, ppc, 1, 20, 0);
+  blit_frame(b, mx_man_frame(MSF_IDLE_B,gfx_man_cel), x, y, ppc, 1, 20, 0);
 }
 
 /* Original painter, with legs keyed to accumulated distance when moving:
@@ -1023,7 +1026,7 @@ void spr_case(u8 *b, int x, int y, int ppc, int turn){
 }
 /* the man standing on his own feet (walk levels): (x,fy) = the middle of his feet; he is drawn at about 3/4 of the sling size */
 void spr_man_walk(u8 *b, int x, int fy, int ppc, int face, int frame, const ManJig *jg){
-  const MsFrame *f = &MS_FRAMES[frame];
+  const MsFrame *f = MFR(frame);
   blit_frame(b, f, x, fy - (f->h - f->ay) * ppc / 4, ppc, face, 0, jg);
 }
 

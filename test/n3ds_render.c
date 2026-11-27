@@ -554,9 +554,17 @@ static int n3_cel_probe(void){
   for(int i=0;i<MX_STORY_LEVELS;i++)stats.stars[i]=1;
   apply_outfit(0);tile_ready=0;tile_build(4);
   if(!cel_active||!memcmp(classic,man_pal,sizeof classic)){puts("FAIL 3DS cel palette unchanged");return 1;}
+#if MX_CEL_INDEXED_AVAILABLE
+  for(int i=0;i<MSF_COUNT;i++)
+    if(mx_man_frame(i,cel_active)!=&MC_FRAMES[i]){puts("FAIL 3DS live alternate geometry");return 1;}
+#endif
   u32 painted=tcol[1][MX_WOOD][0][0][0];
   console_opt.art_style=0;apply_outfit(0);tile_ready=0;tile_build(4);
   if(cel_active||memcmp(classic,man_pal,sizeof classic)||painted==tcol[1][MX_WOOD][0][0][0]){puts("FAIL 3DS cel tile or classic palette restoration");return 1;}
+#if MX_CEL_INDEXED_AVAILABLE
+  if(mx_man_frame(MSF_IDLE_A,cel_active)!=&MS_FRAMES[MSF_IDLE_A]){puts("FAIL 3DS classic geometry");return 1;}
+  puts("N3_LIVE_CEL_ATLAS_PASS");
+#endif
   puts("N3_GOLDEN_CELS_PASS locked, character, tiles, restoration");return 0;
 }
 int main(int argc, char **argv){

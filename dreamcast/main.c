@@ -28,6 +28,7 @@
 #include "manidle.h"
 #define MX_DCART
 #include "dcart.h"
+#include "mx_dc_cel_atlas.h"
 #include <math.h>
 #include <stdlib.h>
 #include "mx.h"
@@ -293,7 +294,7 @@ static int man_fur;                                                          /* 
 /* Four tiny pressure-art colors follow recolor_man, not the original
    flesh tone when Wolfman fur or another skin variant is selected. */
 static uint32 belly_tone[4];
-static int cel_active;
+static int cel_active,dc_atlas_cel;
 static void recolor_man(int o){
   if(!tx_man) return;
   int cel=mx_art_active(&stats,&console_opt);
@@ -304,13 +305,15 @@ static void recolor_man(int o){
   /* One temporary atlas replaces the old permanent 1024x512 source atlas
      PLUS a second temporary copy. Every change starts from the original
      RLE bytes, so repeated outfit switching cannot accumulate tint errors. */
-  size_t n = 0;
-  for(int i = 0; i + 1 < DCT_MAN_RLE_LEN && n < tot; i += 2){
-    unsigned cnt = DCT_MAN_RLE[i];
-    unsigned short v = DCT_MAN_RLE[i + 1];
-    while(cnt-- && n < tot) tmp[n++] = v;
-  }
-  if(n != tot){ free(tmp); return; } /* preserve previous valid texture */
+  int next_atlas=cel&&MX_CEL_DC_AVAILABLE;
+  int human_len,wolf_len;
+  const unsigned short *human=mx_dc_rle(0,next_atlas,&human_len);
+  const unsigned short *wolf=mx_dc_rle(1,next_atlas,&wolf_len);
+  int switch_wolf=tx_wman&&next_atlas!=dc_atlas_cel;
+  /* Validate both sources before either texture or its frame table changes. */
+  if(!mx_dc_rle_valid(human,human_len,tot)||
+     (switch_wolf&&!mx_dc_rle_valid(wolf,wolf_len,tot))){free(tmp);return;}
+  mx_dc_rle_decode(human,human_len,tmp);
   for(size_t i = 0; i < tot; i++){
     unsigned short v = tmp[i]; unsigned a = (v >> 12) & 15, r = ((v >> 8) & 15) * 17, g = ((v >> 4) & 15) * 17, b = (v & 15) * 17;
     int mx_ = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b), d = mx_ - mn;
@@ -326,15 +329,21 @@ static void recolor_man(int o){
       nr = nr > 255 ? 255 : nr; ng = ng > 255 ? 255 : ng; nb = nb > 255 ? 255 : nb;
       v = (unsigned short)((a << 12) | ((nr >> 4) << 8) | ((ng >> 4) << 4) | (nb >> 4));
     }
-    if(cel&&a){
+    if(cel&&!next_atlas&&a){ /* true Cel art already has its painted colors */
       uint8_t ink[3]={(uint8_t)(((v>>8)&15)*17),(uint8_t)(((v>>4)&15)*17),(uint8_t)((v&15)*17)};
       mx_art_color(ink);
       v=(unsigned short)((a<<12)|((ink[0]>>4)<<8)|((ink[1]>>4)<<4)|(ink[2]>>4));
     }
     tmp[i] = v;
   }
+  pvr_wait_ready();
   pvr_txr_load(tmp, tx_man, (uint32)(tot * 2));
+  if(switch_wolf){
+    mx_dc_rle_decode(wolf,wolf_len,tmp);
+    pvr_txr_load(tmp,tx_wman,(uint32)(tot*2));
+  }
   free(tmp);
+  dc_atlas_cel=next_atlas;
   man_fur = fur;cel_active=cel;
   if(cel)for(int k=0;k<4;k++)mx_art_color(sk[k]);
   for(int k=0;k<4;k++)
@@ -427,7 +436,7 @@ static void draw_frame(int fr, float cx, float cy, int face, float z, const Jig 
      textures for the 32 Wolfman poses which did not fit in the old shared
      sheet. A failed Wolfman allocation degrades safely to human imagery. */
   if(fr >= MSF_NBASE && !tx_wman) fr -= MSF_NBASE;
-  const short *f = DCM_FR[fr];
+  const short *f = mx_dc_frame(fr,dc_atlas_cel);
   float sc = DCM_SCALE * man_zoom, s = PXC / 4.0f;
   int live = jg && (jg->bx != 0 || jg->by != 0 || jg->rx != 0 || jg->ry != 0 || jg->sx != 1 || jg->sy != 1);
   float sx = live ? jg->sx : 1, sy = live ? jg->sy : 1;
@@ -495,7 +504,7 @@ static void man_with_towel(ClothActor *ta, int fr, float x, float y, int face, f
   /* All calls take an unshifted base-frame index. Never read MS_HAND[-1]
      or beyond its base sheet when a nonstandard character mode is active. */
   if(fr < 0 || fr >= MSF_NBASE) return;
-  cloth_actor_frame(ta, fcount, MS_HAND[fr], face);
+  cloth_actor_frame(ta, fcount, mx_dc_hand(fr,dc_atlas_cel), face);
   if(ta->live) draw_cloth(&ta->c, x, y, face, z - 0.5f, 0);
   draw_frame(fr, x, y, face, z, jg);
   if(ta->live) draw_cloth(&ta->c, x, y, face, z + 0.5f, 1);
@@ -967,7 +976,7 @@ static void draw_all(void){
         int wf = MSF_SPIN_6 + (m->turn_ticks ? mx_walk_turn_offset(m) :
                                    phase == 0 ? -1 : phase == 2 ? 1 : 0);
         int fc = mx_walk_render_face(m) < 0 ? -1 : 1;
-        const short *f = DCM_FR[wf + (man_fur ? MSF_NBASE : 0)]; float zm = man_zoom; man_zoom = zm * 0.75f;
+        const short *f = mx_dc_frame(wf + (man_fur && tx_wman ? MSF_NBASE : 0),dc_atlas_cel); float zm = man_zoom; man_zoom = zm * 0.75f;
         float ground_y = Y(m->y + 2.375f);
         float foot = ground_y - RTOF(mx_walk_foot_lift(m))*PXC;
         /* Keep the translucent floor contact beneath the character while
