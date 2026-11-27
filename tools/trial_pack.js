@@ -189,8 +189,34 @@ function generateTrials(){
           if(get(x,y)&&get(x,y)!==4&&clearance(x,y))fill(x,y,1,1,1);
       }
     }
+    // Late-campaign traversal: open exterior doors and aligned skybridges.
+    // A steel underside reinforces the opening without erasing roof pads.
+    if(district>=27){
+      function doorway(H,side,low){
+        const dx=side==='left'?H.x:H.x+H.w-2;
+        for(let yy=low-5;yy<low;yy++)grid.fill(0,yy*WIDTH+dx,yy*WIDTH+dx+2);
+        fill(H.x,low-H.fh+1,H.w,1,6);
+      }
+      houses.forEach((H,i)=>doorway(H,i===0?'left':'right',H.base));
+      const A=houses[0],B=houses[1],d=district-9;
+      const y=58-A.fh*(shape===2?1+((tier+d)%2):1);
+      const a=A.x+A.w,b=B.x;
+      if(shape!==2){
+        // Leave the yard open except for punchable intermediate supports
+        // when the deck exceeds the steel lateral-span budget.
+        fill(a,y,b-a,2,6);
+        if(b-a>28){const mid=(a+b)>>1;fill(mid,y+2,1,60-y-2,1);}
+        fill(A.x,y+1,A.w,1,6);fill(B.x,y+1,B.w,1,6);
+      }
+      if(A.top<y)doorway(A,'right',y);
+      if(B.top<y)doorway(B,'left',y);
+      // The existing on-foot tube transport provides a direct ground to
+      // deck route. It is a real map entity, not a new scripted teleport.
+      const landing=(a+b)>>1;
+      tubes.push([A.x-5,57,landing,y-3]);
+    }
     const name=g.prefix+" "+shapes[shape]+" "+(tier+1);
-    const tip=district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
+    const tip=district>=27?(district===27?'LIFT TUBE; CROSS DECK; PUNCH WALLS':district===28?'LIFT TUBE; CROSS ROOFS; REBOUND':'LIFT TUBE; CROSS DECK; BREAK SUPPORTS'):district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
     const men=Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
     const walk=(district===5||district===7)&&tier>=2 || district===8&&tier>=3 || district>=9&&(g.walk===2||!!g.walk&&tier>=2);
     if(targets.length<2||targets.length>20||rooms.length>20||pads.length>3||tubes.length>3)fail("entity cap "+name);
