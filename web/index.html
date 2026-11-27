@@ -1995,7 +1995,8 @@ function celChugPose(m,now){
   const c=m.chug,p=CEL_CHUG,ph=c.ph,t=c.t;
   const sip=ph===2||ph===4,first=ph===2,start=first?CT_BK:CT_TB,end=first?CT_C:CT_D;
   const u=sip?clamp((t-start)/(end-start),0,1):0;
-  const lift=sip?easeIO(u/.27)*(first||c.rel?easeIO((1-u)/.25):1):0;
+  const recovery=ph===5?1-easeIO((t-CT_D)/(.6*(CT_END-CT_D))):0;
+  const lift=sip?easeIO(u/.27)*(first?easeIO((1-u)/.25):1):recovery;
   const theta=ph===1||ph===3?c.th:ph===2?Math.PI:0;
   const reach=ph===1||ph===3?Math.sin(Math.PI*clamp((t-(ph===1?CT_A:CT_C))/.25,0,1))*.65:0;
   const full=clamp(bgrow(stom(m)),0,1.6),gulp=sip?Math.sin(now*26)*lift:0;
@@ -2009,8 +2010,8 @@ function celChugPose(m,now){
   R[0]=33-4*lift;R[1]=-6-25*lift;R[2]=8+5*lift;
   R[3]=31-24*lift;R[4]=16-61*lift+gulp;R[5]=10+12*lift;
   p.bottle=null;
-  if(sip){
-    CEL_DRINK.level=ph===4&&c.keep>0?1-((c.keep*.8)%1):1-u;
+  if(sip||recovery>0){
+    CEL_DRINK.level=ph===5?0:ph===4&&c.keep>0?1-((c.keep*.8)%1):1-u;
     CEL_DRINK.color=first?0:1;CEL_DRINK.angle=(Math.PI+.35)*lift;
     p.bottle=CEL_DRINK;
   }
@@ -3334,7 +3335,8 @@ const FACE3={
  burp:{e:'wide',br:[-9.4,-10.6],ch:1,m:{w:2.6,d:2.6,y:11,lift:1.6,teeth:0,tongue:0}},
  burpo:{e:'sleepy',br:[-7.2,-8.4],m:{w:3.4,d:3.7,y:10.3,lift:2.2,teeth:0,tongue:1}},
  yawn:{e:'squint',br:[-8,-6.5],m:{w:5.4,d:7,y:8.8,lift:3.6,teeth:0,tongue:1}}};
-function eye3(s,k,gz){const ex=s*6,gx=(gz[0]||0)*1.8,gy=(gz[1]||0)*1.4;
+function eye3(s,k,gz,blink=0){const ex=s*6,gx=(gz[0]||0)*1.8,gy=(gz[1]||0)*1.4;
+  if(blink>.56&&k!=='shade'){ctx.strokeStyle=OUT;ctx.lineWidth=1.8;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(ex-4.2,-.4);ctx.quadraticCurveTo(ex,-2.1,ex+4.2,-.4);ctx.stroke();return;}
   if(k==='shade'){ctx.beginPath();ctx.ellipse(ex,-.8,5.7,4.6,s*.08,0,6.3);ctx.fillStyle='#1c1c2a';ctx.fill();ctx.strokeStyle='#e2b53c';ctx.lineWidth=1.5;ctx.stroke();
     ctx.fillStyle='rgba(255,255,255,.55)';ctx.beginPath();ctx.ellipse(ex-2.4,-2.6,2.4,1,-.3,0,6.3);ctx.fill();ctx.beginPath();ctx.moveTo(0,-2);ctx.lineTo(s*.8,-2);ctx.stroke()}
   else if(k==='happy'||(k==='wink'&&s<0)){ctx.strokeStyle=OUT;ctx.lineWidth=2.2;ctx.lineCap='round';ctx.beginPath();ctx.arc(ex,.8,3.7,Math.PI*1.1,Math.PI*1.9);ctx.stroke()}
@@ -3577,12 +3579,13 @@ function drawSpin(th,o){
           if(f==='squeeze'){ctx.strokeStyle=OUT;ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(s*6-s*3.6,-4.2);ctx.lineTo(s*6+s*2.2,-1.2);ctx.lineTo(s*6-s*3.6,1.8);ctx.stroke()}
           else if(f==='sheepish'){eye(s,-1,4.6,5.2,-s*1.4,.8,2.3);ctx.fillStyle=SK;ctx.fillRect(s*6-6,-7,12,5.6);ctx.strokeStyle=OUT;ctx.lineWidth=1.7;ctx.beginPath();ctx.moveTo(s*6-5,-1.5);ctx.lineTo(s*6+5,-1.5);ctx.stroke()}
           else if(f)eye(s,-1,5.5,6.5,.3,.3,1.6);
-          else eye3(s,FX.e,gzv)},[hd]);
+          else eye3(s,FX.e,gzv,typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE?(o.blink||0):0)},[hd]);
         fd(s*10.4,6,()=>{const f=OP&&OP.face;ctx.fillStyle=f?'rgba(255,55,75,.62)':'rgba(255,105,110,.34)';ctx.beginPath();ctx.ellipse(s*10.4,6,f?4.9:3.3,f?3.3:2.2,0,0,6.3);ctx.fill()});
         fd(s*5.3,5.7,()=>stacheLobe(s))}
       mouthWrap();ctx.restore()});
     // grin, wrapped round the jaw so it bends away as the head turns (points on the far side are pinned to the edge)
     const mouthSpec=()=>{const f=OP&&OP.face;
+      if(!f&&typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE&&o.faceMix)return o.faceMix;
       return f==='eek'?{w:3.6,d:6.4,y:9.6,lift:2.6,teeth:0,tongue:1}:f==='blush'?{w:4.6,d:1.7,y:11.6,lift:-1.1,teeth:0,tongue:0}:f==='squeeze'?{w:5.2,d:2.8,y:11.2,lift:-1.5,teeth:1,tongue:0}:f==='sheepish'?{w:4.8,d:2.4,y:10.9,lift:1,teeth:1,tongue:0}:FX.m};
     function mouthWrap(){
       const MM=mouthSpec(),w=MM.w,d=MM.d,y=MM.y,sg=S>=0?1:-1,pts=[],P=(lx,ly)=>{let b=null;for(const h of FH){const s=onS(h,lx,fy(ly),0);if(s&&(!b||s.gz>b.gz))b=s}
@@ -3626,6 +3629,10 @@ function drawSpin(th,o){
   list.sort(cmp);for(const p of list){if(p.leg)p.f();else{ctx.save();ctx.translate(shx,bob);p.f();ctx.restore()}}
   ctx.restore()}
 // live glide for the browser: blends the current step's pose into the next one so the turn is smooth at any frame rate
+function celExpressionBlend(from,to,k){
+  const a=(FACE3[from]||FACE3.base).m,b=(FACE3[to]||FACE3.base).m,n=k<.5?a:b;
+  return {w:a.w+(b.w-a.w)*k,d:a.d+(b.d-a.d)*k,y:a.y+(b.y-a.y)*k,lift:a.lift+(b.lift-a.lift)*k,teeth:n.teeth,tongue:n.tongue};
+}
 function spinLive(Q){
   if(!Q||!Q.gag)return null;
   const st=Q.gag.steps,i=Q.step,a=SPIN_POSE[st[i][0]];if(!a)return null;
@@ -3635,7 +3642,11 @@ function spinLive(Q){
   const r={th:th*Math.PI/180,hip:L('hip'),psi:L('psi'),ld:L('ld'),cl:L('cl'),cr:L('cr'),dir:b.th<a.th?-1:1,t:time,oops:(a.oops||b.oops)?oopsBlend(a.oops,b.oops,ks):null};
   if(T){const n=ks<.5?a:b;r.plant=n.plant;r.cape=n.cape;r.quiff=n.quiff;r.face=n.face;r.prop=n.prop;r.sweatB=n.sweatB;
     r.hp=L('hp');r.hr=L('hr');r.hdx=L('hdx');r.hdy=L('hdy');r.gz=mixA(a.gz,b.gz,ks);r.belly=mixA(a.belly,b.belly,ks);
-    r.arms={L:mixA(a.arms.L,b.arms.L,ks),R:mixA(a.arms.R,b.arms.R,ks)};r.ad=mixA(a.ad||[0,0],b.ad||[0,0],ks)}
+    r.arms={L:mixA(a.arms.L,b.arms.L,ks),R:mixA(a.arms.R,b.arms.R,ks)};r.ad=mixA(a.ad||[0,0],b.ad||[0,0],ks);
+    if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE&&a.face!==b.face){
+      r.faceMix=celExpressionBlend(a.face,b.face,ks);r.blink=Math.max(0,1-Math.abs(ks-.5)*8);
+    }
+  }
   return r}
 // ---- the key poses of the turning idles (named T_*; the gags below step through them and spinLive glides between neighbours)
 (()=>{
@@ -3645,6 +3656,12 @@ function spinLive(Q){
   const tp=(n,o)=>{SPIN_POSE['T_'+n]=Object.assign({},TB,o)};
   const A=(L,R)=>({L,R}),up=A([-40,-34,0,-45,-56,0],mir([-40,-34,0,-45,-56,0]));
   tp('IDLE',{});
+  // Golden Cels-only, staged anticipation and proud recovery.
+  tp('FEAST_READY',{face:'smirk',th:-12,ld:16,arms:A(DL,DR)});
+  tp('FEAST_PAT',{face:'bliss',th:-18,ld:19,hp:7,belly:[1.08,1.03],arms:A([-36,-7,6,-16,3,23],[36,-7,6,16,3,23]),ad:[8,8]});
+  tp('FEAST_BREATH',{face:'burp',hp:-9,belly:[1.1,1.04],arms:A([-35,-7,3,-25,8,10],[35,-7,3,25,8,10])});
+  tp('FEAST_RELIEF',{face:'bliss',hp:7,belly:[.99,.98],arms:A(DL,DR)});
+  tp('FEAST_PROUD',{face:'smirk',th:12,ld:-14,hip:2,arms:A([-40,-7,3,-25,8,10],[39,-21,8,34,-47,8])});
   // look around, then a double take
   tp('LKL',{th:-24,ld:-40,gz:[-1,0],hr:-3});tp('LKR',{th:24,ld:40,gz:[1,0],hr:3});tp('TAKE',{th:-10,ld:-10,hp:-6,hr:-4,face:'scream',belly:[.97,.97]});
   // belly slap in three quarter view, looking at us
@@ -3978,10 +3995,11 @@ const MAN_GAGS=[
 // ---- gag engine.  One state object per man (Q); the host sets Q.ox/oy (body centre in world px), Q.sc (draw scale) and Q.jg (jiggle springs or null)
 function gagNew(gmin,gmax,first){return{gag:null,gi:-1,step:0,st:0,idleT:0,quiet:0,gap:first,gmin,gmax,last:-1,asleep:false,sleepT:0,sph:0,done:0,ws:1,ox:0,oy:0,sc:1,jg:null}}
 function gagReset(Q){if(!Q)return;Q.gag=null;Q.idleT=0;Q.quiet=0;Q.gap=MAN_IDLE.delay;Q.asleep=false;Q.sleepT=0}     // any touch: he snaps back to attention
+const CEL_FEAST_GAG={name:'feast_celebration',steps:[['T_IDLE',.18,''],['T_FEAST_READY',.35,''],['T_FEAST_PAT',.42,'slap'],['T_FEAST_BREATH',.32,'grunt'],['T_FEAST_RELIEF',.6,'burp'],['T_FEAST_PROUD',.65,'sparkle'],['T_IDLE',.35,'']]};
 const OOPS_CHANCE=.2;     // 1 in 5 cape taunts ends up as the boxers-fall-off version
 function gagStart(Q,i){
   Q.last=i;if(MAN_GAGS[i].name==='cape_taunt'&&rnd()<OOPS_CHANCE){const j=MAN_GAGS.findIndex(g=>g.name==='cape_oops');if(j>=0)i=j}
-  Q.gag=MAN_GAGS[i];Q.gi=i;Q.step=0;Q.st=0;gagFx(Q,Q.gag.steps[0][2]);if(Q.gag.name==='cape_oops')setTimeout(()=>{popText(Q.ox,Q.oy-60*Q.sc,'\u25AE\u25AE\u25AE CENSORED \u25AE\u25AE\u25AE','#ff2d6f',22);SFX.taunt&&SFX.taunt()},900)}
+  Q.gag=MAN_GAGS[i];if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE&&Q.gag.name==='burp')Q.gag=CEL_FEAST_GAG;Q.gi=i;Q.step=0;Q.st=0;gagFx(Q,Q.gag.steps[0][2]);if(Q.gag.name==='cape_oops')setTimeout(()=>{popText(Q.ox,Q.oy-60*Q.sc,'\u25AE\u25AE\u25AE CENSORED \u25AE\u25AE\u25AE','#ff2d6f',22);SFX.taunt&&SFX.taunt()},900)}
 function gagTick(Q,dt,canSleep){
   Q.idleT+=dt;
   if(Q.gag){Q.st+=dt;
