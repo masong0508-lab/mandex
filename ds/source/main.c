@@ -2194,7 +2194,7 @@ int main(void){
     if(app == ST_PLAY){
       /* idle gags: only while he waits in the sling and nobody is touching anything */
       if(world.man.mode == MAN_AIM && !dragging && !pad_used && world.banner <= 0 && world.state == MX_PLAY && !(down | held)){
-        mi_update(&mi);
+        mi_update_style(&mi,cel_pal_active);
         if(mi.fx) idle_fx(mi.fx, world.man.x, world.man.y, 1, 1, 1);
       } else mi_reset(&mi);
       if(dragging && (frame % 7) == 0) spawn(PT_SWEAT, world.man.x + RI(rnd(5) - 2), world.man.y - RI(4), rnd(9) - 4, -rnd(8), 0, 28);       /* straining */
