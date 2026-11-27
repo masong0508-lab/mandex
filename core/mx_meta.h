@@ -82,11 +82,16 @@ int mx_tool_power(int tool);                             /* the PW_* a start too
    still loads (missing levels read as 0, extra ones are dropped); any other layout change must bump the version byte. */
 #define MX_SAVE_VERSION 4
 /* District summary for the native title selectors; derived, never serialized. */
+static inline int mx_trial_size(int level){
+  if(level<MX_TRIAL_START||level>=MX_NUM_LEVELS)return 0;
+  int first=MX_TRIAL_START+((level-MX_TRIAL_START)/MX_TRIAL_DISTRICT_SIZE)*MX_TRIAL_DISTRICT_SIZE;
+  return MX_NUM_LEVELS-first<MX_TRIAL_DISTRICT_SIZE?MX_NUM_LEVELS-first:MX_TRIAL_DISTRICT_SIZE;
+}
 static inline int mx_trial_cleared(const MxStats *s,int level,int *stars){
   int total=0,clear=0;
   if(level>=MX_TRIAL_START&&level<MX_NUM_LEVELS){
     int first=MX_TRIAL_START+((level-MX_TRIAL_START)/MX_TRIAL_DISTRICT_SIZE)*MX_TRIAL_DISTRICT_SIZE;
-    for(int i=first;i<first+MX_TRIAL_DISTRICT_SIZE;i++){int n=s->stars[i];if(n>3)n=3;total+=n;clear+=n>0;}
+    for(int i=first;i<first+mx_trial_size(level);i++){int n=s->stars[i];if(n>3)n=3;total+=n;clear+=n>0;}
   }
   if(stars)*stars=total;
   return clear;
