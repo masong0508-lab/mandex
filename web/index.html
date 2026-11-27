@@ -4171,8 +4171,14 @@ function draw(){
     x=x2}}
   drawRoomDetails(paperX0,paperX1,paperY0,paperY1);
   drawSling(true);drawValve();drawBurpStand();drawPwProp();
-  const cx0=Math.max(0,Math.floor(CAM.x/V)-2),cx1=Math.min(COLS,Math.ceil((CAM.x+W/CAM.z)/V)+2);   // only the columns on screen
-  for(let y=0;y<ROWS;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
+  // Bound both tile axes. Include the maximum possible displacement
+  // from spring wobble, integer rounding and world-space camera shake.
+  const tileCull=camOn,tilePad=paperShake+(wobOn?WOB_OMAX*V:0)+2;
+  const cx0=tileCull?Math.max(0,Math.floor((CAM.x-tilePad)/V)-1):0;
+  const cx1=tileCull?Math.min(COLS,Math.ceil((CAM.x+W/CAM.z+tilePad)/V)+1):COLS;
+  const cy0=tileCull?Math.max(0,Math.floor((CAM.y-tilePad)/V)-1):0;
+  const cy1=tileCull?Math.min(ROWS,Math.ceil((CAM.y+H/CAM.z+tilePad)/V)+1):ROWS;
+  for(let y=cy0;y<cy1;y++)for(let x=cx0;x<cx1;x++){const i=idx(x,y),m=grid[i];if(!m)continue;const r=hp[i]/MAT[m].hp;let px=x*V,py=y*V;
     if(wobOn){px=Math.round(px+ox[i]*V);py=Math.round(py+oy[i]*V)}   // swaying with the wobble
     ctx.drawImage(SPR[m][hsh(x,y)&3][r>.66?0:r>.33?1:2],px,py);
     if(brk[i]){ctx.fillStyle=m===GLASS?'rgba(255,255,255,.95)':'rgba(15,8,4,.8)';const b=brk[i];   // snapped joints show as cracks
