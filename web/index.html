@@ -1722,15 +1722,18 @@ function drawWalkMan(m){
 }
 /* Two fingers on the same virtual key must not cancel one another. */
 function releaseWalkTouch(id){
-  const key=TID[id];if(!key)return;
-  delete TID[id];KEYS[key]=false;
+  const key=TID[id];delete TID[id];if(!key)return;
+  KEYS[key]=false;
   for(const p in TID)if(TID[p]===key){KEYS[key]=true;break}
 }
-function walkTouch(x,y,id){
+function walkTouch(x,y,id,moving=false){
   for(const b of walkBtns())if(x>=b.x&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h){
     if(TID[id]&&TID[id]!==b.k)releaseWalkTouch(id);
     KEYS[b.k]=true;TID[id]=b.k;return true;
   }
+  // A captured thumb crossing a gap must release its previous button,
+  // yet remain eligible to slide back into the controls until pointerup.
+  if(moving&&TID[id]!==undefined){releaseWalkTouch(id);TID[id]='';}
   return false;
 }
 /* The touch HUD is drawn every frame. Reuse the five hit-test objects,
@@ -4214,7 +4217,7 @@ function layoutTick(){
     if(typeof dragging!=='undefined')dragging=false;
     if(typeof sliderDrag!=='undefined')sliderDrag=false;
     if(typeof E!=='undefined'&&E){E.drag=null;E.pointer=null;}
-    for(const key in TID){KEYS[TID[key]]=false;delete TID[key]}
+    for(const key in TID){if(TID[key])KEYS[TID[key]]=false;delete TID[key]}
     CAM.reset=true;CAM.snap=true;hits=[];
   }
   if(w!==W||h!==H){if(typeof resetPlayInput==='function')resetPlayInput();W=w;H=h;CAM.snap=true;_vig=null;}
@@ -4290,6 +4293,7 @@ function cancelAim(id){
 }
 function resetPlayInput(){
   cancelAim();PLAY_INPUT.soda=null;sodaHold=false;PLAY_INPUT.pan.clear();
+  for(const id in TID){if(TID[id])KEYS[TID[id]]=false;delete TID[id]}
 }
 function manualCameraClamp(){
   CAM.z=clamp(CAM.z,Math.max(.55,W/WW),1.8);
@@ -4655,6 +4659,7 @@ cv.addEventListener('pointerdown',e=>{
   if(isPortrait()&&['menu','select','ach','outfit','options'].includes(state)){
     /* Defer activation until release: a swipe must change pages without
        accidentally opening a level or erasing a custom project. */
+    if(WEB_UI.gesture)return; // the first finger owns the menu swipe
     WEB_UI.gesture={id:e.pointerId,x,y,screen:state};
     try{cv.setPointerCapture(e.pointerId)}catch(_){}
     return;
@@ -4694,8 +4699,8 @@ cv.addEventListener('pointerdown',e=>{
   else dive()});
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
   if(state==='play'&&CAM.manual){manualCameraMove(e,mx,my);return}
-  if(state==='play'&&man.mode==='walk'&&TID[e.pointerId]){
-    walkTouch(mx,my,e.pointerId);return;
+  if(state==='play'&&man.mode==='walk'&&TID[e.pointerId]!==undefined){
+    walkTouch(mx,my,e.pointerId,true);return;
   }
   if(state==='edit'){
     if(!eStrokeOwner(e.pointerId))return;
@@ -4736,7 +4741,7 @@ cv.addEventListener('pointerup',e=>{
 });   // let go ON the valve: he stays seated and keeps filling; drag him off to fire
 addEventListener('keyup',e=>{KEYS[e.code]=false});
 function releaseAllWalkTouches(){
-  for(const id in TID){KEYS[TID[id]]=false;delete TID[id]}
+  for(const id in TID){if(TID[id])KEYS[TID[id]]=false;delete TID[id]}
   WEB_UI.gesture=null;
   resetPlayInput();dragging=false;sodaHold=false;sliderDrag=false;
 }
@@ -4753,6 +4758,7 @@ for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
 });
 cv.addEventListener('lostpointercapture',e=>{
   releaseWalkTouch(e.pointerId);
+  if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
   if(state==='edit')eEndStroke(e.pointerId,true);
   if(state==='play')releasePlayPointer(e.pointerId);
 });
