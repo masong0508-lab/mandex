@@ -1405,15 +1405,17 @@ static void stick(MxWorld *w){
   if(m->pwr == PW_QUAKE && !m->splatted){
     m->splatted = 1;
     int cx=rfloor(m->x),cy=rfloor(m->y);
-    for(int j=-5;j<=5;j++)for(int i=-5;i<=5;i++)
-      if(i*i+j*j<=25)damage_cell(w,cx+i,cy+j,RI(13));
+    const int radius=m->dive?6:5;
+    const real damage=RI(m->dive?16:13);
+    for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)
+      if(i*i+j*j<=radius*radius)damage_cell(w,cx+i,cy+j,damage);
     for(int i=0;i<w->ntargets;i++){
       MxTarget *t=&w->targets[i];
       real dx=t->x-m->x,dy=t->y-m->y;
-      if(t->alive && rmul(dx,dx)+rmul(dy,dy)<RI(64))kill_target(w,t);
+      if(t->alive && rmul(dx,dx)+rmul(dy,dy)<RI(m->dive?81:64))kill_target(w,t);
     }
-    ev(w,EV_CRUNCH,m->x,m->y,0,R(0.75),0);
-    if(w->shake<R(8))w->shake=R(8);
+    ev(w,EV_CRUNCH,m->x,m->y,0,m->dive?RI(1):R(0.75),0);
+    if(w->shake<RI(m->dive?10:8))w->shake=RI(m->dive?10:8);
   }
   if(w->walk && !m->walked){ enter_walk(w); return; }          /* walk levels: he lands on his feet and you steer him */
   m->mode = MAN_STUCK; m->vx = m->vy = 0; m->t = 0; m->gooT = 0;
