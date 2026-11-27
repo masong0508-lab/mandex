@@ -2101,7 +2101,7 @@ function burpPop(){const m=man;m.burped=true;m.burpT=0;const cx=Math.floor(m.x/V
   for(let i=0;i<20;i++){const sa=rnd()*6.28,sp=140+rnd()*200;P({k:6,x:m.x,y:m.y,vx:Math.cos(sa)*sp,vy:Math.sin(sa)*sp,l:.4+rnd()*.3,l0:.7,s:3+rnd()*3,c:i%3?'#dff3ff':'#c28b5a'})}}
 function dive(){
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){burpBlast();return}
-  if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){const m=man;m.beaned=true;const sp=Math.hypot(m.vx,m.vy)||1;m.vx+=m.vx/sp*520;m.vy+=m.vy/sp*520-80;SFX.fart();shake=Math.max(shake,5);popText(m.x,m.y-34,'PFFFRRRT!','#b6e04a',30);
+  if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){const m=man;m.beaned=true;const sp=Math.hypot(m.vx,m.vy),recover=sp<16||m.vy>Math.abs(m.vx);if(recover){m.vx+=(m.vx<0||(m.vx===0&&m.face<0)?-320:320);m.vy-=360}else{m.vx+=m.vx/sp*520;m.vy+=m.vy/sp*520-80}SFX.fart();shake=Math.max(shake,5);popText(m.x,m.y-34,recover?'RECOVERY JET!':'PFFFRRRT!','#b6e04a',30);
     for(let i=0;i<26;i++)P({k:6,x:m.x-m.vx*.03,y:m.y-m.vy*.03,vx:-m.vx*.35+(rnd()-.5)*160,vy:-m.vy*.35+(rnd()-.5)*160,l:.9+rnd()*.6,l0:1.5,s:6+rnd()*7,c:'#a6d63c'});ring(m.x,m.y,46,'#b6e04a');return}
   if(man.mode==='fly'&&!man.dive){man.dive=true;man.spin=Number.isFinite(man.ang)?man.ang:0;man.diveAge=0;man.rearT=.4;man.vx*=.4;man.vy=Math.max(man.vy,0)+780;SFX.pop();shake=Math.max(shake,3);ring(man.x,man.y,50,'#fff')}}
 
@@ -4688,7 +4688,7 @@ function drawHUD(){
       }
     }
     if(man.mode!=='walk')btn(12,H-44,236,32,'TOOL: '+toolName()+chg+'  >',()=>openToolPicker(),{size:13,on:toolName()!=='NONE',disabled:!toolPickerAllowed()});
-    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: dive for a stronger shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
+    if(pw.sel){const tip={beans:'BEANS: tap to boost or recover from a fall',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: dive for a stronger shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
@@ -4703,7 +4703,7 @@ function drawHUD(){
  * and no simulation advance while choosing. */
 const TOOL_PICKER_DETAILS={
   none:'Standard launch',valve:'Inflate before launch',burp:'Chug soda, then blast',
-  beans:'Mid-air boost',towel:'Glide further',splat:'Goo burst on impact',
+  beans:'Boost or recover from a fall',towel:'Glide further',splat:'Goo burst on impact',
   turbo:'35% faster launch',quake:'Dive for a stronger quake'
 };
 function toolPickerAllowed(){
