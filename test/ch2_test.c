@@ -67,17 +67,42 @@ int main(void){
   CHECK(D(W.man.x) - x0 > 8 && W.man.gr && W.man.face == 1, "right walks him along the floor at about 17 cells/s");
   mx_walk_input(&W, -1, 0, 0, 0); step(30);
   CHECK(W.man.face == -1 && D(W.man.x) < x0 + 14, "left turns him round");
+  /* This moving jump starts under the brick lintel at column 71.
+     Row 51 is solid; the walker half-height is 2.375, so its centre
+     must stop at or below y=54.375. A full outdoor apex is impossible
+     here. Keep the indoor collision and outdoor jump checks separate. */
   { double y0 = D(W.man.y), ymin = y0, jump_x0 = D(W.man.x);
-    int start_grounded = W.man.gr; mx_walk_input(&W, 0, 1, 0, 0);
-    for(int i = 0; i < 30; i++){ step(1); if(D(W.man.y) < ymin) ymin = D(W.man.y); } mx_walk_input(&W, 0, 0, 0, 0); step(60);
-    if (!(y0 - ymin > 3 && fabs(D(W.man.y) - y0) < 0.8 && W.man.gr))
-      printf("CH2_JUMP_TRACE start=(%.4f,%.4f) grounded=%d apex=%.4f rise=%.4f end=(%.4f,%.4f) grounded=%d vy=%.4f mode=%d state=%d\n",
-        jump_x0, y0, start_grounded, ymin, y0-ymin, D(W.man.x), D(W.man.y), (int)W.man.gr, D(W.man.vy), (int)W.man.mode, (int)W.state);
-    CHECK(y0 - ymin > 3, "held jump rises more than 3 cells");
-    CHECK(fabs(D(W.man.y) - y0) < 0.8, "jump returns to the starting floor height");
-    CHECK(W.man.gr, "jump ends grounded"); }
+    const double ceiling_limit = 52.0 + 2.375;
+    CHECK(W.grid[51 * MX_COLS + 71] == MX_BRICK &&
+          fabs(jump_x0 - 71.5) < 1.0 && W.man.gr,
+          "indoor jump starts grounded under the doorway lintel");
+    clear_saw(); mx_walk_input(&W, 0, 1, 0, 0);
+    for(int i = 0; i < 30; i++){ step(1); if(D(W.man.y) < ymin) ymin = D(W.man.y); }
+    mx_walk_input(&W, 0, 0, 0, 0); step(60);
+    printf("CH2_LINTEL_JUMP start=%.4f apex=%.4f rise=%.4f end=%.4f grounded=%d\n",
+           y0, ymin, y0-ymin, D(W.man.y), (int)W.man.gr);
+    CHECK(y0 - ymin > 1.5 && ymin >= ceiling_limit - 0.03 && ymin <= ceiling_limit + 0.30,
+          "indoor jump reaches the lintel without passing through it");
+    CHECK(fabs(D(W.man.y) - y0) < 0.8 && W.man.gr && W.man.mode == MAN_WALK,
+          "ceiling-limited jump lands back on its starting floor"); }
   { double wall_x; mx_walk_input(&W, -1, 0, 0, 0); step(180); wall_x = D(W.man.x);
     CHECK(wall_x < 57 && W.man.gr, "the front door is open: he can walk straight out of the block"); }
+
+  /* Independently demand full-height walking jumps on the same level's
+     open ground, away from the building, pads, partitions and landlords. */
+  mx_load(&W, 22); for(int i = 0; i < 60; i++) mx_update(&W, DT);
+  place_walk(45, MX_ROWS - 2.375); step(10);
+  { double y0 = D(W.man.y), ymin = y0;
+    CHECK(W.man.gr && W.man.mode == MAN_WALK, "outdoor jump starts grounded");
+    mx_walk_input(&W, 0, 1, 0, 0);
+    for(int i = 0; i < 30; i++){ step(1); if(D(W.man.y) < ymin) ymin = D(W.man.y); }
+    mx_walk_input(&W, 0, 0, 0, 0); step(60);
+    printf("CH2_OPEN_JUMP start=%.4f apex=%.4f rise=%.4f end=%.4f grounded=%d\n",
+           y0, ymin, y0-ymin, D(W.man.y), (int)W.man.gr);
+    CHECK(y0 - ymin > 7.0 && y0 - ymin < 10.0,
+          "unobstructed held jump achieves its full ballistic height");
+    CHECK(fabs(D(W.man.y) - y0) < 0.8 && W.man.gr && W.man.mode == MAN_WALK,
+          "unobstructed jump lands on the same ground"); }
 
   /* ---- a wooden door needs a punch ---- */
   mx_load(&W, 22); for(int i = 0; i < 60; i++) mx_update(&W, DT);
