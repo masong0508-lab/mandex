@@ -1127,12 +1127,43 @@ static int ds_objective_probe(void){
 static int ds_cel_probe(void){
   gfx_init();mx_meta_init(&stats);mx_options_default(&opt);app=ST_PLAY;
   apply_outfit(0);u16 classic[224];memcpy(classic,gfx_pal,sizeof classic);
+#if defined(__has_include)
+#if __has_include("manspr_cel.h")
+  static u8 original[256*192],painted[256*192];
+  /* Compare index pixels, not just RGB palette changes. */
+  spr_man_frame(original,128,96,4,1,MSF_FLEX_A,0);
+#endif
+#endif
   opt.art_style=1;apply_outfit(0);
   if(memcmp(classic,gfx_pal,sizeof classic)){puts("FAIL locked DS art changed palette");return 1;}
   for(int i=0;i<MX_STORY_LEVELS;i++)stats.stars[i]=1;
   apply_outfit(0);
   if(classic[C_SKY0]==gfx_pal[C_SKY0]||classic[C_MAN0+1]==gfx_pal[C_MAN0+1]){puts("FAIL DS cel style has no character/scenery change");return 1;}
+#if defined(__has_include)
+#if __has_include("manspr_cel.h")
+  spr_man_frame(painted,128,96,4,1,MSF_FLEX_A,0);
+  /* A chosen frame may match; compare all the original 71 poses if so. */
+  int different=memcmp(original,painted,sizeof original)!=0;
+  for(int f=0;f<MSF_NBASE&&!different;f++){
+    memset(original,0,sizeof original);memset(painted,0,sizeof painted);
+    gfx_set_man_art(0);spr_man_frame(original,128,96,4,1,f,0);
+    gfx_set_man_art(1);spr_man_frame(painted,128,96,4,1,f,0);
+    different=memcmp(original,painted,sizeof original)!=0;
+  }
+  if(!different){puts("FAIL DS alternate pose pixels not used");return 1;}
+  memset(original,0,sizeof original);memset(painted,0,sizeof painted);
+  gfx_set_man_art(0);spr_man_frame(original,128,96,4,1,MSF_FLEX_A,0);
+  gfx_set_man_art(1);
+#endif
+#endif
   opt.art_style=0;apply_outfit(0);
+#if defined(__has_include)
+#if __has_include("manspr_cel.h")
+  spr_man_frame(painted,128,96,4,1,MSF_FLEX_A,0);
+  if(memcmp(original,painted,sizeof original)){puts("FAIL DS Classic geometry restoration");return 1;}
+  puts("DS_LIVE_CEL_ATLAS_PASS");
+#endif
+#endif
   if(memcmp(classic,gfx_pal,sizeof classic)){puts("FAIL DS classic art restoration");return 1;}
   puts("DS_GOLDEN_CELS_PASS locked, skin, sky, restoration");return 0;
 }
