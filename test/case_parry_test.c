@@ -196,6 +196,21 @@ int main(void){
   CHECK(w.walk&&w.ntargets==8&&walkers==3&&throwers==1,
         "Rent Strike must teach parrying without losing a landlord");
 
+  /* Quake remains single-use; the deliberate dive adds a bounded ring. */
+  for(int dive=0;dive<=1;dive++){
+    setup();w.walk=0;w.man.mode=MAN_FLY;w.man.x=RI(40);w.man.y=RI(30);
+    w.man.pwr=PW_QUAKE;w.man.dive=dive;
+    int center=IDX(40,30),edge=IDX(46,30),outside=IDX(47,30);
+    w.grid[center]=w.grid[edge]=w.grid[outside]=MX_BRICK;
+    w.hp[center]=w.hp[edge]=w.hp[outside]=RI(100);
+    stick(&w);
+    CHECK(w.hp[center]==RI(dive?84:87),"quake center damage");
+    CHECK(w.hp[edge]==RI(dive?84:100),"mega quake reaches one extra tile");
+    CHECK(w.hp[outside]==RI(100),"quake stays bounded");
+    stick(&w);
+    CHECK(w.hp[center]==RI(dive?84:87),"quake cannot fire twice");
+  }
+
   if(failures){fprintf(stderr,"CASE_PARRY_FAIL %d/%d\n",failures,checks);return 1;}
   printf("CASE_PARRY_PASS checks=%d hit=1 forward_only=1 range=1 multiple=1 slam=1 points=1 vulnerable=1\n",checks);
   return 0;
