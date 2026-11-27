@@ -899,8 +899,9 @@ static void draw_cells(const View *v){
       const MxCell *a = &ch->cells[k];
       if(a->dead) continue;
       const int sx=VX(v,RTOF(a->wx))-p/2, sy=VY(v,RTOF(a->wy))-p/2;
+      const int fuse=mx_fuse_visual(a);
 #if MX_N3DS_RUBBLE_CULL
-      if(sx+p<=0 || sx>=sw || sy+p<=0 || sy>=sh)continue;
+      if(sx+p<=0 || sx>=sw || sy+p<=0 || sy>=sh+(fuse?3:0))continue;
 #endif
 #if MX_N3DS_RUBBLE_DAMAGE
       const float health=RTOF(a->h)*minv[a->m];
@@ -915,6 +916,10 @@ static void draw_cells(const View *v){
         (int)(256 * g_dim)
 #endif
       );
+      if(fuse){
+        rect(v->s,sx,sy-2,p,1,fuse==2?RGB(255,72,42):RGB(255,190,52));
+        px(v->s,sx+p/2,sy-3,RGB(255,247,210));
+      }
     }
   }
 }
