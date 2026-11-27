@@ -143,6 +143,46 @@ function expansionRegression(html,assert,section){
    assert(newCalls<oldCalls*.6&&newReads<oldReads*.7,'camera culling must materially reduce paint and grid reads');
    console.log('WALLPAPER_CULL_PASS cases='+cases+' paint='+oldCalls+'->'+newCalls+' reads='+oldReads+'->'+newReads);
  }
+
+ if(!section||section==='wobble'){
+   const source=cut('function jointBreakLimit(','// sand: no cohesion');
+   assert(source.includes('WOB_ACTIVE'),'occupied voxel scratch not implemented');
+   const reference="function wobStep(dt){\n  for(let m=1;m<MAT.length;m++)FD[m]=Math.max(0,1-MAT[m].damp*dt);\n  const NB=[0,0,0,0];\n  for(let y=0;y<ROWS-1;y++){const lean=LEANK*(ROWS-1-y);\n    for(let x=0;x<COLS;x++){const i=y*COLS+x,m=grid[i];if(!m)continue;\n      const bk=brk[i],Ki=MAT[m].K;let ax=0,ay=0;\n      NB[0]=x+1<COLS?i+1:-1;NB[1]=x>0?i-1:-1;NB[2]=i+COLS;NB[3]=y>0?i-COLS:-1;\n      for(let d=0;d<4;d++){const j=NB[d];if(j<0||((bk>>d)&1))continue;const mj=grid[j];if(!mj)continue;\n        const Kj=MAT[mj].K,K=Ki<Kj?Ki:Kj;\n        ax+=K*clamp(ox[j]-ox[i],-2,2);ay+=K*clamp(oy[j]-oy[i],-2,2)}\n      const a=INVD[m],f=FD[m];\n      ovx[i]=clamp((ovx[i]+(ax*a+(lean-HOMEK)*ox[i])*dt)*f,-WOB_VMAX,WOB_VMAX);\n      ovy[i]=clamp((ovy[i]+(ay*a-HOMEK*oy[i])*dt)*f,-WOB_VMAX,WOB_VMAX)}}\n  let maxv=0,maxo=0;\n  for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS;x++){const i=y*COLS+x;if(!grid[i])continue;\n    ox[i]=clamp(ox[i]+ovx[i]*dt,-WOB_OMAX,WOB_OMAX);oy[i]=clamp(oy[i]+ovy[i]*dt,-WOB_OMAX,WOB_OMAX);\n    const sv=Math.abs(ovx[i])+Math.abs(ovy[i]),so=Math.abs(ox[i])+Math.abs(oy[i]);if(sv>maxv)maxv=sv;if(so>maxo)maxo=so}\n  for(let y=0;y<ROWS-1;y++)for(let x=0;x<COLS;x++){const i=y*COLS+x,m=grid[i];if(!m)continue;\n    for(let d=0;d<3;d+=2){const j=d===0?(x+1<COLS?i+1:-1):i+COLS;if(j<0||((brk[i]>>d)&1))continue;const mj=grid[j];if(!mj)continue;\n      const s=Math.abs(ox[j]-ox[i])+Math.abs(oy[j]-oy[i]),lim=jointBreakLimit(i,j,m,mj);\n      if(s>lim){brk[i]|=1<<d;brk[j]|=1<<(d^1);needSupport=true;if(crackEv<4){crackEv++;crackFx(x,y,m,d)}}}}\n  if(maxv<.6&&maxo<.03){if(++wobQuiet>20){ox.fill(0);oy.fill(0);ovx.fill(0);ovy.fill(0);wobOn=false;wobQuiet=0}}else wobQuiet=0}\n";
+   const fixture=`
+     const ROWS=60,V=8,LEANK=.06,HOMEK=6,WOB_VMAX=45,WOB_OMAX=3;
+     const MAT=[null,...Array.from({length:8},(_,i)=>({hp:20+8*i,K:45+7*i,d:.5+i*.2,damp:1.1+i*.3,ymax:.16+i*.13}))];
+     const FD=new Float32Array(MAT.length),INVD=new Float32Array(MAT.length);
+     for(let m=1;m<MAT.length;m++)INVD[m]=1/MAT[m].d;
+     const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+     let COLS=120,grid,hp,brk,ox,oy,ovx,ovy,needSupport,crackEv,wobOn,wobQuiet,reads,events;
+     const crackFx=(...v)=>events.push(v);
+     function run(width,density,seed){
+       const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
+       COLS=width;const n=width*ROWS,g=new Uint8Array(n);
+       hp=new Float32Array(n);brk=new Uint8Array(n);ox=new Float32Array(n);oy=new Float32Array(n);ovx=new Float32Array(n);ovy=new Float32Array(n);
+       for(let i=0;i<n;i++)if(rnd()<density){
+         g[i]=1+(rnd()*8|0);hp[i]=MAT[g[i]].hp*rnd();
+         if(rnd()<.06)brk[i]=1+(rnd()*15|0);
+         ox[i]=(rnd()-.5)*4;oy[i]=(rnd()-.5)*4;ovx[i]=(rnd()-.5)*50;ovy[i]=(rnd()-.5)*50;
+       }
+       reads=0;grid=new Proxy(g,{get(a,k){if(typeof k==='string'&&/^\\d+$/.test(k))reads++;return a[k]}});
+       needSupport=false;crackEv=0;wobOn=true;wobQuiet=0;events=[];
+       for(let k=0;k<9;k++){crackEv=0;wobStep(1/180)}
+       return {reads,state:JSON.stringify([Array.from(ox),Array.from(oy),Array.from(ovx),Array.from(ovy),Array.from(brk),needSupport,crackEv,wobOn,wobQuiet,events])};
+     }
+   `;
+   const joint=source.slice(0,source.indexOf('let WOB_ACTIVE'));
+   const ref=new Function(fixture+joint+reference+';return run')();
+   const fast=new Function(fixture+source+';return run')();
+   let cases=0,base=0,reduced=0;
+   for(const width of [120,360,120])for(const density of [0,.025,.12,.35,1])for(const seed of [5,177,923]){
+     const a=ref(width,density,seed),b=fast(width,density,seed);
+     assert(a.state===b.state,'wobble simulation or crack order changed '+[width,density,seed]);
+     if(density<=.12){base+=a.reads;reduced+=b.reads;}cases++;
+   }
+   assert(reduced<base*.65,'sparse solver must read substantially fewer grid cells');
+   console.log('WOBBLE_ACTIVE_PASS cases='+cases+' sparse_reads='+base+'->'+reduced+' state_identical=1');
+ }
  return 'WEB_EXPANSION_PASS '+(section||'starters particles animation');
 }
 console.log(expansionRegression(fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8'),assert));
