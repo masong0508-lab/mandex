@@ -4339,7 +4339,13 @@ function camTick(dt){
   else if(CAM.hold>0){CAM.hold-=dt}
   else if(m.mode==='aim'){if(dragging){const k=Math.min(1,Math.hypot(m.x-SX,m.y-SY)/PULL);tl=iL+(bL-iL)*k*k*(3-2*k);fast=8}else tl=iL}
   else if(m.mode==='fly'||m.mode==='stuck'||m.mode==='walk'){tl=clamp(m.x-vw*.38,0,cameraMaxX);ty=Math.min(baseY,m.y-vh*.3);fast=5}
-  if(CAM.reset){CAM.reset=false;CAM.snap=false;CAM.x=walking?tl:bL;CAM.y=walking?ty:baseY;CAM.hold=walking?0:1.1}
+  if(CAM.reset){
+    // On a narrow portrait viewport, distant district targets can hide the
+    // sling entirely. Start on the active sling, not the target overview.
+    const wideAim=portrait&&!!CL.slings&&m.mode==='aim';
+    CAM.reset=false;CAM.snap=false;CAM.x=walking?tl:wideAim?iL:bL;
+    CAM.y=walking?ty:baseY;CAM.hold=walking||wideAim?0:1.1;
+  }
   else if(CAM.snap){CAM.snap=false;CAM.x=tl;CAM.y=ty}
   else{CAM.x+=(tl-CAM.x)*Math.min(1,dt*fast);CAM.y+=(ty-CAM.y)*Math.min(1,dt*3)}
   CAM.x=clamp(CAM.x,0,cameraMaxX);
