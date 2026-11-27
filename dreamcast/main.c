@@ -534,7 +534,7 @@ static void fx_step(int calm, int strain){
   fcount++;
   if(collapse_toast_t>0)collapse_toast_t--;
   if(tnt_toast_t>0)tnt_toast_t--;
-  if(calm){ mi_update(&mi); if(mi.fx) idle_fx(mi.fx, world.man.x, world.man.y, 1); } else mi_reset(&mi);     /* gags run only while he waits, hands off */
+  if(calm){ mi_update_style(&mi,cel_active); if(mi.fx) idle_fx(mi.fx, world.man.x, world.man.y, 1); } else mi_reset(&mi);     /* gags run only while he waits, hands off */
   if(world.state == MX_PLAY && world.man.mode == MAN_FLY && fcount % 10 == 0)                                  /* stink trail */
     spawn_k(PK_STINK, world.man.x - (world.man.vx > 0 ? 2 : -2), world.man.y + 1, (frand() - 0.5f) * 30, (frand() - 0.5f) * 20, 0.7f + frand() * 0.4f, argb(135, 220, 75, 255));
   if(strain && fcount % 7 == 0)                                                                                 /* straining in the sling */
