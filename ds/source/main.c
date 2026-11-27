@@ -962,11 +962,12 @@ static void draw_chunks(const View *v){
     for(int k=0;k<ch->count;k++){
       const MxCell *a=&ch->cells[k];
       if(a->dead)continue;
+      const int fuse=mx_fuse_visual(a);
 #if MX_DS_CHUNK_VIEW_CULL
       int sx=vx(v,a->wx)-h;
       if(sx+ppc<=0 || sx>=256)continue;
       int sy=vy(v,a->wy)-h;
-      if(sy+ppc<=0 || sy>=192)continue;
+      if(sy+ppc<=0 || sy>=192+(fuse?3:0))continue;
 #else
       int sx=vx(v,a->wx)-h,sy=vy(v,a->wy)-h;
 #endif
@@ -983,8 +984,8 @@ static void draw_chunks(const View *v){
       gfx_tile(v,a->m,damage,k&1,sx,sy);
       /* Mobile TNT's actual hitbox carries the fuse, not its chunk centre.
          Blink a tiny fuse cap without scanning stationary grid cells. */
-      if(a->m==MX_TNT && a->fuse && ((frame>>(a->fuse<=8?1:2))&1)){
-        gfx_rect(v->buf,sx,sy-2,ppc,1,a->fuse<=8?C_RED:C_GOLD);
+      if(fuse){
+        gfx_rect(v->buf,sx,sy-2,ppc,1,fuse==2?C_RED:C_GOLD);
         gfx_px(v->buf,sx+ppc/2,sy-3,C_WHITE);
       }
     }
