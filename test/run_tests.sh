@@ -2,6 +2,17 @@
 # Builds the shared core in both math modes and runs the regression test.
 set -e
 cd "$(dirname "$0")"
+# Preserve the test executable's status even when its success chatter is hidden.
+# Capture first (rather than piping the test into grep), so SIGPIPE or a
+# successful filter cannot turn a failing executable into a passing gate.
+run_filtered() (
+  log=$(mktemp "${TMPDIR:-/tmp}/mandex-test.XXXXXX") || exit 1
+  trap 'rm -f "$log"' 0
+  trap 'exit 1' HUP INT TERM
+  if "$@" > "$log"; then rc=0; else rc=$?; fi
+  sed '/^ok:/d' "$log" || exit $?
+  exit "$rc"
+)
 echo "--- Canonical face, hair and side-profile bake consistency (web and all console atlases) ---"
 python3 character_turnaround_test.py
 echo "--- checked-in 142-frame atlas keeps consistent front/profile/rear hair lighting ---"
@@ -255,17 +266,17 @@ echo "--- dual-slot progress journal: CRC, truncation, generation wrap (float an
 gcc -std=gnu99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c journal_test.c -lm -o journal_float && ./journal_float
 gcc -std=gnu99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c journal_test.c -lm -o journal_fixed && ./journal_fixed
 echo "--- save blob: layout, round trip, corruption, truncation, other level counts (float and fixed) ---"
-gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c save_test.c -lm -o save_float && ./save_float | grep -v "^ok:"
-gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c save_test.c -lm -o save_fixed && ./save_fixed | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c save_test.c -lm -o save_float; run_filtered ./save_float
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c save_test.c -lm -o save_fixed; run_filtered ./save_fixed
 echo "--- outfits: unlock rules, Working Man (index 11), no Walk-in Closet / Birthday Suit deadlock ---"
-gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c outfit_test.c -lm -o outfit_float && ./outfit_float | grep -v "^ok:"
-gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c outfit_test.c -lm -o outfit_fixed && ./outfit_fixed | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c outfit_test.c -lm -o outfit_float; run_filtered ./outfit_float
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c outfit_test.c -lm -o outfit_fixed; run_filtered ./outfit_fixed
 echo "--- achievement progress bars agree with the unlock rules ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c ach_test.c -lm -o ach_float && ./ach_float | tail -n 3
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c ach_test.c -lm -o ach_fixed && ./ach_fixed | tail -n 3
 echo "--- post-run crumble (aftershock): rules, cap of 80, sand untouched, blasted wood tower comes apart (float and fixed) ---"
-gcc -std=c99 -O2 -Wall -Wno-unused-function -I../core crumble_test.c -lm -o crumble_float && ./crumble_float | grep -v "^ok:"
-gcc -std=c99 -O2 -Wall -Wno-unused-function -DMX_FIXED -I../core crumble_test.c -lm -o crumble_fixed && ./crumble_fixed | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -Wno-unused-function -I../core crumble_test.c -lm -o crumble_float; run_filtered ./crumble_float
+gcc -std=c99 -O2 -Wall -Wno-unused-function -DMX_FIXED -I../core crumble_test.c -lm -o crumble_fixed; run_filtered ./crumble_fixed
 echo "--- man pose (core): atan2 accuracy, flight pitch follows the path, belly-flop spin, stuck wobble matches the browser (float and fixed) ---"
 gcc -std=c99 -O2 -Wall -I../core ../core/mx.c pose_test.c -lm -o pose_float && ./pose_float | tail -n 1
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c pose_test.c -lm -o pose_fixed && ./pose_fixed | tail -n 1
@@ -285,9 +296,9 @@ else
   echo "--- exhaustive robustness configurations run in independent CI jobs ---"
 fi
 echo "--- collapsible buildings: off = nothing sleeps, on = rubble sleeps, set_collapse(0) wakes it, level end welds everything back (float, fixed, 48-body pool) ---"
-gcc -std=c99 -O2 -Wall -I../core ../core/mx.c collapse_test.c -lm -o collapse_float && ./collapse_float | grep -v "^ok:"
-gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c collapse_test.c -lm -o collapse_fixed && ./collapse_fixed | grep -v "^ok:"
-gcc -std=c99 -O2 -Wall -DMX_MAX_CHUNKS=48 -I../core ../core/mx.c collapse_test.c -lm -o collapse_48 && ./collapse_48 | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c collapse_test.c -lm -o collapse_float; run_filtered ./collapse_float
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c collapse_test.c -lm -o collapse_fixed; run_filtered ./collapse_fixed
+gcc -std=c99 -O2 -Wall -DMX_MAX_CHUNKS=48 -I../core ../core/mx.c collapse_test.c -lm -o collapse_48; run_filtered ./collapse_48
 echo "--- solver work with / without interior-voxel contact culling (fixed point) ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -I../core ../core/mx.c profile_contacts.c -lm -o prof_edge && ./prof_edge
 gcc -std=gnu99 -O2 -DMX_FIXED -DMX_NO_EDGE -I../core ../core/mx.c profile_contacts.c -lm -o prof_noedge && ./prof_noedge
@@ -406,18 +417,18 @@ gcc -std=gnu99 -O2 -Istubs -I../ds/source sfx_catchup_test.c -o sfx_catchup_test
 echo "--- DS music: one soft PCM note at a time, every note fades, no leaked channel (a looping note that is never killed would drone forever) ---"
 for L in 3 6; do ./ds_render /tmp/dsM$L 12000 $L | grep -q "music wave channels peak=[2-8] (fades=[0-9][0-9]*, bad=0)" && echo "ok: level index $L: music (melody + bass) and tone effects share the 8 PCM channels, volumes and frequencies in range" || { echo "FAIL: music channel leak or bad wave parameters (level index $L)"; exit 1; }; done
 echo "--- DS outfits screen: open, walk, wear, locked swatches, back (scripted stylus + d-pad) ---"
-OUTFIT_SHOTS=1 ./ds_render /tmp/dsout 400 0 | grep -v "^ok:"
+OUTFIT_SHOTS=1 run_filtered ./ds_render /tmp/dsout 400 0
 echo "--- DS options screen (port 13): open, tap + d-pad, start tool pre-armed, valve hidden, collapse stays ON while overload cuts wobble work and substeps, saved and reloaded ---"
-rm -f /tmp/mx_opt.sav; MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_TEST=1 ./ds_render /tmp/dsopt 3000 0 | grep -v "^ok:"
+rm -f /tmp/mx_opt.sav; MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_TEST=1 run_filtered ./ds_render /tmp/dsopt 3000 0
 MX_SAVE_PATH=/tmp/mx_opt.sav OPTIONS_LOAD=1 ./ds_render /tmp/dsopt2 400 0
 echo "--- DS pause touchscreen: RESUME/RESTART/MENU are working, disjoint, thumb-sized touch targets ---"
-PAUSE_TOUCH_TEST=1 ./ds_render /tmp/ds_pause_touch 50 0 | grep -v "^ok:"
+PAUSE_TOUCH_TEST=1 run_filtered ./ds_render /tmp/ds_pause_touch 50 0
 echo "--- DS pause safety: START cancels a live stylus pull without firing, music resumes, new grab works ---"
-PAUSE_DRAG_TEST=1 ./ds_render /tmp/ds_pause_drag 70 0 | grep -v "^ok:"
+PAUSE_DRAG_TEST=1 run_filtered ./ds_render /tmp/ds_pause_drag 70 0
 echo "--- DS six-slot touchscreen toolbar: valve opt-in, normal aiming, TURBO/QUAKE selection ---"
-TOOLBAR_TEST=1 ./ds_render /tmp/dstool 60 0 | grep -v "^ok:"
+TOOLBAR_TEST=1 run_filtered ./ds_render /tmp/dstool 60 0
 echo "--- DS title cheat: L+R+SELECT unlocks every level for the session, in any key order ---"
-CHEAT_TEST=1 ./ds_render /tmp/dscheat 400 0 | grep -v "^ok:"
+CHEAT_TEST=1 run_filtered ./ds_render /tmp/dscheat 400 0
 echo "--- packed cutscene artwork: 15 unique readable silhouettes, no allocations ---"
 gcc -std=c99 -O2 -Wall -I../ds/source cut_art_test.c -o cut_art_test && ./cut_art_test
 echo "--- all 24 story/cutscene chapters: framebuffer guards, colored shots, automatic progression ---"
@@ -425,10 +436,10 @@ gcc -std=gnu99 -O2 -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -I../d
 echo "--- cinematic transitions: real shared software renderer with monotonic wipe/iris masks ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -I../dreamcast/shim -Istubs -I../core -I../art -I../ds/source cutscene_transition_test.c ../ds/source/gfx.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o cutscene_transition_test && ./cutscene_transition_test
 echo "--- DS opening cutscene: plays once per power-on before level 1; all 8 scenes run and hand over to level 1; A finishes the typing then goes on; SKIP and START jump to level 1; the worn outfit comes back ---"
-INTRO_TEST=1 ./ds_render /tmp/dsintro 9000 0 | grep -v "^ok:"
-INTRO_SKIP=1 ./ds_render /tmp/dsintro2 600 0 | grep -v "^ok:"
-END_TEST=1 ./ds_render /tmp/dsend1 9000 0 | grep -v "^ok:"
-END_TEST=2 ./ds_render /tmp/dsend2 9000 0 | grep -v "^ok:"
+INTRO_TEST=1 run_filtered ./ds_render /tmp/dsintro 9000 0
+INTRO_SKIP=1 run_filtered ./ds_render /tmp/dsintro2 600 0
+END_TEST=1 run_filtered ./ds_render /tmp/dsend1 9000 0
+END_TEST=2 run_filtered ./ds_render /tmp/dsend2 9000 0
 echo "--- idle gags: every step valid, every gag ends and plays, he falls asleep, input wakes him ---"
 gcc -std=c99 -O2 -Wall -Wno-unused-function -I../art idle_test.c -o idle_test && ./idle_test
 echo "--- DS moving rubble screen-cull parity (2/3/4 px zoom, all edges) ---"
@@ -571,24 +582,26 @@ n3_ref=$(awk '/^N3_PARTICLE_BOUNDS_SCANNED /{print $2}' n3d_particle_bounds_0.tx
 n3_new=$(awk '/^N3_PARTICLE_BOUNDS_SCANNED /{print $2}' n3d_particle_bounds_1.txt)
 test "$n3_new" -eq 6 && test "$n3_ref" -eq 160
 echo "N3_PARTICLE_BOUNDS_PASS scanned=$n3_new reference=$n3_ref pixel_identical=1"
-./n3ds_render /tmp/n3r0 0 | grep -v "^ok:"
-./n3ds_render /tmp/n3r1 1.0 | grep -v "^ok:"
+run_filtered ./n3ds_render /tmp/n3r0 0
+run_filtered ./n3ds_render /tmp/n3r1 1.0
 echo "--- pneumatic tubes and the hourglass (core, both math modes): a man flying into a mouth is posted out of the nozzle; the sand stands until the plug goes ---"
-gcc -std=c99 -O2 -Wall -I../core ../core/mx.c tube_test.c -lm -o tube_float && ./tube_float | grep -v "^ok:"
-gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c tube_test.c -lm -o tube_fixed && ./tube_fixed | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c tube_test.c -lm -o tube_float; run_filtered ./tube_float
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c tube_test.c -lm -o tube_fixed; run_filtered ./tube_fixed
 echo "--- 3DS man: pixel-art sprites, idle gags, hearts and sparkles, tubes (real 3ds/main.c against the stub libctru) ---"
-gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_gags.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_gags && ./n3ds_gags | grep -v "^ok:"
+gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_gags.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_gags; run_filtered ./n3ds_gags
 echo "--- chapter 2 (walk mode, bounce pads, walker / thrower / bat landlords, the fight-back switch): core in both math modes, DS and 3DS front-ends ---"
-gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c ch2_test.c -lm -o ch2_float && ./ch2_float | grep -v "^ok:"
-gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c ch2_test.c -lm -o ch2_fixed && ./ch2_fixed | grep -v "^ok:"
-WALK_TEST=1 ./ds_render /tmp/dswalk 1400 22 | grep -v "^ok:"
-WALK_TEST=3 ./ds_render /tmp/dswalk3 1400 25 | grep -v "^ok:"
-WALK_TEST=2 ./ds_render /tmp/dswalk2 1400 26 | grep -v "^ok:"
-gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_walk.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_walk && ./n3ds_walk | grep -v "^ok:"
+ch2_status=0
+gcc -std=c99 -O2 -Wall -I../core ../core/mx.c ../core/mx_meta.c ch2_test.c -lm -o ch2_float; run_filtered ./ch2_float || ch2_status=1
+gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core ../core/mx.c ../core/mx_meta.c ch2_test.c -lm -o ch2_fixed; run_filtered ./ch2_fixed || ch2_status=1
+test "$ch2_status" -eq 0
+WALK_TEST=1 run_filtered ./ds_render /tmp/dswalk 1400 22
+WALK_TEST=3 run_filtered ./ds_render /tmp/dswalk3 1400 25
+WALK_TEST=2 run_filtered ./ds_render /tmp/dswalk2 1400 26
+gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_walk.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_walk; run_filtered ./n3ds_walk
 echo "--- 3DS cutscenes (shared with the DS) ---"
-gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_intro.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_intro && ./n3ds_intro | grep -v "^ok:"
+gcc -std=gnu99 -O1 -Wall -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_intro.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_intro; run_filtered ./n3ds_intro
 echo "--- Landlord HQ: three districts in turn (float and fixed core) ---"
-for m in "" "-DMX_FIXED"; do gcc -std=c99 -O2 -Wall $m -I../core ../core/mx.c hq_test.c -lm -o hq_test && ./hq_test | grep -v "^ok:"; done
+for m in "" "-DMX_FIXED"; do gcc -std=c99 -O2 -Wall $m -I../core ../core/mx.c hq_test.c -lm -o hq_test; run_filtered ./hq_test; done
 echo "--- triangle span reference: original rectangle path must retain identical pixels ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -DMX_DS_TRI_SPAN=0 -Istubs -I../core -I../ds/source -I../art gfx_clip_test.c ../ds/source/gfx.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o gfx_tri_reference && ./gfx_tri_reference
 echo "--- offscreen art culling: ellipses / triangles / dither match reference pixels ---"
@@ -596,9 +609,9 @@ gcc -std=gnu99 -O2 -DMX_FIXED -Istubs -I../core -I../ds/source -I../art gfx_clip
 echo "--- text drawing is pixel-identical to the reference ---"
 gcc -std=gnu99 -O2 -DMX_FIXED -Istubs -I../core -I../ds/source -I../art text_hash.c ../ds/source/gfx.c ../core/mx.c ../core/mx_meta.c ../core/cloth.c -lm -o text_hash && [ "$(./text_hash)" = "dbd2d34c803f756e" ] && echo "ok: gfx_text / gfx_text_o / gfx_text_c unchanged"
 echo "--- sound effect synth (3DS + Dreamcast) ---"
-gcc -std=c99 -O2 -Wall -I../core -I../ds/source snd_test.c ../core/mx_snd.c ../core/mx.c -lm -o snd_test && ./snd_test | grep -v "^ok:"
+gcc -std=c99 -O2 -Wall -I../core -I../ds/source snd_test.c ../core/mx_snd.c ../core/mx.c -lm -o snd_test; run_filtered ./snd_test
 gcc -std=c99 -O2 -Wall -DMX_FIXED -I../core -I../ds/source snd_test.c ../core/mx_snd.c ../core/mx.c -lm -o snd_test_fx && ./snd_test_fx | tail -1
-gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_fur.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_fur && ./n3ds_fur | grep -v "^ok:"
+gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__ -I../3ds/shim -Istubs -I../core -I../art -I../ds/source n3ds_fur.c $N3D_UNITS ../core/mx.c ../core/mx_meta.c ../core/cloth.c ../core/mx_snd.c -lm -o n3ds_fur; run_filtered ./n3ds_fur
 echo "--- Dreamcast chapter 2 drawing (walking man, pads, briefcases, landlord kinds) ---"
 DC_WALK=1 ./dc_render | grep "walk mode"
 DC_INTRO=1 ./dc_render | { grep -v " finished after " || true; } ; DC_INTRO=1 ./dc_render | grep -c " finished after " | grep -qx 2 && echo "dc cutscenes: both finish"

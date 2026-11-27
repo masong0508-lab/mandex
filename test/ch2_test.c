@@ -67,9 +67,15 @@ int main(void){
   CHECK(D(W.man.x) - x0 > 8 && W.man.gr && W.man.face == 1, "right walks him along the floor at about 17 cells/s");
   mx_walk_input(&W, -1, 0, 0, 0); step(30);
   CHECK(W.man.face == -1 && D(W.man.x) < x0 + 14, "left turns him round");
-  { double y0 = D(W.man.y), ymin = y0; mx_walk_input(&W, 0, 1, 0, 0);
+  { double y0 = D(W.man.y), ymin = y0, jump_x0 = D(W.man.x);
+    int start_grounded = W.man.gr; mx_walk_input(&W, 0, 1, 0, 0);
     for(int i = 0; i < 30; i++){ step(1); if(D(W.man.y) < ymin) ymin = D(W.man.y); } mx_walk_input(&W, 0, 0, 0, 0); step(60);
-    CHECK(y0 - ymin > 3 && fabs(D(W.man.y) - y0) < 0.8 && W.man.gr, "jump rises about 4 cells and lands back on the floor"); }
+    if (!(y0 - ymin > 3 && fabs(D(W.man.y) - y0) < 0.8 && W.man.gr))
+      printf("CH2_JUMP_TRACE start=(%.4f,%.4f) grounded=%d apex=%.4f rise=%.4f end=(%.4f,%.4f) grounded=%d vy=%.4f mode=%d state=%d\n",
+        jump_x0, y0, start_grounded, ymin, y0-ymin, D(W.man.x), D(W.man.y), (int)W.man.gr, D(W.man.vy), (int)W.man.mode, (int)W.state);
+    CHECK(y0 - ymin > 3, "held jump rises more than 3 cells");
+    CHECK(fabs(D(W.man.y) - y0) < 0.8, "jump returns to the starting floor height");
+    CHECK(W.man.gr, "jump ends grounded"); }
   { double wall_x; mx_walk_input(&W, -1, 0, 0, 0); step(180); wall_x = D(W.man.x);
     CHECK(wall_x < 57 && W.man.gr, "the front door is open: he can walk straight out of the block"); }
 
