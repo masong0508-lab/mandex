@@ -546,7 +546,21 @@ static int n3_pressure_probe(void){
          diff,fur);
   return 0;
 }
+static int n3_cel_probe(void){
+  mx_meta_init(&stats);mx_options_default(&console_opt);apply_outfit(0);
+  unsigned char classic[MS_NPAL][3];memcpy(classic,man_pal,sizeof classic);
+  console_opt.art_style=1;apply_outfit(0);
+  if(cel_active||memcmp(classic,man_pal,sizeof classic)){puts("FAIL locked 3DS art changed palette");return 1;}
+  for(int i=0;i<MX_STORY_LEVELS;i++)stats.stars[i]=1;
+  apply_outfit(0);tile_ready=0;tile_build(4);
+  if(!cel_active||!memcmp(classic,man_pal,sizeof classic)){puts("FAIL 3DS cel palette unchanged");return 1;}
+  u32 painted=tcol[1][MX_WOOD][0][0][0];
+  console_opt.art_style=0;apply_outfit(0);tile_ready=0;tile_build(4);
+  if(cel_active||memcmp(classic,man_pal,sizeof classic)||painted==tcol[1][MX_WOOD][0][0][0]){puts("FAIL 3DS cel tile or classic palette restoration");return 1;}
+  puts("N3_GOLDEN_CELS_PASS locked, character, tiles, restoration");return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("N3DS_CEL_PROBE"))return n3_cel_probe();
   if(getenv("N3DS_PRESSURE_PROBE"))return n3_pressure_probe();
   if(getenv("N3DS_TILE_CLIP_PROBE"))return n3_tile_clip_probe();
 #ifdef MX_N3DS_ROT_WORK_COUNT
