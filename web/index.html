@@ -4298,10 +4298,12 @@ function layoutTick(){
       css=window.getComputedStyle?window.getComputedStyle(document.body):null,
       insetW=css?(parseFloat(css.paddingLeft)||0)+(parseFloat(css.paddingRight)||0):0,
       insetH=css?(parseFloat(css.paddingTop)||0)+(parseFloat(css.paddingBottom)||0):0,
-      availW=Math.max(1,(rect.width||vw)-insetW),
-      availH=Math.max(1,(rect.height||vh)-insetH),
+      availW=Math.max(1,Math.min(vw,rect.width||vw)-insetW),
+      availH=Math.max(1,Math.min(vh,rect.height||vh)-insetH),
       scale=Math.max(.01,Math.min(availW/w,availH/h));
-    cv.style.width=Math.floor(w*scale)+'px';cv.style.height=Math.floor(h*scale)+'px';
+    const cssW=Math.floor(w*scale)+'px',cssH=Math.floor(h*scale)+'px';
+    if((cv.style.width!==cssW||cv.style.height!==cssH)&&typeof resetPlayInput==='function')resetPlayInput();
+    cv.style.width=cssW;cv.style.height=cssH;
   }
   if(state!=='play'&&state!=='win'&&state!=='lose'&&COLS!==120)setWorld(120);
   const playing=state==='play'||state==='win'||state==='lose';
@@ -4347,7 +4349,7 @@ function camTick(dt){
 }
 const toWorld=(sx,sy)=>CAM.on?[sx/CAM.z+CAM.x,sy/CAM.z+CAM.y]:[sx,sy];
 const toScreen=(x,y)=>CAM.on?[(x-CAM.x)*CAM.z,(y-CAM.y)*CAM.z]:[x,y];
-let AIM0={sx:0,sy:0,wx:0,wy:0};
+let AIM0={sx:0,sy:0,wx:0,wy:0,z:1};
 /* Gameplay input owns its own pointers; neither editor nor menu touches
  * may finish an aim, and camera inspection never launches a shot. */
 const PLAY_INPUT={aim:null,soda:null,pan:new Map()};
@@ -4891,7 +4893,8 @@ cv.addEventListener('pointerdown',e=>{
   const[wx,wy]=toWorld(x,y);
   if(man.mode==='aim'&&toolOn('burp')&&!man.chug&&!man.seated&&pw.left.burp>0&&Math.abs(wx-STX)<48&&wy>GY-62){PLAY_INPUT.soda=e.pointerId;sodaHold=true;startChug();if(!man.chug){sodaHold=false;PLAY_INPUT.soda=null}try{cv.setPointerCapture(e.pointerId)}catch(_){}return}   // tap the soda stand: he hops over and chugs
   if(man.mode==='aim'&&!man.chug&&toolOn('valve')&&valveOpen()&&!man.seated&&Math.hypot(wx-VX,wy-VY)<38){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}   // tap the valve: he sits and fills; drag him off to fire
-  if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){PLAY_INPUT.aim={id:e.pointerId,man,x:man.x,y:man.y,seated:man.seated,vlv:man.vlv};AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
+  const aimScale=CAM.on?CAM.z:1,pickup=Math.hypot(wx-man.x,wy-man.y);
+  if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&(isPortrait()?pickup*aimScale<64:pickup<(CAM.on?130:70))){PLAY_INPUT.aim={id:e.pointerId,man,x:man.x,y:man.y,seated:man.seated,vlv:man.vlv};AIM0={sx:x,sy:y,wx:man.x,wy:man.y,z:aimScale};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
   if(WEB_UI.toolPicker)return;
@@ -4909,7 +4912,7 @@ cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
     }
     return;
   }
-  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||state!=='play'||!PLAY_INPUT.aim||PLAY_INPUT.aim.id!==e.pointerId||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
+  if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||state!=='play'||!PLAY_INPUT.aim||PLAY_INPUT.aim.id!==e.pointerId||PLAY_INPUT.aim.man!==man||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=AIM0.z,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
   if(vOn&&dv<VPULL){const k=.9*(VPULL-dv)/(VPULL-VGRAB);man.x+=(VX-man.x)*k;man.y+=(VY-man.y)*k}});   // nearing the valve the sling stretches on back toward it (power stays a full pull), then he drops onto it
 cv.addEventListener('pointerup',e=>{
   if(WEB_UI.toolPicker){const p=pt(e);toolPickerUp(e,p[0],p[1]);return}
@@ -4932,6 +4935,7 @@ cv.addEventListener('pointerup',e=>{
   if(PLAY_INPUT.pan.delete(e.pointerId))return;
   if(PLAY_INPUT.soda===e.pointerId){PLAY_INPUT.soda=null;sodaHold=false;return}
   if(!PLAY_INPUT.aim||PLAY_INPUT.aim.id!==e.pointerId)return;
+  if(PLAY_INPUT.aim.man!==man){cancelAim(e.pointerId);return}
   PLAY_INPUT.aim=null;
   if(dragging){dragging=false;if(man.mode==='aim'){
     if(man.vlv){man.seated=true;return}man.seated=false;launch()

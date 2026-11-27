@@ -4,9 +4,10 @@ function cameraRegression(html, assert){
   const cut=(a,b)=>{const i=html.indexOf(a),j=html.indexOf(b,i+a.length);if(i<0||j<=i)throw Error("missing "+a+" / "+b);return html.slice(i,j)};
   const make=new Function(`
     const events={},globalEvents={},captures=[];
-    const cv={addEventListener(n,fn){(events[n]||=[]).push(fn)},setPointerCapture(id){captures.push(id)},getBoundingClientRect(){return {left:0,top:0,width:W,height:H}}};
+    const cv={style:{},width:960,height:540,addEventListener(n,fn){(events[n]||=[]).push(fn)},setPointerCapture(id){captures.push(id)},getBoundingClientRect(){return {left:0,top:0,width:W,height:H}}};
     const addEventListener=(n,f)=>{(globalEvents[n]||=[]).push(f)};
-    const document={addEventListener(){},hidden:false};
+    const window={innerWidth:390,innerHeight:844,visualViewport:{width:390,height:844}};
+    const document={addEventListener(){},hidden:false,body:{getBoundingClientRect(){return {width:window.innerWidth,height:window.innerHeight}}}};let _vig=null;
     let W=960,H=540,WW=2880,WH=540,GY=480,SX=128,SY=362,VX=36,VY=420,PULL=92,VKEEP=44,VGRAB=40,VPULL=76,COLS=360,state='play',dragging=false,sodaHold=false,sliderDrag=false,mouseX=0,mouseY=0,launches=0,dives=0,uiHits=0;
     let man={mode:'aim',x:SX,y:SY,seated:false,vlv:false,G:null};
     const CL={},targets=[],KEYS={},TID={},pw={left:{burp:1}},clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -17,7 +18,7 @@ function cameraRegression(html, assert){
     ${cut("cv.addEventListener('pointerdown',e=>{","// =====================================================================\n//  META:")}
     function send(name,id,x,y,extras={}){for(const f of events[name]||[])f({pointerId:id,clientX:x,clientY:y,button:0,pointerType:'touch',preventDefault(){},...extras})}
     function globalSend(name){for(const f of globalEvents[name]||[])f({})}
-    return {send,globalSend,CAM,man,tick:camTick,world:toWorld,screen:toScreen,mode:(on)=>cameraMode(on),stats:()=>({dragging,launches,dives,uiHits}),state:v=>{state=v},portrait:()=>{W=540;H=960;WEB_UI.portrait=true},input:()=>({keys:{...KEYS},owners:{...TID},gesture:WEB_UI.gesture})};
+    return {send,globalSend,CAM,man,tick:camTick,layout:layoutTick,viewport:h=>{window.visualViewport.height=h;layoutTick();return cv.style.height},world:toWorld,screen:toScreen,mode:(on)=>cameraMode(on),stats:()=>({dragging,launches,dives,uiHits}),state:v=>{state=v},portrait:()=>{W=540;H=960;WEB_UI.portrait=true},input:()=>({keys:{...KEYS},owners:{...TID},gesture:WEB_UI.gesture})};
   `);
   const h=make();h.send('pointerdown',1,128,362);assert(h.stats().dragging,'owner starts aiming');h.send('pointermove',1,70,362);const x=h.man.x;
   h.send('pointerdown',2,800,100);h.send('pointermove',2,700,100);assert(h.man.x===x,'foreign pointer cannot move sling');h.send('pointerup',2,700,100);assert(h.stats().launches===0&&h.stats().dragging,'foreign release cannot launch');h.send('pointercancel',2,700,100);assert(h.stats().dragging,'foreign cancel cannot clear aim');h.send('pointerup',1,70,362);assert(h.stats().launches===1&&!h.stats().dragging,'owner releases exactly once');
@@ -53,6 +54,26 @@ function cameraRegression(html, assert){
   menu.send('pointerdown',12,100,100);menu.send('lostpointercapture',12,100,100);
   assert(!menu.input().gesture,'lost menu capture clears gesture');
   menu.send('pointerup',12,100,100);assert(menu.stats().uiHits===1,'lost capture cannot activate menu');
-  return 'WEB_MANUAL_CAMERA_PASS aim_owner=1 lost_capture=1 pan=1 pinch=1 wheel=1 bounds=1 blur=1 walk_gap=1 menu_owner=1';
+  const aim=make();aim.portrait();aim.CAM.on=true;aim.CAM.z=1;
+  const [ax,ay]=aim.screen(aim.man.x,aim.man.y);
+  aim.send('pointerdown',31,ax+20,ay-5);
+  assert(aim.stats().dragging,'off-centre thumb owns portrait aim');
+  aim.send('pointermove',31,ax+20,ay-5);
+  assert(aim.man.x===128&&aim.man.y===362,'zero pointer travel must not move character toward thumb');
+  aim.CAM.z=1.5;aim.send('pointermove',31,ax-40,ay+15);
+  assert(Math.abs(aim.man.x-68)<1e-7&&Math.abs(aim.man.y-382)<1e-7,'captured scale controls relative drag');
+  aim.send('pointercancel',31,ax-40,ay+15);
+  assert(aim.man.x===128&&aim.man.y===362&&aim.stats().launches===0,'cancel restores original sling');
+  aim.CAM.z=.55;const [bx,by]=aim.screen(128,362);
+  aim.send('pointerdown',32,bx+65,by);
+  assert(!aim.stats().dragging,'portrait pickup radius remains bounded when zoomed out');
+  const resize=make();resize.layout();const [rx,ry]=resize.screen(128,362);
+  resize.send('pointerdown',41,rx,ry);resize.send('pointermove',41,rx-30,ry);
+  assert(resize.stats().dragging&&resize.man.x<128,'resize fixture has an owned pull');
+  const css=resize.viewport(340);
+  assert(!resize.stats().dragging&&resize.man.x===128&&resize.stats().launches===0,'CSS-only viewport change cancels old pull without launch');
+  assert(parseFloat(css)<=340,'keyboard viewport bounds CSS height even with stale body rectangle');
+  resize.send('pointerup',41,rx-30,ry);assert(resize.stats().launches===0,'stale resize release never launches');
+  return 'WEB_MANUAL_CAMERA_PASS aim_owner=1 lost_capture=1 pan=1 pinch=1 wheel=1 bounds=1 blur=1 walk_gap=1 menu_owner=1 relative_aim=1 fixed_pickup=1 viewport_cancel=1';
 }
 console.log(cameraRegression(fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8'),assert));
