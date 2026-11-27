@@ -1392,7 +1392,7 @@ function cleanChunks(dt){
 // =====================================================================
 //  THE MAN: plowing physics (kinetic energy pays for each destroyed voxel)
 // =====================================================================
-function stick(){const m=man;if(m.pwr==='quake'&&!m.splatted){m.splatted=true;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);for(let j=-5;j<=5;j++)for(let i=-5;i<=5;i++)if(i*i+j*j<=25)damageCell(cx+i,cy+j,13);for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<64)killTarget(t);ring(m.x,m.y,76,'#ffd23f');ring(m.x,m.y,45,'#fff');shake=Math.max(shake,8);if(m.jg){m.jg.bvy-=22;m.jg.sq=1;m.jg.st=0}SFX.boom();popText(m.x,m.y-40,'KAPOW!','#ffd23f',30)}if(m.pwr==='splat'&&!m.splatted){m.splatted=true;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);for(let j=-7;j<=7;j++)for(let i=-7;i<=7;i++)if(i*i+j*j<=49)damageCell(cx+i,cy+j,9);for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<85)killTarget(t);goo(m.x,m.y,70,420);ring(m.x,m.y,90,'#7dff5a');ring(m.x,m.y,60,'#fff');shake=Math.max(shake,10);flash=.25;SFX.boom();popText(m.x,m.y-40,'SPLOOSH!','#7dff5a',34)}
+function stick(){const m=man;if(m.pwr==='quake'&&!m.splatted){m.splatted=true;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);const radius=m.dive?6:5,damage=m.dive?16:13;for(let j=-radius;j<=radius;j++)for(let i=-radius;i<=radius;i++)if(i*i+j*j<=radius*radius)damageCell(cx+i,cy+j,damage);for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<(m.dive?72:64))killTarget(t);ring(m.x,m.y,m.dive?92:76,'#ffd23f');ring(m.x,m.y,m.dive?54:45,'#fff');shake=Math.max(shake,m.dive?10:8);if(m.jg){m.jg.bvy-=22;m.jg.sq=1;m.jg.st=0}SFX.boom();popText(m.x,m.y-40,m.dive?'MEGA QUAKE!':'KAPOW!','#ffd23f',30)}if(m.pwr==='splat'&&!m.splatted){m.splatted=true;const cx=Math.floor(m.x/V),cy=Math.floor(m.y/V);for(let j=-7;j<=7;j++)for(let i=-7;i<=7;i++)if(i*i+j*j<=49)damageCell(cx+i,cy+j,9);for(const t of targets)if(t.alive&&Math.hypot(t.x-m.x,t.y-m.y)<85)killTarget(t);goo(m.x,m.y,70,420);ring(m.x,m.y,90,'#7dff5a');ring(m.x,m.y,60,'#fff');shake=Math.max(shake,10);flash=.25;SFX.boom();popText(m.x,m.y-40,'SPLOOSH!','#7dff5a',34)}
   if(CL&&CL.walk&&!m.walked){enterWalk();return}
   if(m.pwr==='burp'&&!m.burped)m.burpT=1.0;m.mode='stuck';m.vx=m.vy=0;m.t=0;m.gooT=0;shake=Math.max(shake,4);goo(m.x,m.y,22,260);SFX.splat();ring(m.x,m.y,40,'#7dff5a')}
 function bounceRubber(){
@@ -4688,7 +4688,7 @@ function drawHUD(){
       }
     }
     if(man.mode!=='walk')btn(12,H-44,236,32,'TOOL: '+toolName()+chg+'  >',()=>openToolPicker(),{size:13,on:toolName()!=='NONE',disabled:!toolPickerAllowed()});
-    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
+    if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: dive for a stronger shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
   else if(man.mode==='fly'&&!man.dive){ctx.globalAlpha=.8;txt('TAP = BELLY FLOP',W/2,P?H-60:H-18,16,'#fff','center');ctx.globalAlpha=1}
@@ -4704,7 +4704,7 @@ function drawHUD(){
 const TOOL_PICKER_DETAILS={
   none:'Standard launch',valve:'Inflate before launch',burp:'Chug soda, then blast',
   beans:'Mid-air boost',towel:'Glide further',splat:'Goo burst on impact',
-  turbo:'35% faster launch',quake:'Landing shockwave'
+  turbo:'35% faster launch',quake:'Dive for a stronger quake'
 };
 function toolPickerAllowed(){
   return state==='play'&&man&&man.mode==='aim'&&!dragging&&!man.chug&&
