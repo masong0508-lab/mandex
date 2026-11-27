@@ -52,6 +52,14 @@ for(const [label,x,y] of [['behind',296,297],['edge',337+19,297],['too high',337
   check(a.e.cases.length===1&&a.e.score===0&&
     !popups(a.e).includes('PARRY! +150'),'miss must not parry '+label);
 }
+// A charge reaches beyond a standing fist, but only with forward momentum.
+for(const face of [-1,1]){
+  for(const speed of [0,120,-120]){
+    const a=make();a.e.man.face=face;a.e.man.vx=face*speed;
+    a.caseAt(320+face*39,297);a.walkPunch();
+    check(a.e.score===(speed===120?150:0),'shoulder charge reach and facing '+face+' '+speed);
+  }
+}
 const two=make();
 two.caseAt(337,297);two.caseAt(340,298);two.walkPunch();
 check(two.e.cases.length===0&&two.e.score===300,
