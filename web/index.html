@@ -4866,6 +4866,7 @@ function drawEnd(){
   txt(win?(level===1109?'SUMMIT CONQUERED!':'EVICTION COMPLETE!'):'THE LANDLORDS LIVE...',tx,y0,P?32:38,win?'#7dff5a':'#ff6a6a','center');
   if(win){const st=men>=2?3:men>=1?2:1;for(let i=0;i<3;i++)star(P?tx-70+i*70:W/2-10+i*70,y0+70,28,i<st)}
   txt('SCORE  '+Math.round(score),tx,P?y0+330:330,28,'#fff','center');
+  if(win&&level===1098&&typeof chapter4Open==='function'&&chapter4Open())txt('CHAPTER 4 - SECRET CITY OPEN!',tx,P?y0+305:304,16,'#7dff5a','center');
   const bh=40,by=P?y0+370:366,cx=tx;
   if(win){btn(cx-190,by,120,bh,'RETRY',retry,{size:16});btn(cx-60,by,120,bh,CL.custom?(testing?'EDITOR':'LEVELS'):(level===1109?'THE END':level>=TRIAL_START?(trialAfterWin(level)>=0?'NEXT >':'TRIALS'):level+1<chEnd(level)?'NEXT >':'THE END'),nextAfterWin,{size:16,on:true,col:'#7dff5a'});btn(cx+70,by,120,bh,'MENU',()=>{testing=false;goMenu()},{size:16})}
   else{btn(cx-125,by,120,bh,'RETRY',retry,{size:16,on:true});btn(cx+5,by,120,bh,testing?'EDITOR':'LEVELS',backFromPlay,{size:16})}}
@@ -4888,7 +4889,7 @@ function drawTitle(){
 // =====================================================================
 function pt(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
 function retry(){load(level,CL&&CL.custom?CL:undefined)}
-function nextAfterWin(){if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level===1109){state='ending';endScroll=0;hits=[]}else if(level>=TRIAL_START){const next=trialAfterWin(level);if(next>=0)startStory(next);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else if(level+1===CH1)startCutEnd(1);else if(level+1===CH2)startCutEnd(2);else{state='ending';endScroll=0;hits=[]}}
+function nextAfterWin(){if(state!=='win')return false;if(CL.custom){if(testing)openEditor(true);else goSelect()}else if(level===1109){state='ending';endScroll=0;hits=[]}else if(level>=TRIAL_START){const next=trialAfterWin(level);if(next>=0)startStory(next);else goSelect()}else if(level+1<chEnd(level))startStory(level+1);else if(level+1===CH1)startCutEnd(1);else if(level+1===CH2)startCutEnd(2);else{state='ending';endScroll=0;hits=[]}}
 let endScroll=0;
 const CREDITS=['MANDEX','THE LANDLORD SMASHER','','Every landlord has been evicted.','The neighbourhood is free.','Rent is cancelled.','','STARRING','The Man  -  as himself','His Towel  -  as the cape','The Belly  -  stunts and special effects','','LANDLORDS HARMED','all of them','','Thank you for playing!'];
 function drawEnding(){ctx.fillStyle='rgba(8,10,20,.6)';ctx.fillRect(0,0,W,H);endScroll+=frameDt*26;const PT=W<700,cx=PT?W/2:W/2+190;
@@ -5219,7 +5220,7 @@ function trialGroupCount(secret=selTab===5,stars=PD.stars){return secret?(chapte
 function trialGroupFirst(d,secret=selTab===5){return secret?1010+20*d:d>=trialRegularGroups()?1098:TRIAL_START+20*d}
 function trialGroupName(d,secret=selTab===5){return secret?'SECRET CITY - PART '+(d+1):d>=trialRegularGroups()?'QUALIFYING MISSION':TRIAL_DISTRICTS[d]}
 function trialDistrictSize(d,secret=selTab===5,stars=PD.stars){if(d<0||d>=trialGroupCount(secret,stars))return 0;const first=trialGroupFirst(d,secret);return secret?Math.min(20,LEVELS.length-first):d>=trialRegularGroups()?1:Math.min(20,trialRegularEnd()-first)}
-function trialAfterWin(i,stars=PD.stars){if(chapter4Available()){if(i===1009)return chapter4Open(stars)?1010:trialVisible(1098,stars)?1098:-1;if(i===1098&&chapter4Open(stars)){for(let j=1010;j<1098;j++)if(!stars[j])return j;return 1099}if(i>=1010)return chapter4Open(stars)&&i+1<LEVELS.length?i+1:-1}return i+1<chEnd(i)&&trialVisible(i+1,stars)?i+1:-1}
+function trialAfterWin(i,stars=PD.stars){if(chapter4Available()){if(i===1009)return chapter4Open(stars)?1010:trialVisible(1098,stars)?1098:-1;if(i===1098&&chapter4Open(stars)){for(let j=1010;j<1098;j++)if(!stars[j])return j;return 1099}if(i===1097&&chapter4Open(stars))return 1099;if(i>=1010)return chapter4Open(stars)&&i+1<LEVELS.length?i+1:-1}return i+1<chEnd(i)&&trialVisible(i+1,stars)?i+1:-1}
 function trialDistrictProgress(d,stars=PD.stars){
   const first=trialGroupFirst(d),end=first+trialDistrictSize(d,selTab===5,stars);let cleared=0,earned=0,next=-1;
   for(let i=first;i<end;i++){
@@ -5240,10 +5241,16 @@ function trialBrief(i){
 // wrap once through remaining districts. Never change the save.
 function trialNextUnfinishedIndex(d,stars=PD.stars){
   const secret=selTab===5,n=trialGroupCount(secret,stars);if(!n)return -1;
-  const start=Math.max(0,Math.min(n-1,d|0));
-  for(let k=0;k<n;k++){const group=(start+k)%n,first=trialGroupFirst(group,secret),end=first+trialDistrictSize(group,secret,stars);
-    for(let i=first;i<end;i++)if(trialVisible(i,stars)&&!(Number(stars[i])>0))return i;}
-  return -1;
+  const start=Math.max(0,Math.min(n-1,d|0)),first=trialGroupFirst(start,secret);
+  const lo=secret?1010:TRIAL_START,hi=secret?LEVELS.length:trialRegularEnd();
+  const scan=(a,b)=>{for(let i=a;i<b;i++)if(!(Number(stars[i])>0))return i;return -1};
+  // All selected groups form one contiguous range, except the standalone
+  // qualifying mission. Never scan the hidden interval on each menu draw.
+  const gate=!secret&&start>=trialRegularGroups()||!secret&&n>trialRegularGroups();
+  if(gate&&first===1098&&!(Number(stars[1098])>0))return 1098;
+  let next=scan(first,hi);if(next>=0)return next;
+  if(gate&&!(Number(stars[1098])>0))return 1098;
+  return scan(lo,Math.min(first,hi));
 }
 function trialNextUnfinished(d){
   const next=trialNextUnfinishedIndex(d);

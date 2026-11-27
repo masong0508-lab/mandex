@@ -25,6 +25,21 @@ int main(void){
     CHECK(mx_visible_district_step(&s,1000,1)==MX_CH4_FIRST);
     CHECK(mx_visible_district_step(&s,0,-1)==1090);
     for(int i=MX_CH4_FIRST;i<MX_NUM_LEVELS;i++)CHECK(mx_level_visible(&s,i));
+    CHECK(mx_menu_part_number(&s,MX_CH4_FIRST)==1&&mx_menu_part_count(&s,MX_CH4_FIRST)==5);
+    CHECK(mx_menu_part_number(&s,MX_NUM_LEVELS-1)==5&&mx_menu_part_count(&s,MX_NUM_LEVELS-1)==5);
+    CHECK(mx_menu_part_number(&s,1000)==48&&mx_menu_part_count(&s,1000)==48);
+    /* Exhaustively compare direct jumps against a slow reference in all
+       three progression states, even from a stale hidden selection. */
+    for(int phase=0;phase<3;phase++){
+        memset(s.stars,0,sizeof s.stars);
+        if(phase>=1)s.stars[MX_CH4_PREREQ]=1;
+        if(phase==2)s.stars[MX_CH4_GATE]=1;
+        for(int i=0;i<MX_NUM_LEVELS;i++)for(int dir=-1;dir<=1;dir+=2){
+            int ref=i;
+            do {ref=(ref+(dir>0?1:MX_NUM_LEVELS-1))%MX_NUM_LEVELS;} while(!mx_level_visible(&s,ref));
+            CHECK(mx_visible_level_step(&s,i,dir)==ref);
+        }
+    }
     int cases=0;
     for(int i=MX_TRIAL_START;i<MX_NUM_LEVELS;i++){
         memset(s.stars,3,sizeof s.stars);s.stars[i]=0;before=s;
@@ -43,6 +58,7 @@ int main(void){
     }
     CHECK(mx_trial_next_unfinished(&s,-1)==-1&&mx_trial_next_unfinished(&s,MX_NUM_LEVELS)==-1&&mx_trial_next_unfinished(&s,0)==-1);
     CHECK(mx_campaign_next(&s,MX_CH4_GATE)==MX_CH4_GATE+1);
+    CHECK(mx_campaign_next(&s,MX_CH4_GATE-1)==MX_CH4_GATE+1);
     s.stars[MX_TRIAL_START+2]=0;s.stars[MX_NUM_LEVELS-1]=0;
     CHECK(mx_trial_next_unfinished(&s,MX_NUM_LEVELS-3)==MX_NUM_LEVELS-1);
     CHECK(mx_trial_next_unfinished(&s,MX_NUM_LEVELS)==MX_TRIAL_START+2);

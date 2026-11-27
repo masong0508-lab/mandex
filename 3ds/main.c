@@ -1507,7 +1507,8 @@ static void draw_end(void){
   if(win){
     int n = mx_stars_for(&world);
     for(int i = 0; i < 3; i++) star(&top, 200 + (i - 1) * 30, 128, 10, i < n ? RGB(255, 210, 63) : RGB(60, 64, 78));
-    if(new_best && (frame & 16)) textc(&top, 200, 146, "NEW BEST!", 2, RGB(255, 126, 176));
+    if(world.level==MX_CH4_GATE&&mx_ch4_unlocked(&stats))textc(&top,200,146,"SECRET CITY UNLOCKED",1,RGB(125,255,90));
+    else if(new_best && (frame & 16)) textc(&top, 200, 146, "NEW BEST!", 2, RGB(255, 126, 176));
   }
   textc(&top, 200, 162, win ? (world.level == MX_NUM_LEVELS - 1 ? "ALL LANDLORDS EVICTED" : "A = NEXT LEVEL") : "A = TRY AGAIN", 2, RGB(255, 210, 63));
   if(win){                                                                   /* two dancers, one on each side of the panel (the 32-beat loop in art/manidle.h) */
@@ -1793,7 +1794,7 @@ int main(void){
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
       if(sel==MX_CH4_GATE&&!mx_ch4_unlocked(&stats))textc(&top,200,228,"QUALIFYING MISSION",1,RGB(255,210,63));
-      else if(sel>=MX_TRIAL_START){int stars=0,count=0,clear=mx_menu_trial_summary(&stats,sel,&stars,&count);snprintf(b,sizeof b,"%s %d/%d  %d/%d CLEARED",sel>=MX_CH4_FIRST&&mx_ch4_unlocked(&stats)?"CHAPTER 4":"DISTRICT",mx_menu_group_index(&stats,sel),mx_menu_group_count(&stats)-1,clear,count);textc(&top,200,228,b,1,RGB(255,210,63));}
+      else if(sel>=MX_TRIAL_START){int stars=0,count=0,clear=mx_menu_trial_summary(&stats,sel,&stars,&count);snprintf(b,sizeof b,"%s %d/%d  %d/%d CLEARED",sel>=MX_CH4_FIRST&&mx_ch4_unlocked(&stats)?"CHAPTER 4":"DISTRICT",mx_menu_part_number(&stats,sel),mx_menu_part_count(&stats,sel),clear,count);textc(&top,200,228,b,1,RGB(255,210,63));}
       else textc(&top, 200, 228, "UP/DOWN: TRIAL DISTRICTS", 1, RGB(255, 210, 63));
       if(!snd_ok){ char sb[48]; sprintf(sb, "NO SOUND (ndsp %08X) - NEEDS dspfirm.cdc", (unsigned)snd_err); textc(&top, 200, 212, sb, 1, RGB(255, 90, 90)); }
 #if defined(__3DS__) && !MX_N3DS_NO_SAVE

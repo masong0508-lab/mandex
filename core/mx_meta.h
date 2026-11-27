@@ -95,6 +95,7 @@ static inline int mx_campaign_next(const MxStats *s,int level){
   if(mx_ch4_available()&&level==MX_CH4_GATE&&mx_ch4_unlocked(s)){
     for(int i=MX_CH4_FIRST;i<MX_CH4_GATE;i++)if(!s->stars[i])return i;
   }
+  if(mx_ch4_unlocked(s)&&level==MX_CH4_GATE-1)return MX_CH4_GATE+1; /* qualifier is already cleared */
   for(int i=level+1;i<MX_NUM_LEVELS;i++)if(mx_level_visible(s,i))return i;
   return MX_NUM_LEVELS;
 }

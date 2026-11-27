@@ -77,6 +77,7 @@ def main():
         ok(phases===6,'qualifier has six stages');
         for(let d=0;d<phases;d++){
           ok(level===1098&&CL.relayPhase===d,'qualifier correct phase');
+          nextAfterWin();ok(level===1098&&CL.relayPhase===d&&state==='play','next action cannot skip qualifier phase');
           for(const t of targets)t.alive=false;
           winT=1.61;update(1/60);
           if(d<phases-1)ok(!chapter4Open()&&state==='play','intermediate qualifier does not reveal chapter');
@@ -86,6 +87,7 @@ def main():
         nextAfterWin();ok(level===1010&&selTab===5,'secret city begins at level 1011');
         visit(4,48);visit(5,5);
         ok(startStory(1109)===true&&CL.relayCount===18,'finale available after unlock');
+        nextAfterWin();ok(level===1109&&CL.relayPhase===0&&state==='play','next action cannot bypass summit');
       } finally {btn=savedBtn;}
       return {checks,transitions,walkPhases:walks,levels:LEVELS.length}
     }"""

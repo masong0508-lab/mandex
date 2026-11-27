@@ -1514,7 +1514,9 @@ static void end_panel(u8 *b){
   }
   gfx_text_c(b, 128, 120, "DAMAGE", C_UILINE, C_UIBG, 1);
   gfx_text_c(b, 128, 128, gfx_int(disp_score), C_GOLD, C_BLACK, 2);
-  if(win && world.men > 0){
+  if(win && world.level==MX_CH4_GATE && mx_ch4_unlocked(&stats)){
+    gfx_text_c(b, 128, 144, "CHAPTER 4 - SECRET CITY OPEN!", C_GOO, C_UIBG, 1);
+  } else if(win && world.men > 0){
     gfx_text_c(b, 128, 144, world.level == MX_NUM_LEVELS - 1 ? "THE END - THANKS FOR PLAYING" : "SPARE MEN BONUS INCLUDED", C_GOO, C_UIBG, 1);
   } else if(!win){
     gfx_text_c(b, 128, 144, "DAMAGE IS NEVER ENOUGH", C_UILINE, C_UIBG, 1);
@@ -1878,7 +1880,7 @@ static void title_bottom(View *v){
   draw_world(v, 0);
   panel(v->buf, 8, 6, 240, 38);
   if(sel_level==MX_CH4_GATE&&!mx_ch4_unlocked(&stats))gfx_text_c(v->buf,128,11,"QUALIFYING MISSION",C_UILINE,C_UIBG,1);
-  else if(sel_level>=MX_TRIAL_START){int stars=0,count=0,clear=mx_menu_trial_summary(&stats,sel_level,&stars,&count);char b[]="TRIAL 00/00 CLEAR 00/00 STAR 00/00";int d=mx_menu_group_index(&stats,sel_level),groups=mx_menu_group_count(&stats)-1,maxstars=count*3;b[6]='0'+d/10;b[7]='0'+d%10;b[9]='0'+groups/10;b[10]='0'+groups%10;b[18]='0'+clear/10;b[19]='0'+clear%10;b[21]='0'+count/10;b[22]='0'+count%10;b[29]='0'+stars/10;b[30]='0'+stars%10;b[32]='0'+maxstars/10;b[33]='0'+maxstars%10;if(sel_level>=MX_CH4_FIRST&&mx_ch4_unlocked(&stats)){gfx_text_c(v->buf,128,11,"CHAPTER 4 - SECRET CITY",C_UILINE,C_UIBG,1);}else gfx_text_c(v->buf,128,11,b,C_UILINE,C_UIBG,1);}
+  else if(sel_level>=MX_TRIAL_START){int stars=0,count=0,clear=mx_menu_trial_summary(&stats,sel_level,&stars,&count);char b[]="TRIAL 00/00 CLEAR 00/00 STAR 00/00";int d=mx_menu_part_number(&stats,sel_level),groups=mx_menu_part_count(&stats,sel_level),maxstars=count*3;b[6]='0'+d/10;b[7]='0'+d%10;b[9]='0'+groups/10;b[10]='0'+groups%10;b[18]='0'+clear/10;b[19]='0'+clear%10;b[21]='0'+count/10;b[22]='0'+count%10;b[29]='0'+stars/10;b[30]='0'+stars%10;b[32]='0'+maxstars/10;b[33]='0'+maxstars%10;if(sel_level>=MX_CH4_FIRST&&mx_ch4_unlocked(&stats)){char c4[]="CH 4  0/0  CLEAR 00/20";c4[6]='0'+d;c4[8]='0'+groups;c4[17]='0'+clear/10;c4[18]='0'+clear%10;gfx_text_c(v->buf,128,11,c4,C_UILINE,C_UIBG,1);}else gfx_text_c(v->buf,128,11,b,C_UILINE,C_UIBG,1);}
   else gfx_text_c(v->buf,128,11,"UP/DOWN: TRIAL DISTRICTS",C_UILINE,C_UIBG,1);
   const char *nm = mx_level_name(sel_level);
   gfx_text_c(v->buf, 128, 21, nm, C_GOLD, C_BLACK, gfx_text_w(nm,2)>204?1:2);

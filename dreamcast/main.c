@@ -608,7 +608,7 @@ static void draw_title(void){
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
   text("B: NEXT UNCLEARED TRIAL",320,370,17,argb(255,210,63,255),1,Z_HUD);
   if(title_lv==MX_CH4_GATE&&!mx_ch4_unlocked(&stats))text("QUALIFYING MISSION",320,394,17,argb(255,210,63,255),1,Z_HUD);
-  else if(title_lv>=MX_TRIAL_START){int stars=0,count=0,clear=mx_menu_trial_summary(&stats,title_lv,&stars,&count);char b[80];snprintf(b,sizeof b,"%s %d/%d  %d/%d CLEARED  %d/%d STARS",title_lv>=MX_CH4_FIRST&&mx_ch4_unlocked(&stats)?"CHAPTER 4":"DISTRICT",mx_menu_group_index(&stats,title_lv),mx_menu_group_count(&stats)-1,clear,count,stars,3*count);text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
+  else if(title_lv>=MX_TRIAL_START){int stars=0,count=0,clear=mx_menu_trial_summary(&stats,title_lv,&stars,&count);char b[80];snprintf(b,sizeof b,"%s %d/%d  %d/%d CLEARED  %d/%d STARS",title_lv>=MX_CH4_FIRST&&mx_ch4_unlocked(&stats)?"CHAPTER 4":"DISTRICT",mx_menu_part_number(&stats,title_lv),mx_menu_part_count(&stats,title_lv),clear,count,stars,3*count);text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
   else text("UP/DOWN: TRIAL DISTRICTS",320,394,17,argb(255,210,63,255),1,Z_HUD);
   { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD);
     snprintf(tb, sizeof tb, "X OPTIONS / Y FIGHT: %s", nofight ? "OFF" : "ON"); text(tb, 320, 418, 16, argb(255, 255, 255, 220), 1, Z_HUD); }
@@ -1196,6 +1196,7 @@ static void draw_all(void){
     text("B: RETURN TO TITLE",320,435,21,WHITE,1,Z_END+2);
     snprintf(buf, sizeof buf, "SCORE  %d", world.score);
     text(buf, 320, 330, 34, WHITE, 1, Z_END + 2);
+    if(win&&world.level==MX_CH4_GATE&&mx_ch4_unlocked(&stats))text("CHAPTER 4 - SECRET CITY OPEN!",320,357,19,argb(125,255,90,255),1,Z_END+2);
     if(((fcount >> 5) & 1) == 0 || fcount > 0) text(win ? (world.level == MX_NUM_LEVELS - 1 ? "THE END - THANKS FOR PLAYING!" : "PRESS START: NEXT LEVEL") : "PRESS START: TRY AGAIN", 320, 390, 24, argb(255, 210, 63, 120 + (int)(120 * (0.5f + 0.5f * sinf(fcount * 0.1f)))), 1, Z_END + 2);
   }
 }

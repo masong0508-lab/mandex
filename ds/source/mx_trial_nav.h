@@ -2,6 +2,7 @@
 #ifndef MX_TRIAL_NAV_H
 #define MX_TRIAL_NAV_H
 #include "mx_meta.h"
+#include <string.h>
 static inline int mx_menu_regular_end(void){return mx_ch4_available()?MX_CH4_FIRST:MX_NUM_LEVELS;}
 static inline int mx_menu_regular_groups(void){return (mx_menu_regular_end()-MX_TRIAL_START+MX_TRIAL_DISTRICT_SIZE-1)/MX_TRIAL_DISTRICT_SIZE;}
 static inline int mx_menu_group_count(const MxStats *s){
@@ -22,12 +23,29 @@ static inline int mx_visible_district_step(const MxStats *s,int level,int dir){
     return mx_menu_group_first(s,(g+(dir>0?1:n-1))%n);
 }
 static inline int mx_visible_level_step(const MxStats *s,int level,int dir){
-    int l=level;
-    for(int k=0;k<MX_NUM_LEVELS;k++){
-        l=(l+(dir>0?1:MX_NUM_LEVELS-1))%MX_NUM_LEVELS;
-        if(mx_level_visible(s,l))return l;
+    /* The visible catalogue is contiguous except for the one qualifier.
+       Jump directly across the secret interval, even on a held D-pad. */
+    if(level<0||level>=MX_NUM_LEVELS)level=0;
+    const int l=(level+(dir>0?1:MX_NUM_LEVELS-1))%MX_NUM_LEVELS;
+    if(!mx_ch4_available()||mx_ch4_unlocked(s)||l<MX_CH4_FIRST)return l;
+    if(mx_level_visible(s,MX_CH4_GATE)){
+        if(dir>0&&l<=MX_CH4_GATE)return MX_CH4_GATE;
+        if(dir<=0&&l>=MX_CH4_GATE)return MX_CH4_GATE;
     }
-    return 0;
+    return dir>0?0:MX_CH4_FIRST-1;
+}
+static inline int mx_menu_secret_part(const MxStats *s,int level){
+    return mx_ch4_unlocked(s)&&level>=MX_CH4_FIRST&&level<MX_NUM_LEVELS?
+        1+(level-MX_CH4_FIRST)/MX_TRIAL_DISTRICT_SIZE:0;
+}
+static inline int mx_menu_part_number(const MxStats *s,int level){
+    const int secret=mx_menu_secret_part(s,level);
+    return secret?secret:mx_menu_group_index(s,level);
+}
+static inline int mx_menu_part_count(const MxStats *s,int level){
+    return mx_menu_secret_part(s,level)?
+        (MX_NUM_LEVELS-MX_CH4_FIRST+MX_TRIAL_DISTRICT_SIZE-1)/MX_TRIAL_DISTRICT_SIZE:
+        mx_menu_regular_groups()+(mx_ch4_available()&&!mx_ch4_unlocked(s)&&mx_level_visible(s,MX_CH4_GATE)?1:0);
 }
 static inline int mx_menu_trial_summary(const MxStats *s,int level,int *stars,int *size){
     const int g=mx_menu_group_index(s,level);
@@ -40,12 +58,25 @@ static inline int mx_menu_trial_summary(const MxStats *s,int level,int *stars,in
     }
     if(stars)*stars=total;if(size)*size=n;return clear;
 }
-/* Resume only a visible unfinished trial, including the short last group. */
+/* Search only real visible ranges. Standard memchr may use word-sized
+   comparisons, and never reads private sectors or mutates the save. */
+static inline int mx_find_uncleared(const MxStats *s,int first,int end){
+    if(first>=end)return -1;
+    const uint8_t *p=(const uint8_t*)memchr(s->stars+first,0,(size_t)(end-first));
+    return p?(int)(p-s->stars):-1;
+}
 static inline int mx_trial_next_unfinished(const MxStats *s,int level){
     int first=mx_menu_group_first(s,mx_menu_group_index(s,level));
     if(first<MX_TRIAL_START)first=MX_TRIAL_START;
-    for(int i=first;i<MX_NUM_LEVELS;i++)if(mx_level_visible(s,i)&&!s->stars[i])return i;
-    for(int i=MX_TRIAL_START;i<first;i++)if(mx_level_visible(s,i)&&!s->stars[i])return i;
-    return -1;
+    if(!mx_ch4_available()||mx_ch4_unlocked(s)){
+        const int next=mx_find_uncleared(s,first,MX_NUM_LEVELS);
+        return next>=0?next:mx_find_uncleared(s,MX_TRIAL_START,first);
+    }
+    const int gate=mx_level_visible(s,MX_CH4_GATE)&&!s->stars[MX_CH4_GATE];
+    if(first==MX_CH4_GATE&&gate)return MX_CH4_GATE;
+    const int next=mx_find_uncleared(s,first,MX_CH4_FIRST);
+    if(next>=0)return next;
+    if(gate)return MX_CH4_GATE;
+    return mx_find_uncleared(s,MX_TRIAL_START,first<MX_CH4_FIRST?first:MX_CH4_FIRST);
 }
 #endif
