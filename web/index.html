@@ -162,11 +162,11 @@ function buildCelBackground(){
   bgA=mkCanvas(WW,WH);bgB=mkCanvas(WW,WH);
   const a=bgA.getContext('2d'),b=bgB.getContext('2d');
   // Painted color keys and layers, baked once per world/option change.
-  const night=typeof CL!=='undefined'&&CL&&CL.wolf;
+  const night=typeof level!=='undefined'&&level>=40&&level<60;
   const sky=a.createLinearGradient(0,0,0,GY);
   sky.addColorStop(0,night?'#242039':'#575477');sky.addColorStop(.42,night?'#56405e':'#a77e91');sky.addColorStop(.78,night?'#a56870':'#e9ac86');sky.addColorStop(1,night?'#d79b73':'#f7d8a1');a.fillStyle=sky;a.fillRect(0,0,WW,WH);
   const sunX=WW*.77,sunY=GY*.32;let g=a.createRadialGradient(sunX,sunY,5,sunX,sunY,185);
-  g.addColorStop(0,'#fff1c8');g.addColorStop(.1,'rgba(255,213,152,.95)');g.addColorStop(.5,'rgba(255,170,126,.25)');g.addColorStop(1,'rgba(255,170,126,0)');a.fillStyle=g;a.fillRect(0,0,WW,GY);
+  g.addColorStop(0,night?'#f5e6db':'#fff1c8');g.addColorStop(.1,night?'rgba(208,202,239,.85)':'rgba(255,213,152,.95)');g.addColorStop(.5,night?'rgba(142,134,203,.23)':'rgba(255,170,126,.25)');g.addColorStop(1,'rgba(255,170,126,0)');a.fillStyle=g;a.fillRect(0,0,WW,GY);
   // Wispy brush-shaped clouds, rather than repeating round silhouettes.
   for(let i=0;i<WW/38;i++){const x=hsh(i,81)%WW,y=12+hsh(i,82)%(Math.max(20,GY*.58)|0),w=35+hsh(i,83)%160;a.fillStyle=i%3?'rgba(255,221,177,.10)':'rgba(109,74,106,.10)';a.beginPath();a.moveTo(x-w,y+7);a.bezierCurveTo(x-w*.4,y-14,x+w*.32,y-12,x+w,y);a.quadraticCurveTo(x+w*.1,y+11,x-w,y+7);a.fill()}
   for(let layer=0;layer<2;layer++){const base=GY-32-layer*32;const gg=b.createLinearGradient(0,base-120,0,GY);gg.addColorStop(0,layer?'#82748b':'#aa8495');gg.addColorStop(1,layer?'#a98c91':'#e4b69b');b.fillStyle=gg;b.beginPath();b.moveTo(0,GY);for(let x=0;x<=WW+24;x+=24){b.lineTo(x,base-26-Math.sin(x*.009+layer*3)*28-Math.sin(x*.023)*12)}b.lineTo(WW,GY);b.fill()}
@@ -764,7 +764,9 @@ function load(l,custom){
     const d=Math.max(0,Math.min(2,phase|0)),layout=LEVELS[l-40+20*d];
     CL={...layout,name:LEVELS[l].name,relayPhase:d};
   }
-  setWorld(CL.cols||120);lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
+  const oldCols=COLS;
+  setWorld(CL.cols||120);if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE&&oldCols===COLS)buildBG();
+  lv.booms=lv.shots=lv.flops=lv.kills=0;grid=new Uint8Array(COLS*ROWS);hp=new Float32Array(COLS*ROWS);anch=new Uint8Array(COLS*ROWS);
   ox=new Float32Array(COLS*ROWS);oy=new Float32Array(COLS*ROWS);ovx=new Float32Array(COLS*ROWS);ovy=new Float32Array(COLS*ROWS);brk=new Uint8Array(COLS*ROWS);dmg.fill(0);wobOn=false;wobQuiet=0;sandOn=true;sandT=0;crackEv=0;
   /* The air valve and every tool begin unequipped for each new level;
      a previously saved AIR choice cannot obstruct the very next shot. */
@@ -1680,6 +1682,17 @@ function walkLandingSquash(m){
 function walkAirPitch(m){
   return m.stomp?0:.13*Math.max(-1,Math.min(1,(m.vy||0)/345));
 }
+// Pose-only acting derived from current movement; no timer, input or
+// hitbox changes. Reused scratch state means no new per-frame object.
+const CEL_WALK_ACT={face:'base',pitch:0,lead:12};
+function celWalkActing(m,step,turning){
+  const p=CEL_WALK_ACT;
+  const air=!m.gr,v=Math.max(-1,Math.min(1,(m.vy||0)/345));
+  p.face=air?(m.stomp?'scream':v<-.35?'smirk':v>.65?'scream':'base'):
+    m.pT>.065?'focus':m.landFx>.08?'bliss':Math.abs(step)>.2?'smirk':'base';
+  p.pitch=air?(m.stomp?10:Math.max(-7,Math.min(8,v*8))):Math.max(-3,Math.min(3,step*3));
+  p.lead=turning?12:12+step*3;return p;
+}
 function drawWalkMan(m){
   const turning=m.turn>0,sc=.36,step=walkStrideStep(m),hip=2.4*step,squash=walkLandingSquash(m);
   if(m.gr){
@@ -1698,6 +1711,10 @@ function drawWalkMan(m){
   const th=m.stomp&&!m.gr?Math.PI*.86:turning?walkTurnAngle(m.turn):Math.PI/2+.055*step;
   WALK_SPIN_POSE.th=th;WALK_SPIN_POSE.hip=hip;
   WALK_SPIN_POSE.psi=-3.7*step;WALK_SPIN_POSE.t=time;
+  if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE){
+    const pose=celWalkActing(m,step,turning);
+    WALK_SPIN_POSE.face=pose.face;WALK_SPIN_POSE.hp=pose.pitch;WALK_SPIN_POSE.ld=pose.lead;
+  }else{WALK_SPIN_POSE.face='';WALK_SPIN_POSE.hp=0;WALK_SPIN_POSE.ld=12;}
   JIG=null;drawSpin(th,WALK_SPIN_POSE);
   ctx.restore();
   // Keep the attack cue on the live hitbox even during a rear-facing turn.
@@ -1795,7 +1812,20 @@ function stretchBriefs(cy,rx,ry,f){if(f<.05||THONG)return;const k=Math.min(1,f*1
 // SPANDEX
 // FIGURE2
 // BELLYMERGE: the belly is part of the torso's single outline; this adds the underside shadow and the fold where it meets the lap
-function bellyVol(bx,by,rx,ry,f){if(f<.05)return;const k=Math.min(1,f),gr=ctx.createLinearGradient(0,by-ry,0,by+ry);
+function bellyVol(bx,by,rx,ry,f){if(f<.05)return;const k=Math.min(1,f);
+  if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE){
+    // Follow the current pressure geometry, with a broad weight-bearing
+    // shadow plane and a restrained highlight; never modify the simulation.
+    ctx.save();ctx.beginPath();ctx.ellipse(bx,by,Math.max(1,rx-.8),Math.max(1,ry-.8),0,0,7);ctx.clip();
+    ctx.fillStyle='rgba(135,68,83,'+(.27*k)+')';ctx.beginPath();ctx.moveTo(bx-rx,by+ry*.07);
+    ctx.bezierCurveTo(bx-rx*.4,by+ry*.63,bx+rx*.54,by+ry*.8,bx+rx,by-ry*.22);
+    ctx.lineTo(bx+rx,by+ry);ctx.lineTo(bx-rx,by+ry);ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(255,231,190,'+(.25*k)+')';ctx.beginPath();ctx.moveTo(bx-rx*.74,by-ry*.24);
+    ctx.bezierCurveTo(bx-rx*.55,by-ry*.79,bx+rx*.16,by-ry*.9,bx+rx*.36,by-ry*.62);
+    ctx.bezierCurveTo(bx-rx*.14,by-ry*.58,bx-rx*.48,by-ry*.39,bx-rx*.74,by-ry*.24);ctx.fill();
+    ctx.restore();return;
+  }
+  const gr=ctx.createLinearGradient(0,by-ry,0,by+ry);
   gr.addColorStop(.4,'rgba(176,92,52,0)');gr.addColorStop(1,'rgba(176,92,52,'+(.34*k)+')');ctx.save();ctx.fillStyle=gr;ctx.beginPath();ctx.ellipse(bx,by,Math.max(1,rx-.8),Math.max(1,ry-.8),0,0,6.3);ctx.fill();
   ctx.strokeStyle='rgba(176,92,52,'+(.5*k)+')';ctx.lineWidth=1.3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(bx-rx*.5,by+ry*.8);ctx.quadraticCurveTo(bx+rx*.15,by+ry*1.02,bx+rx*.85,by+ry*.5);ctx.stroke();ctx.restore()}
 // BGROW
@@ -2773,7 +2803,7 @@ function drawSide(t,fk){
   else blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});
   blob([pEll(25.5,-16,3,4)],{ow:1.3,sd:1,hl:0});
   sideHair(31,-17,11.2);wolfEarS(31,-17);
-  if(celCharacter()&&!WOLF&&!WOLFH)celProfileFeatures(31,-17,11.2,0,'flight');
+  if(celCharacter()&&!WOLF&&!WOLFH)celProfileFeatures(28.5,-17,11.2,0,'flight');
   else{ell(36.2,-20.5,4.3,4.9,'#fff',1.2);ell(37.8,-20.2,2.3,2.7,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(37,-21.4,.95,0,6.3);ctx.fill();ctx.fillStyle='rgba(255,105,110,.3)';ctx.beginPath();ctx.ellipse(35,-12,3.2,2,0,0,6.3);ctx.fill();ctx.strokeStyle=HAIR;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(32,-27);ctx.lineTo(40,-25.5);ctx.stroke();
   ell(42,-16,3.4,3,SKD,1.3);
   ell(38.5,-7,5,5.4,'#5a1010',1.3);ell(37,-4.8,3,2,'#ff6b8a');
@@ -3261,7 +3291,7 @@ const TOWEL_HAND=(()=>{const r=v=>Math.round(v*1000)/1000+0,H={};
 // =====================================================================
 const GRIN={w:5.4,d:4.9,y:10.6,lift:.6,teeth:1,tongue:1};
 const FACE3={
- base:{e:'open',br:[-7.8,-8.8],m:GRIN},cool:{e:'shade',br:null,m:GRIN},bliss:{e:'happy',br:[-7.8,-8.8],m:GRIN},
+ base:{e:'open',br:[-7.8,-8.8],m:GRIN},focus:{e:'open',br:[-8.9,-6.8],m:{w:4.8,d:1.8,y:11.3,lift:.3,teeth:1,tongue:0}},cool:{e:'shade',br:null,m:GRIN},bliss:{e:'happy',br:[-7.8,-8.8],m:GRIN},
  smirk:{e:'wink',br:[-7.4,-9.5],m:{w:5.2,d:3.2,y:11,lift:.6,teeth:1,tongue:1}},
  whiff:{e:'happy',br:[-9.6,-10.6],m:{w:3.6,d:1.1,y:12,lift:-1,teeth:0,tongue:0}},
  pick:{e:'cross',br:[-8.2,-6.6],m:{w:4.6,d:1.8,y:12,lift:-1.2,teeth:0,tongue:0}},
@@ -3496,7 +3526,7 @@ function drawSpin(th,o){
       for(const br of[0,1]){const f=fs+br*Math.PI,vt=vh(f);ctx.beginPath();                                          // the hair's two edges against the sky
         for(let j=0;j<=10;j++){const v=-.34+(vt+.34)*j/10,rr=Math.sqrt(Math.max(0,1-v*v)),px=oU+(br?-1:1)*rr*N,py=hcy+B*v;j?ctx.lineTo(px,py):ctx.moveTo(px,py)}ctx.stroke()}
             ctx.strokeStyle=HAIR;ctx.lineWidth=1.1;for(let k=0;k<4;k++){ctx.beginPath();let on=false;for(let q=0;q<=14;q++){const f=-1.9+q/14*3.0,v=-.62-.12*Math.sin(q/14*Math.PI)*1.4+k*.03,sq=Math.sqrt(Math.max(0,1-v*v));if(fac(f,v)>.0){const p=hp(f,v-.0);on?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]);on=true}else on=false}ctx.stroke()}   // the comb-over, wherever it faces us
-      ctx.fillStyle='rgba(255,255,255,.4)';ctx.beginPath();ctx.ellipse(oU-3,hcy-B*.86,4.4,1.9,-.2,0,6.2832);ctx.fill();
+      ctx.fillStyle=celCharacter()?'rgba(255,224,174,.34)':'rgba(255,255,255,.4)';ctx.beginPath();ctx.ellipse(oU-3,hcy-B*.86,4.4,1.9,-.2,0,6.2832);ctx.fill();
       if(0)dec([shell],0,-52,()=>{ctx.strokeStyle='rgba(25,12,4,.75)';ctx.lineWidth=1.3;ctx.beginPath();for(let a=0;a<9;a+=.4){const r=a*.55;a?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r*.8):ctx.moveTo(0,0)}ctx.stroke()},{back:1})});
     const tk=G3(0,-62.6,-1,5.6,5.2,5,U);                                                                                 // top knot
     if(o.quiff)add(31,()=>quiffDraw(oU+Sh*5,Math.max(.3,Math.abs(Ch)),pdv));else if(0)add(30,()=>{ell(tk.px,tk.py,tk.rx,5.2,HAIR,0);ctx.strokeStyle=OUT;ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(tk.px,tk.py,tk.rx,5.2,0,Math.PI,6.2832);ctx.stroke();
@@ -4060,7 +4090,15 @@ function drawCases(){for(const c of cases){ctx.save();ctx.translate(c.x,c.y);ctx
 //  DRAW
 // =====================================================================
 function txt(s,x,y,size,fill,align,stroke){ctx.font=`bold ${size}px "Trebuchet MS",Impact,sans-serif`;ctx.textAlign=align||'left';ctx.lineWidth=Math.max(3,size/6);ctx.strokeStyle=stroke||'#000';ctx.lineJoin='round';ctx.strokeText(s,x,y);ctx.fillStyle=fill;ctx.fillText(s,x,y)}
-function drawCloud(c){ctx.globalAlpha=.9;ctx.fillStyle='#fff';const r=34*c.s;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.arc(c.x+r*.9,c.y+6,r*.75,0,7);ctx.arc(c.x-r*.9,c.y+9,r*.65,0,7);ctx.arc(c.x+r*.2,c.y-r*.4,r*.7,0,7);ctx.fill();ctx.globalAlpha=1}
+function drawCloud(c){if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE){
+  const r=34*c.s;ctx.save();ctx.translate(c.x,c.y);
+  ctx.fillStyle='rgba(243,210,182,.62)';ctx.beginPath();ctx.moveTo(-r*1.7,5);
+  ctx.bezierCurveTo(-r*1.15,-r*.38,-r*.85,-r*.12,-r*.55,-r*.38);
+  ctx.bezierCurveTo(-r*.25,-r*.8,r*.37,-r*.68,r*.65,-r*.13);
+  ctx.quadraticCurveTo(r*1.25,-r*.26,r*1.7,6);
+  ctx.quadraticCurveTo(r*.3,r*.42,-r*1.7,5);ctx.fill();
+  ctx.fillStyle='rgba(126,91,120,.16)';ctx.beginPath();ctx.ellipse(r*.08,5,r*1.25,r*.16,0,0,7);ctx.fill();ctx.restore();return;
+}ctx.globalAlpha=.9;ctx.fillStyle='#fff';const r=34*c.s;ctx.beginPath();ctx.arc(c.x,c.y,r,0,7);ctx.arc(c.x+r*.9,c.y+6,r*.75,0,7);ctx.arc(c.x-r*.9,c.y+9,r*.65,0,7);ctx.arc(c.x+r*.2,c.y-r*.4,r*.7,0,7);ctx.fill();ctx.globalAlpha=1}
 // The band stays attached to the posts and returns from the release pose.
 const SLING_BAND_POINT={x:0,y:0};
 function slingBandPoint(m,back){
