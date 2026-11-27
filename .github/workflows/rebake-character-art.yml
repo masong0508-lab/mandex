@@ -99,7 +99,7 @@ jobs:
           python3 tools/ppm_to_png.py /tmp/mandex-turnaround.ppm
           test -s /tmp/mandex-turnaround.png
       - name: Publish reproducible generated atlas and review previews
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mandex-canonical-character-atlas-and-preview
           path: |

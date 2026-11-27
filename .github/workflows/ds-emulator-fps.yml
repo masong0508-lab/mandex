@@ -41,7 +41,7 @@ jobs:
               mv "out/$N-$MODE.tmp.nds" "out/$N-$MODE.nds"
             done
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-ds-fps-autoboot-roms
           path: out/*.nds
@@ -76,7 +76,7 @@ jobs:
             done
           done
           ls -lh captures/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: mandex-ds-emulator-fps-screenshots

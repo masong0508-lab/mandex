@@ -20,7 +20,7 @@ jobs:
       - run: python tools/gen_manspr.py web/index.html
       - name: How much changed
         run: git status --short && git diff --stat
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: man-sprites
           path: |

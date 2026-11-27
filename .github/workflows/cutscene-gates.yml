@@ -52,7 +52,7 @@ jobs:
           mkdir -p out
           gcc -std=gnu99 -O2 -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source test/cutscene_profile.c ds/source/gfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/mandex_cutscene_profile
           /tmp/mandex_cutscene_profile | tee out/cutscene-perf-host.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-cutscene-host-profiler
           path: out/cutscene-perf-host.txt
@@ -69,7 +69,7 @@ jobs:
           /tmp/mandex_intro_shot out/cutscene-storyboards/05_chapter_one_victory.ppm 2 1 46 148 270
           /tmp/mandex_intro_shot out/cutscene-storyboards/06_chapter_two_victory.ppm 3 2 46 155 290
           python3 tools/ppm_to_png.py out/cutscene-storyboards/*.ppm
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-cutscene-storyboards
           path: out/cutscene-storyboards/*.png
