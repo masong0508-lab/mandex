@@ -18,6 +18,24 @@ HTML = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(os.pa
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_H = os.path.join(HERE, "..", "art", "manspr.h")
 OUT_PNG = os.path.join(HERE, "..", "docs", "man_sprites.png")
+# Optional alternate-art export never overwrites the shipped Classic atlas.
+CEL_PREVIEW_DIR = os.environ.get("MX_CEL_PREVIEW_DIR")
+if CEL_PREVIEW_DIR:
+    CEL_PREVIEW_DIR = os.path.abspath(CEL_PREVIEW_DIR)
+    os.makedirs(CEL_PREVIEW_DIR, exist_ok=True)
+    OUT_H = os.path.join(CEL_PREVIEW_DIR, "manspr-cel-preview.h")
+    OUT_PNG = os.path.join(CEL_PREVIEW_DIR, "man-sprites-cel-preview.png")
+
+def activate_cel_preview(page):
+    if not CEL_PREVIEW_DIR:
+        return
+    # This isolated offline browser has no player save. Unlock only its
+    # local fixture, then use the normal production art refresh path.
+    page.evaluate("""() => {
+        for(let i=0;i<CH1;i++)PD.stars[i]=1;
+        OPT().artStyle='golden-cels';refreshArt();
+        if(!CEL_ACTIVE)throw Error('Golden Cels preview not active');
+    }""")
 SS = 4                      # supersample
 NCOL = 30                   # palette entries for the man (shared by every pose)
 OUTLINE = (84, 44, 26)      # 1 px rim
@@ -370,6 +388,7 @@ def main():
         pg.on("pageerror", lambda e: errs.append(str(e)))
         pg.goto("file://" + HTML)
         pg.wait_for_timeout(300)
+        activate_cel_preview(pg)
         has_api = pg.evaluate("typeof drawManFrame === 'function' && typeof MAN_FRAMES === 'object'")
         meta = pg.evaluate("MAN_FRAMES") if has_api else {}
         # the towel is a real cloth the consoles simulate at runtime, so the sprites are drawn WITHOUT it; the HTML says where the hand is
