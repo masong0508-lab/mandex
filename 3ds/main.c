@@ -115,6 +115,7 @@ static unsigned char man_pal[MS_NPAL][3];              /* the man's palette, re-
 #endif
 static u32 man_tone[3][MS_NPAL];   /* regular, warm-facing edge, cool trailing edge */
 static int man_tone_ready; /* standalone sprite host tools may draw before game init */
+static int cel_active;
 /* This cache is initialized before the later software rasterizer's RGB macro
    is declared. Keep the packer local and byte-order-identical. */
 static inline u32 man_rgb(int r,int g,int b){
@@ -136,6 +137,8 @@ static void apply_outfit(int o){
   memcpy(man_pal, MS_PAL, sizeof man_pal);
   for(int k = 0; k < 6; k++) for(int c = 0; c < 3; c++) man_pal[idx[k]][c] = sh[k][c];
   for(int k = 0; k < 4; k++) for(int c = 0; c < 3; c++) man_pal[1 + k][c] = sk[k][c];
+  cel_active=mx_art_active(&stats,&console_opt);
+  if(cel_active)for(int k=0;k<MS_NPAL;k++)mx_art_color(man_pal[k]);
   man_tone_prepare(); /* update the exact worn outfit's highlights once, not every frame */
 }
 static int outfit_sel, toast_id = -1, toast_q[6], toast_nq, toast_t;
@@ -701,7 +704,8 @@ static void draw_sky(const View *v){
   int night=world.level>=MX_CH3_START;
   snowcap_prepare();
   for(int y = 0; y < gy; y += 2){ float t = (float)y / (gy > 1 ? gy : 1), r, g, b;           /* #3d8fe8 -> #8ccaf7 -> #ffeccb: the web's warm horizon */
-    if(night){r=11+30*t;g=16+28*t;b=41+42*t;}
+    if(cel_active){r=night?35+125*t:87+159*t;g=night?28+79*t:84+130*t;b=night?57+53*t:119+42*t;}
+    else if(night){r=11+30*t;g=16+28*t;b=41+42*t;}
     else if(t<.55f){float u=t/.55f;r=61+(140-61)*u;g=143+(202-143)*u;b=232+(247-232)*u;}
     else{float u=(t-.55f)/.45f;r=140+(255-140)*u;g=202+(236-202)*u;b=247+(203-247)*u;}
     rect(s,0,y,s->w,2,RGB((int)r,(int)g,(int)b)); }
@@ -795,7 +799,9 @@ static void tile_build(int p){
         float wx = (xx + 1 < x1 ? xx + 1 : x1) - (xx > x0 ? xx : x0), wy = (yy + 1 < y1 ? yy + 1 : y1) - (yy > y0 ? yy : y0), w = wx * wy, *q = T[yy * 8 + xx];
         sr += q[0] * q[3] * w; sg += q[1] * q[3] * w; sb += q[2] * q[3] * w; sa += q[3] * w; sw += w; }
       float al = sa / sw, r = sa > 0 ? sr / sa : 0, g2 = sa > 0 ? sg / sa : 0, b2 = sa > 0 ? sb / sa : 0;
-      tcol[slot][m][v][d][j * 8 + i] = RGB((int)r, (int)g2, (int)b2); talp[slot][m][v][d][j * 8 + i] = (u8)(al * 255 + .5f); }
+      uint8_t ink[3]={(uint8_t)r,(uint8_t)g2,(uint8_t)b2};
+      if(cel_active)mx_art_color(ink);
+      tcol[slot][m][v][d][j * 8 + i] = RGB(ink[0],ink[1],ink[2]); talp[slot][m][v][d][j * 8 + i] = (u8)(al * 255 + .5f); }
   }
   tile_ready |= 1u << slot;
 }
@@ -1530,8 +1536,11 @@ static void load_level(int l){
   dragging = 0; pad_used = 0; pad_dx = pad_dy = 0; new_best = 0;
 }
 static void opt_change(int dir){
+  opt_menu.art_available=mx_art_unlocked(&stats);
+  int old_art=console_opt.art_style;
   int action=mx_opt_activate(&console_opt,&opt_menu,dir,app==ST_TITLE);
-  if(action==MX_O_ERASE){mx_meta_init(&stats);outfit_sel=0;outfit_seen=1;toast_nq=0;toast_t=0;toast_id=-1;sel=0;apply_outfit(0);outfit_scan(1);load_level(0);}
+  if(action==MX_O_ERASE){mx_meta_init(&stats);console_opt.art_style=0;outfit_sel=0;outfit_seen=1;toast_nq=0;toast_t=0;toast_id=-1;sel=0;apply_outfit(0);outfit_scan(1);load_level(0);}
+  if(old_art!=console_opt.art_style){apply_outfit(outfit_sel);tile_ready=0;}
   nofight=console_opt.nofight;mus_pref=!console_opt.music_off;
   mx_set_fight(&world,!nofight);mx_set_collapse(&world,console_opt.collapse);
   if(action==MX_O_SAVE_NOW||action==MX_O_ERASE)n3_save_sync();
@@ -1550,9 +1559,10 @@ static void options_input(u32 down,int x,int y){
   else if(down&KEY_RIGHT)opt_change(1);
 }
 static void draw_options(void){
+  opt_menu.art_available=mx_art_unlocked(&stats);
   rect(&bot,0,0,320,240,RGB(15,18,30));textc(&bot,160,4,"MANDEX OPTIONS",1,RGB(255,210,63));
   for(int i=0;i<4;i++){rect(&bot,i*80+2,18,76,20,i==opt_menu.page?RGB(65,85,130):RGB(28,34,54));textc(&bot,i*80+40,24,mx_opt_tabs[i],1,RGB(255,230,160));}
-  for(int i=0;i<mx_opt_rows(&opt_menu);i++){int id=mx_opt_id(&opt_menu,i),y=42+i*39;u32 c=i==opt_menu.row?RGB(255,210,63):RGB(165,184,213);rect(&bot,4,y,312,36,RGB(29,37,60));rect(&bot,4,y,312,1,c);text(&bot,9,y+5,mx_opt_names[id],1,c);textc(&bot,265,y+5,mx_opt_value(&console_opt,&opt_menu,id,app==ST_TITLE),1,RGB(255,255,255));text(&bot,9,y+20,mx_opt_desc[id],1,RGB(182,197,218));}
+  for(int i=0;i<mx_opt_rows(&opt_menu);i++){int id=mx_opt_id(&opt_menu,i),y=42+i*39;u32 c=i==opt_menu.row?RGB(255,210,63):RGB(165,184,213);rect(&bot,4,y,312,36,RGB(29,37,60));rect(&bot,4,y,312,1,c);text(&bot,9,y+5,mx_opt_names[id],1,c);textc(&bot,265,y+5,mx_opt_value(&console_opt,&opt_menu,id,app==ST_TITLE),1,RGB(255,255,255));text(&bot,9,y+20,id==MX_O_ART&&opt_menu.art_available?"CEL PAINT / ORIGINAL LOOK":mx_opt_desc[id],1,RGB(182,197,218));}
   if(opt_menu.page==MX_OPT_PERF)textc(&bot,160,200,console_opt.profile==3?"FLAT TOP SCREEN / ECO FX":"SLIDER STEREO / PROFILE FX",1,RGB(125,255,90));
 #if defined(__3DS__) && !MX_N3DS_NO_SAVE
   if(opt_menu.page==MX_OPT_DATA)textc(&bot,160,170,n3_save_status<0?"SD WRITE FAILED":n3_save_status?"SD SAVE OK":"NO SAVE CONFIRMED",1,RGB(125,255,90));
