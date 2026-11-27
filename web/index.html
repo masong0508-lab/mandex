@@ -1124,13 +1124,17 @@ function targetOffset(t){if(!wobOn)return[0,0];const gx=Math.floor(t.x/V);let gy
 // only when a custom level changes grid dimensions (120 / 360 columns).
 const SUPPORT_QUEUE=[],SUPPORT_STACK=[];
 let supportVis=new Uint8Array(0);
+function supportBorder(x,y){return (x===COLS-1?1:0)|(x===0?2:0)|(y===ROWS-1?4:0)|(y===0?8:0)}
 function supportPass(){
   needSupport=false;hb.fill(255);
   const q=SUPPORT_QUEUE;q.length=0;
-  for(let x=0;x<COLS;x++){const i=idx(x,ROWS-1);if(grid[i]){hb[i]=0;q.push(i)}}
+  const off=[1,-1,COLS,-COLS];
+  const ground=(ROWS-1)*COLS;
+  for(let i=ground;i<grid.length;i++)if(grid[i]){hb[i]=0;q.push(i)}
   for(let qi=0;qi<q.length;qi++){const i=q[qi],x=i%COLS,y=(i/COLS)|0,h=hb[i];
-    for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(!inb(nx,ny)||((brk[i]>>d)&1))continue;const j=idx(nx,ny),m=grid[j];if(!m)continue;
-      const nh=DY[d]===-1?0:h+1;if(nh<hb[j]&&nh<=MAT[m].lim+(anch[j]?8:0)){hb[j]=nh;q.push(j)}}}
+    const blocked=supportBorder(x,y)|brk[i];
+    for(let d=0;d<4;d++){if(blocked&(1<<d))continue;const j=i+off[d],m=grid[j];if(!m)continue;
+      const nh=d===3?0:h+1;if(nh<hb[j]&&nh<=MAT[m].lim+(anch[j]?8:0)){hb[j]=nh;q.push(j)}}}
   if(supportVis.length!==grid.length)supportVis=new Uint8Array(grid.length);
   else supportVis.fill(0);
   const vis=supportVis;
@@ -1142,7 +1146,8 @@ function supportPass(){
       // Keep the remainder in the world until the next support pass.
       if(comp.length<512)comp.push({x,y,m:grid[a],h:hp[a],px:(x+.5+ox[a])*V,py:(y+.5+oy[a])*V,vx:ovx[a]*V,vy:ovy[a]*V});
       else oversized=true;
-      for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(!inb(nx,ny))continue;const j=idx(nx,ny);if(grid[j]&&grid[j]!==SAND&&hb[j]===255&&!vis[j]&&!((brk[a]>>d)&1)){vis[j]=1;st.push(j)}}}
+      const blocked=supportBorder(x,y)|brk[a];
+      for(let d=0;d<4;d++){if(blocked&(1<<d))continue;const j=a+off[d];if(grid[j]&&grid[j]!==SAND&&hb[j]===255&&!vis[j]){vis[j]=1;st.push(j)}}}
     for(const c of comp){const k=idx(c.x,c.y);grid[k]=0;hp[k]=0;anch[k]=0;paperHit(c.x,c.y);wobZero(k);clearLinks(k)}
     paperDirty=true;newChunk(comp);
     if(oversized)needSupport=true; // detach remaining unsupported cells next pass
