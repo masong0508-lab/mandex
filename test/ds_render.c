@@ -998,8 +998,20 @@ static int chunk_visibility_probe(void){
       a->m=(uint8_t)(1+(k+c)%(MX_NMAT-1));
       a->h=RI(MAXHP[a->m]*(k%4+1)/4); /* pristine, chipped and cracked */
       a->dead=(uint8_t)(k%19==0);
+      if(a->m==MX_TNT)a->fuse=(uint8_t)(k&1?8:24);
     }
   }
+  /* Explicitly place an armed tile just below the bottom edge: its
+     white spark is visible even though no tile pixel is on-screen. */
+  MxCell *spark=&world.chunks[0].cells[0];
+  spark->dead=0;spark->m=MX_TNT;spark->fuse=8;spark->h=RI(MAXHP[MX_TNT]);
+  spark->wx=world.chunks[0].x;spark->wy=world.chunks[0].y;
+  View edge={buf_top,4,40*4-100,25*4-196};
+  int saved_count=world.chunks[0].count;
+  world.chunks[0].count=1;world.chunks[1].active=world.chunks[2].active=0;
+  memset(buf_top,0,sizeof buf_top);draw_chunks(&edge);
+  if(buf_top[191*256+100]!=C_WHITE){fputs("FAIL: fuse spark below DS viewport vanished\n",stderr);return 1;}
+  world.chunks[0].count=saved_count;world.chunks[1].active=world.chunks[2].active=1;
   /* Vary the world-camera separation and zoom without moving a single cell:
      this catches partial chunks, isolated edge pixels, and entirely
      invisible chunks (where the optimized path saves the most work). */
