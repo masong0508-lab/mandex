@@ -6,13 +6,14 @@ function expansionRegression(html,assert,section){
    const create=new Function(`
      const ROWS=60,EMIN=28,COLS=120;const E={g:new Uint8Array(7200),t:[],men:5,undo:[],redo:[],starters:true,id:1,name:'Original'};
      const toast=()=>{},buttons=[],panel=()=>{},txt=()=>{},btn=(x,y,w,h,n,fn)=>buttons.push({x,y,w,h,n,fn});
+     let starterPage=0;
      ${cut('function encodeCells(','function encodeSharedLevel(')}
      ${cut('function eState(){','function eCell(')}
      return {E,buttons,patterns:E_STARTERS,pattern:eStarterPattern,apply:eApplyStarter,undo:eUndo,draw:drawStarterMenu,validate:validateSharedLevel};
    `)();
-   assert(create.patterns.length===6,'six starter structures');
+   assert(create.patterns.length===18,'eighteen starter structures');
    const seen=new Set();
-   for(let kind=0;kind<6;kind++){
+   for(let kind=0;kind<create.patterns.length;kind++){
      const a=create.pattern(kind),b=create.pattern(kind);
      assert(JSON.stringify(a.level)===JSON.stringify(b.level),'deterministic starter');
      assert(JSON.stringify(a.level)===JSON.stringify(create.validate(a.level)),'shareable starter');
@@ -23,12 +24,35 @@ function expansionRegression(html,assert,section){
          assert(row===60||a.grid[row*120+cx]>0,'new starter landlord has floor');
        }
        assert(a.grid.slice(59*120).some(x=>x!==0),'new starter grounded foundation');
+       if(kind>=6){
+         const lim=[0,6,9,14,2,2,16,8,8],span=new Uint8Array(7200);span.fill(255);
+         const q=[];for(let x=0;x<120;x++){const i=59*120+x;if(a.grid[i]){span[i]=0;q.push(i)}}
+         for(let k=0;k<q.length;k++){const i=q[k],x=i%120,y=i/120|0;
+           for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+             if(x+dx<0||x+dx>=120||y+dy<0||y+dy>=60)continue;
+             const j=i+dx+dy*120,m=a.grid[j],n=dy===-1?0:span[i]+1;
+             if(m&&n<span[j]&&n<=lim[m]){span[j]=n;q.push(j)}
+           }
+         }
+         for(let i=0;i<7200;i++)assert(!a.grid[i]||span[i]!==255,'unsupported cell in new starter '+kind+' at '+i);
+       }
      }
      create.apply(kind);assert(create.E.id===-1,'new design cannot overwrite old project');create.undo();assert(create.E.id===1,'undo restores project identity');
    }
-   assert(seen.size===6,'six distinct structures');create.draw(0,0,416);
-   assert(create.buttons.length===7,'all six designs plus cancel accessible');
-   for(const b of create.buttons)assert(b.x>=0&&b.x+b.w<=416&&b.y+b.h<=256,'desktop starter buttons fit');
+   assert(seen.size===18,'eighteen distinct structures');
+   const all=new Set();
+   for(let p=0;p<3;p++){
+     create.buttons.length=0;create.draw(0,0,416);
+     for(const b of create.buttons){
+       assert(b.x>=0&&b.x+b.w<=416&&b.y+b.h<=290,'desktop starter buttons fit');
+       if(create.patterns.includes(b.n))all.add(b.n);
+     }
+     const next=create.buttons.find(b=>b.n==='NEXT >');assert(next,'next starter page exists');next.fn();
+   }
+   assert(all.size===18,'all 18 designs reachable in desktop picker');
+   create.buttons.length=0;create.draw(0,0,516,216);
+   for(const b of create.buttons)assert(b.x>=0&&b.x+b.w<=516&&b.y+b.h<=216,'portrait starter picker fits minimum height');
+   assert(create.buttons.filter(b=>create.patterns.includes(b.n)).length===6,'portrait shows six choices per page');
  }
  if(!section||section==='particles'){
    const run=new Function(`
