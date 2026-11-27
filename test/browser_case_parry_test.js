@@ -162,6 +162,20 @@ for(const dive of [false,true]){
   impact();
   check(hits.length===(dive?113:81),'quake stays single-use');
 }
+// Exercise the production Beans flight activation.
+const diveCode=section('function dive(){','//  TARGETS: grumpy landlords');
+for(const face of [-1,1]){
+  for(const falling of [false,true]){
+    const m={mode:'fly',pwr:'beans',face,x:320,y:200,vx:falling?face*40:0,vy:falling?400:0};
+    const messages=[],env={man:m,shake:0,SFX:{fart(){},pop(){}},P(){},ring(){},rnd:()=>.5,popText:(x,y,t)=>messages.push(t)};
+    const activate=new Function('e','with(e){'+diveCode+'\nreturn dive;}')(env);
+    activate();
+    check(m.vx===face*(falling?360:320)&&m.vy===(falling?40:-360),'beans recovery impulse');
+    check(m.beaned&&!m.dive&&messages.includes('RECOVERY JET!'),'beans recovery feedback');
+    activate();
+    check(m.dive&&messages.length===1,'second activation dives, no repeat jet');
+  }
+}
 const parseStart=html.indexOf('<script>'),parseEnd=html.indexOf('</script>',parseStart);
 new Function(html.slice(parseStart+8,parseEnd));
 console.log('BROWSER_CASE_PARRY_PASS checks='+checks+
