@@ -1,0 +1,7 @@
+# Mandex development and integration procedure
+
+- Always inspect and start from the latest `main`; preserve the existing integrated campaign, art, save compatibility and platform features. Do not start a new development pass from an older feature branch.
+- Review all open pull requests at the start of each development pass. Integrate ready, non-conflicting pull requests with successful relevant CI on their latest head, in sequence. Refresh stale branches against current main and retest before integrating if there are overlapping or incompatible changes. Do not merge red, pending, incomplete, or superseded work just because an older CI run passed.
+- Use a short-lived branch when needed to verify feature or risky changes; merge it into main as soon as the relevant tests and builds pass. Do not leave completed green work stranded indefinitely. Direct main commits are appropriate for narrowly verified, low-risk maintenance or an explicit fix to an existing broken main, but check resulting CI and immediately investigate failures.
+- Check the exact current head, host tests, browser regressions, DS/3DS/Dreamcast builds and ROM workflow when relevant; never infer full test success from a package existing. Do not weaken tests or bypass failing checks to force a merge.
+- After integration, verify main's head and build status; make every subsequent pass build on that integrated revision. Report any pending verification, conflicts, or failures accurately and provide updated ROM artifacts only when verified available.
