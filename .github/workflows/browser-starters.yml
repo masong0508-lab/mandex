@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Three distinct valid level blueprints and bounded undo/redo
         run: node test/browser_creator_starters_test.js
       - name: Share codes and preflight remain backwards-compatible

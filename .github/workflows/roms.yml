@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify campaign geometry, walking and legacy saves before packaging
         shell: bash
         run: |
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -77,7 +77,7 @@ jobs:
           N3DS_CEL_PROBE=1 /tmp/n3d_cel
           gcc -std=gnu99 -O1 -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source /tmp/dc_gfx.o /tmp/dc_intro.o core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c test/dc_render.c -lm -o /tmp/dc_cel
           DC_OUTFIT_RECOLOR_PROBE=1 /tmp/dc_cel
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-native-cel-runtime
           path: |
@@ -91,7 +91,7 @@ jobs:
     timeout-minutes: 20
     container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with: { name: mandex-native-cel-runtime, path: art }
       - run: test -s art/manspr_cel.h && make -C ds
@@ -112,7 +112,7 @@ jobs:
               print(n, "ARM9 @0x4000:", d[0x4000:0x4008].hex(), " @0x4800 (entry):", d[0x4800:0x4810].hex())
           PY
           ndstool -i out/mandex.nds | grep -iE "unit|ARM9 (offset|entry|RAM|code)|ARM7 (offset|entry|RAM|code)|Logo CRC|Header CRC"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: rom-nds
           path: out/*.nds
@@ -124,7 +124,7 @@ jobs:
     timeout-minutes: 30
     container: kazade/dreamcast-sdk:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with: { name: mandex-native-cel-runtime, path: art }
       - name: Validate both character atlases before Dreamcast ROM build
@@ -150,7 +150,7 @@ jobs:
           # -N: no data track padding (the default pads the .cdi out to ~740 MB just to optimise loading speed; the game is ~5 MB)
           mkdcdisc -N -e mandex.elf -o mandex.cdi -n MANDEX 2>&1 | tail -20
           ls -la mandex.elf mandex.cdi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: rom-dreamcast
           path: |
@@ -163,7 +163,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify boot capture and readiness rejection cases
         run: python3 test/ds_smoke_test.py
       - uses: actions/download-artifact@v8
@@ -178,7 +178,7 @@ jobs:
           export LIBGL_ALWAYS_SOFTWARE=1
           timeout 90s xvfb-run -a -s "-screen 0 1024x768x24" \
             python3 tools/run_ds_smoke.py --rom mandex.nds --out-dir ds-smoke
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: smoke-ds-shots
@@ -189,7 +189,7 @@ jobs:
     needs: [ds, dreamcast, n3ds, smoke-ds, gameplay-gates]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate latest canonical head-turn sprites and all 71 Wolfman atlas frames
         run: |
           set -eu
@@ -215,9 +215,9 @@ jobs:
           sha256sum -c SHA256SUMS
           zip -9 ../mandex-roms.zip "${files[@]}" SHA256SUMS
           unzip -tq ../mandex-roms.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: mandex-roms, path: mandex-roms.zip, if-no-files-found: error }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: mandex-web, path: pack/mandex.html, if-no-files-found: error }
 
   n3ds:
@@ -226,7 +226,7 @@ jobs:
     timeout-minutes: 20
     container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with: { name: mandex-native-cel-runtime, path: art }
       - name: Build the 3DS homebrew (libctru, software rendering)
@@ -237,7 +237,7 @@ jobs:
           test -s art/manspr_cel.h
           make -C 3ds
           mkdir -p out3ds && cp 3ds/mandex.3dsx 3ds/mandex.elf out3ds/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-3ds
           path: out3ds/*

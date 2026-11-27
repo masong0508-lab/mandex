@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check the browser game JavaScript parses
         run: |
           python3 - <<'PY'
@@ -73,7 +73,7 @@ jobs:
           print(f'ALL 60 LEVELS: sampled screen hashes equal; mean per-level host-time sum old={old:.1f}us new={new:.1f}us; median per-level delta={med:+.2f}%')
           print('HOST x86 CPU TIME ONLY: NOT DS HARDWARE FPS. Alternating repeated trials are needed before claiming a speedup.')
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ds-aim-all-levels-host-parity
           path: out/fastpath-profiles/ds-aim-host-ab.txt

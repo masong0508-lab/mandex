@@ -15,7 +15,7 @@ jobs:
   alley:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Fixed and float street cells and stability
         run: |
           for mode in float fixed; do

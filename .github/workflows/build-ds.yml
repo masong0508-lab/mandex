@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 20
     container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain
         run: |
           echo "DEVKITPRO=$DEVKITPRO DEVKITARM=$DEVKITARM"
@@ -31,7 +31,7 @@ jobs:
           ls $DEVKITPRO/calico/share
       - name: Build mandex.nds
         run: make -C ds
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-nds
           path: ds/mandex.nds

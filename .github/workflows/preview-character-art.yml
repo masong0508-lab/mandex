@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -86,7 +86,7 @@ jobs:
         # Preserve generated sprites for visual diagnosis even if a validation
         # assertion fails after both bakers have successfully produced art.
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mandex-pr-character-sprite-review
           path: |
@@ -105,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -152,7 +152,7 @@ jobs:
           git diff --exit-code -- art/manspr.h art/dcart.h docs/man_sprites.png docs/dc_art_sheet.png
       - name: Upload alternate native artwork for review
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mandex-golden-cels-native-preview
           path: ${{ runner.temp }}/mandex-cel-art
