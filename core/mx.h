@@ -63,7 +63,7 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
 #define MX_TRIAL_START   60
-#define MX_TRIAL_COUNT   1039
+#define MX_TRIAL_COUNT   1050
 #define MX_TRIAL_DISTRICTS ((MX_TRIAL_COUNT+MX_TRIAL_DISTRICT_SIZE-1)/MX_TRIAL_DISTRICT_SIZE)
 #define MX_TRIAL_DISTRICT_SIZE 20
 #define MX_NUM_LEVELS    (MX_TRIAL_START + MX_TRIAL_COUNT)
@@ -338,7 +338,8 @@ typedef struct {
   real combo_left;
   real bank_left;               /* 2 seconds after a rubber rebound to earn one +1500 BANK SHOT */
   int bank_contact;              /* transient: only actual flying-man collisions earn the bonus */
-  int district;                  /* Landlord HQ (level 39) is three 120-cell districts played one after another; 0..2 (always 0 on other levels) */
+  int district;                  /* active sector of a streamed multi-stage mission */
+  int summit_reached;            /* transient on-foot summit visit, never serialized */
   real time, shake, slow, banner, flash, waitT, winT, loseT;
   int freeze, need_support, support_cd, substeps, nhouses;
   int wob_budget, wob_shift;                   /* wobble cost cap: max cells walked per step (0 = unlimited); wob_shift = how much the 'cold' limits are scaled up (0..6) to stay under it */
@@ -428,13 +429,21 @@ static inline int mx_tube_pulse_stage(const MxTube *t){
 /* Preserve original three-stage circuits; the final 19 new circuits have six sectors. */
 #define MX_RELAY_END 660
 #define MX_GRAND_RELAY_START 1080
-static inline int mx_level_stage_count(int l){return l>=MX_GRAND_RELAY_START&&l<MX_NUM_LEVELS?6:l==MX_HQ_LEVEL||(l>=MX_RELAY_START&&l<MX_RELAY_END)?3:1;}
+#define MX_GRAND_RELAY_END 1099
+#define MX_MOUNTAIN_START 1099
+#define MX_MOUNTAIN_LEVEL 1109
+#define MX_MOUNTAIN_STAGES 11
+static inline int mx_level_stage_count(int l){return l==MX_MOUNTAIN_LEVEL?MX_MOUNTAIN_STAGES:l>=MX_GRAND_RELAY_START&&l<MX_GRAND_RELAY_END?6:l==MX_HQ_LEVEL||(l>=MX_RELAY_START&&l<MX_RELAY_END)?3:1;}
 static inline int mx_stage_source(int l,int d){
-  if(l>=MX_GRAND_RELAY_START&&l<MX_NUM_LEVELS)return l-100+20*(d<0?0:d>5?5:d);
+  if(l==MX_MOUNTAIN_LEVEL)return MX_MOUNTAIN_START+(d<0?0:d>=MX_MOUNTAIN_STAGES?MX_MOUNTAIN_STAGES-1:d);
+  if(l>=MX_GRAND_RELAY_START&&l<MX_GRAND_RELAY_END)return l-100+20*(d<0?0:d>5?5:d);
   if(l>=MX_RELAY_START&&l<MX_RELAY_END)return l-40+20*(d<0?0:d>2?2:d);
   return l;
 }
 static inline int mx_stage_bonus(int l){return l>=MX_RELAY_START?MX_RELAY_BONUS_MEN:MX_HQ_BONUS_MEN;}
+static inline int mx_summit_needed(const MxWorld *w){return w->level==MX_MOUNTAIN_LEVEL&&w->district==MX_MOUNTAIN_STAGES-1&&!w->summit_reached;}
+static inline void mx_summit_visit(MxWorld *w){if(mx_summit_needed(w)&&w->man.mode==MAN_WALK&&w->man.x>=RI(96)&&w->man.x<=RI(113)&&w->man.y<=RI(9))w->summit_reached=1;}
+static inline int mx_mountain_altitude(const MxWorld *w){return w->level==MX_MOUNTAIN_LEVEL?200*(w->district+1):w->level>=MX_MOUNTAIN_START?200*(w->level-MX_MOUNTAIN_START+1):0;}
 const char *mx_stage_tactic(const MxWorld *w);
 void mx_load(MxWorld *w, int level);
 void mx_update(MxWorld *w, real dt);          /* dt ~ 1/60 s */

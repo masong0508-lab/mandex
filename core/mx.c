@@ -3154,7 +3154,8 @@ void mx_update(MxWorld *w, real dt){
   man_pose(m, dt);
 
   if(w->state == MX_PLAY){
-    if(mx_targets_alive(w) == 0){
+    mx_summit_visit(w);
+    if(mx_targets_alive(w) == 0 && !mx_summit_needed(w)){
       w->winT += dt;
       if(w->winT > R(1.6) && w->district + 1 < mx_level_stage_count(w->level)){ hq_next_district(w); return; }
       if(w->winT > R(1.6)){ w->state = MX_WIN; w->score += w->men * 3000; ev(w, EV_WIN, 0, 0, 0, 0, 0); }
