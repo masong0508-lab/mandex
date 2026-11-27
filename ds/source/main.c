@@ -1610,14 +1610,34 @@ static void save_sync(void){
   if(n <= 0 || (n == saved_n && memcmp(b, saved_blob, n) == 0)) return;
   if(card_save_write(b, n)){ memcpy(saved_blob, b, n); saved_n = n; } else save_off = 1;
 }
+static u16 cel_classic_pal[199];static int cel_pal_ready,cel_pal_active;
+static void apply_art_palette(int active){
+  if(!cel_pal_ready){memcpy(cel_classic_pal,gfx_pal,sizeof cel_classic_pal);cel_pal_ready=1;}
+  if(active==cel_pal_active)return;
+  cel_pal_active=active;
+  for(int i=1;i<199;i++){
+    u16 c=cel_classic_pal[i];
+    if(active){
+      uint8_t rgb[3]={(uint8_t)((c&31)*255/31),(uint8_t)(((c>>5)&31)*255/31),(uint8_t)(((c>>10)&31)*255/31)};
+      mx_art_color(rgb);
+      if(i>=C_SKY0&&i<C_SKY0+16){int k=i-C_SKY0;rgb[0]=87+k*10;rgb[1]=84+k*8;rgb[2]=119+k*3;}
+      c=RGB15(rgb[0]>>3,rgb[1]>>3,rgb[2]>>3);
+    }
+    gfx_pal[i]=c;BG_PALETTE[i]=c;
+    if(app!=ST_TITLE||i<64)BG_PALETTE_SUB[i]=c;
+  }
+}
 static void apply_outfit(int o){
+  int cel=mx_art_active(&stats,&opt);apply_art_palette(cel);
   uint8_t sh[6][3]; mx_outfit_shades(o, sh);
+  if(cel)for(int k=0;k<6;k++)mx_art_color(sh[k]);
   static const int idx[6] = { 5, 6, 7, 13, 14, 15 };
   for(int k = 0; k < 6; k++){
     u16 c = RGB15(sh[k][0] >> 3, sh[k][1] >> 3, sh[k][2] >> 3);
     gfx_pal[C_MAN0 + idx[k]] = c; BG_PALETTE[C_MAN0 + idx[k]] = c; BG_PALETTE_SUB[C_MAN0 + idx[k]] = c;
   }
   { uint8_t sk[4][3]; extern int gfx_man_fur; gfx_man_fur = mx_outfit_skin(o, sk);                                   /* the Wolfman's skin is grey fur */
+    if(cel)for(int k=0;k<4;k++)mx_art_color(sk[k]);
     for(int k = 0; k < 4; k++){ u16 c = RGB15(sk[k][0] >> 3, sk[k][1] >> 3, sk[k][2] >> 3); gfx_pal[C_MAN0 + 1 + k] = c; BG_PALETTE[C_MAN0 + 1 + k] = c; BG_PALETTE_SUB[C_MAN0 + 1 + k] = c; } }
   /* Palette-only volume shading follows the chosen outfit/skin. The 25
      reserved shades are below the inventory swatches at index 224. */
@@ -1793,11 +1813,14 @@ static void outfits_bottom(u8 *b){
 
 /* ---- options screen (port 13): three rows on the title's bottom screen.  Tap a row (or d-pad up/down + A / left / right); B or BACK returns and saves. ---- */
 static void opt_change(int dir){
+  opt_menu.art_available=mx_art_unlocked(&stats);
+  int old_art=opt.art_style;
   int action=mx_opt_activate(&opt,&opt_menu,dir,app==ST_TITLE);
   if(action==MX_O_ERASE){
-    mx_meta_init(&stats);outfit_sel=0;outfit_seen=1;toast_nq=0;toast_t=-1;
+    mx_meta_init(&stats);opt.art_style=0;outfit_sel=0;outfit_seen=1;toast_nq=0;toast_t=-1;
     sel_level=0;apply_outfit(0);outfit_scan(1);load_level(0);
   }
+  if(old_art!=opt.art_style)apply_outfit(outfit_sel);
   music_pref=!opt.music_off;
   sfx_set_enabled(!opt.sfx_off);
   apply_options();
@@ -1805,6 +1828,7 @@ static void opt_change(int dir){
   if(!opt.sfx_off)sfx_play(SFX_CLICK,64);
 }
 static void options_bottom(u8 *b){
+  opt_menu.art_available=mx_art_unlocked(&stats);
   gfx_rect(b,0,0,256,192,C_BLACK);
   gfx_text_c(b,128,4,"MANDEX OPTIONS",C_GOLD,C_BLACK,1);
   for(int i=0;i<4;i++){
@@ -1817,7 +1841,7 @@ static void options_bottom(u8 *b){
     gfx_text(b,10,y+4,mx_opt_names[id],col,1);
     const char *v=mx_opt_value(&opt,&opt_menu,id,app==ST_TITLE);
     gfx_text(b,246-gfx_text_w(v,1),y+4,v,C_WHITE,1);
-    gfx_text(b,10,y+15,mx_opt_desc[id],C_UILINE,1);
+    gfx_text(b,10,y+15,id==MX_O_ART&&opt_menu.art_available?"CEL PAINT / ORIGINAL LOOK":mx_opt_desc[id],C_UILINE,1);
   }
   if(opt_menu.page==MX_OPT_PERF)gfx_text_c(b,128,154,opt.profile==3?"QUIET OVERVIEW 15HZ / ECO FX":opt.profile==1?"FULL OVERVIEW WHEN BUDGET ALLOWS":"ADAPTIVE OVERVIEW / FIXED SIM",C_GOO,C_BLACK,1);
   if(opt_menu.page==MX_OPT_DATA)gfx_text_c(b,128,133,save_off?"SAVE UNAVAILABLE - RAM ONLY":saved_n?"CARTRIDGE SAVE LOADED / WRITTEN":"CARTRIDGE SAVE NOT CONFIRMED",C_GOO,C_BLACK,1);
