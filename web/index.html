@@ -1556,7 +1556,7 @@ function walkTubeStep(m,dt){
     ring(tb.ax,tb.ay,50,tb.col);ring(tb.bx,tb.by,50,tb.col);SFX.whoosh();popText(m.x,m.y-30,'TUBE TRANSFER!',tb.col,22);shake=Math.max(shake,3);return;
   }
 }
-function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.gait=0;m.vx=m.vy=0;m.landFx=0;m.landPower=0;m.gr=false;m.wt=WALK_T;m.parryTimeUsed=0;m.pT=0;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.jumpBuffer=0;m.jumpLatched=false;m.walkSafe=false;m.walkJam=0;m.R=14;m.pwr=m.pwr;
+function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.gait=0;m.vx=m.vy=0;m.landFx=0;m.landPower=0;m.gr=false;m.wt=WALK_T;m.parryTimeUsed=0;m.pT=0;m.chargePunch=false;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.jumpBuffer=0;m.jumpLatched=false;m.walkSafe=false;m.walkJam=0;m.R=14;m.pwr=m.pwr;
   m.x=clamp(m.x,WHW+2,WW-WHW-2);m.y=clamp(m.y,WHH,ROWS*V-WHH);
   let ok=!wBlocked(m.x,m.y);for(let u=1;u<=110&&!ok;u++){if(m.y-u>=WHH&&!wBlocked(m.x,m.y-u)){m.y-=u;ok=true}}
   for(let r=4;r<=200&&!ok;r+=4)for(let a=0;a<16&&!ok;a++){const an=-Math.PI/2+(a%2?1:-1)*Math.ceil(a/2)*.4,qx=m.x+Math.cos(an)*r,qy=m.y+Math.sin(an)*r;if(walkPlace(m,qx,qy))ok=true}   // nearest free spot, preferring up
@@ -1591,7 +1591,7 @@ function parryCase(c){
     popText(c.x,c.y-44,'+1s','#7dff5a',18);
   }
 }
-function walkPunch(){const m=man,cx=m.x+m.face*17,cy=m.y-3,run=m.vx*m.face>100,beforeCases=cases.length,d=walkHit(cx,cy,run?18:13,16,run?24:16);m.pT=.2;m.pCd=.3;
+function walkPunch(){const m=man,cx=m.x+m.face*17,cy=m.y-3,run=m.vx*m.face>100,beforeCases=cases.length,d=walkHit(cx,cy,run?18:13,16,run?24:16);m.chargePunch=run;m.pT=.2;m.pCd=.3;
   if(d>0){SFX.crunch(Math.min(1,d/90));shake=Math.max(shake,3);spark(cx,cy,5,200);wobKick(Math.floor(cx/V),Math.floor(cy/V),4,m.face*.9,0);if(cases.length===beforeCases)popText(cx,cy-24,run?'SHOULDER!':'POW!','#ffd23f',20)}else SFX.whoosh()}
 function walkSlam(){const m=man,cx=m.x,cy=m.y+WHH+4,beforeCases=cases.length;let d=0;for(const[hw,dm]of[[14,34],[26,18]])d+=walkHit(cx,cy+4,hw,10,dm);
   m.stomp=false;shake=Math.max(shake,9);ring(cx,cy,70,'#fff');ring(cx,cy,45,'#ffd23f');dust(cx,cy,10,14);SFX.boom&&SFX.crunch(1);wobKick(Math.floor(cx/V),Math.floor(cy/V),6,0,.9);if(cases.length===beforeCases)popText(cx,cy-34,'BELLY SLAM!','#ff8a3a',24);return d}
@@ -2219,7 +2219,7 @@ function updCases(dt){for(let i=cases.length-1;i>=0;i--){const c=cases[i];c.vy+=
     // Let the visible 0.2s punch animation intercept an arriving case.
     // A missed or expired punch leaves the normal projectile hazard intact.
     if(!dead&&m&&m.mode==='walk'&&m.pT>0&&
-       Math.abs(c.x-(m.x+m.face*17))<19&&Math.abs(c.y-(m.y-3))<22){
+       Math.abs(c.x-(m.x+m.face*17))<(m.chargePunch?24:19)&&Math.abs(c.y-(m.y-3))<22){
       cases.splice(i,1);parryCase(c);SFX.crunch(.8);continue;
     }
     if(!dead&&m&&(m.mode==='aim'||m.mode==='walk')&&Math.hypot(m.x-c.x,m.y-c.y)<(m.mode==='walk'?22:m.R+6)&&hurtMan(Math.sign(c.vx)||1))dead=true;
