@@ -1325,6 +1325,7 @@ static void draw_world(const View *v, int parallax){
   draw_voxels(v);
   DS_LAYER(v,4);
   draw_roof_trim(v);
+  if(world.level==MX_MOUNTAIN_LEVEL&&world.district==MX_MOUNTAIN_STAGES-1){int x=vx(v,RI(105)),y=vy(v,RI(9));gfx_rect(v->buf,x,y-14,1,14,C_WHITE);gfx_rect(v->buf,x+1,y-14,11,6,world.summit_reached?C_GOO:C_GOLD);}
   DS_LAYER(v,5);
   draw_chunks(v);
   DS_LAYER(v,6);
@@ -1409,12 +1410,12 @@ static void draw_objective_edge(const View *v){
   gfx_text_c(v->buf,edge.x,edge.y-5,label,C_PINK,C_BLACK,1);
 }
 static void top_hud(u8 *b){
-  const char *nm = mx_level_name(world.level);
+  const char *nm = mx_level_name(world.level==MX_MOUNTAIN_LEVEL?mx_stage_source(world.level,world.district):world.level);
   gfx_rect(b, 0, 0, 256, 11, C_UIBG); gfx_rect(b, 0, 11, 256, 1, C_UILINE);
   gfx_text(b,4,3,"LV",C_GOLD,1);
   const char *lv=gfx_int(world.level+1);int namex=14+gfx_text_w(lv,1)+2;
   gfx_text(b,14,3,lv,C_GOLD,1);gfx_text(b,namex,3,nm,C_WHITE,1);
-  if(mx_level_stage_count(world.level)>1){char stage[]="1/3";stage[0]=(char)('1'+world.district);stage[2]=(char)('0'+mx_level_stage_count(world.level));gfx_text(b,174,3,stage,C_GOLD,1);}
+  if(mx_level_stage_count(world.level)>1){int n=mx_level_stage_count(world.level),d=world.district+1;char stage[]="00/00";stage[0]='0'+d/10;stage[1]='0'+d%10;stage[3]='0'+n/10;stage[4]='0'+n%10;gfx_text(b,174,3,stage,C_GOLD,1);}
   const char *sc = gfx_int(disp_score);
   gfx_text(b, 252 - gfx_text_w(sc, 1), 3, sc, C_GOLD, 1);
   gfx_text(b, 252 - gfx_text_w(sc, 1) - 6, 3, "$", C_GOLD2, 1);
@@ -1485,7 +1486,7 @@ static void banner(u8 *b){
   int slide = t > 120 ? (t - 120) * 8 : (t < 24 ? (24 - t) * 12 : 0);
   gfx_rect(b, 0, 70, 256, 44, C_UIBG);
   gfx_rect(b, 0, 69, 256, 1, C_UILINE); gfx_rect(b, 0, 114, 256, 1, C_UILINE);
-  { char dn[]="DISTRICT 1 OF 3";dn[9]=(char)('1'+world.district);dn[14]=(char)('0'+mx_level_stage_count(world.level));
+  { int d=world.district+1,n=mx_level_stage_count(world.level);char dn[]="STAGE 00 OF 00";dn[6]='0'+d/10;dn[7]='0'+d%10;dn[12]='0'+n/10;dn[13]='0'+n%10;
     gfx_text_c(b, 128 - slide, 76, mx_level_stage_count(world.level)>1 ? dn : "LEVEL", C_GOLD, C_BLACK, 1); }
   {const char *nm=mx_level_name(world.level);gfx_text_c(b,128+slide,84,nm,C_WHITE,C_BLACK,gfx_text_w(nm,2)>244?1:2);}
   gfx_text_c(b, 128 - slide, 102, mx_stage_tactic(&world), C_PINK, C_BLACK, 1);
@@ -1495,7 +1496,7 @@ static void end_panel(u8 *b){
   if(world.state == MX_PLAY) return;
   int win = world.state == MX_WIN;
   panel(b, 24, 34, 208, 124);
-  gfx_text_c(b, 128, 42, win ? (world.level == MX_NUM_LEVELS - 1 ? "ALL LANDLORDS EVICTED!" : "EVICTION COMPLETE!") : "THE LANDLORDS LIVE...", win ? C_GOLD : C_RED, C_BLACK, 2);
+  gfx_text_c(b, 128, 42, win ? (world.level == MX_MOUNTAIN_LEVEL ? "SUMMIT CONQUERED!" : "EVICTION COMPLETE!") : "THE LANDLORDS LIVE...", win ? C_GOLD : C_RED, C_BLACK, 2);
   if(win){
     man_with_towel(b, &tow_win[0], 52, 98, 3, 1, mi_dance_frame(frame), 0);          /* victory butt-wiggle, one on each side */
     man_with_towel(b, &tow_win[1], 204, 98, 3, -1, mi_dance_frame(frame + 14), 0);

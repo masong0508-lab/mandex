@@ -857,9 +857,9 @@ static void draw_all(void){
   shx = shy = 0;
   if(world.shake > 0.05f){float scale=console_opt.shake==2?0:console_opt.shake==1?.3f:.6f;shx=(frand()-.5f)*world.shake*scale;shy=(frand()-.5f)*world.shake*scale;}
   /* backdrop: sky, drifting clouds, hills / city / ground + the sling post */
-  tquad(&hdr_bga, DCT_BGA_W, DCT_BGA_H, 0, 0, 640, 480, 0, 0, 512, 256, Z_BG, cel_active?argb(255,200,188,255):WHITE);
+  tquad(&hdr_bga, DCT_BGA_W, DCT_BGA_H, 0, 0, 640, 480, 0, 0, 512, 256, Z_BG, world.level>=MX_MOUNTAIN_START?argb(160,200,255,255):cel_active?argb(255,200,188,255):WHITE);
   draw_clouds();
-  tquad(&hdr_bgb, DCT_BGB_W, DCT_BGB_H, 0, 0, 1024, 512, 0, 0, 1024, 512, Z_BGB, cel_active?argb(255,224,206,255):WHITE);
+  tquad(&hdr_bgb, DCT_BGB_W, DCT_BGB_H, 0, 0, 1024, 512, 0, 0, 1024, 512, Z_BGB, world.level>=MX_MOUNTAIN_START?argb(180,210,245,255):cel_active?argb(255,224,206,255):WHITE);
   draw_rooms();
   draw_facades();
   const MxMan *m = &world.man;
@@ -879,6 +879,7 @@ static void draw_all(void){
   }
   /* Cull whole offscreen rubble chunks before their per-cell draw. */
   draw_rubble_chunks();
+  if(world.level==MX_MOUNTAIN_LEVEL&&world.district==MX_MOUNTAIN_STAGES-1){float x=X(105),y=Y(9);quad(x,y-23,2,23,Z_TARGET,WHITE);quad(x+2,y-23,22,10,Z_TARGET,world.summit_reached?argb(125,255,90,255):argb(255,210,63,255));}
   /* landlords */
   const int last_target=world.state==MX_PLAY && mx_targets_alive(&world)==1;
   for(int i = 0; i < world.ntargets; i++){
@@ -1043,7 +1044,8 @@ static void draw_all(void){
   char buf[64], nm[40]; int n = 0;
   for(const char *q = mx_level_name(world.level); *q && n < 38; q++) nm[n++] = (*q >= 'a' && *q <= 'z') ? *q - 32 : *q;
   nm[n] = 0;
-  if(mx_level_stage_count(world.level)>1)snprintf(buf,sizeof buf,"LV %d %s %d/%d",world.level+1,nm,world.district+1,mx_level_stage_count(world.level));
+  if(world.level==MX_MOUNTAIN_LEVEL)snprintf(buf,sizeof buf,"LV 1110 %d/%d  %d FT",world.district+1,MX_MOUNTAIN_STAGES,mx_mountain_altitude(&world));
+  else if(mx_level_stage_count(world.level)>1)snprintf(buf,sizeof buf,"LV %d %s %d/%d",world.level+1,nm,world.district+1,mx_level_stage_count(world.level));
   else snprintf(buf, sizeof buf, "LV %d  %s", world.level + 1, nm);
   text(buf, 12, 26, 16, argb(255, 210, 63, 255), 0, Z_HUD + 0.1f);
   MxObjective objective=mx_objective_snapshot(&world);
@@ -1184,7 +1186,7 @@ static void draw_all(void){
         puff(110 + sd * 22.0f, 284 + f * 60, 4.5f, Z_END + 2, argb(127, 212, 255, (int)(230 * (1 - f))));
       }
     }
-    text(win ? (world.level == MX_NUM_LEVELS - 1 ? "EVERY LANDLORD EVICTED!" : "EVICTION COMPLETE!") : "THE LANDLORDS LIVE...", 320, 190, 46, win ? argb(125, 255, 90, 255) : argb(255, 106, 106, 255), 1, Z_END + 2);
+    text(win ? (world.level == MX_MOUNTAIN_LEVEL ? "SUMMIT CONQUERED!" : "EVICTION COMPLETE!") : "THE LANDLORDS LIVE...", 320, 190, 46, win ? argb(125, 255, 90, 255) : argb(255, 106, 106, 255), 1, Z_END + 2);
     if(win){ int st = world.men >= 2 ? 3 : world.men >= 1 ? 2 : 1;
       for(int i = 0; i < 3; i++) atl(320 - 105 + i * 70 - 31, 215, 62, 62, &DCA_STARS[i < st ? 0 : 4], Z_END + 2, WHITE); }
     man_zoom = 1.0f;
