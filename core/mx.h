@@ -142,6 +142,15 @@ typedef struct { uint8_t type, m; real x, y, a, b; } MxEvent;
 /* edge = this voxel touches empty space inside its chunk. Interior voxels can't be the first
    point of contact with anything, so the solver skips them (big win on large chunks). */
 typedef struct { real lx, ly, wx, wy, h; uint8_t m, dead, edge, fuse; } MxCell; /* fuse uses existing 24-byte padding */
+/* A fuse is a simulation countdown, not a render-frame counter. Every
+ * native port therefore shows the same warning phase, including at 30 Hz,
+ * when paused or when a frame is skipped. 0=hidden, 1=gold, 2=urgent red. */
+static inline int mx_fuse_visual(const MxCell *a){
+  if(a->dead||a->m!=MX_TNT||!a->fuse)return 0;
+  if(a->fuse<=8)return (a->fuse&1)?0:2;
+  return (a->fuse&2)?0:1;
+}
+
 
 /* Interior rooms (backdrop only): front-ends may draw wallpaper behind the voxels. */
 typedef struct { uint8_t x, y, w, h, pal; } MxRoom;
