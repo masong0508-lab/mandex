@@ -1988,7 +1988,7 @@ function drawBurpStand(){if(state!=='play'||!toolOn('burp'))return;const c=man.c
     if(OPT().burpCharge)txt('BURP x'+burpMult(man).toFixed(1),STX,y0+24,12,'#ff9ec8','center')}}
 // Golden Cels uses the same articulated rig for the entire soda routine.
 // Read only the current simulation state: no new gameplay ticks or timers.
-const CEL_CHUG={ld:0,hip:0,psi:0,hp:0,face:'base',cape:1,plant:1,quiff:1,t:0,
+const CEL_CHUG={ld:0,hip:0,psi:0,hp:0,face:'base',cape:1,plant:0,quiff:1,t:0,
   arms:{L:[-33,-6,0,-31,16,2],R:[33,-6,0,31,16,2]},belly:[1,1],bottle:null,pressure:0};
 const CEL_DRINK={level:1,color:0,angle:0};
 function celChugPose(m,now){
@@ -3501,7 +3501,7 @@ function drawSpin(th,o){
 
   // ---------------- upper body: shoulders, chest, belly and love handles are ONE mass (see blob); the chest and belly marks sit on top of it
   const pressure=typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE?Math.max(0,Math.min(1.6,o.pressure||0)):0;
-  const shL=G3(-20.5,-21.5,0,7.4,6.8,7,{ox:oU}),shR=G3(20.5,-21.5,0,7.4,6.8,7,{ox:oU}),trL=G3(-9,-28.5,0,9.5,5.2,8,{ox:oU}),trR=G3(9,-28.5,0,9.5,5.2,8,{ox:oU}),chest=G3(0,-21,0,21,11.5,11,{ox:oU}),belly=G3(0,-2+pressure*7,6+pressure*10,(22+pressure*8)*bs[0],(17+pressure*12)*bs[1],17+pressure*12,{ox:oM+bo[0],oy:bo[1],bias:3});
+  const shL=G3(-20.5,-21.5,0,7.4,6.8,7,{ox:oU}),shR=G3(20.5,-21.5,0,7.4,6.8,7,{ox:oU}),trL=G3(-9,-28.5,0,9.5,5.2,8,{ox:oU}),trR=G3(9,-28.5,0,9.5,5.2,8,{ox:oU}),chest=G3(0,-21,0,21,11.5,11,{ox:oU}),belly=G3(0,-2+pressure*14,6+pressure*10,(22+pressure*16)*bs[0],(17+pressure*20)*bs[1],17+pressure*12,{ox:oM+bo[0],oy:bo[1],bias:3});
   const hnd=[-1,1].map(q=>{const hxx=q*18,hz=4,a=10.5,b=6,c=13,hy=10;return{q,px:hxx*C+hz*S+oM+wo[0],py:hy+wo[1],rx:Math.hypot(a*C,c*S),b}});
   add(belly.d,()=>{
     ctx.fillStyle='rgba(110,30,30,.30)';for(const h of hnd){ctx.beginPath();ctx.ellipse(h.px,h.py+5.4,h.rx*.98,h.b*.85,0,0,6.2832);ctx.fill()}                  // the shadow a love handle throws on the shorts
