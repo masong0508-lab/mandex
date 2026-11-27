@@ -23,6 +23,18 @@ SCRIPT = r"""() => {
   ];
   for(let a=0;a<=360;a+=30)
     shots.push(['turn-'+a,()=>drawSpin(a*Math.PI/180,{ld:0,face:'base',dir:1,hip:0})]);
+  // Exercise actual walking draw calls, mirrored facing and air/turn
+  // transitions, rather than isolated limb diagrams. Each frame is
+  // anchored to the same ground position for easy visual review.
+  for(const face of [1,-1])for(let k=0;k<8;k++){
+    const m={mode:'walk',x:0,y:-WHH,gr:true,face,turn:0,gait:k*2,vx:face*120,vy:0,pT:0,landFx:0,stomp:false};
+    shots.push(['walk-'+(face>0?'right':'left')+'-'+k,()=>drawWalkMan(m)]);
+  }
+  for(const [name,m] of [
+    ['turning',{gr:true,turn:6,vx:0,vy:0}],
+    ['jump',{gr:false,turn:0,vx:100,vy:-250}],
+    ['stomp',{gr:false,turn:0,vx:0,vy:300,stomp:true}]
+  ])shots.push(['walk-'+name,()=>drawWalkMan({mode:'walk',x:0,y:-WHH,face:1,gait:4,pT:0,landFx:0,...m})]);
   // Compare the actual two-bottle sequence, including the release recovery.
   // Restore global pressure / outfit state after each isolated drawing.
   for(const t of [CT_A+.12,CT_BK+.10,CT_BK+.31,CT_C+.12,CT_TB+.18,CT_D+.04,CT_END-.02]){
@@ -55,11 +67,18 @@ SCRIPT = r"""() => {
     const f=frames[i];f.cel=paint(shots[i][1]);ok(f.classic.hash!==f.cel.hash,'unchanged art: '+f.name);
     // Drinking is new choreography rather than just a reskin, so use a
     // wider silhouette bound for articulated prop and pressure poses.
-    const lo=f.name.startsWith('drink-')?.45:.72,hi=f.name.startsWith('drink-')?2:1.28;
+    const moving=f.name.startsWith('drink-')||f.name.startsWith('walk-');
+    const lo=moving?.45:.72,hi=moving?2:1.28;
     ok(f.cel.count/f.classic.count>lo&&f.cel.count/f.classic.count<hi,'character proportions changed excessively: '+f.name);
+  }
+  for(const dir of ['right','left']){
+    const walk=frames.filter(f=>f.name.startsWith('walk-'+dir+'-'));
+    ok(walk.length===8&&new Set(walk.map(f=>f.cel.hash)).size>=6,'walking cycle does not animate: '+dir);
   }
   ok(cycleArtStyle()&&!CEL_ACTIVE,'classic restored');
   const restored=paint(shots[0][1]);ok(restored.hash===frames[0].classic.hash,'classic front art changed');
+  const k=shots.findIndex(f=>f[0]==='walk-right-2');
+  ok(k>=0&&paint(shots[k][1]).hash===frames[k].classic.hash,'classic walking art changed');
   return {frames,classicRestored:true,chapter:CH1};
 }"""
 
