@@ -1434,43 +1434,29 @@ const KEYS={},TID={},WHW=7,WHH=19,WALK_T=45;
  * partial fragments and borderline hits behave identically. No arrays are
  * allocated during this very hot walk/jump/stomp collision query. */
 function wBlocked(x,y){
+  const x0=x-WHW,x2=x+WHW,y0=y-WHH,y1=y-WHH*.5,y3=y+WHH*.5,y4=y+WHH-.01;
   for(let i=0;i<3;i++){
-    const qx=i===0?x-WHW:i===1?x:x+WHW;
-    for(let j=0;j<5;j++){
-      let qy=y;
-      if(j===0)qy=y-WHH;
-      else if(j===1)qy=y-WHH*.5;
-      else if(j===3)qy=y+WHH*.5;
-      else if(j===4)qy=y+WHH-.01;
-      if(solidAt(qx,qy))return true;
-    }
+    const qx=i===0?x0:i===1?x:x2;
+    if(solidAt(qx,y0)||solidAt(qx,y1)||solidAt(qx,y)||solidAt(qx,y3)||solidAt(qx,y4))return true;
   }
   for(const ch of chunks){
     const radius=ch.rad+RC;
     if(Math.abs(ch.x-x)>radius+WHW||Math.abs(ch.y-y)>radius+WHH)continue;
     for(const a of ch.cells){
       if(a.dead||Math.abs(a.wx-x)>=WHW+RC||Math.abs(a.wy-y)>=WHH+RC)continue;
-      for(let i=0;i<3;i++){
-        const qx=i===0?x-WHW:i===1?x:x+WHW;
-        if(Math.abs(a.wx-qx)>=RC)continue;
-        for(let j=0;j<5;j++){
-          let qy=y;
-      if(j===0)qy=y-WHH;
-      else if(j===1)qy=y-WHH*.5;
-      else if(j===3)qy=y+WHH*.5;
-      else if(j===4)qy=y+WHH-.01;
-          if(Math.abs(a.wy-qy)>=RC)continue;
-          return true; /* the actual rubble voxel hit, not a distant chunk-centre proxy */
-        }
-      }
+      // The Cartesian hitbox needs one matching sample on each axis.
+      if(Math.abs(a.wx-x0)>=RC&&Math.abs(a.wx-x)>=RC&&Math.abs(a.wx-x2)>=RC)continue;
+      if(Math.abs(a.wy-y0)<RC||Math.abs(a.wy-y1)<RC||Math.abs(a.wy-y)<RC||
+         Math.abs(a.wy-y3)<RC||Math.abs(a.wy-y4)<RC)return true;
     }
   }
   return false;
 }
-function walkPlace(m,x,y){if(x<WHW+2||x>WW-WHW-2||y<WHH||y>ROWS*V-WHH||wBlocked(x,y))return false;m.x=x;m.y=y;m.vx=m.vy=0;m.gr=false;m.stomp=false;m.ledgeGrace=m.jumpHold=m.jumpBuffer=m.walkJam=0;m.walkSafe=true;m.safeX=x;m.safeY=y;return true}
+function walkClear(x,y){return x>=WHW+2&&x<=WW-WHW-2&&y>=WHH&&y<=ROWS*V-WHH&&!wBlocked(x,y)}
+function walkPlace(m,x,y){if(!walkClear(x,y))return false;m.x=x;m.y=y;m.vx=m.vy=0;m.gr=false;m.stomp=false;m.ledgeGrace=m.jumpHold=m.jumpBuffer=m.walkJam=0;m.walkSafe=true;m.safeX=x;m.safeY=y;return true}
 function walkRescue(m){if(m.walkSafe&&walkPlace(m,m.safeX,m.safeY))return true;const origin=typeof SX==='number'?SX:128;for(let y=0;y<3;y++)for(let x=-1;x<=1;x++)if(walkPlace(m,origin+x*64,ROWS*V-WHH-2-y*48))return true;return false}
 function walkTubeStep(m,dt){
-  if(m.mode!=='walk'||!tubes.length)return;
+  if(m.mode!=='walk'||!tubes.length||m.walkJam>0)return;
   if(m.tubeCd>0){m.tubeCd=Math.max(0,m.tubeCd-dt);return}
   for(const tb of tubes){
     const dx=m.x-tb.ax,dy=m.y-tb.ay;
@@ -1521,7 +1507,7 @@ function walkSlam(){const m=man,cx=m.x,cy=m.y+WHH+4,beforeCases=cases.length;let
 function walkStep(dt){const m=man;
   m.landFx=Math.max(0,(m.landFx||0)-dt);
   m.wt-=dt;if(m.wt<=0){popText(m.x,m.y-40,'TIME!','#ff6b6b',26);walkQuit();return}
-  if(wBlocked(m.x,m.y)){let f=false;for(let u=2;u<=80&&!f;u+=2)for(const sg of[0,-1,1])if(!wBlocked(m.x+sg*u,m.y-u)){m.x+=sg*u;m.y-=u;f=true;break}
+  if(wBlocked(m.x,m.y)){let f=false;for(let u=2;u<=80&&!f;u+=2)for(const sg of[0,-1,1])if(walkClear(m.x+sg*u,m.y-u)){m.x+=sg*u;m.y-=u;f=true;break}
     if(!f){m.walkJam=(m.walkJam||0)+dt;if(m.walkJam>=.25&&walkRescue(m)){ring(m.x,m.y,24,'#7dff5a');popText(m.x,m.y-36,'BACK ON YOUR FEET!','#7dff5a',18)}else return}}
   m.walkJam=0;
   // Record the real start AFTER rubble recovery; moving the player out of
