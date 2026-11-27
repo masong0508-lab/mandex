@@ -423,7 +423,7 @@ static void on_events(void){
 #if MX_N3DS_PARTICLE_HINT
       part_free_hint = 0;
 #endif   /* Landlord HQ: next district, fresh men */
-      popup(60, 20, world.district == 1 ? "DISTRICT 2 OF 3!" : "DISTRICT 3 OF 3!", RGB(255, 210, 63)); break;
+      popup(60, 20, "NEXT DISTRICT!", RGB(255, 210, 63)); break;
     case EV_BONK: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, e->m == 2 ? (e->a>0?"PARRY +150 / +1S":"PARRY! +150") : "BONK!", RGB(255, 210, 63)); break;
     default: break;
     }
@@ -703,12 +703,14 @@ static void snowcap_prepare(void){
 static void draw_sky(const View *v){
   Scr *s=v->s;int gy=VY(v,MX_ROWS);float k=v->ppc/8.0f;
   int night=world.level>=MX_CH3_START;
+  int altitude=mx_mountain_altitude(&world);
   snowcap_prepare();
   for(int y = 0; y < gy; y += 2){ float t = (float)y / (gy > 1 ? gy : 1), r, g, b;           /* #3d8fe8 -> #8ccaf7 -> #ffeccb: the web's warm horizon */
     if(cel_active){r=night?35+125*t:87+159*t;g=night?28+79*t:84+130*t;b=night?57+53*t:119+42*t;}
     else if(night){r=11+30*t;g=16+28*t;b=41+42*t;}
     else if(t<.55f){float u=t/.55f;r=61+(140-61)*u;g=143+(202-143)*u;b=232+(247-232)*u;}
     else{float u=(t-.55f)/.45f;r=140+(255-140)*u;g=202+(236-202)*u;b=247+(203-247)*u;}
+    if(altitude){r=35+100*t;g=58+100*t;b=99+95*t;if(altitude>=1600){r+=18;g+=20;b+=18;}}
     rect(s,0,y,s->w,2,RGB((int)r,(int)g,(int)b)); }
   if(gy < s->h) rect(s, 0, gy, s->w, s->h - gy, RGB(100, 68, 40));
   { int sx=330+LD(10)-(int)(g_pan*.02f);
@@ -1340,8 +1342,12 @@ static void draw_valve(const View *v){
   rect(v->s, x - p, y, p * 2, p * 2, world.valve_ok ? RGB(255, 160, 40) : RGB(130, 130, 140));                         /* nozzle */
   if(m->mode == MAN_AIM && f > 0){ rect(v->s, x - p * 5, y - p * 9, p * 10, p, RGB(20, 24, 40)); rect(v->s, x - p * 5 + 1, y - p * 9 + 1, f * (p * 10 - 2) / 100, p - 2, f < 50 ? RGB(125, 255, 90) : f < 80 ? RGB(255, 210, 63) : RGB(255, 70, 70)); }
 }
+static void draw_summit_flag(const View *v){
+  if(world.level!=MX_MOUNTAIN_LEVEL||world.district!=MX_MOUNTAIN_STAGES-1)return;
+  int x=VX(v,105),y=VY(v,9);rect(v->s,x,y-20,2,20,RGB(235,242,255));rect(v->s,x+2,y-20,15,8,world.summit_reached?RGB(125,255,90):RGB(255,210,63));
+}
 static void draw_world(const View *v){
-  draw_sky(v); draw_street_dressing(v); draw_rooms(v); draw_facades(v); draw_cells(v); draw_roof_trim(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v);
+  draw_sky(v); draw_street_dressing(v); draw_rooms(v); draw_facades(v); draw_cells(v); draw_roof_trim(v); draw_summit_flag(v); draw_landlords(v); draw_tubes(v); draw_pads(v); draw_cases(v); draw_sling(v); draw_valve(v); draw_aim(v);
   /* Bottom touch-screen camera: ground the sprite on the ledge he is
      standing on, including elevated debris, not only street level. */
   if(world.man.mode==MAN_WALK && world.man.gr)
@@ -1363,7 +1369,7 @@ static void draw_world_3d(const View *vt, int sgn, float sl){
   a.ox = vt->ox + DX(14); draw_sky(&a); draw_street_dressing(&a);                                                   /* far plane (hills/clouds inside carry their own parallax) */
   a.ox = vt->ox + DX(8); draw_rooms(&a); draw_facades(&a);                               /* dressed interiors sit behind destructible front walls */
   if(stereo){ a.ox = vt->ox + DX(4); g_dim = .45f; draw_cells(&a); g_dim = 1.0f; }       /* back faces */
-  a.ox = vt->ox; draw_cells(&a); draw_roof_trim(&a);
+  a.ox = vt->ox; draw_cells(&a); draw_roof_trim(&a); draw_summit_flag(&a);
   a.ox = vt->ox + DX(-3); draw_landlords(&a); draw_tubes(&a); draw_pads(&a); draw_cases(&a);
   a.ox = vt->ox + DX(-4); draw_sling(&a); draw_valve(&a);
   a.ox = vt->ox + DX(-5); draw_aim(&a);
@@ -1397,8 +1403,8 @@ static void draw_hud(const View *camera){
   char b[48];
   text(&top, 6, 8, "LV", 2, RGB(255, 210, 63)); itoa_(world.level + 1, b); text(&top, 30, 8, b, 2, RGB(255, 210, 63));
   int namex=world.level>=99?70:56;
-  text(&top,namex,8,mx_level_name(world.level),world.man.mode==MAN_WALK||mx_level_stage_count(world.level)>1?1:2,RGB(255,255,255));
-  if(mx_level_stage_count(world.level)>1){snprintf(b,sizeof b,"STAGE %d/3",world.district+1);text(&top,144,18,b,1,RGB(255,210,63));}
+  text(&top,namex,8,mx_stage_name(&world),world.man.mode==MAN_WALK||mx_level_stage_count(world.level)>1?1:2,RGB(255,255,255));
+  if(mx_level_stage_count(world.level)>1){if(world.level==MX_MOUNTAIN_LEVEL)snprintf(b,sizeof b,"%d/%d  %s %d FT",world.district+1,MX_MOUNTAIN_STAGES,mx_metro_tower_height(&world)?"ROOF":"ALT",mx_metro_tower_height(&world)?mx_metro_tower_height(&world):mx_mountain_altitude(&world));else snprintf(b,sizeof b,"STAGE %d/%d",world.district+1,mx_level_stage_count(world.level));text(&top,144,18,b,1,RGB(255,210,63));}
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                               /* walk levels: the clock */
     int k = (int)(RTOF(world.man.wt) * 100.0f / MX_WALK_T); if(k < 0) k = 0; if(k > 100) k = 100;
     rect(&top, 250, 6, 142, 12, RGB(255, 255, 255)); rect(&top, 251, 7, 140, 10, RGB(40, 40, 50)); rect(&top, 251, 7, k * 140 / 100, 10, k > 30 ? RGB(125, 255, 90) : RGB(255, 74, 74));
@@ -1496,7 +1502,7 @@ static void draw_end(void){
   if(world.state == MX_PLAY) return;
   int win = world.state == MX_WIN;
   rect(&top, 90, 64, 220, 114, RGB(15, 18, 30));
-  textc(&top, 200, 74, win ? (world.level == MX_NUM_LEVELS - 1 ? "THE END!" : "LEVEL CLEAR!") : "OUT OF MEN", 3, win ? RGB(125, 255, 90) : RGB(255, 90, 90));
+  textc(&top, 200, 74, win ? (world.level == MX_MOUNTAIN_LEVEL ? "SUMMIT CONQUERED!" : "LEVEL CLEAR!") : "OUT OF MEN", 3, win ? RGB(125, 255, 90) : RGB(255, 90, 90));
   char b[32]; sprintf(b, "SCORE %d", world.score); textc(&top, 200, 98, b, 2, RGB(255, 255, 255));
   if(win){
     int n = mx_stars_for(&world);
@@ -1623,12 +1629,12 @@ int main(void){
         int next=mx_trial_next_unfinished(&stats,sel);
         if(next>=0&&next!=sel){sel=next;load_level(sel);}
         down&=~(KEY_TOUCH|KEY_A|KEY_START);
-      }else if(down & (KEY_UP|KEY_DOWN)){sel=mx_trial_district_step(sel,(down&KEY_DOWN)?1:-1);load_level(sel);}
-      else if(down & KEY_RIGHT){ sel = (sel + 1) % MX_NUM_LEVELS; load_level(sel); }
-      else if(down & KEY_LEFT){ sel = (sel + MX_NUM_LEVELS - 1) % MX_NUM_LEVELS; load_level(sel); }
+      }else if(down & (KEY_UP|KEY_DOWN)){sel=mx_visible_district_step(&stats,sel,(down&KEY_DOWN)?1:-1);load_level(sel);}
+      else if(down & KEY_RIGHT){ sel = mx_visible_level_step(&stats,sel,1); load_level(sel); }
+      else if(down & KEY_LEFT){ sel = mx_visible_level_step(&stats,sel,-1); load_level(sel); }
       if(down & (KEY_L | KEY_R)){ int dir = (down & KEY_R) ? 1 : MX_NUM_OUTFITS - 1; for(int k = 1; k <= MX_NUM_OUTFITS; k++){ int n = (outfit_sel + dir * k) % MX_NUM_OUTFITS; if(mx_outfit_unlocked(&stats, n)){ outfit_sel = n; break; } } apply_outfit(outfit_sel); n3_save_sync(); }
       if(down & KEY_Y){ nofight = !nofight; console_opt.nofight=nofight; mx_set_fight(&world, !nofight); n3_save_sync(); }
-      if(down & (KEY_A | KEY_START | KEY_TOUCH)){
+      if((down & (KEY_A | KEY_START | KEY_TOUCH))&&mx_level_visible(&stats,sel)){
         if(sel == 0 && !intro_seen){ intro_seen = 1; intro_level = 0; app = ST_INTRO; intro_start(); }
         else if(sel == MX_CH3_START && !wolf_seen){ wolf_seen = 1; intro_level = sel; app = ST_INTRO; intro_start_wolf(); }
         else { app = ST_PLAY; load_level(sel); } }
@@ -1673,7 +1679,7 @@ int main(void){
       if((down & KEY_B) && world.state != MX_PLAY){ app = ST_TITLE; sel = world.level; load_level(sel); }       /* B on the end screen = back to the title */
       if(world.state != MX_PLAY){
         if(down & (KEY_A | KEY_START | KEY_TOUCH)){
-          int next = world.state == MX_WIN ? world.level + 1 : world.level;
+          int next = world.state == MX_WIN ? mx_campaign_next(&stats,world.level) : world.level;
           int ce = (world.state == MX_WIN && next == MX_CH2_START) ? 1 : (world.state == MX_WIN && next == MX_CH3_START) ? 2 : 0;   /* the closing cutscene of the chapter just finished */
           if(ce && !(end_seen & (1 << ce))){ end_seen |= 1 << ce; sel = next; intro_level = next; app = ST_INTRO; intro_start_end(ce); }
           else if(next >= MX_NUM_LEVELS){ app = ST_TITLE; sel = 0; load_level(0); } else { sel = next; load_level(next); }
@@ -1786,7 +1792,8 @@ int main(void){
       rect(&top, 140, 161, 120, 9, RGB(15, 18, 30));
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
-      if(sel>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel,&stars);snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/30  %d/20 CLEARED  %d/60 STARS",(sel-MX_TRIAL_START)/20+1,clear,stars);textc(&top,200,228,b,1,RGB(255,210,63));}
+      if(sel==MX_CH4_GATE&&!mx_ch4_unlocked(&stats))textc(&top,200,228,"QUALIFYING MISSION",1,RGB(255,210,63));
+      else if(sel>=MX_TRIAL_START){int stars=0,count=0,clear=mx_menu_trial_summary(&stats,sel,&stars,&count);snprintf(b,sizeof b,"%s %d/%d  %d/%d CLEARED",sel>=MX_CH4_FIRST&&mx_ch4_unlocked(&stats)?"CHAPTER 4":"DISTRICT",mx_menu_group_index(&stats,sel),mx_menu_group_count(&stats)-1,clear,count);textc(&top,200,228,b,1,RGB(255,210,63));}
       else textc(&top, 200, 228, "UP/DOWN: TRIAL DISTRICTS", 1, RGB(255, 210, 63));
       if(!snd_ok){ char sb[48]; sprintf(sb, "NO SOUND (ndsp %08X) - NEEDS dspfirm.cdc", (unsigned)snd_err); textc(&top, 200, 212, sb, 1, RGB(255, 90, 90)); }
 #if defined(__3DS__) && !MX_N3DS_NO_SAVE

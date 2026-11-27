@@ -14,10 +14,11 @@ int main(void){
   S.stars[2] = 1; CHECK(mx_level_unlocked(&S, 3), "beating level 3 opens level 4");
   CHECK(!mx_level_unlocked(&S, 4), "level 5 still locked");
   { MxStats U; mx_meta_init(&U); U.bestScore = 99999; CHECK(!mx_level_unlocked(&U, 3), "bestScore alone does not unlock"); }
-  { MxStats U; mx_meta_init(&U); U.unlock_all = 1; int ok = 1; for(int i = 0; i < MX_NUM_LEVELS; i++) ok &= mx_level_unlocked(&U, i); CHECK(ok, "unlock_all opens every level"); }
+  { MxStats U; mx_meta_init(&U); U.unlock_all = 1; int ok = 1; for(int i = 0; i < MX_NUM_LEVELS; i++) ok &= mx_level_unlocked(&U, i)==mx_level_visible(&U,i); CHECK(ok, "unlock_all cannot expose secret chapter"); }
 #else
-  { int ok = 1; for(int i = 0; i < MX_NUM_LEVELS; i++) ok &= mx_level_unlocked(&S, i); CHECK(ok, "default build: every level open"); }
+  { int ok = 1; for(int i = 0; i < MX_NUM_LEVELS; i++) ok &= mx_level_unlocked(&S, i)==mx_level_visible(&S,i); CHECK(ok, "default build: every visible level open"); }
 #endif
+  if(mx_ch4_available()){ MxStats U; mx_meta_init(&U); U.unlock_all=1; CHECK(!mx_level_unlocked(&U,MX_CH4_FIRST)&&!mx_level_unlocked(&U,MX_CH4_GATE),"secret chapter is not a cheat unlock"); U.stars[MX_CH4_PREREQ]=1; CHECK(mx_level_unlocked(&U,MX_CH4_GATE)&&!mx_level_unlocked(&U,MX_CH4_FIRST),"qualifier accessible without revealing chapter"); U.stars[MX_CH4_GATE]=1; CHECK(mx_level_unlocked(&U,MX_CH4_FIRST)&&mx_level_unlocked(&U,MX_NUM_LEVELS-1),"earned qualifier opens chapter"); }
   printf(fails ? "meta_test: %d FAILED\n" : "meta_test: all passed\n", fails);
   return fails != 0;
 }

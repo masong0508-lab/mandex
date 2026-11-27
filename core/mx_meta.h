@@ -81,12 +81,35 @@ int mx_tool_power(int tool);                             /* the PW_* a start too
    20 levels = 176 bytes (175 for a version 1 blob).  Not saved: unlock_all and the per-level transients (lv_*, seen_*).  A save with fewer or more levels than this build
    still loads (missing levels read as 0, extra ones are dropped); any other layout change must bump the version byte. */
 #define MX_SAVE_VERSION 4
+/* Secret chapter access is derived from an earned completion, never the
+   session-only unlock_all cheat. The qualifier becomes reachable after
+   the last regular trial, so the chapter cannot lock its own key away. */
+static inline int mx_ch4_available(void){return MX_NUM_LEVELS>=1110;}
+static inline int mx_ch4_unlocked(const MxStats *s){return mx_ch4_available()&&s->stars[MX_CH4_GATE]>0;}
+static inline int mx_level_visible(const MxStats *s,int level){
+  if(level<0||level>=MX_NUM_LEVELS)return 0;
+  return !mx_ch4_available()||level<MX_CH4_FIRST||mx_ch4_unlocked(s)||
+    (level==MX_CH4_GATE&&s->stars[MX_CH4_PREREQ]>0);
+}
+static inline int mx_campaign_next(const MxStats *s,int level){
+  if(mx_ch4_available()&&level==MX_CH4_GATE&&mx_ch4_unlocked(s)){
+    for(int i=MX_CH4_FIRST;i<MX_CH4_GATE;i++)if(!s->stars[i])return i;
+  }
+  for(int i=level+1;i<MX_NUM_LEVELS;i++)if(mx_level_visible(s,i))return i;
+  return MX_NUM_LEVELS;
+}
+
 /* District summary for the native title selectors; derived, never serialized. */
+static inline int mx_trial_size(int level){
+  if(level<MX_TRIAL_START||level>=MX_NUM_LEVELS)return 0;
+  int first=MX_TRIAL_START+((level-MX_TRIAL_START)/MX_TRIAL_DISTRICT_SIZE)*MX_TRIAL_DISTRICT_SIZE;
+  return MX_NUM_LEVELS-first<MX_TRIAL_DISTRICT_SIZE?MX_NUM_LEVELS-first:MX_TRIAL_DISTRICT_SIZE;
+}
 static inline int mx_trial_cleared(const MxStats *s,int level,int *stars){
   int total=0,clear=0;
   if(level>=MX_TRIAL_START&&level<MX_NUM_LEVELS){
     int first=MX_TRIAL_START+((level-MX_TRIAL_START)/MX_TRIAL_DISTRICT_SIZE)*MX_TRIAL_DISTRICT_SIZE;
-    for(int i=first;i<first+MX_TRIAL_DISTRICT_SIZE;i++){int n=s->stars[i];if(n>3)n=3;total+=n;clear+=n>0;}
+    for(int i=first;i<first+mx_trial_size(level);i++){int n=s->stars[i];if(n>3)n=3;total+=n;clear+=n>0;}
   }
   if(stars)*stars=total;
   return clear;

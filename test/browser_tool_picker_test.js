@@ -65,6 +65,13 @@ a.pw.sel='burp';a.pw.left.burp=0;assert(a.openToolPicker());assert(a.toolPickerS
 a.man.mode='walk';assert(!a.openToolPicker(),'no tools during walk');a.man.mode='aim';
 assert(a.openToolPicker());a.toolPickerKey({code:'Digit4',preventDefault(){}});assert(a.WEB_UI.toolPicker,'spent shortcut rejected');
 a.toolPickerKey({code:'Digit5',preventDefault(){}});assert(!a.WEB_UI.toolPicker&&a.pw.sel==='towel','keyboard selects');
+const key=code=>a.toolPickerKey({code,preventDefault(){}});
+assert(a.openToolPicker());key('Home');assert.strictEqual(a.WEB_UI.toolFocus,'none');
+key('ArrowRight');assert.strictEqual(a.WEB_UI.toolFocus,'valve');
+key('ArrowRight');assert.notStrictEqual(a.WEB_UI.toolFocus,'beans','skip used gadget');
+key('End');assert.strictEqual(a.WEB_UI.toolFocus,'quake');
+key('Enter');assert(!a.WEB_UI.toolPicker&&a.pw.sel==='quake');
+assert(a.openToolPicker());key('Numpad5');assert(!a.WEB_UI.toolPicker&&a.pw.sel==='towel');
 assert(html.includes('if(!WEB_UI.toolPicker)update(WEB_SIM_DT);'),'simulation pauses');
 assert(html.includes('if(WEB_UI.toolPicker){const p=pt(e);toolPickerUp('),'real pointer-up routed');
 assert(html.includes("if(state==='play'&&WEB_UI.toolPicker){toolPickerDown"),'real pointer-down routed');

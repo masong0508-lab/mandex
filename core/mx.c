@@ -1405,15 +1405,17 @@ static void stick(MxWorld *w){
   if(m->pwr == PW_QUAKE && !m->splatted){
     m->splatted = 1;
     int cx=rfloor(m->x),cy=rfloor(m->y);
-    for(int j=-5;j<=5;j++)for(int i=-5;i<=5;i++)
-      if(i*i+j*j<=25)damage_cell(w,cx+i,cy+j,RI(13));
+    const int radius=m->dive?6:5;
+    const real damage=RI(m->dive?16:13);
+    for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)
+      if(i*i+j*j<=radius*radius)damage_cell(w,cx+i,cy+j,damage);
     for(int i=0;i<w->ntargets;i++){
       MxTarget *t=&w->targets[i];
       real dx=t->x-m->x,dy=t->y-m->y;
-      if(t->alive && rmul(dx,dx)+rmul(dy,dy)<RI(64))kill_target(w,t);
+      if(t->alive && rmul(dx,dx)+rmul(dy,dy)<RI(m->dive?81:64))kill_target(w,t);
     }
-    ev(w,EV_CRUNCH,m->x,m->y,0,R(0.75),0);
-    if(w->shake<R(8))w->shake=R(8);
+    ev(w,EV_CRUNCH,m->x,m->y,0,m->dive?RI(1):R(0.75),0);
+    if(w->shake<RI(m->dive?10:8))w->shake=RI(m->dive?10:8);
   }
   if(w->walk && !m->walked){ enter_walk(w); return; }          /* walk levels: he lands on his feet and you steer him */
   m->mode = MAN_STUCK; m->vx = m->vy = 0; m->t = 0; m->gooT = 0;
@@ -1666,7 +1668,12 @@ void mx_dive(MxWorld *w){
   if(m->mode == MAN_FLY && m->pwr == PW_BEANS && !m->beaned){     /* beans: a fart jet along his flight */
     m->beaned = 1;
     real sp = rsqrt(rmul(m->vx, m->vx) + rmul(m->vy, m->vy));
-    if(sp > 0){ m->vx += rmul(rdiv(m->vx, sp), RI(65)); m->vy += rmul(rdiv(m->vy, sp), RI(65)) - RI(10); }
+    /* A stalled or steeply falling shot can recover instead of firing
+       its one charge straight into the floor. Keep ordinary jets unchanged. */
+    if(sp<R(2)||m->vy>rabs(m->vx)){
+      m->vx+=RI((m->vx<0||(m->vx==0&&m->face<0))?-40:40);
+      m->vy-=RI(45);
+    }else{ m->vx += rmul(rdiv(m->vx, sp), RI(65)); m->vy += rmul(rdiv(m->vy, sp), RI(65)) - RI(10); }
     ev(w, EV_FART, m->x, m->y, 0, 0, 0);
     if(w->shake < R(5)) w->shake = R(5);
     return;
@@ -1959,7 +1966,7 @@ static void upd_cases(MxWorld *w, real dt){
        countered, not just on the exact button-down frame. */
     if(!dead && m->mode==MAN_WALK && m->pT>0){
       real hx=m->x+(m->face>0?MX_WALK_PUNCH_X:-MX_WALK_PUNCH_X), hy=m->y+MX_WALK_PUNCH_Y;
-      if(rabs(c->x-hx)<MX_WALK_PUNCH_HW+R(0.75) && rabs(c->y-hy)<MX_WALK_PUNCH_HH+R(0.75)){
+      if(rabs(c->x-hx)<(m->charge_punch?R(2.25):MX_WALK_PUNCH_HW)+R(0.75) && rabs(c->y-hy)<MX_WALK_PUNCH_HH+R(0.75)){
         parry_case(w,c);continue;
       }
     }
@@ -2037,7 +2044,7 @@ static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
   mx_flight_face_update(m);
   if(m->face != -1) m->face = 1;
-  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->parry_time_used=0; m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=m->jump_buffer=0;m->jump_latched=m->walk_safe=0;m->walk_jam=0;
+  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->parry_time_used=0; m->charge_punch=0; m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=m->jump_buffer=0;m->jump_latched=m->walk_safe=0;m->walk_jam=0;
   m->in_ax = 0; m->in_jump = m->in_punch = m->in_stomp = 0;
   m->x=rclamp(m->x,WHW+R(.25),RI(MX_COLS)-WHW-R(.25));m->y=rclamp(m->y,WHH,RI(MX_ROWS)-WHH);
   int ok = !wblocked(w, m->x, m->y);
@@ -2101,10 +2108,10 @@ static real walk_hit(MxWorld *w, real cx, real cy, real hw, real hh, real dmg, i
 static void walk_punch(MxWorld *w){
   MxMan *m = &w->man;
   real cx = m->x + (m->face > 0 ? MX_WALK_PUNCH_X : -MX_WALK_PUNCH_X), cy = m->y + MX_WALK_PUNCH_Y;
-  int run = rabs(m->vx) > R(12.5);
+  int run = (m->face > 0 ? m->vx : -m->vx) > R(12.5);
   int parried=0;
-  real d = walk_hit(w, cx, cy, MX_WALK_PUNCH_HW, MX_WALK_PUNCH_HH, RI(run ? 24 : 16), &parried);
-  m->pT = R(0.2); m->pCd = R(0.3);
+  real d = walk_hit(w, cx, cy, run ? R(2.25) : MX_WALK_PUNCH_HW, MX_WALK_PUNCH_HH, RI(run ? 24 : 16), &parried);
+  m->charge_punch = (uint8_t)run; m->pT = R(0.2); m->pCd = R(0.3);
   ev(w, EV_PUNCH, cx, cy, run, d, RI(parried));
   if(d > 0){ if(w->shake < RI(3)) w->shake = RI(3); wob_kick(w, rfloor(cx), rfloor(cy), 4, m->face > 0 ? R(0.9) : -R(0.9), 0); }
 }
@@ -2954,7 +2961,9 @@ static void hq_next_district(MxWorld *w){
   ev(w, EV_DISTRICT, 0, 0, d, RI(mx_stage_bonus(level)), 0);
 }
 
-const char *mx_stage_tactic(const MxWorld *w){return mx_level_tactic(mx_stage_source(w->level,w->district));}
+const char *mx_stage_name(const MxWorld *w){int l=mx_stage_source(w->level,w->district);return w->level==MX_MOUNTAIN_LEVEL?MX_TRIALS[l-MX_TRIAL_START].name:mx_level_name(w->level);}
+int mx_metro_tower_height(const MxWorld *w){return w->level==MX_MOUNTAIN_LEVEL&&w->district>=0&&w->district<MX_METRO_STAGES?MX_METRO_TOWER_FEET[w->district][2]:0;}
+const char *mx_stage_tactic(const MxWorld *w){int l=mx_stage_source(w->level,w->district);return l>=MX_METRO_START&&l<MX_METRO_START+MX_METRO_STAGES?MX_TRIALS[l-MX_TRIAL_START].tip:mx_level_tactic(l);}
 void mx_set_wobble_budget(MxWorld *w, int cells){ w->wob_budget = cells < 0 ? 0 : cells; if(!cells) w->wob_shift = 0; }
 void mx_set_substeps(MxWorld *w, int n){ w->substeps = n < 2 ? 2 : n > 4 ? 4 : n; }
 void mx_preview_point(const MxWorld *w, real t, real *ox, real *oy){
@@ -3147,7 +3156,8 @@ void mx_update(MxWorld *w, real dt){
   man_pose(m, dt);
 
   if(w->state == MX_PLAY){
-    if(mx_targets_alive(w) == 0){
+    mx_summit_visit(w);
+    if(mx_targets_alive(w) == 0 && !mx_summit_needed(w)){
       w->winT += dt;
       if(w->winT > R(1.6) && w->district + 1 < mx_level_stage_count(w->level)){ hq_next_district(w); return; }
       if(w->winT > R(1.6)){ w->state = MX_WIN; w->score += w->men * 3000; ev(w, EV_WIN, 0, 0, 0, 0, 0); }
