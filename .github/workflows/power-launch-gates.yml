@@ -28,7 +28,7 @@ jobs:
       matrix:
         mode: [float, fixed]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compile and exercise real selected-power launches
         run: |
           FLAGS=""

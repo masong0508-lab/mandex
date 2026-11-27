@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Test DS music catch-up ring budget
         run: |
           gcc -std=gnu99 -O2 -Itest/stubs -Ids/source test/music_clock_test.c -o /tmp/mx_music_clock

@@ -13,7 +13,7 @@ jobs:
   ds-art:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: DS detail, pressure progression and pixel bounds
         run: |
           gcc -std=gnu99 -O2 -Wall -Werror -DMX_FIXED -Itest/stubs -Icore -Iart test/ds_inflation_detail_test.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_art

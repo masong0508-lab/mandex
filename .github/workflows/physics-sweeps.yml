@@ -46,7 +46,7 @@ jobs:
             flags: "-DMX_MAX_CHUNKS=48 -DSWEEP_COLLAPSE"
     name: Sweep ${{ matrix.mode }} / shard ${{ matrix.shard }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build and exercise assigned levels, 80 seeds each
         shell: bash
         run: |
