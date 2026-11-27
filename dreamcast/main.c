@@ -67,6 +67,7 @@ static int dc_valve_equipped; /* selected explicitly; hidden during ordinary sho
 #define Z_HUD    5.00f
 #define Z_END    6.00f
 static int hint_t;                            /* ticks left of the 'pull back' hint */
+static int parry_toast_t,parry_toast_bonus;
 static int bank_toast_t;                      /* rubber rebound trick shot HUD message */
 static int survivor_toast_t;                  /* rare catastrophic collapse escape */
 static int collapse_toast_t;                   /* capped severe aftershock tell */
@@ -399,13 +400,13 @@ static void handle_events(void){
     case EV_SURVIVOR: survivor_toast_t=120;
       for(int k=0;k<6;k++)spawn(e->x,e->y,k&1?argb(255,210,63,255):argb(190,180,160,255),230);
       break;
-    case EV_DISTRICT: was_aim=0;dc_valve_equipped=0;world.valve_ok=0;memset(parts,0,sizeof parts);part_high_water=0;
+    case EV_DISTRICT: parry_toast_t=0;was_aim=0;dc_valve_equipped=0;world.valve_ok=0;memset(parts,0,sizeof parts);part_high_water=0;
 #if MX_DC_PARTICLE_HINT
       part_free_hint=0;
 #endif
       break;
     case EV_HEAL:  for(int k = 0; k < 8; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 520); break;
-    case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), e->m == 2 ? 580 : 520); break;
+    case EV_BONK:  for(int k = 0; k < 16; k++) spawn(e->x, e->y, k & 1 ? argb(255, 210, 63, 255) : argb(255, 255, 255, 255), e->m == 2 ? 580 : 520); if(e->m==2){parry_toast_t=72;parry_toast_bonus=e->a>0;} break;
     case EV_THROW: case EV_SWING: for(int k = 0; k < 4; k++) spawn(e->x, e->y, argb(255, 255, 255, 255), 160); break;
     default: break;   /* AICA sounds are routed through mx_event_sfx above. */
     }
@@ -1119,6 +1120,7 @@ static void draw_all(void){
     quad(246, 40, 148, 12, Z_HUD, WHITE); quad(247, 41, 146, 10, Z_HUD + 0.05f, argb(40, 40, 50, 255)); quad(247, 41, 146.0f * k / 100.0f, 10, Z_HUD + 0.1f, k > 30 ? argb(125, 255, 90, 255) : argb(255, 74, 74, 255));
     char clock[24];snprintf(clock,sizeof clock,"TIME %ds",mx_walk_seconds_left(m));
     text(clock,238,51,12,k>30?WHITE:argb(255,100,100,255),2,Z_HUD+.1f);
+    if(parry_toast_t>0)text(parry_toast_bonus?"PARRY +150 / +1S":"PARRY +150",320,443,15,argb(255,210,63,255),1,Z_HUD+.1f);
     text("A JUMP   B PUNCH   X SLAM   L GIVE UP", 320, 466, 14, argb(255, 255, 255, 205), 1, Z_HUD);
   }
   if(m->mode == MAN_FLY && !m->dive) text("PRESS A = BELLY FLOP", 320, 466, 20, argb(255, 255, 255, 205), 1, Z_HUD);
@@ -1193,7 +1195,7 @@ static void draw_all(void){
   }
 }
 
-static void load_level(int n){ bank_toast_t = survivor_toast_t = collapse_toast_t = tnt_toast_t = 0; mx_load(&world, n); mx_set_collapse(&world,console_opt.collapse); mx_set_fight(&world, !nofight); was_aim=0; mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
+static void load_level(int n){ parry_toast_t=parry_toast_bonus=0; bank_toast_t = survivor_toast_t = collapse_toast_t = tnt_toast_t = 0; mx_load(&world, n); mx_set_collapse(&world,console_opt.collapse); mx_set_fight(&world, !nofight); was_aim=0; mx_meta_level_start(&stats, &world); dc_valve_equipped=0; world.valve_ok=0; hint_t = 420; }
 
 static void draw_intro(void){
   intro_draw(ic_top, ic_bot); ic_upload(tx_ic_top, ic_top); ic_upload(tx_ic_bot, ic_bot);
@@ -1398,6 +1400,7 @@ int main(int argc, char **argv){
         } was = world.state; }
       if(hint_t > 0) hint_t--;
       if(bank_toast_t > 0) bank_toast_t--;
+      if(parry_toast_t > 0) parry_toast_t--;
       if(survivor_toast_t > 0) survivor_toast_t--;
       {
         int calm = st && world.state == MX_PLAY && world.man.mode == MAN_AIM && world.banner <= 0 && !st->buttons && abs(st->joyx) < 30 && abs(st->joyy) < 30;

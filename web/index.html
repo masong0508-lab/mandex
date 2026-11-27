@@ -479,7 +479,7 @@ LEVELS.push(
    for(let f=0;f<2;f++){const yb=59-f*12;for(let y=yb-9;y<yb;y++)set(79,y,0);rect(62,yb-9,3,7,0);   // clear the centre partition (the tube shot needs a clear room), then cut the slot
      tgt(71,yb,'thrower');tgt(79,yb);tgt(87,yb);tnt(91,yb)}
    tube('#ff9a3c',300,340,546,456,0);tube('#4fd0ff',410,236,546,360,0)}},
- {name:'Rent Strike',men:4,walk:true,tip:'PUNCH thrown briefcases to PARRY (+150)!  Watch the windup.',build(){   // Walk-Up Wreckage again, 3 storeys, but the tenants on foot are walkers who fight back
+ {name:'Rent Strike',men:4,walk:true,tip:'PARRY cases for +150 points and +1s (six time bonuses per life).',build(){   // Walk-Up Wreckage again, 3 storeys, but the tenants on foot are walkers who fight back
    const g=59,fh=10,ft=2,X=58,Wd=48,F=3,PT=[71,83,95],pap=['#f0e0a8','#cfe0c0','#f0c9c9'],
      DR=[[1,0,1],[0,1,0],[1,0,1]],
      PADS=[[100,0],[60,1]];            // zig-zag again: a pad at the right end of floor 1, at the left end of floor 2
@@ -643,7 +643,7 @@ const EARLY_TACTICS=[
  "GLASS TOWERS SHATTER WITH CHAIN HITS",
  "BREAK THE COLUMN UNDER THE PENTHOUSE",
  "USE TUBES OR THREAD THE MAIL SLOTS",
- "PUNCH A THROWN CASE TO PARRY +150",
+ "PARRY CASES FOR +150 AND +1S",
  "BREAK THE SAND TANK ABOVE THE FIGHT",
  "THREE DISTRICTS - CLEAR EVERY LANDLORD"
 ];
@@ -1556,7 +1556,7 @@ function walkTubeStep(m,dt){
     ring(tb.ax,tb.ay,50,tb.col);ring(tb.bx,tb.by,50,tb.col);SFX.whoosh();popText(m.x,m.y-30,'TUBE TRANSFER!',tb.col,22);shake=Math.max(shake,3);return;
   }
 }
-function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.gait=0;m.vx=m.vy=0;m.landFx=0;m.landPower=0;m.gr=false;m.wt=WALK_T;m.pT=0;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.jumpBuffer=0;m.jumpLatched=false;m.walkSafe=false;m.walkJam=0;m.R=14;m.pwr=m.pwr;
+function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.gait=0;m.vx=m.vy=0;m.landFx=0;m.landPower=0;m.gr=false;m.wt=WALK_T;m.parryTimeUsed=0;m.pT=0;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.jumpBuffer=0;m.jumpLatched=false;m.walkSafe=false;m.walkJam=0;m.R=14;m.pwr=m.pwr;
   m.x=clamp(m.x,WHW+2,WW-WHW-2);m.y=clamp(m.y,WHH,ROWS*V-WHH);
   let ok=!wBlocked(m.x,m.y);for(let u=1;u<=110&&!ok;u++){if(m.y-u>=WHH&&!wBlocked(m.x,m.y-u)){m.y-=u;ok=true}}
   for(let r=4;r<=200&&!ok;r+=4)for(let a=0;a<16&&!ok;a++){const an=-Math.PI/2+(a%2?1:-1)*Math.ceil(a/2)*.4,qx=m.x+Math.cos(an)*r,qy=m.y+Math.sin(an)*r;if(walkPlace(m,qx,qy))ok=true}   // nearest free spot, preferring up
@@ -1585,6 +1585,11 @@ function walkHit(cx,cy,hw,hh,dmg){let dealt=0;const x0=Math.floor((cx-hw)/V),x1=
 function parryCase(c){
   score+=150;spark(c.x,c.y,7,220);
   popText(c.x,c.y-20,'PARRY! +150','#ffd23f',20);
+  const m=man;
+  if(state==='play'&&m&&m.mode==='walk'&&m.wt>0&&m.wt<=WALK_T+14&&(m.parryTimeUsed||0)<6){
+    m.wt+=1;m.parryTimeUsed=(m.parryTimeUsed||0)+1;
+    popText(c.x,c.y-44,'+1s','#7dff5a',18);
+  }
 }
 function walkPunch(){const m=man,cx=m.x+m.face*17,cy=m.y-3,run=Math.abs(m.vx)>100,beforeCases=cases.length,d=walkHit(cx,cy,13,16,run?24:16);m.pT=.2;m.pCd=.3;
   if(d>0){SFX.crunch(Math.min(1,d/90));shake=Math.max(shake,3);spark(cx,cy,5,200);wobKick(Math.floor(cx/V),Math.floor(cy/V),4,m.face*.9,0);if(cases.length===beforeCases)popText(cx,cy-24,run?'SHOULDER!':'POW!','#ffd23f',20)}else SFX.whoosh()}
@@ -4258,7 +4263,7 @@ const CAM={on:false,z:1,x:0,y:0,reset:true,snap:false,hold:0,manual:false};
    landscapes retain the original 960x540 artwork and screen geometry. */
 const WEB_UI={portrait:false,viewportW:0,viewportH:0,
   page:{select:0,ach:0,outfit:0,options:0,edit:0},editorX:0,editorScale:1,
-  editorHeight:480,gesture:null};
+  editorHeight:480,gesture:null,toolPicker:false,toolPointer:null};
 const isPortrait=()=>WEB_UI.portrait;
 const mobilePage=(kind,n,size)=>Math.max(0,Math.min(Math.max(0,Math.ceil(n/size)-1),WEB_UI.page[kind]||0));
 function layoutTick(){
@@ -4353,6 +4358,7 @@ function cancelAim(id){
   dragging=false;
 }
 function resetPlayInput(){
+  WEB_UI.toolPicker=false;WEB_UI.toolPointer=null;
   cancelAim();PLAY_INPUT.soda=null;sodaHold=false;PLAY_INPUT.pan.clear();
   for(const id in TID){if(TID[id])KEYS[TID[id]]=false;delete TID[id]}
 }
@@ -4595,7 +4601,7 @@ function draw(){
   if(camOn)ctx.restore();
   grade();
   if(flash>0){ctx.fillStyle=`rgba(255,240,200,${flash*.9})`;ctx.fillRect(0,0,W,H)}
-  drawHUD();drawObjectiveEdge();drawToasts(frameDt)}
+  drawHUD();drawObjectiveEdge();drawToasts(frameDt);if(WEB_UI.toolPicker)drawToolPicker()}
 // Screen-space HUD cue; does not pan, collide with or change the final
 // landlord. Skip it entirely if the actor is already in the camera view.
 function drawObjectiveEdge(){
@@ -4681,7 +4687,7 @@ function drawHUD(){
            ready==='RELEASE TO LAUNCH'?'#7dff5a':'#ffe190','center');
       }
     }
-    if(man.mode!=='walk')btn(12,H-44,236,32,'TOOL: '+toolName()+chg,()=>{if(man.mode!=='aim'||dragging||man.chug)return;toolCycle();toolArm();if(!toolOn('valve')&&(man.seated||man.vlv)){man.seated=false;man.vlv=false;man.x=SX;man.y=SY}pdTouch();pdSave();SFX.pop()},{size:14,on:toolName()!=='NONE',disabled:man.mode!=='aim'||dragging||!!man.chug});
+    if(man.mode!=='walk')btn(12,H-44,236,32,'TOOL: '+toolName()+chg+'  >',()=>openToolPicker(),{size:13,on:toolName()!=='NONE',disabled:!toolPickerAllowed()});
     if(pw.sel){const tip={beans:'BEANS: tap in the air for a fart jet',towel:'TOWEL: glide further',splat:'SPLAT: huge goo blast on landing',turbo:'TURBO: 35% faster launch',quake:'QUAKE: heavy landing shockwave',burp:'BURPBURSTER: tap in the air for a shockwave; no tap = burst on impact'}[pw.sel];txt(tip,W/2,H-54,15,'#ffd23f','center')}}
   if(man.mode==='fly'&&man.pwr==='beans'&&!man.beaned){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = FART JET!',W/2,P?H-60:H-18,18,'#b6e04a','center');ctx.globalAlpha=1}
   if(man.mode==='fly'&&man.pwr==='burp'&&!man.burped){ctx.globalAlpha=.8+.2*Math.sin(time*12);txt('TAP = BURP BLAST!',W/2,P?H-60:H-18,18,'#ffd23f','center');ctx.globalAlpha=1}
@@ -4693,6 +4699,97 @@ function drawHUD(){
     btn(W-146,P?66:74,138,30,CAM.manual?'FOLLOW':'CAMERA',()=>cameraMode(!CAM.manual),{size:14,on:CAM.manual});
   }
   if(state==='win'||state==='lose')drawEnd()}
+/* Direct modal picker: actual inventory, no launch or background gesture,
+ * and no simulation advance while choosing. */
+const TOOL_PICKER_DETAILS={
+  none:'Standard launch',valve:'Inflate before launch',burp:'Chug soda, then blast',
+  beans:'Mid-air boost',towel:'Glide further',splat:'Goo burst on impact',
+  turbo:'35% faster launch',quake:'Landing shockwave'
+};
+function toolPickerAllowed(){
+  return state==='play'&&man&&man.mode==='aim'&&!dragging&&!man.chug&&
+    !(pw.sel==='burp'&&pw.left.burp>0)&&!PLAY_INPUT.aim&&PLAY_INPUT.soda===null&&!PLAY_INPUT.pan.size;
+}
+function toolPickerStatus(id){
+  if(id==='none')return 'STANDARD';
+  if(id==='valve')return valveOpen()?'UNLIMITED':'LOCKED - 3 CLEARS';
+  const n=Math.max(0,Number(pw.left[id])||0);
+  return n>0?'READY x'+n:'USED';
+}
+function toolPickerLayout(w,h){
+  const portrait=w<700,cols=portrait?2:4,ids=['none'].concat(toolList().map(t=>t.id));
+  const width=Math.min(w-24,760),height=portrait?484:306,x=(w-width)/2,y=(h-height)/2;
+  const gap=8,cardW=(width-32-(cols-1)*gap)/cols,cardH=portrait?82:84;
+  const cards=ids.map((id,i)=>({id,x:x+16+(i%cols)*(cardW+gap),y:y+72+Math.floor(i/cols)*(cardH+gap),w:cardW,h:cardH}));
+  return {x,y,w:width,h:height,cards,close:{x:x+16,y:y+height-44,w:width-32,h:32}};
+}
+function toolPickerHit(x,y){
+  const p=toolPickerLayout(W,H),inside=(a)=>x>=a.x&&x<a.x+a.w&&y>=a.y&&y<a.y+a.h;
+  if(!inside(p)||inside(p.close))return 'close';
+  const c=p.cards.find(inside);return c?c.id:null;
+}
+function closeToolPicker(){
+  WEB_UI.toolPicker=false;WEB_UI.toolPointer=null;hits=[];
+}
+function openToolPicker(){
+  if(!toolPickerAllowed())return false;
+  resetPlayInput();WEB_UI.toolPicker=true;WEB_UI.toolPointer=null;hits=[];
+  return true;
+}
+function toolPickerSelect(id){
+  if(!WEB_UI.toolPicker||!toolPickerAllowed())return false;
+  if(!Object.hasOwn(TOOL_PICKER_DETAILS,id))return false;
+  const status=toolPickerStatus(id);
+  if(status.startsWith('LOCKED')||status==='USED')return false;
+  OPT().tool=id;toolArm();
+  if(id!=='valve'&&(man.seated||man.vlv)){
+    man.seated=false;man.vlv=false;man.x=SX;man.y=SY;
+  }
+  closeToolPicker();pdTouch();pdSave();SFX.pop();return true;
+}
+function toolPickerDown(e,x,y){
+  if(WEB_UI.toolPointer!==null||(e.button!==undefined&&e.button!==0))return;
+  WEB_UI.toolPointer={id:e.pointerId,item:toolPickerHit(x,y),x,y};
+  try{cv.setPointerCapture(e.pointerId)}catch(_){}
+}
+function toolPickerUp(e,x,y){
+  const p=WEB_UI.toolPointer;if(!p||p.id!==e.pointerId)return;
+  WEB_UI.toolPointer=null;
+  if(Math.hypot(x-p.x,y-p.y)>22||toolPickerHit(x,y)!==p.item)return;
+  if(p.item==='close')closeToolPicker();else if(p.item)toolPickerSelect(p.item);
+}
+function toolPickerCancel(id){
+  if(WEB_UI.toolPointer&&WEB_UI.toolPointer.id===id)WEB_UI.toolPointer=null;
+}
+function toolPickerKey(e){
+  if(!WEB_UI.toolPicker)return false;
+  e.preventDefault();if(e.repeat)return true;
+  if(e.code==='Escape'||e.code==='KeyT')closeToolPicker();
+  else if(/^Digit[1-8]$/.test(e.code)){
+    const ids=['none'].concat(toolList().map(t=>t.id));toolPickerSelect(ids[+e.code.slice(-1)-1]);
+  }
+  return true;
+}
+function drawToolPicker(){
+  if(!toolPickerAllowed()){closeToolPicker();return}
+  const p=toolPickerLayout(W,H),selected=OPT().tool||'none';
+  ctx.fillStyle='rgba(4,8,18,.76)';ctx.fillRect(0,0,W,H);
+  rrect(p.x,p.y,p.w,p.h,15);ctx.fillStyle='#16223a';ctx.fill();ctx.strokeStyle='#d6ad74';ctx.lineWidth=2;ctx.stroke();
+  txt('CHOOSE A TOOL',W/2,p.y+28,24,'#ffe090','center');
+  txt('PAUSED / CHARGES SPENT ONLY ON LAUNCH',W/2,p.y+51,12,'#b7d5e9','center');
+  for(let i=0;i<p.cards.length;i++){
+    const c=p.cards[i],status=toolPickerStatus(c.id),locked=status==='USED'||status.startsWith('LOCKED'),on=c.id===selected;
+    rrect(c.x,c.y,c.w,c.h,9);ctx.fillStyle=locked?'#30384b':on?'#355a55':'#263754';ctx.fill();
+    ctx.strokeStyle=on?'#ffe090':locked?'#4a5266':'#91aac8';ctx.lineWidth=on?2:1;ctx.stroke();
+    const name=c.id==='none'?'NONE':TOOLS.find(t=>t.id===c.id).name;
+    txt((i+1)+'. '+name,c.x+10,c.y+22,13,locked?'#9ca8b9':'#fff','left');
+    txt(TOOL_PICKER_DETAILS[c.id],c.x+10,c.y+42,11,'#c4d5e7','left');
+    txt(status,c.x+10,c.y+63,11,locked?'#ffbd93':'#b5f5c5','left');
+    if(on)txt('SELECTED',c.x+c.w-8,c.y+63,10,'#ffe090','right');
+  }
+  const c=p.close;rrect(c.x,c.y,c.w,c.h,8);ctx.fillStyle='#304565';ctx.fill();ctx.strokeStyle='#91aac8';ctx.lineWidth=1;ctx.stroke();
+  txt('CANCEL / BACK TO AIM',W/2,c.y+21,14,'#fff','center');
+}
 function star(x,y,r,on){ctx.fillStyle=on?'#ffd23f':'#3a3f55';ctx.strokeStyle='#000';ctx.lineWidth=3;ctx.beginPath();for(let i=0;i<10;i++){const a=-1.5708+i*.6283,rr=i%2?r*.45:r;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.closePath();ctx.stroke();ctx.fill()}
 function drawEnd(){
   ctx.fillStyle='rgba(8,10,20,.72)';ctx.fillRect(0,0,W,H);const win=state==='win';
@@ -4772,6 +4869,7 @@ cv.addEventListener('pointerdown',e=>{
       try{cv.setPointerCapture(e.pointerId)}catch(_){}
     return;
   }
+  if(state==='play'&&WEB_UI.toolPicker){toolPickerDown(e,x,y);return}
   if(state==='play'){
     if(PLAY_INPUT.aim&&!dragging)PLAY_INPUT.aim=null;
     if(PLAY_INPUT.aim||PLAY_INPUT.soda!==null)return;
@@ -4793,6 +4891,7 @@ cv.addEventListener('pointerdown',e=>{
   if(man.mode==='aim'&&!man.chug&&!(man.stun>0)&&Math.hypot(wx-man.x,wy-man.y)<(CAM.on?130:70)){PLAY_INPUT.aim={id:e.pointerId,man,x:man.x,y:man.y,seated:man.seated,vlv:man.vlv};AIM0={sx:x,sy:y,wx,wy};dragging=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}}
   else dive()});
 cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
+  if(WEB_UI.toolPicker)return;
   if(state==='play'&&CAM.manual){manualCameraMove(e,mx,my);return}
   if(state==='play'&&man.mode==='walk'&&TID[e.pointerId]!==undefined){
     walkTouch(mx,my,e.pointerId,true);return;
@@ -4810,6 +4909,7 @@ cv.addEventListener('pointermove',e=>{{const[mx,my]=pt(e);mouseX=mx;mouseY=my;
   if(sliderDrag&&state==='options'){setVolFromX(mx);return}}if(!dragging||state!=='play'||!PLAY_INPUT.aim||PLAY_INPUT.aim.id!==e.pointerId||man.mode!=='aim')return;gagReset(man.G);const[sx,sy]=pt(e),zz=CAM.on?CAM.z:1,x=AIM0.wx+(sx-AIM0.sx)/zz,y=AIM0.wy+(sy-AIM0.sy)/zz;let dx=x-SX,dy=y-SY;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}const dv=Math.hypot(x-VX,y-VY),vOn=toolOn('valve')&&valveOpen();if(man.seated&&dv<VKEEP)return;if(vOn&&!man.seated&&dv<VGRAB){man.vlv=true;man.seated=true;man.x=VX;man.y=VY;SFX.valveCrack();return}if(man.seated)SFX.plop();man.x=SX+dx;man.y=SY+dy;man.vlv=false;man.seated=false;
   if(vOn&&dv<VPULL){const k=.9*(VPULL-dv)/(VPULL-VGRAB);man.x+=(VX-man.x)*k;man.y+=(VY-man.y)*k}});   // nearing the valve the sling stretches on back toward it (power stays a full pull), then he drops onto it
 cv.addEventListener('pointerup',e=>{
+  if(WEB_UI.toolPicker){const p=pt(e);toolPickerUp(e,p[0],p[1]);return}
   if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId){
     const g=WEB_UI.gesture;WEB_UI.gesture=null;
     const p=pt(e),dy=p[1]-g.y;
@@ -4846,12 +4946,14 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseAllW
 for(const ev of['pointerup','pointercancel'])cv.addEventListener(ev,e=>{
   releaseWalkTouch(e.pointerId);
   if(ev==='pointercancel'){
+    if(WEB_UI.toolPicker)toolPickerCancel(e.pointerId);
     if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
     if(state==='edit')eEndStroke(e.pointerId,true);
     if(state==='play')releasePlayPointer(e.pointerId);
   }
 });
 cv.addEventListener('lostpointercapture',e=>{
+  if(WEB_UI.toolPicker)toolPickerCancel(e.pointerId);
   releaseWalkTouch(e.pointerId);
   if(WEB_UI.gesture&&WEB_UI.gesture.id===e.pointerId)WEB_UI.gesture=null;
   if(state==='edit')eEndStroke(e.pointerId,true);
@@ -4861,12 +4963,15 @@ cv.addEventListener('contextmenu',e=>{if(state==='play')e.preventDefault()});
 cv.addEventListener('wheel',e=>{
   if(state!=='play')return;
   e.preventDefault();
-  if(dragging||PLAY_INPUT.soda!==null||PLAY_INPUT.pan.size)return;
+  if(WEB_UI.toolPicker||dragging||PLAY_INPUT.soda!==null||PLAY_INPUT.pan.size)return;
   if(!CAM.manual)cameraMode(true);
   const [x,y]=pt(e),dy=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?H:1);
   manualCameraTransform(x,y,x,y,Math.exp(clamp(-dy*.002,-.65,.65)));
 },{passive:false});
-addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);KEYS[e.code]=true;
+addEventListener('keydown',e=>{audioInit();if(man&&man.G)gagReset(man.G);
+  if(WEB_UI.toolPicker&&toolPickerKey(e))return;
+  if(state==='play'&&e.code==='KeyT'&&!e.repeat){e.preventDefault();openToolPicker();return}
+  KEYS[e.code]=true;
   if(man&&man.mode==='walk'&&state==='play'){if(e.code==='KeyG')walkQuit();if(/^(Space|Arrow)/.test(e.code))e.preventDefault()}
   if(e.code==='Space'){dive();e.preventDefault()}
   if(state==='play'&&e.code==='KeyC'&&!e.repeat){cameraMode(!CAM.manual);return}
@@ -6904,11 +7009,11 @@ function loop(t){
     webFxCap=webFxBudget(OPT());webDetailedLighting=state!=='play'||webLightingDetail(OPT()); // resolve preferences once, not for every particle
     layoutTick();
     for(let i=0;i<ticks;i++){
-      const playing=state==='play';
-      update(WEB_SIM_DT);
+      const playing=state==='play'&&!WEB_UI.toolPicker;
+      if(!WEB_UI.toolPicker)update(WEB_SIM_DT);
       if(playing)sim++;
     }
-    camTick(Math.min(.067,raw));musUpdate();
+    if(!WEB_UI.toolPicker)camTick(Math.min(.067,raw));musUpdate();
     const mode=(man&&man.mode||''),cap=state==='play'?webRenderCap(OPT()):60;
     const force=state!==webDrawState||mode!==webDrawMode||cv.width!==webDrawW||cv.height!==webDrawH||cap!==webDrawCap;
     if(force||t+1>=webNextDraw){
@@ -6917,7 +7022,7 @@ function loop(t){
       webNextDraw=webNextPaint(t,cap,webNextDraw,force);webDrawCap=cap;
       webDrawState=state;webDrawMode=mode;webDrawW=cv.width;webDrawH=cv.height;
     }
-    webPerfSample(OPT(),raw,performance.now()-started,state==='play');
+    webPerfSample(OPT(),raw,performance.now()-started,state==='play'&&!WEB_UI.toolPicker);
   }catch(e){console.error(e)}
   frameMeterClock+=raw;frameMeterDraws+=painted?1:0;frameMeterSims+=sim;frameMeterGameTime+=sim*WEB_SIM_DT;
   if(frameMeterClock>=2){

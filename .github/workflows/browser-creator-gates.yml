@@ -35,6 +35,8 @@ jobs:
         run: node test/browser_orientation_test.js
       - name: Captured multitouch and camera safety
         run: node test/browser_multitouch_test.js
+      - name: Direct gadget chooser, stock and modal touch isolation
+        run: node test/browser_tool_picker_test.js
       - name: Shared walk controls and collision memory
         run: node test/browser_walk_memory_test.js
       - name: Portrait walking focus and bounded camera transitions

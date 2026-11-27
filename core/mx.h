@@ -124,7 +124,7 @@ enum {
   EV_SLAM,     /* walking belly slam at x,y: a = damage dealt, b > 0 if PARRY popup takes priority */
   EV_PAD,      /* bounce pad boing at x,y: m = 1 if it was a stomp-boosted one */
   EV_HURT,     /* a landlord hurt him at x,y: m = 1 on foot, 0 in the sling */
-  EV_BONK,     /* bat swat at x,y: m=0 bat, m=1 shield; m=2 player parried a thrown case (+150 points) */
+  EV_BONK,     /* bat swat at x,y: m=0 bat, m=1 shield; m=2 parry (+150 points; a=extra walking seconds granted) */
   EV_THROW,    /* a landlord threw a briefcase from x,y */
   EV_SWING,    /* a landlord swung at x,y (walker punch / bat practice swing) */
   EV_HEAL,     /* a healer patched a landlord up at x,y */
@@ -182,6 +182,7 @@ typedef struct { real x, y, vx, vy, rot, l; uint8_t active; } MxCase;      /* a 
 #define MX_MAX_PADS 3
 typedef struct { uint8_t x, y, w; } MxPad;                                  /* bounce pad: top-left cell and width (the pad itself is rubber in the grid) */
 #define MX_WALK_T 45
+#define MX_PARRY_TIME_MAX 6 /* extra seconds from deflections per walking life */
 
 /* Pneumatic tube (chapter 2): a man who flies within MX_TUBE_R of the mouth (ax,ay) is posted out of the nozzle (bx,by) at (vx,vy) cells/s. */
 #define MX_MAX_TUBES 3
@@ -199,7 +200,7 @@ typedef struct {
      short-hop release after an ordinary player jump. No new buffers. */
   real ledge_grace, jump_hold, jump_buffer;
   real walk_safe_x, walk_safe_y, walk_jam; /* validated temporary recovery point, not a saved checkpoint */
-  uint8_t jump_latched, walk_safe;
+  uint8_t jump_latched, walk_safe, parry_time_used; /* transient, not serialized */
   real gait;            /* cosmetic ground distance, modulo 4 cells; no renderer memory or save data */
   int8_t in_ax; uint8_t in_jump, in_punch, in_stomp;
   real tubeT, tubeCd;  /* just posted out of a tube: gravity is 10 % for tubeT seconds, no second tube for tubeCd seconds */

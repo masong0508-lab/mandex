@@ -108,6 +108,27 @@ int main(void){
   CHECK(events(EV_HURT)==1,
         "normal incoming briefcase still hurts an undefended walker");
 
+  /* Reward every real parry, but cap time at six seconds per life. */
+  setup();
+  for(int i=0;i<8;i++){
+    w.nev=0;case_at(0,punch_x(),punch_y());walk_punch(&w);
+    CHECK(w.score==(i+1)*150,"score remains +150 after time budget expires");
+    CHECK(w.man.parry_time_used==(i<6?i+1:6),"bounded per-life budget");
+    CHECK(w.man.wt==RI(30+(i<6?i+1:6)),"exact clock reward");
+    for(int e=0;e<w.nev;e++)if(w.ev[e].type==EV_BONK)
+      CHECK(w.ev[e].a==RI(i<6?1:0),"event reports actual time");
+    parry_case(&w,&w.cases[0]);
+    CHECK(w.score==(i+1)*150,"inactive case cannot score twice");
+  }
+  setup();w.man.wt=R(59.5);case_at(0,punch_x(),punch_y());walk_punch(&w);
+  CHECK(w.man.wt==R(59.5)&&w.man.parry_time_used==0,"near-cap does not waste budget");
+  w.man.wt=RI(59);case_at(0,punch_x(),punch_y());walk_punch(&w);
+  CHECK(w.man.wt==RI(60)&&w.man.parry_time_used==1,"exact cap");
+  w.man.wt=0;case_at(0,punch_x(),punch_y());walk_punch(&w);
+  CHECK(w.man.wt==0,"expired clock cannot revive");
+  w.man.parry_time_used=6;w.man.mode=MAN_FLY;enter_walk(&w);
+  CHECK(w.man.parry_time_used==0&&w.man.wt==RI(MX_WALK_T),"new walking life resets its budget");
+
   /* Campaign reachability: a nearby thrower on a walking floor must
      telegraph first, then release a real solved arc. */
   setup();w.nofight=0;w.man.mode=MAN_WALK;w.man.x=RI(40);w.man.y=RI(35);

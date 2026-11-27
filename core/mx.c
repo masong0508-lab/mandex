@@ -1934,11 +1934,17 @@ static int bat_block(MxWorld *w, MxTarget *t){
   return 1;
 }
 
-/* Shared parry result for both the immediate fist hitbox and a projectile
-   entering the already visible punch animation. No extra world state. */
+/* Reward actual deflections, with six one-second extensions per walking
+   life. Never revive an expired clock or exceed the existing 60s cap. */
 static void parry_case(MxWorld *w, MxCase *c){
+  if(!c->active)return;
   c->active=0; w->score+=150;
-  ev(w, EV_BONK, c->x, c->y, 2, 0, 0);
+  MxMan *m=&w->man; int bonus=0;
+  if(w->state==MX_PLAY&&m->mode==MAN_WALK&&m->wt>0&&
+     m->wt<=RI(MX_WALK_T+14)&&m->parry_time_used<MX_PARRY_TIME_MAX){
+    m->wt+=RI(1);m->parry_time_used++;bonus=1;
+  }
+  ev(w, EV_BONK, c->x, c->y, 2, RI(bonus), 0);
 }
 
 static void upd_cases(MxWorld *w, real dt){
@@ -2031,7 +2037,7 @@ static void enter_walk(MxWorld *w){
   MxMan *m = &w->man;
   mx_flight_face_update(m);
   if(m->face != -1) m->face = 1;
-  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=m->jump_buffer=0;m->jump_latched=m->walk_safe=0;m->walk_jam=0;
+  m->mode = MAN_WALK; m->walked = 1; m->turn_ticks=0; m->vx = m->vy = 0; m->gr = 0; m->wt = RI(MX_WALK_T); m->parry_time_used=0; m->pT = m->pCd = m->gait = 0; m->stomp = 0; m->ledge_grace=m->jump_hold=m->jump_buffer=0;m->jump_latched=m->walk_safe=0;m->walk_jam=0;
   m->in_ax = 0; m->in_jump = m->in_punch = m->in_stomp = 0;
   m->x=rclamp(m->x,WHW+R(.25),RI(MX_COLS)-WHW-R(.25));m->y=rclamp(m->y,WHH,RI(MX_ROWS)-WHH);
   int ok = !wblocked(w, m->x, m->y);
@@ -2493,7 +2499,7 @@ const char *mx_level_tactic(int l){
     "GLASS TOWERS SHATTER WITH CHAIN HITS",
     "BREAK THE COLUMN UNDER THE PENTHOUSE",
     "USE TUBES OR THREAD THE MAIL SLOTS",
-    "PUNCH A THROWN CASE TO PARRY +150",
+    "PARRY CASES FOR +150 AND +1S",
     "BREAK THE SAND TANK ABOVE THE FIGHT",
     "THREE DISTRICTS - CLEAR EVERY LANDLORD"
   };

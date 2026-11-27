@@ -13,9 +13,9 @@ const stepCases=section('function updCases(', '/* Only a collapsing room');
 function make(){
   const e={
     V:8,RC:4,WHH:19,RUBBER:7,COLS:120,ROWS:60,WW:960,G:900,GY:480,
-    score:0,shake:0,grid:new Uint8Array(7200),hp:new Float32Array(7200),
+    state:'play',WALK_T:45,score:0,shake:0,grid:new Uint8Array(7200),hp:new Float32Array(7200),
     MAT:[],chunks:[],cases:[],targets:[],events:[],hurtCount:0,
-    man:{mode:'walk',x:320,y:300,face:1,vx:0,vy:0,pT:0,pCd:0,stomp:false,R:14}};
+    man:{mode:'walk',x:320,y:300,face:1,vx:0,vy:0,pT:0,pCd:0,stomp:false,R:14,wt:30,parryTimeUsed:0}};
   e.idx=(x,y)=>y*120+x;
   e.inb=(x,y)=>x>=0&&x<120&&y>=0&&y<60;
   e.damageCell=()=>0;e.wobKick=()=>{};e.wake=()=>{};e.killTarget=()=>{};
@@ -107,6 +107,21 @@ unguarded.updCases(1/60);
 check(unguarded.e.hurtCount===1&&unguarded.e.score===0&&unguarded.e.cases.length===0,
   'briefcase must still strike an undefended player');
 
+const clock=make();
+for(let i=0;i<8;i++){
+  clock.caseAt(337,297);clock.walkPunch();
+  check(clock.e.score===(i+1)*150,'score remains +150');
+  check(clock.e.man.wt===30+Math.min(i+1,6),'bounded clock reward');
+  check(clock.e.man.parryTimeUsed===Math.min(i+1,6),'bounded life count');
+}
+check(popups(clock.e).filter(t=>t==='+1s').length===6,'actual awards show +1s');
+const cap=make();cap.e.man.wt=59.5;cap.caseAt(337,297);cap.walkPunch();
+check(cap.e.man.wt===59.5&&cap.e.man.parryTimeUsed===0,'near-cap does not waste budget');
+cap.e.man.wt=59;cap.caseAt(337,297);cap.walkPunch();
+check(cap.e.man.wt===60&&cap.e.man.parryTimeUsed===1,'exact cap');
+cap.e.man.wt=0;cap.caseAt(337,297);cap.walkPunch();
+check(cap.e.man.wt===0,'expired life cannot revive');
+check(html.includes('m.wt=WALK_T;m.parryTimeUsed=0;'),'fresh life resets budget');
 const parseStart=html.indexOf('<script>'),parseEnd=html.indexOf('</script>',parseStart);
 new Function(html.slice(parseStart+8,parseEnd));
 console.log('BROWSER_CASE_PARRY_PASS checks='+checks+
