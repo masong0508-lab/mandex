@@ -116,6 +116,36 @@ int main(void){
   for(int y=10;y<=30;y++)for(int x=65;x<=75;x++)w.grid[IDX(x,y)]=MX_STEEL;
   real ox=w.man.x,oy=w.man.y;walk_tube_step(&w,DT);
   CHECK(w.man.x==ox&&w.man.y==oy&&w.man.tubeCd>0,"solid tube exit refuses transport");
+  /* Exhaust the sample boundaries against the old Cartesian predicate.
+     Live, dead and sleeping cells share the same voxel geometry. */
+  scene(0);
+  MxChunk *ch=&w.chunks[0];
+  ch->active=1;ch->rest=1;ch->count=1;ch->rad=RI(20);ch->x=RI(40);ch->y=RI(30);
+  MxCell *a=&ch->cells[0];
+  const real xs[3]={ch->x-WHW,ch->x,ch->x+WHW};
+  const real ys[5]={ch->y-WHH,ch->y-R(1.1875),ch->y,ch->y+R(1.1875),ch->y+WHH-R(.0125)};
+  for(int ix=-16;ix<=16;ix++)for(int iy=-28;iy<=28;iy++){
+    a->wx=ch->x+rmul(RI(ix),R(.125));
+    a->wy=ch->y+rmul(RI(iy),R(.125));
+    int expect=0;
+    for(int x=0;x<3;x++)for(int y=0;y<5;y++)
+      if(rabs(a->wx-xs[x])<RC&&rabs(a->wy-ys[y])<RC)expect=1;
+    CHECK(wblocked(&w,ch->x,ch->y)==expect,"separable voxel samples preserve original collision");
+  }
+  a->wx=ch->x;a->wy=ch->y;a->dead=1;
+  CHECK(!wblocked(&w,ch->x,ch->y),"destroyed debris does not block walking");
+  /* At the ceiling the old local pop-out could put the body above the map.
+     A jammed walker also must not trigger a tube until safely recovered. */
+  scene(0);w.man.x=RI(2);w.man.y=WHH;
+  w.man.walk_safe=1;w.man.walk_safe_x=RI(25);w.man.walk_safe_y=RI(20);
+  for(int y=0;y<10;y++)for(int x=0;x<15;x++)w.grid[IDX(x,y)]=MX_STEEL;
+  w.ntubes=1;w.tubes[0]=(MxTube){.ax=w.man.x,.ay=w.man.y,.bx=RI(70),.by=RI(20),.vx=RI(60)};
+  tick(0,0,0);
+  CHECK(w.man.y==WHH&&w.man.x==RI(2)&&w.man.walk_jam>0,"ceiling jam refuses off-map escape");
+  walk_tube_step(&w,DT);
+  CHECK(w.man.x==RI(2)&&w.man.tubeCd==0,"jammed walker cannot activate tube");
+  for(int n=0;n<20;n++)tick(0,0,0);
+  CHECK(w.man.x==RI(25)&&w.man.y>=WHH&&!wblocked(&w,w.man.x,w.man.y),"ceiling jam restores valid safe point");
   if(failures){fprintf(stderr,"WALK_JUMP_FORGIVENESS_FAIL %d/%d\n",failures,checks);return 1;}
   printf("WALK_JUMP_FORGIVENESS_PASS cases=%d short_hop=1 held_height=1 coyote=1 no_double=1 edge=1 stomp=1 pad=1\n",checks);
   return 0;
