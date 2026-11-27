@@ -4772,10 +4772,23 @@ function toolPickerKey(e){
     const ids=['none'].concat(toolList().map(t=>t.id));
     const ready=ids.filter(id=>{const status=toolPickerStatus(id);return status!=='USED'&&!status.startsWith('LOCKED')});
     let i=ready.indexOf(WEB_UI.toolFocus||OPT().tool||'none');
-    if(e.code==='Enter'||e.code==='Space'){if(i>=0)toolPickerSelect(ready[i]);}
+    if(e.code==='Enter'||e.code==='Space'){if(i>=0&&WEB_UI.toolPointer===null)toolPickerSelect(ready[i]);}
     else if(e.code==='Home')WEB_UI.toolFocus=ready[0];
     else if(e.code==='End')WEB_UI.toolFocus=ready[ready.length-1];
-    else {const d=e.code==='ArrowLeft'||e.code==='ArrowUp'?-1:1;WEB_UI.toolFocus=ready[(i<0?(d<0?ready.length-1:0):(i+d+ready.length)%ready.length)];}
+    else {
+      // Navigate the actual card grid, preserving columns on vertical moves.
+      const cols=W<700?2:4,vertical=e.code==='ArrowUp'||e.code==='ArrowDown';
+      const d=e.code==='ArrowLeft'||e.code==='ArrowUp'?-1:1;
+      const start=ids.indexOf(ready[i]);
+      if(vertical&&start>=0){
+        for(let n=start+d*cols;n>=0&&n<ids.length;n+=d*cols){
+          if(ready.includes(ids[n])){WEB_UI.toolFocus=ids[n];return true;}
+        }
+        // At a grid edge, retain focus rather than jumping to an unrelated card.
+        return true;
+      }
+      WEB_UI.toolFocus=ready[(i<0?(d<0?ready.length-1:0):(i+d+ready.length)%ready.length)];
+    }
   }
   return true;
 }
@@ -4785,7 +4798,7 @@ function drawToolPicker(){
   ctx.fillStyle='rgba(4,8,18,.76)';ctx.fillRect(0,0,W,H);
   rrect(p.x,p.y,p.w,p.h,15);ctx.fillStyle='#16223a';ctx.fill();ctx.strokeStyle='#d6ad74';ctx.lineWidth=2;ctx.stroke();
   txt('CHOOSE A TOOL',W/2,p.y+28,24,'#ffe090','center');
-  txt('PAUSED / CHARGES SPENT ONLY ON LAUNCH',W/2,p.y+51,12,'#b7d5e9','center');
+  txt('PAUSED / TAP OR ARROWS + ENTER',W/2,p.y+51,12,'#b7d5e9','center');
   for(let i=0;i<p.cards.length;i++){
     const c=p.cards[i],status=toolPickerStatus(c.id),locked=status==='USED'||status.startsWith('LOCKED'),on=c.id===selected;
     rrect(c.x,c.y,c.w,c.h,9);ctx.fillStyle=locked?'#30384b':on?'#355a55':'#263754';ctx.fill();
