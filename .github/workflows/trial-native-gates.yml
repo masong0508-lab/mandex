@@ -4,6 +4,7 @@ on:
     paths:
       - "core/**"
       - "test/native_*_test.c"
+      - "ds/source/mx_trial_nav.h"
       - "test/vmu_save_test.c"
       - "test/save_test.c"
       - ".github/workflows/trial-native-gates.yml"
@@ -12,6 +13,7 @@ on:
     paths:
       - "core/**"
       - "test/native_*_test.c"
+      - "ds/source/mx_trial_nav.h"
       - "test/vmu_save_test.c"
       - "test/save_test.c"
       - ".github/workflows/trial-native-gates.yml"
@@ -37,6 +39,8 @@ jobs:
           if [ "${{ matrix.mode }}" = fixed ]; then flags+=(-DMX_FIXED); fi
           gcc "${flags[@]}" -Wno-unused-function test/native_trial_pack_test.c core/mx_meta.c -lm -o /tmp/trials
           /tmp/trials
+          gcc "${flags[@]}" -Ids/source test/native_trial_nav_test.c -o /tmp/trial_nav
+          /tmp/trial_nav
           gcc "${flags[@]}" test/native_options_test.c core/mx_meta.c -lm -o /tmp/options
           /tmp/options
           gcc "${flags[@]}" -Wno-unused-function test/native_cel_motion_test.c -lm -o /tmp/cel_motion

@@ -26,6 +26,18 @@ function checkLandscape(html){
  click('TRIALS');paint();assert.strictEqual(env.tiles.length,20);env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',60]);
  click('< DISTRICT');paint();env.tiles.at(-1).fn();assert.deepStrictEqual(env.actions.pop(),['story',659]);
  env.WEB_UI.districtPicker=true;paint();assert.strictEqual(env.tiles.length,0);assert.strictEqual(env.buttons.filter(b=>b.label==='').length,30);env.buttons.filter(b=>b.label==='')[18].fn();paint();env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',420]);
+ for(let i=60;i<660;i++)env.PD.stars[i]=3;
+ env.PD.stars[65]=0;env.PD.stars[641]=0;
+ env.trialDistrict=18;paint();
+ click('PLAY NEXT UNCLEARED DISTRICT');
+ assert.deepStrictEqual(env.actions.pop(),['story',641]);
+ env.PD.stars[641]=3;env.trialDistrict=29;paint();
+ click('PLAY NEXT UNCLEARED DISTRICT');
+ assert.deepStrictEqual(env.actions.pop(),['story',65]);
+ env.PD.stars[65]=3;paint();
+ assert(env.buttons.some(b=>b.label==='ALL TRIALS CLEARED'));
+ const allClear=env.buttons.find(b=>b.label==='ALL TRIALS CLEARED');
+ allClear.fn();assert(env.actions.length===0);
  return 'WEB_LANDSCAPE_SELECT_PASS all_custom_pages=1 actions=1 delete_clamp=1 trial_wrap=1';
 }
 if(require.main===module)console.log(checkLandscape(fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8')));

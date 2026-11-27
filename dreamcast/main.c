@@ -36,6 +36,7 @@
 #include "mx_objective.h"
 #include "mx_fps_meter.h"
 #include "mx_meta.h"
+#include "mx_trial_nav.h"
 #include "mx_options_menu.h"
 static MxOptions console_opt;
 static MxOptMenu opt_menu;
@@ -604,6 +605,7 @@ static void draw_title(void){
     text("THE LANDLORD SMASHER",320,225,29,WHITE,1,Z_HUD);
   }
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
+  text("B: NEXT UNCLEARED TRIAL",320,370,17,argb(255,210,63,255),1,Z_HUD);
   if(title_lv>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,title_lv,&stars);char b[80];snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/30  %d/20 CLEARED  %d/60 STARS",(title_lv-MX_TRIAL_START)/20+1,clear,stars);text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
   else text("UP/DOWN: TRIAL DISTRICTS",320,394,17,argb(255,210,63,255),1,Z_HUD);
   { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD);
@@ -1312,7 +1314,11 @@ int main(int argc, char **argv){
       } else if(opt_open){options_input(pressed);}
       else if((on_title||paused)&&(pressed&CONT_X)){opt_open=1;mx_opt_open(&opt_menu);}
       else if(on_title){
-        if(pressed & (CONT_DPAD_UP | CONT_DPAD_DOWN))title_lv=mx_trial_district_step(title_lv,(pressed&CONT_DPAD_DOWN)?1:-1);
+        if(pressed&CONT_B){
+          int next=mx_trial_next_unfinished(&stats,title_lv);
+          if(next>=0)title_lv=next;
+          pressed&=~(CONT_A|CONT_START);
+        }else if(pressed & (CONT_DPAD_UP | CONT_DPAD_DOWN))title_lv=mx_trial_district_step(title_lv,(pressed&CONT_DPAD_DOWN)?1:-1);
         else if(pressed & (CONT_DPAD_RIGHT | CONT_DPAD_LEFT)) title_lv = (title_lv + ((pressed & CONT_DPAD_RIGHT) ? 1 : MX_NUM_LEVELS - 1)) % MX_NUM_LEVELS;
         { int tl = (st->ltrig > 128 && !(prev_trig & 1)), tr = (st->rtrig > 128 && !(prev_trig & 2)); prev_trig = (st->ltrig > 128) | ((st->rtrig > 128) << 1);
         if(tl || tr){
