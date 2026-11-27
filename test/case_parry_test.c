@@ -56,6 +56,17 @@ int main(void){
   CHECK(w.cases[0].active&&w.score==0,"out-of-height case cannot be punched");
   expect_parry(0);
 
+  /* Match the browser's 39px offset, testing actual forward momentum. */
+  for(int face=-1;face<=1;face+=2){
+    for(int speed=-15;speed<=15;speed+=15){
+      setup();w.man.face=face;w.man.vx=RI(face*speed);
+      case_at(0,w.man.x+face*R(4.875),punch_y());
+      walk_punch(&w);
+      CHECK(w.score==(speed==15?150:0),"shoulder reach requires forward momentum");
+      CHECK(w.cases[0].active==(speed!=15),"charge contact matches facing");
+    }
+  }
+
   setup();case_at(0,punch_x(),punch_y());case_at(1,punch_x()+R(.5),punch_y());
   walk_punch(&w);
   CHECK(!w.cases[0].active&&!w.cases[1].active,"one punch can cover two overlapping cases");
