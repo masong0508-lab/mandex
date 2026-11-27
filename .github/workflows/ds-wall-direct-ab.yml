@@ -60,7 +60,7 @@ jobs:
               print(f'Level {l+1:02}: old {ref:.2f}us, direct {new:.2f}us, delta {gain:+.2f}% — pixel identical')
           pathlib.Path('out/ds-wall-ab/paired-host-report.txt').write_text('\n'.join(lines)+'\n')
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-ds-wall-direct-ab-host
           path: out/ds-wall-ab/paired-host-report.txt

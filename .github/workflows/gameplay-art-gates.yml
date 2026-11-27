@@ -75,7 +75,7 @@ jobs:
           find out/art-review -name '*.ppm' -print | head -24
           find out/art-review -name '*.ppm' -print0 | xargs -0 -r python3 tools/ppm_to_png.py
           test -n "$(find out/art-review -name '*.png' -print -quit)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mandex-gameplay-art-review
           path: |

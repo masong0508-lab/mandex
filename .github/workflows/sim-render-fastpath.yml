@@ -230,7 +230,7 @@ jobs:
             p0=get(a,ph);p1=get(b,ph)
             print(f'DS_AB level={level+1} pixels=IDENTICAL old_frame_us={x:.2f} new_frame_us={y:.2f} total_gain_pct={(x-y)*100/x:.2f} old_top_us={t0:.2f} new_top_us={t1:.2f} old_physics_us={p0:.2f} new_physics_us={p1:.2f}')
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sim-render-fastpath-host-metrics
