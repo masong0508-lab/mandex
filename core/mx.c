@@ -1946,7 +1946,10 @@ static int wblocked(const MxWorld *w, real x, real y){
     for(int k = 0; k < ch->count; k++){
       const MxCell *a = &ch->cells[k];
       if(a->dead || rabs(a->wx - x) > WHW + RC || rabs(a->wy - y) > WHH + RC) continue;
-      for(int i = 0; i < 3; i++) for(int j = 0; j < 5; j++) if(rabs(a->wx - xs[i]) < RC && rabs(a->wy - ys[j]) < RC) return 1;
+      /* Cartesian sample grid: X and Y hits are independent. Test each
+         axis once rather than rechecking X for all five Y samples. */
+      if(rabs(a->wx-xs[0])>=RC && rabs(a->wx-xs[1])>=RC && rabs(a->wx-xs[2])>=RC)continue;
+      for(int j=0;j<5;j++)if(rabs(a->wy-ys[j])<RC)return 1;
     }
   }
   return 0;
@@ -1954,9 +1957,12 @@ static int wblocked(const MxWorld *w, real x, real y){
 #define PX(n) rmul(RI(n), R(0.125))
 /* Never move a walker to a point that intersects the new rubble pose or
    outside the stage. Recovery only runs after local escape failed. */
+static int walk_clear(const MxWorld *w,real x,real y){
+  return x>=WHW+R(.25)&&x<=RI(MX_COLS)-WHW-R(.25)&&y>=WHH&&y<=RI(MX_ROWS)-WHH&&!wblocked(w,x,y);
+}
 static int walk_place(MxWorld *w,real x,real y){
   MxMan *m=&w->man;
-  if(x<WHW+R(.25)||x>RI(MX_COLS)-WHW-R(.25)||y<WHH||y>RI(MX_ROWS)-WHH||wblocked(w,x,y))return 0;
+  if(!walk_clear(w,x,y))return 0;
   m->x=x;m->y=y;m->vx=m->vy=0;m->gr=0;m->stomp=0;
   m->ledge_grace=m->jump_hold=m->jump_buffer=m->walk_jam=0;
   m->walk_safe=1;m->walk_safe_x=x;m->walk_safe_y=y;
@@ -1976,7 +1982,7 @@ static int walk_rescue(MxWorld *w){
    Blocked exits do not spend time or teleport into a solid wall. */
 static void walk_tube_step(MxWorld *w,real dt){
   MxMan *m=&w->man;
-  if(m->mode!=MAN_WALK||!w->ntubes)return;
+  if(m->mode!=MAN_WALK||!w->ntubes||m->walk_jam>0)return;
   if(m->tubeCd>0){m->tubeCd=rclamp(m->tubeCd-dt,0,RI(1));return;}
   for(int i=0;i<w->ntubes;i++){
     MxTube *tb=&w->tubes[i];
@@ -2086,7 +2092,8 @@ static void walk_step(MxWorld *w, real dt){
     int f = 0;
     for(int u = 2; u <= 80 && !f; u += 2) for(int k = 0; k < 3 && !f; k++){
       int sg = k == 0 ? 0 : k == 1 ? -1 : 1;
-      if(!wblocked(w, m->x + sg * PX(u), m->y - PX(u))){ m->x += sg * PX(u); m->y -= PX(u); f = 1; }
+      real qx=m->x+sg*PX(u),qy=m->y-PX(u);
+      if(walk_clear(w,qx,qy)){m->x=qx;m->y=qy;f=1;}
     }
     if(!f){
       m->walk_jam+=dt;
