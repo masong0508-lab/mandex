@@ -86,3 +86,47 @@ for(const a of Object.keys(face.faces))for(const b of Object.keys(face.faces))fo
  if(k===1)assert(Math.abs(m.d-face.faces[b].m.d)<1e-9);
 }
 console.log('GOLDEN_CELS_MOTION_PASS chug_samples='+chugCases+' expression_blends='+blends+' smooth_grip=1');
+
+/* A grounded walk driven by collision-resolved distance, not the clock. */
+const stride=new Function(
+  'const V=8;'+cut('const CEL_WALK_ACT=','function drawWalkMan(')+
+  'return {rig:typeof celWalkRig==="function"?celWalkRig:null,foot:typeof celWalkFoot==="function"?celWalkFoot:null,hips:typeof celWalkHipBob==="function"?celWalkHipBob:null};')();
+assert(stride.rig&&stride.foot&&stride.hips,'missing articulated grounded walking rig');
+const m0={gr:true,turn:0,gait:0,vx:120},beforeM=JSON.stringify(m0);
+const rig0=stride.rig(m0);
+assert(JSON.stringify(m0)===beforeM&&stride.rig(m0)===rig0,'walking rig mutated gameplay or allocated per tick');
+let strideSamples=0,reachSamples=0,contacts=0;
+for(const speed of [0,10,50,100,200])for(let k=0;k<=512;k++){
+  const m={gr:true,turn:0,gait:32*k/512,vx:speed},before=JSON.stringify(m);
+  const pose=stride.rig(m);
+  assert(JSON.stringify(m)===before&&pose===rig0&&pose.L&&pose.R);
+  for(const foot of [pose.L,pose.R]){
+    assert(Number.isFinite(foot.travel)&&Number.isFinite(foot.lift));
+    assert(Math.abs(foot.travel)<=8/(2*.36)+1e-9&&foot.lift>=0&&foot.lift<=6);
+    if(speed===0)assert(foot.travel===0&&foot.lift===0);
+  }
+  assert(pose.L.lift===0||pose.R.lift===0,'no planted foot');
+  if(speed>=100&&k<512){
+    const next={travel:0,lift:0};
+    for(const side of [-1,1]){
+      const a={travel:0,lift:0};
+      stride.foot(m.gait/(2*8),side,1,a);
+      stride.foot((m.gait+1e-4)/(2*8),side,1,next);
+      if(a.lift===0&&next.lift===0){
+        assert(Math.abs((next.travel-a.travel)*.36+1e-4)<1e-8,'stance foot slid');
+        contacts++;
+      }
+    }
+  }
+  const beforePhase=JSON.stringify(pose);
+  const hips=stride.hips(2,2.5,10,0,14,pose.L.travel,pose.L.lift,0);
+  assert(Number.isFinite(hips)&&hips>=2);
+  const dx=pose.L.travel-2.5,dz=14-10;
+  assert(Math.hypot(dx,55-pose.L.lift-(24+hips),dz)<=31.15+1e-7,'leg exceeds reach');
+  assert(JSON.stringify(pose)===beforePhase);
+  strideSamples++;reachSamples++;
+}
+assert(stride.rig({...m0,gr:false})===null&&stride.rig({...m0,turn:5})===null,'turn/air must retain original pose');
+assert(contacts>500);
+assert(html.includes('WALK_SPIN_POSE.walk=rig')&&html.includes('celWalkHipBob(bob,')&&html.includes('walkTravel'), 'foot trajectory not connected to live IK renderer');
+console.log('GOLDEN_CELS_STRIDE_PASS poses='+strideSamples+' planted_contacts='+contacts+' reach='+reachSamples);
