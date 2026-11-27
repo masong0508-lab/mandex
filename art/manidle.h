@@ -18,20 +18,24 @@ typedef struct { unsigned char frame, ticks, fx; } MiStep;
 
 #define MI_STEPS(...) { __VA_ARGS__, { 0, 0, 0 } }          /* ticks == 0 ends a gag */
 #define MI_MAXSTEPS 52
+/* Preserve the planted-turn frame progression even in ordinary idle gags.
+ * Both sweeps fit the existing fixed-width animation table. */
+#define MI_TURN_IN { MSF_SPIN_0, 5, FX_WHOOSH }, { MSF_SPIN_1, 3, 0 }, { MSF_SPIN_2, 3, 0 }, { MSF_SPIN_3, 3, 0 }, { MSF_SPIN_4, 3, 0 }, { MSF_SPIN_5, 3, 0 }, { MSF_SPIN_6, 3, 0 }, { MSF_SPIN_7, 3, 0 }, { MSF_SPIN_8, 3, 0 }, { MSF_SPIN_9, 3, 0 }, { MSF_SPIN_10, 3, 0 }, { MSF_SPIN_11, 3, 0 }, { MSF_SPIN_12, 5, 0 }
+#define MI_TURN_OUT { MSF_SPIN_R11, 3, FX_WHOOSH }, { MSF_SPIN_R10, 3, 0 }, { MSF_SPIN_R9, 3, 0 }, { MSF_SPIN_R8, 3, 0 }, { MSF_SPIN_R7, 3, 0 }, { MSF_SPIN_R6, 3, 0 }, { MSF_SPIN_R5, 3, 0 }, { MSF_SPIN_R4, 3, 0 }, { MSF_SPIN_R3, 3, 0 }, { MSF_SPIN_R2, 3, 0 }, { MSF_SPIN_R1, 3, 0 }, { MSF_SPIN_0, 5, 0 }
 static const MiStep MI_GAGS[GAG_OOPS + 1][MI_MAXSTEPS] = {
   /* belly bounce: slap, jiggle, slap... */
   MI_STEPS({ MSF_IDLE_A, 10, 0 }, { MSF_BELLY_A, 6, FX_SLAP }, { MSF_BELLY_B, 6, 0 }, { MSF_BELLY_A, 6, FX_SLAP }, { MSF_BELLY_B, 6, 0 },
            { MSF_BELLY_A, 6, FX_SLAP }, { MSF_BELLY_B, 8, 0 }, { MSF_IDLE_A, 10, 0 }),
   /* butt wiggle: back to us, hips left-right, boing per swing */
-  MI_STEPS({ MSF_BACK_C, 8, 0 }, { MSF_BACK_L, 6, FX_BOING }, { MSF_BACK_R, 6, FX_BOING }, { MSF_BACK_L, 6, FX_BOING }, { MSF_BACK_R, 6, FX_BOING },
-           { MSF_BACK_L, 6, FX_BOING }, { MSF_BACK_R, 6, FX_BOING }, { MSF_BACK_C, 10, 0 }, { MSF_IDLE_A, 8, 0 }),
+  MI_STEPS(MI_TURN_IN, { MSF_SPIN_BL, 7, FX_BOING }, { MSF_SPIN_12, 4, 0 }, { MSF_SPIN_BR, 7, FX_BOING }, { MSF_SPIN_12, 4, 0 },
+           { MSF_SPIN_BL, 7, FX_BOING }, { MSF_SPIN_12, 4, 0 }, { MSF_SPIN_BR, 7, FX_BOING }, { MSF_SPIN_12, 8, 0 }, MI_TURN_OUT, { MSF_IDLE_A, 8, 0 }),
   /* belly scratch, then a sniff of the fingers */
   MI_STEPS({ MSF_SCRATCH_A, 8, 0 }, { MSF_SCRATCH_B, 8, 0 }, { MSF_SCRATCH_A, 8, 0 }, { MSF_SCRATCH_B, 8, 0 }, { MSF_SCRATCH_A, 8, 0 },
            { MSF_SCRATCH_B, 8, 0 }, { MSF_IDLE_A, 20, FX_SNIFF }, { MSF_IDLE_A, 10, 0 }),
   /* burp: puff up, let it out (green cloud) */
   MI_STEPS({ MSF_IDLE_A, 12, 0 }, { MSF_BURP_A, 22, FX_GRUNT }, { MSF_BURP_B, 28, FX_BURP }, { MSF_IDLE_A, 14, 0 }),
   /* fart: turn around, strain, release (big green cloud + flies), guilty glance */
-  MI_STEPS({ MSF_BACK_C, 10, 0 }, { MSF_FART_A, 24, FX_GRUNT }, { MSF_FART_B, 34, FX_FART }, { MSF_BACK_C, 20, 0 }, { MSF_IDLE_A, 10, 0 }),
+  MI_STEPS(MI_TURN_IN, { MSF_BACK_C, 10, 0 }, { MSF_FART_A, 24, FX_GRUNT }, { MSF_FART_B, 34, FX_FART }, { MSF_BACK_C, 20, 0 }, { MSF_SPIN_12, 5, 0 }, MI_TURN_OUT, { MSF_IDLE_A, 10, 0 }),
   /* nose pick, flick it away */
   MI_STEPS({ MSF_PICK_A, 10, 0 }, { MSF_PICK_B, 10, 0 }, { MSF_PICK_A, 10, 0 }, { MSF_PICK_B, 10, 0 }, { MSF_PICK_A, 12, 0 },
            { MSF_IDLE_A, 16, FX_FLICK }),
