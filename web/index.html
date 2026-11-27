@@ -2561,9 +2561,50 @@ function workLegF(s,kx,ky,ax,ay){blob([pTap(s*10.6,24,9.9,kx,ky,7,BR),pTap(kx,ky
 function workVestB(sh){ctx.save();ctx.beginPath();ctx.moveTo(-8+sh,-31);ctx.quadraticCurveTo(sh,-29,8+sh,-31);ctx.lineTo(20+sh,-28);ctx.lineTo(23,-18);ctx.bezierCurveTo(26,-4,26,4,23,10);ctx.quadraticCurveTo(0,14,-23,10);ctx.bezierCurveTo(-26,4,-26,-4,-23,-18);ctx.lineTo(-20+sh,-28);ctx.closePath();
  ctx.fillStyle='#ff6a00';ctx.fill();ctx.save();ctx.clip();ctx.fillStyle='#e6ff3a';ctx.fillRect(-30,-9,60,3.4);ctx.fillRect(-30,3,60,3.4);ctx.fillRect(-10,-32,3.4,50);ctx.fillRect(6.6,-32,3.4,50);ctx.restore();ctx.strokeStyle=OUT;ctx.lineWidth=1.8;ctx.stroke();ctx.restore()}
 // Gerald's hair, front view: the same thinning as the back of his head.  Hair stays only around the sides, the top is bare, and a few long strands are combed across it
+// Golden Cels: one softly rounded skull/jaw contour, shared across poses.
+function celCharacter(){return typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE}
+function celHeadShape(cx,cy,rx,ry,jx,jy,jrx,jry){
+  const p=new Path2D(),left=Math.min(cx-rx,jx-jrx),right=Math.max(cx+rx,jx+jrx);
+  const top=cy-ry,bottom=Math.max(cy+ry,jy+jry);
+  p.moveTo(cx,top);
+  p.bezierCurveTo(cx+rx*.75,top,cx+rx,cy-ry*.48,cx+rx,cy+.8);
+  p.bezierCurveTo(right,cy+ry*.47,jx+jrx*.93,bottom-jry*.18,jx,bottom);
+  p.bezierCurveTo(jx-jrx*.82,bottom,left,cy+ry*.46,left,cy+.8);
+  p.bezierCurveTo(cx-rx,cy-ry*.6,cx-rx*.64,top,cx,top);p.closePath();
+  return {p,fill:SK,bb:[left,top,right,bottom]};
+}
+function celHead(cx,cy,rx,ry,jx,jy,jrx,jry){
+  blob([celHeadShape(cx,cy,rx,ry,jx,jy,jrx,jry)],{ow:1.65,shc:'rgba(126,58,75,.27)',hlc:'rgba(255,224,174,.30)'});
+}
+function celProfileFeatures(hx,hy,r,pressure,expression){
+  ctx.save();ctx.translate(hx,hy);ctx.scale(r/13,r/13);ctx.lineJoin='round';ctx.lineCap='round';
+  const f=Math.max(0,Math.min(1.4,pressure||0)),wide=expression==='flight'?1.08:1+f*.19;
+  celEyeAt(8.3,-3.3,4,4.5*wide,1.1,-.12,2.15);
+  ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(4.7,-9.3-f);
+  ctx.quadraticCurveTo(8.5,-12.1-f,12.1,-8.7+f*.6);
+  ctx.quadraticCurveTo(8.7,-9.15,5.1,-8.2);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(183,84,95,.30)';ctx.beginPath();ctx.ellipse(7.7,5.7,3.4,1.8,.20,0,7);ctx.fill();
+  ctx.beginPath();ctx.moveTo(12.2,-1.8);ctx.bezierCurveTo(15,-2.5,18.7,-.8,18.5,1.8);
+  ctx.bezierCurveTo(18.2,4.2,14.5,4.6,12.4,3.5);ctx.fillStyle=SK;ctx.fill();
+  ctx.strokeStyle='#73414a';ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle='rgba(255,224,177,.65)';ctx.beginPath();ctx.ellipse(15.7,.05,1.5,.7,-.25,0,7);ctx.fill();
+  ctx.fillStyle=HAIR;ctx.strokeStyle=OUT;ctx.lineWidth=.85;ctx.beginPath();ctx.moveTo(7,4.2);
+  ctx.bezierCurveTo(11.1,1.8,16.5,3.1,19,5.1);
+  ctx.quadraticCurveTo(20.5,7.5,16.1,7.4);ctx.quadraticCurveTo(11.2,6.2,7,6.7);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.strokeStyle='#825844';ctx.lineWidth=.65;ctx.beginPath();ctx.moveTo(8,4.6);ctx.quadraticCurveTo(13,3.7,16.7,5.1);ctx.stroke();
+  if(expression==='flight'||f>.45)mouthOpen(11.8,10.2,3.2+Math.min(f,1)*1.8,2.8+Math.min(f,1)*2.8,true);
+  else{ctx.strokeStyle=OUT;ctx.lineWidth=1.35;ctx.beginPath();ctx.moveTo(8.7,10.2);ctx.quadraticCurveTo(12.8,12.7,16.5,9.3);ctx.stroke();}
+  ctx.strokeStyle='rgba(128,66,67,.52)';ctx.lineWidth=.75;ctx.beginPath();ctx.moveTo(8.5,13.7);ctx.quadraticCurveTo(11.7,14.7,14.2,13.2);ctx.stroke();ctx.restore();
+}
 function frontHair(){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
   for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*14.7,-37);ctx.quadraticCurveTo(q*18.5,-50,q*9,-56.5);ctx.quadraticCurveTo(q*11.5,-50,q*10.4,-44.5);ctx.quadraticCurveTo(q*11,-40.5,q*14.7,-37);ctx.closePath();ctx.fillStyle=HAIR;ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.4;ctx.stroke()}
-  ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(-2.5,-55,3.4,1.7,-.3,0,6.3);ctx.fill();   // shine on the bare top, like the back view
+  if(celCharacter()){
+    // Keep his thinning crown and comb-over, not an entirely new hairdo.
+    ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(-11,-51);ctx.bezierCurveTo(-7,-58.7,4.5,-60.3,10.9,-53.3);
+    ctx.quadraticCurveTo(4.3,-56,-2.1,-53.4);ctx.quadraticCurveTo(-7,-52,-11,-51);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#93664c';ctx.lineWidth=.85;ctx.beginPath();ctx.moveTo(-8.8,-53.2);ctx.quadraticCurveTo(-.1,-59,8.1,-54.8);ctx.stroke();
+    ctx.fillStyle='rgba(255,223,177,.34)';ctx.beginPath();ctx.ellipse(-2.2,-50.8,4.1,1.45,-.27,0,7);ctx.fill();
+  }else{ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(-2.5,-55,3.4,1.7,-.3,0,6.3);ctx.fill();}
   ctx.strokeStyle=typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE?'#573747':HAIR;ctx.lineWidth=1.25;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(-10.4,-47-k*2.2);ctx.quadraticCurveTo(-1+k,-62.5+k*.5,10.6,-51.5+k*1.6);ctx.stroke()}   // the comb-over
   ctx.restore()}
 let NOHEAD=false;   // the sprite generator draws the fly / dive frames without the head and pixels its own
@@ -2579,7 +2620,7 @@ function sideHair(cx,cy,r,o){o=o||{};   // one recognizable swept crown from the
   ctx.quadraticCurveTo(cx+r*.34,cy-r*.58,cx-r*.06,cy-r*.60);
   ctx.quadraticCurveTo(cx-r*.53,cy-r*.51,cx-r*.78,cy-r*.38);
   ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.05;ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(cx+r*.12,cy-r*.8,r*.3,r*.13,-.15,0,6.3);ctx.fill();
+  ctx.fillStyle=celCharacter()?'rgba(235,177,119,.35)':'rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(cx+r*.12,cy-r*.8,r*.3,r*.13,-.15,0,6.3);ctx.fill();
   ctx.strokeStyle=HAIR;ctx.lineWidth=1.15;for(let k=0;k<4;k++){ctx.beginPath();ctx.moveTo(cx-r*.74,cy-r*(.5+k*.04));ctx.quadraticCurveTo(cx-r*.1+k*r*.07,cy-r*(1.12-k*.03),cx+r*.62,cy-r*(.62-k*.02));ctx.stroke()}
   ctx.restore()}
 function drawFront(pose,fk,t,o){
@@ -2633,7 +2674,8 @@ function drawFront(pose,fk,t,o){
   if(o&&o.head){ctx.save();ctx.translate(o.head[0],o.head[1]);ctx.translate(0,-30);ctx.rotate(o.head[2]||0);ctx.translate(0,30)}
   if(WORK)workVestF(o);
   ell(0,-31,10,6,SKD);blob([pEll(-14,-44,4,5)],{ow:1.5,sd:1.2,hl:0});blob([pEll(14,-44,4,5)],{ow:1.5,sd:1.2,hl:0});
-  blob([pEll(-10.8,-38,5.4,5.8),pEll(10.8,-38,5.4,5.8),pEll(0,-34,11.2,8.2),pEll(0,-44,14.3,13.3)],{ow:1.8});               // cheeks, jaw and skull: one head, no seams
+  if(celCharacter())celHead(0,-44,14.3,13.3,0,-34,13.9,8.2);
+  else blob([pEll(-10.8,-38,5.4,5.8),pEll(10.8,-38,5.4,5.8),pEll(0,-34,11.2,8.2),pEll(0,-44,14.3,13.3)],{ow:1.8});               // cheeks, jaw and skull: one head, no seams
   ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(-6,-52,5,2.8,-.4,0,6.3);ctx.fill();
   frontHair();
   ctx.fillStyle='rgba(74,45,26,.35)';for(let k=0;k<12;k++)ctx.fillRect(-8+k*1.4,-33+(k%3)*1.2,1,1);
@@ -2678,10 +2720,13 @@ function drawSeatSide(f,t){
   {const bx=7+f*10,by=-22+f*3,rx=10+f*13,ry=10+f*9,hx=bx+rx*.62,hy=by-ry*.78,ex=8+f*3,ey=-37+f*1.5;blob([pTap(3,-47,6,ex,ey,5.2),pTap(ex,ey,5,hx,hy,4.4),pEll(ex,ey,5.4,5.3),pEll(hx,hy,5.6,5)],{ow:1.8})}   // hand rests on top of the belly
   // head in profile: skull, jaw, nose, ear, comb-over, eye, moustache, mouth
   const hx=4+tr-f*2,hy=-70+f*1.2;   // leans back to counterbalance the belly
-  blob([pEll(hx,hy,13,12.5),pEll(hx+6,hy+6,10.5,8)],{ow:1.9});                                               // skull + jaw
+  if(celCharacter())celHead(hx,hy,13,12.5,hx+6,hy+6,10.5,8);
+  else blob([pEll(hx,hy,13,12.5),pEll(hx+6,hy+6,10.5,8)],{ow:1.9});                                               // skull + jaw
   blob([pEll(hx+15.5,hy+1,3.6,3.2)],{ow:1.4,hl:0});                                                          // nose
   if(f>.45){ctx.fillStyle='rgba(235,40,50,'+Math.min(.62,(f-.45)*1.4)*(.9+.1*Math.sin(t*14))+')';ctx.beginPath();ctx.ellipse(hx+3,hy+3,11.5,10,0,0,6.3);ctx.fill();ctx.beginPath();ctx.ellipse(hx+15.5,hy+1,3.6,3.2,0,0,6.3);ctx.fill();ctx.beginPath();ctx.ellipse(hx-6,hy+1,3,4.2,0,0,6.3);ctx.fill()}   // face reddens as the pressure builds
   blob([pEll(hx-6,hy+1,3,4.2)],{ow:1.3,sd:1,hl:0});                                                          // ear
+  if(celCharacter()){sideHair(hx,hy,13);celProfileFeatures(hx,hy,13,f,'seat');}
+  else{
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(hx-12,hy+2);ctx.quadraticCurveTo(hx-15,hy-14,hx-3,hy-13);ctx.quadraticCurveTo(hx+4,hy-16,hx+10,hy-8);
   ctx.quadraticCurveTo(hx+2,hy-9,hx-3,hy-8);ctx.quadraticCurveTo(hx-8,hy-6,hx-9,hy+2);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1.2;ctx.stroke();
   ctx.strokeStyle=HAIR;ctx.lineWidth=1.4;ctx.lineCap='round';for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(hx-5+k*3.5,hy-13);ctx.quadraticCurveTo(hx+1+k*3,hy-16+k,hx+7+k*2,hy-11);ctx.stroke()}   // comb-over strands
@@ -2690,7 +2735,7 @@ function drawSeatSide(f,t){
   ctx.strokeStyle=HAIR;ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(hx+6,hy-10-f*2);ctx.lineTo(hx+14,hy-8+f*2);ctx.stroke();                                                          // worried brow
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(hx+8,hy+4);ctx.quadraticCurveTo(hx+14,hy+2,hx+20,hy+4.5);ctx.quadraticCurveTo(hx+22,hy+7,hx+17,hy+7.5);ctx.quadraticCurveTo(hx+11,hy+7,hx+8,hy+6.5);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1;ctx.stroke();   // moustache
   ell(hx+15,hy+11,3+f*2,2.6+f*3.2,'#5a1010',1.2);                                                           // mouth, opening wider as the pressure builds
-  ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(hx+9,hy+10,8.5,.2,2.4);ctx.fill();                              // stubble shadow on the jaw
+  ctx.fillStyle=HAIR;ctx.beginPath();ctx.arc(hx+9,hy+10,8.5,.2,2.4);ctx.fill();}                              // stubble shadow on the jaw
   if(f>.45){ctx.fillStyle='rgba(120,200,255,.85)';for(let k=0;k<2;k++){const sy=hy-10+((t*40+k*17)%26);ctx.beginPath();ctx.ellipse(hx+(k?-2:15),sy,1.6,2.4,0,0,6.3);ctx.fill()}}   // sweat
 }
 function drawSide(t,fk){
@@ -2724,12 +2769,16 @@ function drawSide(t,fk){
   blob([pTap(15,2,6.6,52,16+fl*2,4.8)],{ow:1.8});     // near arm: straight out in front, above the head
   blob([pEll(55.5,17.5+fl*2,5.8,5.4)],{ow:1.6});ctx.strokeStyle='rgba(120,60,30,.55)';ctx.lineWidth=1;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(58,14+fl*2);ctx.lineTo(58,21+fl*2);ctx.moveTo(53,14+fl*2);ctx.lineTo(53,21+fl*2);ctx.stroke();   // a clenched fist
   if(!NOHEAD){
-  blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});blob([pEll(25.5,-16,3,4)],{ow:1.3,sd:1,hl:0});
+  if(celCharacter())celHead(31,-17,11.2,11,35.5,-10,5.6,4.4);
+  else blob([pEll(31,-17,11.2,11),pEll(35.5,-10,5,4.4)],{ow:1.9});
+  blob([pEll(25.5,-16,3,4)],{ow:1.3,sd:1,hl:0});
   sideHair(31,-17,11.2);wolfEarS(31,-17);
-  ell(36.2,-20.5,4.3,4.9,'#fff',1.2);ell(37.8,-20.2,2.3,2.7,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(37,-21.4,.95,0,6.3);ctx.fill();ctx.fillStyle='rgba(255,105,110,.3)';ctx.beginPath();ctx.ellipse(35,-12,3.2,2,0,0,6.3);ctx.fill();ctx.strokeStyle=HAIR;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(32,-27);ctx.lineTo(40,-25.5);ctx.stroke();
+  if(celCharacter()&&!WOLF&&!WOLFH)celProfileFeatures(31,-17,11.2,0,'flight');
+  else{ell(36.2,-20.5,4.3,4.9,'#fff',1.2);ell(37.8,-20.2,2.3,2.7,'#2b1810');ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(37,-21.4,.95,0,6.3);ctx.fill();ctx.fillStyle='rgba(255,105,110,.3)';ctx.beginPath();ctx.ellipse(35,-12,3.2,2,0,0,6.3);ctx.fill();ctx.strokeStyle=HAIR;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(32,-27);ctx.lineTo(40,-25.5);ctx.stroke();
   ell(42,-16,3.4,3,SKD,1.3);
   ell(38.5,-7,5,5.4,'#5a1010',1.3);ell(37,-4.8,3,2,'#ff6b8a');
   ctx.fillStyle=HAIR;ctx.beginPath();ctx.moveTo(33,-12.5);ctx.quadraticCurveTo(40,-14.5,46,-10.5);ctx.quadraticCurveTo(48,-12.5,47,-15);ctx.quadraticCurveTo(50,-8,41,-9);ctx.quadraticCurveTo(36,-9,33,-10);ctx.closePath();ctx.fill();ctx.strokeStyle=OUT;ctx.lineWidth=1;ctx.stroke();
+  }
   wolfSnoutS(31,-17);
   }
   if(WORK)workHatSide();
@@ -2876,10 +2925,7 @@ function blush(a){
 function mustache(dy){ctx.save();ctx.translate(0,(dy||0)-.9);ctx.fillStyle=HAIR;ctx.strokeStyle=OUT;ctx.lineWidth=.8;ctx.lineJoin='round';   // soft, thin, sits beside the nose and leaves the mouth clear
   for(const s of[-1,1]){ctx.beginPath();ctx.moveTo(s*.6,5.7);ctx.quadraticCurveTo(s*4,4.7,s*8.2,5.9);ctx.quadraticCurveTo(s*10.4,6.8,s*10,8.5);ctx.quadraticCurveTo(s*8.8,7.3,s*7,7.2);ctx.quadraticCurveTo(s*3.6,7.4,s*.6,6.7);ctx.closePath();ctx.fill();ctx.stroke()}
   ctx.restore()}
-function eye(s,y,rx,ry,px,py,pr){const ex=s*6;
-  if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE){
-    // Retain the round, friendly eye spacing and acting parameters, with
-    // tapered hand-inked lids and a colored iris instead of a flat dot.
+function celEyeAt(ex,y,rx,ry,px,py,pr){
     ctx.save();ctx.beginPath();ctx.moveTo(ex-rx,y);
     ctx.bezierCurveTo(ex-rx*.82,y-ry*1.18,ex+rx*.82,y-ry*1.12,ex+rx,y);
     ctx.bezierCurveTo(ex+rx*.76,y+ry*.95,ex-rx*.76,y+ry*.95,ex-rx,y);ctx.closePath();
@@ -2887,8 +2933,10 @@ function eye(s,y,rx,ry,px,py,pr){const ex=s*6;
     const r=pr||Math.min(rx,ry)*.66,cx=ex+px,cy=y+py;
     ctx.fillStyle='#a36e42';ctx.beginPath();ctx.ellipse(cx,cy,r*.97,r*1.12,0,0,7);ctx.fill();
     ctx.fillStyle='#2c202a';ctx.beginPath();ctx.ellipse(cx,cy,r*.63,r*.82,0,0,7);ctx.fill();
-    ctx.fillStyle='#fff4d4';ctx.beginPath();ctx.arc(cx-r*.28,cy-r*.43,r*.32,0,7);ctx.fill();ctx.restore();return;
-  }
+    ctx.fillStyle='#fff4d4';ctx.beginPath();ctx.arc(cx-r*.28,cy-r*.43,r*.32,0,7);ctx.fill();ctx.restore();
+}
+function eye(s,y,rx,ry,px,py,pr){const ex=s*6;
+  if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE){celEyeAt(ex,y,rx,ry,px,py,pr);return;}
   ell(ex,y,rx,ry,'#fff',1.3);const r=pr||Math.min(rx,ry)*.66;
   ctx.fillStyle='#2b1810';ctx.beginPath();ctx.arc(ex+px,y+py,r,0,6.3);ctx.fill();
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ex+px-r*.35,y+py-r*.4,r*.4,0,6.3);ctx.fill();ctx.beginPath();ctx.arc(ex+px+r*.4,y+py+r*.45,r*.18,0,6.3);ctx.fill()}
@@ -3412,7 +3460,8 @@ function drawSpin(th,o){
        The jaw sits slightly forward in depth instead of disappearing
        inside the cranium as the character turns sideways. */
     const jaw=G3(0,-34,3.8,11.4,8.2,11,U),hd=G3(0,-44,0,14.3,13.3,13.5,U);
-    add(0,()=>blob([pEll(jaw.px,jaw.py,jaw.rx,jaw.b),pEll(hd.px,hd.py,hd.rx,hd.b)],{ow:1.8}));                              // jaw and skull: one head, no chin seam
+    add(0,()=>{if(celCharacter())celHead(hd.px,hd.py,hd.rx,hd.b,jaw.px,jaw.py,jaw.rx,jaw.b);
+      else blob([pEll(jaw.px,jaw.py,jaw.rx,jaw.b),pEll(hd.px,hd.py,hd.rx,hd.b)],{ow:1.8})});                              // jaw and skull: one head, no chin seam
     const shell={x:0,y:hcy,z:0,a:A,b:B,c:Cc,cc:C,ss:S,ox:oU,oy:0};
     for(const s of[-1,1]){const r=G3(s*14.2,-44,-1,4,5,4,U2),near=r.d>=0;
       add(near?20:-700+r.d,()=>blob([pEll(r.px,r.py,r.rx,5)],{ow:1.5,sd:1.4}))}
@@ -3420,7 +3469,7 @@ function drawSpin(th,o){
        same centre, while the silhouette acquires a readable bridge and
        tip as Ch approaches zero (profile). */
     const nz=G3(0,-39.7,17,3.2,2.9,3.6,U2);
-    add(nz.d>=0?21:-650,()=>{ell(nz.px,nz.py,nz.rx,2.9,'#f3a784',1.2);shade(nz.px,nz.py,nz.rx,2.9,.1,.7)});
+    add(nz.d>=0?21:-650,()=>{ell(nz.px,nz.py,nz.rx,2.9,celCharacter()?'#e9a078':'#f3a784',celCharacter()?.9:1.2);shade(nz.px,nz.py,nz.rx,2.9,.1,.7)});
     /* A matching sideburn and ear root rotate with the head. They remain
        BEHIND the cheek and forward of the rear hair mass, instead of
        jumping to a different position in a side-on frame. */
