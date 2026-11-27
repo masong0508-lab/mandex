@@ -607,7 +607,7 @@ static void draw_title(void){
   }
   if(!((title_t >> 5) & 1)) text("PRESS START", 320, 438, 40, WHITE, 1, Z_HUD);
   text("B: NEXT UNCLEARED TRIAL",320,370,17,argb(255,210,63,255),1,Z_HUD);
-  if(title_lv>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,title_lv,&stars);char b[80];snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/30  %d/20 CLEARED  %d/60 STARS",(title_lv-MX_TRIAL_START)/20+1,clear,stars);text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
+  if(title_lv>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,title_lv,&stars);char b[80];snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/%d  %d/%d CLEARED  %d/%d STARS",(title_lv-MX_TRIAL_START)/20+1,MX_TRIAL_DISTRICTS,clear,mx_trial_size(title_lv),stars,3*mx_trial_size(title_lv));text(b,320,394,17,argb(255,210,63,255),1,Z_HUD);}
   else text("UP/DOWN: TRIAL DISTRICTS",320,394,17,argb(255,210,63,255),1,Z_HUD);
   { char tb[80]; snprintf(tb, sizeof tb, "< LEVEL %d  %s >   L/R TRIGGER: OUTFIT - %s", title_lv + 1, mx_level_name(title_lv), mx_outfit(outfit_sel)->name); text(tb, 320, 466, 16, argb(255, 126, 176, 255), 1, Z_HUD);
     snprintf(tb, sizeof tb, "X OPTIONS / Y FIGHT: %s", nofight ? "OFF" : "ON"); text(tb, 320, 418, 16, argb(255, 255, 255, 220), 1, Z_HUD); }
@@ -1043,7 +1043,7 @@ static void draw_all(void){
   char buf[64], nm[40]; int n = 0;
   for(const char *q = mx_level_name(world.level); *q && n < 38; q++) nm[n++] = (*q >= 'a' && *q <= 'z') ? *q - 32 : *q;
   nm[n] = 0;
-  if(mx_level_stage_count(world.level)>1)snprintf(buf,sizeof buf,"LV %d %s %d/3",world.level+1,nm,world.district+1);
+  if(mx_level_stage_count(world.level)>1)snprintf(buf,sizeof buf,"LV %d %s %d/%d",world.level+1,nm,world.district+1,mx_level_stage_count(world.level));
   else snprintf(buf, sizeof buf, "LV %d  %s", world.level + 1, nm);
   text(buf, 12, 26, 16, argb(255, 210, 63, 255), 0, Z_HUD + 0.1f);
   MxObjective objective=mx_objective_snapshot(&world);
@@ -1159,7 +1159,7 @@ static void draw_all(void){
     quad(x, y + h - 4, w * k, 4, Z_HUD + 1.05f, fc); }
   if(world.banner > 0 && world.state == MX_PLAY){
     int a = (int)(255 * (world.banner > 1 ? 1.0f : world.banner));
-    if(mx_level_stage_count(world.level)>1){ char dn[32]; snprintf(dn, sizeof dn, "DISTRICT %d OF %d", world.district + 1, MX_HQ_DISTRICTS); text(dn, 320, 150, 22, argb(255, 126, 176, a), 1, Z_HUD); }
+    if(mx_level_stage_count(world.level)>1){ char dn[32]; snprintf(dn, sizeof dn, "DISTRICT %d OF %d", world.district + 1, mx_level_stage_count(world.level)); text(dn, 320, 150, 22, argb(255, 126, 176, a), 1, Z_HUD); }
     text(nm, 320, 180, 40, argb(255, 255, 255, a), 1, Z_HUD);
     text(mx_stage_tactic(&world), 320, 214, 20, argb(255, 210, 63, a), 1, Z_HUD);
   }
