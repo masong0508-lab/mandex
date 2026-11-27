@@ -243,6 +243,7 @@ static int n3_fastpath_probe(void){
     for(int k=0;k<24;k++){
       MxCell *a=&ch->cells[k];a->dead=0;a->m=(k&1)?MX_STONE:MX_WOOD;
       a->wx=R((k*13)%157);a->wy=R((k*11)%79);
+      if(k%5==0){a->m=MX_TNT;a->fuse=(uint8_t)(k&1?8:24);}
     }
     /* Completely remote rubble plus a chunk crossing the screen edge. */
     MxChunk *far=&world.chunks[1];
