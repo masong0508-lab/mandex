@@ -30,6 +30,17 @@ static void wall(int x,int y,int mat){
 }
 int main(void){
   CHECK(sizeof(MxCell)==24,"fuse fits existing mobile voxel layout");
+  MxCell visual={0};visual.m=MX_TNT;
+  int gold=0,red=0;
+  for(int tick=0;tick<=24;tick++){
+    visual.fuse=(uint8_t)tick;
+    int f=mx_fuse_visual(&visual);
+    CHECK(f==(!tick?0:tick<=8?((tick&1)?0:2):((tick&2)?0:1)),"fuse animation follows simulation countdown");
+    gold+=f==1;red+=f==2;
+  }
+  CHECK(gold==8&&red==4,"normal and urgent blink cadence changed");
+  visual.dead=1;CHECK(mx_fuse_visual(&visual)==0,"destroyed TNT still flashes");
+  visual.dead=0;visual.m=MX_WOOD;CHECK(mx_fuse_visual(&visual)==0,"ordinary wood flashes a fuse");
   CHECK(MX_TRIAL_START == 60 && MX_NUM_LEVELS == 660,"existing 60 campaign IDs and trial count preserved");
   scene();
   MxChunk *ch=charge(R(20.5),R(20.5));
