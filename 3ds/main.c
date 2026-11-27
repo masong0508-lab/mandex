@@ -423,7 +423,7 @@ static void on_events(void){
 #if MX_N3DS_PARTICLE_HINT
       part_free_hint = 0;
 #endif   /* Landlord HQ: next district, fresh men */
-      popup(60, 20, world.district == 1 ? "DISTRICT 2 OF 3!" : "DISTRICT 3 OF 3!", RGB(255, 210, 63)); break;
+      popup(60, 20, "NEXT DISTRICT!", RGB(255, 210, 63)); break;
     case EV_BONK: for(int k = 0; k < 8; k++) spawn(x, y - 1, (rand() % 21 - 10) * .3f, -(rand() % 11) * .3f, 24, k & 1 ? RGB(255, 210, 63) : RGB(255, 255, 255)); popup(x, y - 6, e->m == 2 ? (e->a>0?"PARRY +150 / +1S":"PARRY! +150") : "BONK!", RGB(255, 210, 63)); break;
     default: break;
     }
@@ -1398,7 +1398,7 @@ static void draw_hud(const View *camera){
   text(&top, 6, 8, "LV", 2, RGB(255, 210, 63)); itoa_(world.level + 1, b); text(&top, 30, 8, b, 2, RGB(255, 210, 63));
   int namex=world.level>=99?70:56;
   text(&top,namex,8,mx_level_name(world.level),world.man.mode==MAN_WALK||mx_level_stage_count(world.level)>1?1:2,RGB(255,255,255));
-  if(mx_level_stage_count(world.level)>1){snprintf(b,sizeof b,"STAGE %d/3",world.district+1);text(&top,144,18,b,1,RGB(255,210,63));}
+  if(mx_level_stage_count(world.level)>1){snprintf(b,sizeof b,"STAGE %d/%d",world.district+1,mx_level_stage_count(world.level));text(&top,144,18,b,1,RGB(255,210,63));}
   if(world.man.mode == MAN_WALK && world.state == MX_PLAY){                               /* walk levels: the clock */
     int k = (int)(RTOF(world.man.wt) * 100.0f / MX_WALK_T); if(k < 0) k = 0; if(k > 100) k = 100;
     rect(&top, 250, 6, 142, 12, RGB(255, 255, 255)); rect(&top, 251, 7, 140, 10, RGB(40, 40, 50)); rect(&top, 251, 7, k * 140 / 100, 10, k > 30 ? RGB(125, 255, 90) : RGB(255, 74, 74));
@@ -1786,7 +1786,7 @@ int main(void){
       rect(&top, 140, 161, 120, 9, RGB(15, 18, 30));
       if(stats.best[sel]){ sprintf(b, "BEST %06u", (unsigned)stats.best[sel]); textc(&top, 200, 163, b, 1, RGB(255, 210, 63)); } else textc(&top, 200, 163, "NOT PLAYED YET", 1, RGB(150, 150, 165));
       textc(&top, 200, 176, "A / START = PLAY", 2, RGB(125, 255, 90));
-      if(sel>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel,&stars);snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/30  %d/20 CLEARED  %d/60 STARS",(sel-MX_TRIAL_START)/20+1,clear,stars);textc(&top,200,228,b,1,RGB(255,210,63));}
+      if(sel>=MX_TRIAL_START){int stars=0,clear=mx_trial_cleared(&stats,sel,&stars);snprintf(b,sizeof b,"UP/DOWN  DISTRICT %d/%d  %d/%d CLEARED  %d/%d STARS",(sel-MX_TRIAL_START)/20+1,MX_TRIAL_DISTRICTS,clear,mx_trial_size(sel),stars,3*mx_trial_size(sel));textc(&top,200,228,b,1,RGB(255,210,63));}
       else textc(&top, 200, 228, "UP/DOWN: TRIAL DISTRICTS", 1, RGB(255, 210, 63));
       if(!snd_ok){ char sb[48]; sprintf(sb, "NO SOUND (ndsp %08X) - NEEDS dspfirm.cdc", (unsigned)snd_err); textc(&top, 200, 212, sb, 1, RGB(255, 90, 90)); }
 #if defined(__3DS__) && !MX_N3DS_NO_SAVE
