@@ -96,6 +96,23 @@ int main(void){
   ch->cells[0].dead=0;
   upd_targets(&w,R(0.016));
   CHECK(!t->alive,"live fast-moving rubble did not register a real collision");
+  /* Stationary slabs are skipped, but spinning slabs and sleepers with
+     a fresh impulse must still cause a genuine impact. */
+  init(1);t=&w.targets[0];t->room_id=255;
+  ch=&w.chunks[0];ch->active=1;ch->count=MX_CHUNK_CELLS;ch->rad=RI(3);
+  ch->x=t->x-RI(2);ch->y=t->y;
+  for(int i=0;i<ch->count;i++){ch->cells[i].wx=t->x;ch->cells[i].wy=t->y;}
+  upd_targets(&w,R(0.016));
+  CHECK(t->alive&&!t->inv&&!t->stun,"motionless debris inflicted an impact");
+  ch->w=RI(12);
+  upd_targets(&w,R(0.016));
+  CHECK(!t->alive,"pure rotation failed to impart a real impact");
+  init(1);t=&w.targets[0];t->room_id=255;
+  ch=&w.chunks[0];ch->active=1;ch->rest=1;ch->count=1;ch->rad=RI(3);
+  ch->x=t->x;ch->y=t->y;ch->vx=RI(30);
+  ch->cells[0].wx=t->x;ch->cells[0].wy=t->y;
+  upd_targets(&w,R(0.016));
+  CHECK(!t->alive,"resting flag hid a fresh debris impulse");
   /* Large high-velocity chunks must not hit a landlord through fixed-point
      squared-distance wrapping. Keep chunk centroid nearby to deliberately
      exercise the per-cell guard; a single far-flung cell is still harmless. */
