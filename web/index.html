@@ -1986,7 +1986,40 @@ function drawBurpStand(){if(state!=='play'||!toolOn('burp'))return;const c=man.c
     ctx.fillStyle=f<.55?'#7dff5a':f<.85?'#ffd23f':'#ff4a4a';ctx.fillRect(x0+1,y0+1,(w-2)*f,6);
     if(!OPT().noBurst){ctx.fillStyle='#fff';ctx.fillRect(x0+w/SODA_BURST-1,y0-3,2,14);if(f>.85&&Math.sin(time*20)>0)txt('DANGER!',STX,y0-8,13,'#ff4a4a','center')}
     if(OPT().burpCharge)txt('BURP x'+burpMult(man).toFixed(1),STX,y0+24,12,'#ff9ec8','center')}}
+// Golden Cels uses the same articulated rig for the entire soda routine.
+// Read only the current simulation state: no new gameplay ticks or timers.
+const CEL_CHUG={ld:0,hip:0,psi:0,hp:0,face:'base',cape:1,plant:1,quiff:1,t:0,
+  arms:{L:[-33,-6,0,-31,16,2],R:[33,-6,0,31,16,2]},belly:[1,1],bottle:null,pressure:0};
+const CEL_DRINK={level:1,color:0,angle:0};
+function celChugPose(m,now){
+  const c=m.chug,p=CEL_CHUG,ph=c.ph,t=c.t;
+  const sip=ph===2||ph===4,first=ph===2,start=first?CT_BK:CT_TB,end=first?CT_C:CT_D;
+  const u=sip?clamp((t-start)/(end-start),0,1):0;
+  const lift=sip?easeIO(u/.27)*(first||c.rel?easeIO((1-u)/.25):1):0;
+  const theta=ph===1||ph===3?c.th:ph===2?Math.PI:0;
+  const reach=ph===1||ph===3?Math.sin(Math.PI*clamp((t-(ph===1?CT_A:CT_C))/.25,0,1))*.65:0;
+  const full=clamp(bgrow(stom(m)),0,1.6),gulp=sip?Math.sin(now*26)*lift:0;
+  p.th=theta;p.t=now;p.hip=2*reach;p.psi=-5*reach;p.hp=-13*lift+2*gulp;p.ld=0;
+  p.face=lift>.6?'sip':full>.65?'burpo':ph===5?'bliss':'base';p.pressure=full;
+  p.belly[0]=1+.025*gulp;p.belly[1]=1-.02*gulp;
+  const L=p.arms.L,R=p.arms.R;
+  // Left hand supports the growing stomach; right hand grips the bottle
+  // throughout the lift. Positions are local 3D joint coordinates.
+  L[0]=-33+full*2;L[1]=-6;L[2]=6;L[3]=-19-full*2;L[4]=4+full*3;L[5]=20+full*8;
+  R[0]=33-4*lift;R[1]=-6-25*lift;R[2]=8+5*lift;
+  R[3]=31-24*lift;R[4]=16-61*lift+gulp;R[5]=10+12*lift;
+  p.bottle=null;
+  if(sip){
+    CEL_DRINK.level=ph===4&&c.keep>0?1-((c.keep*.8)%1):1-u;
+    CEL_DRINK.color=first?0:1;CEL_DRINK.angle=(Math.PI+.35)*lift;
+    p.bottle=CEL_DRINK;
+  }
+  return p;
+}
 function drawChugMan(m){const c=m.chug,ph=c.ph;ctx.save();ctx.scale(.5,.5);
+  if(typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE){
+    const p=celChugPose(m,time);drawSpin(p.th,p);ctx.restore();return;
+  }
   if(ph===1||ph===3)drawSpin(c.th,{});else if(ph===2)drawBack(null,time,{});else{INF=bgrow(stom(m));drawFront('up','cool',time);INF=0}
   ctx.restore();
   if(ph===2||ph===4){const k=ph===2?0:1,t0=ph===2?CT_BK:CT_TB,lvl=c.keep>0?1-((c.keep*.8)%1):1-clamp((c.t-t0)/(CT_D-CT_TB),0,1),px=ph===2?0:3,py=ph===2?-20:-17,tl=ph===2?.32:.58;   // from behind only the upturned base shows over his head
@@ -3291,7 +3324,7 @@ const TOWEL_HAND=(()=>{const r=v=>Math.round(v*1000)/1000+0,H={};
 // =====================================================================
 const GRIN={w:5.4,d:4.9,y:10.6,lift:.6,teeth:1,tongue:1};
 const FACE3={
- base:{e:'open',br:[-7.8,-8.8],m:GRIN},focus:{e:'open',br:[-8.9,-6.8],m:{w:4.8,d:1.8,y:11.3,lift:.3,teeth:1,tongue:0}},cool:{e:'shade',br:null,m:GRIN},bliss:{e:'happy',br:[-7.8,-8.8],m:GRIN},
+ base:{e:'open',br:[-7.8,-8.8],m:GRIN},sip:{e:'sleepy',br:[-8.2,-8.8],m:{w:2.4,d:2.1,y:11.5,lift:1.1,teeth:0,tongue:0}},focus:{e:'open',br:[-8.9,-6.8],m:{w:4.8,d:1.8,y:11.3,lift:.3,teeth:1,tongue:0}},cool:{e:'shade',br:null,m:GRIN},bliss:{e:'happy',br:[-7.8,-8.8],m:GRIN},
  smirk:{e:'wink',br:[-7.4,-9.5],m:{w:5.2,d:3.2,y:11,lift:.6,teeth:1,tongue:1}},
  whiff:{e:'happy',br:[-9.6,-10.6],m:{w:3.6,d:1.1,y:12,lift:-1,teeth:0,tongue:0}},
  pick:{e:'cross',br:[-8.2,-6.6],m:{w:4.6,d:1.8,y:12,lift:-1.2,teeth:0,tongue:0}},
@@ -3465,7 +3498,8 @@ function drawSpin(th,o){
   }
 
   // ---------------- upper body: shoulders, chest, belly and love handles are ONE mass (see blob); the chest and belly marks sit on top of it
-  const shL=G3(-20.5,-21.5,0,7.4,6.8,7,{ox:oU}),shR=G3(20.5,-21.5,0,7.4,6.8,7,{ox:oU}),trL=G3(-9,-28.5,0,9.5,5.2,8,{ox:oU}),trR=G3(9,-28.5,0,9.5,5.2,8,{ox:oU}),chest=G3(0,-21,0,21,11.5,11,{ox:oU}),belly=G3(0,-2,6,22*bs[0],17*bs[1],17,{ox:oM+bo[0],oy:bo[1],bias:3});
+  const pressure=typeof CEL_ACTIVE!=='undefined'&&CEL_ACTIVE?Math.max(0,Math.min(1.6,o.pressure||0)):0;
+  const shL=G3(-20.5,-21.5,0,7.4,6.8,7,{ox:oU}),shR=G3(20.5,-21.5,0,7.4,6.8,7,{ox:oU}),trL=G3(-9,-28.5,0,9.5,5.2,8,{ox:oU}),trR=G3(9,-28.5,0,9.5,5.2,8,{ox:oU}),chest=G3(0,-21,0,21,11.5,11,{ox:oU}),belly=G3(0,-2+pressure*7,6+pressure*10,(22+pressure*8)*bs[0],(17+pressure*12)*bs[1],17+pressure*12,{ox:oM+bo[0],oy:bo[1],bias:3});
   const hnd=[-1,1].map(q=>{const hxx=q*18,hz=4,a=10.5,b=6,c=13,hy=10;return{q,px:hxx*C+hz*S+oM+wo[0],py:hy+wo[1],rx:Math.hypot(a*C,c*S),b}});
   add(belly.d,()=>{
     ctx.fillStyle='rgba(110,30,30,.30)';for(const h of hnd){ctx.beginPath();ctx.ellipse(h.px,h.py+5.4,h.rx*.98,h.b*.85,0,0,6.2832);ctx.fill()}                  // the shadow a love handle throws on the shorts
@@ -3571,6 +3605,13 @@ function drawSpin(th,o){
       ctx.beginPath();ctx.moveTo(-2.2,-5);ctx.lineTo(2.2,-5);ctx.lineTo(1.2,3);ctx.lineTo(-1.2,3);ctx.closePath();ctx.fill();ctx.stroke();ctx.beginPath();ctx.arc(0,6.2,1.5,0,6.3);ctx.fill();ctx.stroke();ctx.restore()}});
   // ---------------- the towel: a real cloth pinned to the raised hand (see TOWEL CLOTH), drawn as depth sorted 3D quads
   if(!NOTOWEL&&!CA){const Hh=[rF[0],rF[1],rF[2]],tm=rF[1]>-62.5?2:1,cl=live?towelFor(TW_SPIN,Hh,0,tm):towelStatic(Hh,tm);for(const q of towelJobs(cl,rF[2]))add(q.d,q.fn)}
+  if(o.bottle&&CA){
+    // The prop is attached to the projected fist, sharing body sway,
+    // turn angle and depth order. No screen-space floating bottle.
+    const b=o.bottle;
+    add(rF[2]-.12,()=>{ctx.save();ctx.translate(rF[0],rF[1]);ctx.rotate(b.angle*(C<0?-1:1));ctx.scale(1.35,1.35);ctx.translate(0,17);bottleDraw(0,0,b.level,BOTCOL[b.color]);ctx.restore()});
+    add(rF[2]+.12,()=>{blob([pEll(rF[0],rF[1],5.5,5.6)],{ow:1.1});knuckles(rF)});
+  }
   if(!CA)add(rF[2]+.2,()=>{if(covering)palm(rF);else{blob([pEll(rF[0],rF[1],6.8,6.8)],{ow:0});knuckles(rF)}});                // the raised hand over the towel's held edge
 
   if(o.prop){const H=o.prop.h==='L'?lF:rF;add(H[2]+.8,()=>{if(o.prop.k==='lint')lint(H[0]+(o.prop.dx||0),H[1]+(o.prop.dy||-7))})}
