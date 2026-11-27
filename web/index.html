@@ -1109,11 +1109,11 @@ function wobStep(dt){
   if(maxv<.6&&maxo<.03){if(++wobQuiet>20){ox.fill(0);oy.fill(0);ovx.fill(0);ovy.fill(0);wobOn=false;wobQuiet=0}}else wobQuiet=0}
 // sand: no cohesion - falls straight down and slides off slopes steeper than 45 degrees
 function sandStep(){let moved=false;const par=sandT&1;
-  for(let y=ROWS-2;y>=0;y--)for(let x=0;x<COLS;x++){const i=y*COLS+x;if(grid[i]!==SAND)continue;
+  for(let y=ROWS-2;y>=0;y--){const row=y*COLS;for(let x=0;x<COLS;x++){const i=row+x;if(grid[i]!==SAND)continue;
     let dst=-1;if(!grid[i+COLS])dst=i+COLS;
-    else for(let k=0;k<2&&dst<0;k++){const nx=x+((k^par)?1:-1);if(nx>=0&&nx<COLS&&!grid[y*COLS+nx]&&!grid[(y+1)*COLS+nx])dst=(y+1)*COLS+nx}
+    else for(let k=0;k<2&&dst<0;k++){const dx=(k^par)?1:-1,nx=x+dx;if(nx>=0&&nx<COLS&&!grid[i+dx]&&!grid[i+COLS+dx])dst=i+COLS+dx}
     if(dst<0)continue;
-    grid[dst]=SAND;hp[dst]=hp[i];anch[dst]=0;grid[i]=0;hp[i]=0;anch[i]=0;wobZero(i);wobZero(dst);clearLinks(i);clearLinks(dst);moved=true}
+    grid[dst]=SAND;hp[dst]=hp[i];anch[dst]=0;grid[i]=0;hp[i]=0;anch[i]=0;wobZero(i);wobZero(dst);clearLinks(i);clearLinks(dst);moved=true}}
   sandOn=moved;if(moved)needSupport=true}
 // the floor under a landlord: he rides its wobble
 function targetOffset(t){if(!wobOn)return[0,0];const gx=Math.floor(t.x/V);let gy=Math.floor((t.y+t.r+1)/V);
@@ -1244,7 +1244,7 @@ function stepChunks(dt){
         // entries share an owner, this bucket has no other owner between.
         // The existing ID rule rejects every candidate in an older/self bucket.
         if(b[0].ch===b[b.length-1].ch&&b[0].ch.id<=ch.id)continue;
-        for(const o of b){if(a.dead)break;if(o.dead)continue;const oc=o.ch;if(oc.id<=ch.id)continue;const dx=a.wx-o.wx,dy=a.wy-o.wy,d2=dx*dx+dy*dy;if(d2>=V*V||d2<1e-6)continue;
+        for(const o of b){if(a.dead)break;if(o.dead)continue;const oc=o.ch;if(oc.id<=ch.id)continue;const dx=a.wx-o.wx,dy=a.wy-o.wy;if(Math.abs(dx)>=V||Math.abs(dy)>=V)continue;const d2=dx*dx+dy*dy;if(d2>=V*V||d2<1e-6)continue;
           const d=Math.sqrt(d2),nx=dx/d,ny=dy/d,pen=V-d,rax=a.wx-ch.x,ray=a.wy-ch.y,rbx=o.wx-oc.x,rby=o.wy-oc.y;
           const vax=ch.vx-ch.w*ray,vay=ch.vy+ch.w*rax,vbx=oc.vx-oc.w*rby,vby=oc.vy+oc.w*rbx,vn=(vax-vbx)*nx+(vay-vby)*ny;
           if(vn<0){const rna=rax*ny-ray*nx,rnb=rbx*ny-rby*nx,den=1/ch.m+1/oc.m+rna*rna/ch.I+rnb*rnb/oc.I,jj=-(1.1)*vn/den;
@@ -1282,12 +1282,10 @@ function syncChunkPoses(){
   }
 }
 function cleanChunks(dt){
-  for(let k=chunks.length-1;k>=0;k--){const ch=chunks[k];let lost=false;
-    for(const a of ch.cells)if(a.dead){lost=true;score+=5}
-    if(lost){
-      // Preserve live fragment identity and order without allocating a
-      // replacement array on each impact-heavy frame.
-      let n=0;for(const a of ch.cells)if(!a.dead)ch.cells[n++]=a;
+  for(let k=chunks.length-1;k>=0;k--){const ch=chunks[k];let n=0;
+    // Compact and score in one traversal; preserve fragment identity/order.
+    for(let i=0;i<ch.cells.length;i++){const a=ch.cells[i];if(a.dead){score+=5;continue}if(n!==i)ch.cells[n]=a;n++}
+    if(n!==ch.cells.length){
       ch.cells.length=n;
       if(!n){chunks.splice(k,1);continue}recompute(ch)
     }
@@ -2092,6 +2090,9 @@ function updTargets(dt){
        precise circle hit and rubble velocity still decide actual impacts. */
     const radius=t.r+RC,rad2=radius*radius;
     for(const ch of chunks){
+      // Stationary debris cannot impart an impact. Rotating or recently
+      // woken rubble still uses the original precise per-voxel checks.
+      if(ch.vx===0&&ch.vy===0&&ch.w===0)continue;
       const cdx=ch.x-t.x,cdy=ch.y-t.y,cr=ch.rad+t.r+4;
       if(Math.abs(cdx)>cr||Math.abs(cdy)>cr||cdx*cdx+cdy*cdy>cr*cr)continue;
       let dead=false;
