@@ -778,8 +778,18 @@ static void draw_rubble_chunks(void){
     for(int k=0;k<ch->count;k++){
       const MxCell *a=&ch->cells[k];
       if(a->dead)continue;
-      tile_rot_visible(X(a->wx),Y(a->wy),ca,sa,a->m,
+      const float x=X(a->wx),y=Y(a->wy);
+      const int fuse=mx_fuse_visual(a);
+#if MX_DC_RUBBLE_CULL
+      /* An armed voxel's spark extends above the rotated tile. */
+      if(x<=-4.0f||x>=644.0f||y<=-4.0f||y>=484.0f+(fuse?3.0f:0.0f))continue;
+#endif
+      tile_rot_visible(x,y,ca,sa,a->m,
                        variant((int)(a->lx*7),(int)(a->ly*3)),dmg(a->h,a->m),Z_CHUNK);
+      if(fuse){
+        quad(x-2.0f,y-5.0f,4.0f,1.0f,Z_CHUNK+.01f,fuse==2?argb(255,72,42,255):argb(255,190,52,255));
+        quad(x-.5f,y-6.0f,1.0f,1.0f,Z_CHUNK+.02f,WHITE);
+      }
     }
   }
 }
