@@ -32,12 +32,432 @@ function generateTrials(){
     {"label":"Switchback Depot","prefix":"Switchback","wall":2,"floor":1,"roof":2,"kind":[0,1,2,3],"tip":"CLIMB THE YARD STEPS; PUNCH WOOD","tnt":0,"pad":0,"tube":0,"sand":0,"walk":2},
     {"label":"Rooftop Relay","prefix":"Relay","wall":3,"floor":6,"roof":7,"kind":[1,5,2,4],"tip":"CLIMB THE STEPS; REBOUND OVER WALLS","tnt":0,"pad":1,"tube":1,"sand":0,"walk":2},
     {"label":"Three-Stage Circuit","prefix":"Circuit","wall":6,"floor":2,"roof":7,"kind":[4,6,3,7],"tip":"BREAK THE SUPPORTS; FINISH THE CIRCUIT","tnt":1,"pad":1,"tube":1,"sand":0,"walk":1}
-  ];
+  ].concat([
+  {
+    "label": "Rubble Raceway",
+    "prefix": "Raceway",
+    "wall": 2,
+    "floor": 1,
+    "roof": 7,
+    "kind": [
+      1,
+      5,
+      2,
+      0
+    ],
+    "tip": "BANK AND RUN THROUGH THE RUBBLE",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 0,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Pressure Foundry",
+    "prefix": "Pressure",
+    "wall": 6,
+    "floor": 2,
+    "roof": 1,
+    "kind": [
+      3,
+      2,
+      4,
+      1
+    ],
+    "tip": "DIVE WITH QUAKE AT THE POSTS",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Airship Docks",
+    "prefix": "Airship",
+    "wall": 4,
+    "floor": 6,
+    "roof": 7,
+    "kind": [
+      2,
+      1,
+      5,
+      3
+    ],
+    "tip": "USE THE BEANS RECOVERY JET",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Silt Refinery",
+    "prefix": "Silt",
+    "wall": 3,
+    "floor": 1,
+    "roof": 2,
+    "kind": [
+      0,
+      2,
+      6,
+      4
+    ],
+    "tip": "RELEASE SILT THEN BREAK THE FRAME",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 1,
+    "walk": 1
+  },
+  {
+    "label": "Brick Observatory",
+    "prefix": "Observatory",
+    "wall": 2,
+    "floor": 6,
+    "roof": 4,
+    "kind": [
+      2,
+      3,
+      1,
+      0
+    ],
+    "tip": "SHATTER THE TOWER WINDOWS",
+    "tnt": 0,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Spring Foundry",
+    "prefix": "Springforge",
+    "wall": 6,
+    "floor": 1,
+    "roof": 7,
+    "kind": [
+      5,
+      4,
+      2,
+      6
+    ],
+    "tip": "REBOUND ABOVE THE STEEL FRAME",
+    "tnt": 1,
+    "pad": 1,
+    "tube": 0,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Courier Alley",
+    "prefix": "Courier",
+    "wall": 2,
+    "floor": 2,
+    "roof": 1,
+    "kind": [
+      2,
+      1,
+      5,
+      6
+    ],
+    "tip": "PARRY CASES AND CLIMB THE STEPS",
+    "tnt": 0,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Marble Exchange",
+    "prefix": "Marble",
+    "wall": 3,
+    "floor": 6,
+    "roof": 3,
+    "kind": [
+      4,
+      3,
+      6,
+      7
+    ],
+    "tip": "BREAK SUPPORTS BEFORE THE BOSS",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 1,
+    "walk": 1
+  },
+  {
+    "label": "Glass Viaduct",
+    "prefix": "Viaduct",
+    "wall": 4,
+    "floor": 6,
+    "roof": 4,
+    "kind": [
+      1,
+      2,
+      3,
+      5
+    ],
+    "tip": "CUT THE PIERS UNDER THE BRIDGE",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Sandstone Works",
+    "prefix": "Sandstone",
+    "wall": 3,
+    "floor": 2,
+    "roof": 2,
+    "kind": [
+      0,
+      1,
+      2,
+      4
+    ],
+    "tip": "RELEASE SAND INTO THE YARD",
+    "tnt": 0,
+    "pad": 0,
+    "tube": 0,
+    "sand": 1,
+    "walk": 1
+  },
+  {
+    "label": "Bumper Gardens",
+    "prefix": "Bumper",
+    "wall": 2,
+    "floor": 1,
+    "roof": 7,
+    "kind": [
+      5,
+      6,
+      1,
+      2
+    ],
+    "tip": "USE RUBBER PADS TO CROSS ROOFS",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Iron Courthouse",
+    "prefix": "Ironcourt",
+    "wall": 6,
+    "floor": 6,
+    "roof": 2,
+    "kind": [
+      4,
+      3,
+      2,
+      7
+    ],
+    "tip": "BREAK THE COURT FOUNDATIONS",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 1
+  },
+  {
+    "label": "Night Freight",
+    "prefix": "Nightfreight",
+    "wall": 3,
+    "floor": 6,
+    "roof": 1,
+    "kind": [
+      2,
+      5,
+      6,
+      4
+    ],
+    "tip": "PARRY THE THROWERS ON FOOT",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Shatter Plaza",
+    "prefix": "Shatter",
+    "wall": 4,
+    "floor": 1,
+    "roof": 4,
+    "kind": [
+      1,
+      2,
+      0,
+      3
+    ],
+    "tip": "BREAK GLASS AND DROP THE FLOORS",
+    "tnt": 0,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Floodplain Yard",
+    "prefix": "Floodplain",
+    "wall": 2,
+    "floor": 6,
+    "roof": 7,
+    "kind": [
+      0,
+      5,
+      4,
+      6
+    ],
+    "tip": "BANK ABOVE THE SAND BANK",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 0,
+    "sand": 1,
+    "walk": 1
+  },
+  {
+    "label": "Powder Junction",
+    "prefix": "Junction",
+    "wall": 6,
+    "floor": 2,
+    "roof": 6,
+    "kind": [
+      2,
+      3,
+      4,
+      7
+    ],
+    "tip": "CHAIN TNT THEN DIVE WITH QUAKE",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Finale: Arrival",
+    "prefix": "Arrival",
+    "wall": 2,
+    "floor": 1,
+    "roof": 7,
+    "kind": [
+      1,
+      2,
+      5,
+      0
+    ],
+    "tip": "REBOUND INTO THE FIRST SECTOR",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Finale: Furnace",
+    "prefix": "Furnace",
+    "wall": 6,
+    "floor": 2,
+    "roof": 1,
+    "kind": [
+      3,
+      2,
+      4,
+      6
+    ],
+    "tip": "COLLAPSE THE FURNACE SUPPORTS",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 1
+  },
+  {
+    "label": "Finale: Sandbank",
+    "prefix": "Sandbank",
+    "wall": 3,
+    "floor": 1,
+    "roof": 2,
+    "kind": [
+      0,
+      1,
+      2,
+      4
+    ],
+    "tip": "RELEASE THE SAND AND ADVANCE",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 1,
+    "walk": 0
+  },
+  {
+    "label": "Finale: Skybridge",
+    "prefix": "Skybridge",
+    "wall": 4,
+    "floor": 6,
+    "roof": 7,
+    "kind": [
+      2,
+      5,
+      6,
+      3
+    ],
+    "tip": "RECOVER FLIGHT ACROSS THE BRIDGE",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Finale: Guardhouse",
+    "prefix": "Guardhouse",
+    "wall": 6,
+    "floor": 6,
+    "roof": 2,
+    "kind": [
+      4,
+      3,
+      2,
+      7
+    ],
+    "tip": "PARRY AND BREAK THE GUARDHOUSE",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Six-Stage Grand Circuit",
+    "prefix": "Grand Circuit",
+    "wall": 3,
+    "floor": 6,
+    "roof": 7,
+    "kind": [
+      4,
+      6,
+      3,
+      7
+    ],
+    "tip": "FINISH ALL SIX SECTORS",
+    "tnt": 1,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 1
+  }
+]);
   const shapes=["Court","Stacks","Bridge","Terrace"];
   const palettes=["#e8d3a8","#d7dfe9","#d2b6b4","#b9d6be"];
   const levels=[],distinct=new Set();
   const fail=(msg)=>{throw Error(msg)};
   for(let district=0;district<groups.length;district++)for(let shape=0;shape<4;shape++)for(let tier=0;tier<5;tier++){
+    if(district===51&&shape===3&&tier===4)continue; // final district has 19 maps
     const g=groups[district],grid=new Uint8Array(WIDTH*HEIGHT),targets=[],rooms=[],pads=[],tubes=[],houses=[];
     const get=(x,y)=>grid[y*WIDTH+x];
     function fill(x,y,w,h,m){
@@ -188,6 +608,12 @@ function generateTrials(){
         for(let y=H.base-5;y<H.base;y++)for(let x=H.x;x<H.x+2;x++)
           if(get(x,y)&&get(x,y)!==4&&clearance(x,y))fill(x,y,1,1,1);
       }
+    }
+    if(district>=30){
+      // Short grounded entry steps: vary the first approach and give
+      // walkers a low punchable ledge, without intruding on the sling.
+      const d=district-30,h=1+d%3,hh=1+Math.floor(d/3)%3,mat=1+Math.floor(d/9);
+      fill(28,60-h,1,h,mat);fill(29,60-hh,1,hh,mat);
     }
     const name=g.prefix+" "+shapes[shape]+" "+(tier+1);
     const tip=district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
