@@ -82,23 +82,6 @@ jobs:
           python3 tools/ppm_to_png.py docs/art-review/turnaround.ppm
           test -s docs/art-review/turnaround.png
           test -s docs/art-review/turnaround.txt
-      - name: Export isolated Golden Cels native artwork on manual request
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          MX_CEL_PREVIEW_DIR: ${{ runner.temp }}/mandex-cel-art
-        run: |
-          python3 tools/gen_manspr.py
-          python3 tools/gen_dc_art.py
-          test -s "$MX_CEL_PREVIEW_DIR/manspr-cel-preview.h"
-          test -s "$MX_CEL_PREVIEW_DIR/dcart-cel-preview.h"
-      - name: Upload alternate native artwork for review
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: mandex-golden-cels-native-preview
-          path: ${{ runner.temp }}/mandex-cel-art
-          retention-days: 7
-          if-no-files-found: error
       - name: Upload reviewable artwork (never push to main from a PR)
         # Preserve generated sprites for visual diagnosis even if a validation
         # assertion fails after both bakers have successfully produced art.
@@ -115,3 +98,63 @@ jobs:
             docs/art-review/turnaround.txt
           if-no-files-found: warn
           retention-days: 14
+
+  # Run the alternate baker in parallel, so a failed Cel export cannot
+  # consume the existing Classic preview job's time budget.
+  cel-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install alternate art pipeline
+        run: |
+          python -m pip install --disable-pip-version-check "numpy<3" pillow playwright
+          python -m playwright install --with-deps chromium
+      - name: Bake and validate isolated Golden Cels assets
+        env:
+          MX_CEL_PREVIEW_DIR: ${{ runner.temp }}/mandex-cel-art
+        run: |
+          set -euo pipefail
+          python3 tools/gen_manspr.py
+          python3 tools/gen_dc_art.py | tee /tmp/mandex-cel-hd.log
+          for f in manspr-cel-preview.h dcart-cel-preview.h man-sprites-cel-preview.png dc-art-sheet-cel-preview.png; do
+            test -s "$MX_CEL_PREVIEW_DIR/$f"
+          done
+          grep -q 'shared human rectangles: 0' /tmp/mandex-cel-hd.log
+          grep -q '^#define MSF_NBASE 71 ' "$MX_CEL_PREVIEW_DIR/manspr-cel-preview.h"
+          grep -q '^#define DCM_NFR 142$' "$MX_CEL_PREVIEW_DIR/dcart-cel-preview.h"
+          # Compile both generated headers against the existing frame contract.
+          cat > /tmp/cel-atlas-contract.c <<'EOF'
+          #include "manspr-cel-preview.h"
+          #define MX_DCART
+          #include "dcart-cel-preview.h"
+          _Static_assert(MSF_COUNT == 142, "indexed frame count");
+          _Static_assert(MSF_COUNT == DCM_NFR, "atlas frame count");
+          _Static_assert(MSF_NBASE == 71, "wolf frame offset");
+          _Static_assert(MS_NPAL == 39, "indexed palette contract");
+          int main(void) {
+            for (int i = 0; i < MSF_COUNT; ++i) {
+              const MsFrame *f = &MS_FRAMES[i];
+              if (!f->px || f->w <= 0 || f->h <= 0) return 1;
+              const short *hd = DCM_FR[i];
+              if (hd[0] < 0 || hd[1] < 0 || hd[2] <= 0 || hd[3] <= 0 ||
+                  hd[0] + hd[2] > DCT_MAN_W || hd[1] + hd[3] > DCT_MAN_H) return 2;
+            }
+            return 0;
+          }
+          EOF
+          gcc -std=c11 -O0 -I"$MX_CEL_PREVIEW_DIR" /tmp/cel-atlas-contract.c -o /tmp/cel-atlas-contract
+          /tmp/cel-atlas-contract
+          # The alternate bake must never overwrite shipped Classic artwork.
+          git diff --exit-code -- art/manspr.h art/dcart.h docs/man_sprites.png docs/dc_art_sheet.png
+      - name: Upload alternate native artwork for review
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mandex-golden-cels-native-preview
+          path: ${{ runner.temp }}/mandex-cel-art
+          retention-days: 7
+          if-no-files-found: warn
