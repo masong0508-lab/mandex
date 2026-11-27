@@ -6150,7 +6150,7 @@ function drawMobileEditor(){
     WEB_UI.editorX=Math.min(Math.max(0,WW-W/sc),WEB_UI.editorX+150)
   },{size:18});
   const y=surface+66,p=!!WEB_UI.page.edit,cols=5,cw=(W-24-4*6)/cols;
-  if(!p){
+  if(!p&&!E.starters){
     const mats=['ERASE',...MAT.slice(1).map(m=>m.n.toUpperCase()),'LANDLORD'];
     mats.forEach((name,i)=>{
       const x=12+(i%cols)*(cw+6),yy=y+Math.floor(i/cols)*48;
@@ -6172,10 +6172,7 @@ function drawMobileEditor(){
     txt('BRUSH '+brushLabel()+'  •  '+(E.tool==='mat'?MAT[E.mat].n:E.tool).toUpperCase(),
       W/2,Math.min(H-80,y+225),14,'#cfd','center');
   }else if(E.starters){
-    txt('START A BUILD — Undo restores the old one',W/2,y+13,17,'#ffd23f','center');
-    const sw=(W-36)/2;
-    E_STARTERS.forEach((name,i)=>btn(12+(i%2)*(sw+12),y+28+Math.floor(i/2)*52,sw,44,name,
-      ()=>eApplyStarter(i),{size:14}));
+    hits=[];drawStarterMenu(12,y,W-24,H-61-y);
   }else{
     const actions=[
       ['MEN -',()=>eAdjustMen(-1)],
@@ -6430,6 +6427,7 @@ function importCode(){
 // ---------- the editor ----------
 const E={g:new Uint8Array(COLS*ROWS),t:[],men:5,mat:1,tool:'mat',shape:'pen',bk:0,bs:0,bt:1,undo:[],redo:[],starters:false,id:-1,name:'',drag:null,pointer:null};
 const EMIN=28;   // columns left of this stay empty: the sling lives there
+let starterPage=0;
 function openEditor(back,which){
   testing=false;state='edit';hits=[];
   // Editor grids are always 120×60, even after the 360-column finale.
@@ -6437,7 +6435,7 @@ function openEditor(back,which){
   if(back)return;
   if(which!==undefined&&which>=0){const L=PD.custom[which];E.g=decodeCells(L.c,120);E.t=L.t.map(p=>p.slice());E.men=L.m|0||5;E.id=which;E.name=L.n}
   else{E.g=new Uint8Array(COLS*ROWS);E.t=[];E.men=5;E.id=-1;E.name=''}
-  E.undo=[];E.redo=[];E.starters=false;E.pointer=null;E.drag=null;E.mat=1;E.tool='mat';E.shape='pen';E.bk=0;E.bs=0;E.bt=1}
+  E.undo=[];E.redo=[];E.starters=false;starterPage=0;E.pointer=null;E.drag=null;E.mat=1;E.tool='mat';E.shape='pen';E.bk=0;E.bs=0;E.bt=1}
 
 // Editor-only snapshots are capped at 24 states (~175 KiB of grid data).
 // They never enter the console core, the save payload or the frame loop.
@@ -6454,7 +6452,9 @@ function eAdjustMen(delta){
 }
 // Deterministic starter structures: no generated textures, random levels,
 // extra draw calls or terrain outside the canonical 120x60 creator grid.
-const E_STARTERS=['THREE-STOREY TOWER','BREAKAWAY BRIDGE','FACTORY WORKSHOP','ROOFTOP TENEMENTS','TNT TRANSFER DEPOT','RUBBER BOUNCE ARENA'];
+const E_STARTERS=['THREE-STOREY TOWER','BREAKAWAY BRIDGE','FACTORY WORKSHOP','ROOFTOP TENEMENTS','TNT TRANSFER DEPOT','RUBBER BOUNCE ARENA',
+ 'CANAL LOCK','FREIGHT TERMINAL','SAND SILO','GLASS PAVILION','RUBBER SWITCHBACK','FIRE ESCAPE COURT',
+ 'CLOCKTOWER','FOUNDRY GANTRY','QUARRY STEPS','ROOF GARDENS','TNT BUNKER','CROSSOVER STATION'];
 function eStarterPattern(kind){
   if(!Number.isInteger(kind)||kind<0||kind>=E_STARTERS.length)throw Error('Unknown starter');
   const g=new Uint8Array(120*ROWS);
@@ -6495,13 +6495,72 @@ function eStarterPattern(kind){
     fill(51,30,55,31,7);fill(86,30,90,31,7);
     fill(62,46,78,47,1);fill(68,48,70,57,2);fill(36,56,40,57,8);
     t=[[58,32],[81,32],[109,58]];
-  }else{ // staggered rubber roofs make a vertical trick-shot challenge
+  }else if(kind===5){ // staggered rubber roofs make a vertical trick-shot challenge
     fill(39,58,114,59,3);
     fill(48,51,49,57,2);fill(59,51,60,57,2);fill(48,50,60,50,7);
     fill(75,40,76,57,6);fill(86,40,87,57,6);fill(75,39,87,39,7);
     fill(96,29,97,57,2);fill(111,29,112,57,2);fill(96,28,112,28,7);
     fill(96,49,97,50,5);fill(111,49,112,50,5);
     t=[[55,50],[81,39],[104,28]];
+  }else{
+    // Authored bonus blueprints, with load-bearing columns, clear tenants
+    // and usable platforms. All coordinates are inclusive.
+    const foundation=(a,b)=>fill(a,58,b,59,3);
+    const pier=(x,y,m=6)=>fill(x,y,x+1,57,m);
+    const deck=(a,b,y,m,posts)=>{for(const x of posts)pier(x,y+2);fill(a,y,b,y+1,m)};
+    const charge=(x,y)=>fill(x,y,x+1,y+1,5);
+    switch(kind){
+      case 6: // Two towers and a destructible canal gate.
+        foundation(36,111);deck(39,58,46,6,[39,57]);deck(82,107,36,6,[82,106]);
+        deck(58,82,51,6,[62,80]);charge(39,54);charge(80,54);
+        t=[[48,46],[72,51],[94,36]];break;
+      case 7: // Three freight loading decks at staggered elevations.
+        foundation(33,114);deck(35,60,50,6,[35,59]);deck(64,86,38,6,[64,85]);
+        deck(90,111,26,6,[90,110]);charge(64,52);charge(110,48);
+        t=[[48,50],[75,38],[100,26]];break;
+      case 8: // Sand stockpile and two storage silos.
+        foundation(38,112);deck(39,61,39,6,[39,60]);deck(83,107,25,6,[83,106]);
+        for(let y=57;y>=50;y--)fill(65+(57-y),y,79-(57-y),y,8);
+        charge(39,53);t=[[50,39],[95,25],[110,58]];break;
+      case 9: // Glass braces in a steel pavilion.
+        foundation(36,113);deck(40,74,43,6,[40,56,73]);deck(81,109,30,6,[81,94,108]);
+        for(const x of [40,56,73,81,94,108])fill(x,51,x+1,52,4);
+        t=[[48,43],[65,43],[88,30],[101,30]];break;
+      case 10: // Alternating rubber rebound decks.
+        foundation(35,114);deck(37,50,49,7,[37,49]);deck(62,75,39,7,[62,74]);
+        deck(94,107,24,7,[94,106]);charge(62,53);
+        t=[[44,49],[69,39],[100,24]];break;
+      case 11: // Exterior escape steps.
+        foundation(32,113);deck(36,47,51,3,[36,46]);deck(54,65,43,6,[54,64]);
+        deck(72,83,35,6,[72,82]);deck(92,110,25,6,[92,109]);
+        t=[[41,51],[59,43],[78,35],[101,25]];break;
+      case 12: // Four-floor clocktower and an annex.
+        foundation(42,101);pier(48,11,6);pier(72,11,6);
+        for(const y of [11,24,37,50])fill(48,y,73,y+1,6);
+        deck(83,100,44,3,[83,99]);charge(48,55);charge(72,55);
+        t=[[59,11],[60,24],[60,37],[60,50],[92,44]];break;
+      case 13: // Broad gantry over loading bays, charged supports.
+        foundation(34,115);deck(37,110,34,6,[37,60,84,109]);
+        charge(37,52);charge(60,52);charge(84,52);
+        deck(43,55,51,3,[43,54]);deck(91,103,51,3,[91,102]);
+        t=[[49,34],[72,34],[97,34],[48,51],[97,51]];break;
+      case 14: // Masonry terraces with punchable timber faces.
+        foundation(34,114);fill(37,52,49,57,3);fill(58,43,72,57,3);fill(83,29,105,57,3);
+        fill(37,52,49,52,1);fill(58,43,72,43,1);fill(83,29,105,29,1);
+        charge(83,52);t=[[43,52],[65,43],[94,29]];break;
+      case 15: // Roof gardens with short spring paths.
+        foundation(34,114);deck(35,62,38,6,[35,48,61]);deck(72,109,34,6,[72,90,108]);
+        fill(37,37,41,37,7);fill(74,33,78,33,7);fill(108,49,109,50,4);
+        t=[[44,38],[55,38],[81,34],[100,34]];break;
+      case 16: // Reinforced bunker with six charged piers.
+        foundation(36,114);deck(39,69,29,6,[39,54,68]);deck(81,110,45,6,[81,95,109]);
+        for(const x of [39,54,68,81,95,109])charge(x,54);
+        t=[[46,29],[61,29],[88,45],[103,45],[75,58]];break;
+      case 17: // High and low decks intersect beneath an elevated station.
+        foundation(32,114);deck(34,75,27,6,[34,54,74]);deck(65,112,48,6,[65,89,111]);
+        deck(84,109,16,6,[84,108]);charge(54,55);charge(89,55);
+        t=[[45,27],[65,27],[79,48],[99,48],[96,16]];break;
+    }
   }
   const level={n:E_STARTERS[kind],m:6,c:encodeCells(g),t};
   validateSharedLevel(level); // Refuse a bad template before touching an edit.
@@ -6514,14 +6573,21 @@ function eApplyStarter(kind){
   E.name=p.level.n;E.id=-1;E.drag=null;E.pointer=null;E.starters=false;
   toast('outfit','Starter loaded',E.name+' — UNDO restores the previous design');
 }
-function drawStarterMenu(x,y,w){
-  panel(x,y,w,256);
-  txt('CHOOSE A STARTER',x+w/2,y+27,20,'#ffd23f','center');
-  txt('Replaces the grid — Undo restores it',x+w/2,y+48,12,'#cfd','center');
-  const sw=(w-36)/2;
-  E_STARTERS.forEach((name,i)=>btn(x+12+(i%2)*(sw+12),y+60+Math.floor(i/2)*52,sw,44,name,
-    ()=>eApplyStarter(i),{size:13}));
-  btn(x+12,y+216,w-24,30,'CANCEL',()=>{E.starters=false},{size:13});
+function drawStarterMenu(x,y,w,h=270){
+  const pages=Math.ceil(E_STARTERS.length/6);
+  starterPage=Math.max(0,Math.min(pages-1,starterPage|0));
+  panel(x,y,w,h);
+  txt('BUILD BLUEPRINTS  '+(starterPage+1)+' / '+pages,x+w/2,y+22,18,'#ffd23f','center');
+  const row=Math.floor((h-77)/3),sw=(w-36)/2;
+  for(let k=0;k<6;k++){
+    const i=starterPage*6+k;if(i>=E_STARTERS.length)break;
+    btn(x+12+(k%2)*(sw+12),y+34+Math.floor(k/2)*row,sw,row-5,E_STARTERS[i],
+      ()=>eApplyStarter(i),{size:13});
+  }
+  const bw=(w-36)/3,by=y+h-36;
+  btn(x+12,by,bw,28,'< PREV',()=>{starterPage=(starterPage+pages-1)%pages},{size:12});
+  btn(x+18+bw,by,bw,28,'CANCEL',()=>{E.starters=false},{size:12});
+  btn(x+24+2*bw,by,bw,28,'NEXT >',()=>{starterPage=(starterPage+1)%pages},{size:12});
 }
 function eCell(px,py){return[Math.floor(px/V),Math.floor(py/V)]}
 // Preserve the tiny target list: large rectangle brushes can paint thousands
@@ -6665,7 +6731,7 @@ function drawEditor(){
   btn(x,y2,106,24,'STARTER BUILDS',()=>{E.starters=!E.starters},{size:12,on:E.starters});
   btn(x+112,y2,90,24,'CHECK BUILD',eCheckBuild,{size:11});
   txt(E.name?E.name:'unsaved level',W-8,y1+17,13,'#99a','right');
-  if(E.starters)drawStarterMenu(W-428,66,416)}
+  if(E.starters){hits=[];drawStarterMenu(W-428,66,416)}}
 
 // ---------- level finished: stars, achievements ----------
 function onWin(){
