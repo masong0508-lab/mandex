@@ -63,7 +63,8 @@ real ratan2(real y, real x);                 /* radians, about 0.005 rad accurat
 #define MX_MAX_TARGETS   20      /* the last Landlord HQ district has 17 */
 #define MX_MAX_EVENTS    96
 #define MX_TRIAL_START   60
-#define MX_TRIAL_COUNT   600
+#define MX_TRIAL_COUNT   1039
+#define MX_TRIAL_DISTRICTS ((MX_TRIAL_COUNT+MX_TRIAL_DISTRICT_SIZE-1)/MX_TRIAL_DISTRICT_SIZE)
 #define MX_TRIAL_DISTRICT_SIZE 20
 #define MX_NUM_LEVELS    (MX_TRIAL_START + MX_TRIAL_COUNT)
 #if MX_NUM_LEVELS > 1500
@@ -424,8 +425,15 @@ static inline int mx_tube_pulse_stage(const MxTube *t){
 #define MX_HQ_BONUS_MEN    4
 #define MX_RELAY_START     640 /* 20 circuits: stages 600+k, 620+k, 640+k */
 #define MX_RELAY_BONUS_MEN 6
-static inline int mx_level_stage_count(int l){return l==MX_HQ_LEVEL||(l>=MX_RELAY_START&&l<MX_NUM_LEVELS)?3:1;}
-static inline int mx_stage_source(int l,int d){return l>=MX_RELAY_START&&l<MX_NUM_LEVELS?l-40+20*(d<0?0:d>2?2:d):l;}
+/* Preserve original three-stage circuits; the final 19 new circuits have six sectors. */
+#define MX_RELAY_END 660
+#define MX_GRAND_RELAY_START 1080
+static inline int mx_level_stage_count(int l){return l>=MX_GRAND_RELAY_START&&l<MX_NUM_LEVELS?6:l==MX_HQ_LEVEL||(l>=MX_RELAY_START&&l<MX_RELAY_END)?3:1;}
+static inline int mx_stage_source(int l,int d){
+  if(l>=MX_GRAND_RELAY_START&&l<MX_NUM_LEVELS)return l-100+20*(d<0?0:d>5?5:d);
+  if(l>=MX_RELAY_START&&l<MX_RELAY_END)return l-40+20*(d<0?0:d>2?2:d);
+  return l;
+}
 static inline int mx_stage_bonus(int l){return l>=MX_RELAY_START?MX_RELAY_BONUS_MEN:MX_HQ_BONUS_MEN;}
 const char *mx_stage_tactic(const MxWorld *w);
 void mx_load(MxWorld *w, int level);
@@ -455,9 +463,9 @@ int  mx_targets_alive(const MxWorld *w);
 int  mx_cells_left(const MxWorld *w);
 const char *mx_level_name(int level);
 static inline int mx_trial_district_step(int level,int dir){
-  if(level<MX_TRIAL_START)return dir>0?MX_TRIAL_START:MX_NUM_LEVELS-MX_TRIAL_DISTRICT_SIZE;
+  if(level<MX_TRIAL_START)return dir>0?MX_TRIAL_START:MX_TRIAL_START+(MX_TRIAL_DISTRICTS-1)*MX_TRIAL_DISTRICT_SIZE;
   const int d=(level-MX_TRIAL_START)/MX_TRIAL_DISTRICT_SIZE;
-  if(dir>0)return d==MX_TRIAL_COUNT/MX_TRIAL_DISTRICT_SIZE-1?0:MX_TRIAL_START+(d+1)*MX_TRIAL_DISTRICT_SIZE;
+  if(dir>0)return d==MX_TRIAL_DISTRICTS-1?0:MX_TRIAL_START+(d+1)*MX_TRIAL_DISTRICT_SIZE;
   return d==0?0:MX_TRIAL_START+(d-1)*MX_TRIAL_DISTRICT_SIZE;
 }
 const char *mx_level_tactic(int level); /* read-only stage guidance */
