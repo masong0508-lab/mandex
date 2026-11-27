@@ -116,6 +116,29 @@ int main(void){
   for(int y=10;y<=30;y++)for(int x=65;x<=75;x++)w.grid[IDX(x,y)]=MX_STEEL;
   real ox=w.man.x,oy=w.man.y;walk_tube_step(&w,DT);
   CHECK(w.man.x==ox&&w.man.y==oy&&w.man.tubeCd>0,"solid tube exit refuses transport");
+  /* A blocked landing must not hide another reachable, clear lift. */
+  scene(0);w.ntubes=2;
+  w.man.walk_safe=1;w.man.walk_safe_x=RI(15);w.man.walk_safe_y=RI(30);
+  w.tubes[0]=(MxTube){.ax=w.man.x,.ay=w.man.y,.bx=RI(53),.by=RI(20),.vx=RI(60)};
+  w.tubes[1]=(MxTube){.ax=w.man.x+RI(1),.ay=w.man.y,.bx=RI(90),.by=RI(20),.vx=RI(60)};
+  for(int y=8;y<=32;y++)for(int x=49;x<=57;x++)w.grid[IDX(x,y)]=MX_STEEL;
+  timer=w.man.wt;walk_tube_step(&w,DT);
+  CHECK(w.man.x==RI(90)&&w.man.y==RI(20)&&w.man.mode==MAN_WALK&&w.man.tubeCd==R(.85),"blocked first exit must not hide a second clear lift");
+  CHECK(w.man.wt==timer&&w.man.walk_safe&&w.man.walk_safe_x==RI(15)&&w.man.walk_safe_y==RI(30),"transfer preserves time and last grounded recovery point");
+  CHECK(w.tubes[0].pulse==0&&w.tubes[1].pulse>0&&w.nev==1&&w.ev[0].type==EV_TUBE&&w.ev[0].m==1,"only the successful lift emits an event and pulses");
+  scene(0);w.ntubes=2;
+  w.tubes[0]=(MxTube){.ax=w.man.x,.ay=w.man.y,.bx=RI(53),.by=RI(20),.vx=RI(60)};
+  w.tubes[1]=(MxTube){.ax=w.man.x+RI(1),.ay=w.man.y,.bx=RI(54),.by=RI(20),.vx=RI(60)};
+  for(int y=8;y<=32;y++)for(int x=49;x<=57;x++)w.grid[IDX(x,y)]=MX_STEEL;
+  ox=w.man.x;oy=w.man.y;walk_tube_step(&w,DT);
+  CHECK(w.man.x==ox&&w.man.y==oy&&w.man.tubeCd==R(.20)&&w.nev==0,"all blocked exits preserve position and use short retry cooldown");
+  scene(0);w.ntubes=2;
+  w.tubes[0]=(MxTube){.ax=w.man.x,.ay=w.man.y,.bx=RI(75),.by=RI(20),.vx=RI(60)};
+  w.tubes[1]=(MxTube){.ax=w.man.x+RI(1),.ay=w.man.y,.bx=RI(90),.by=RI(20),.vx=RI(60)};
+  walk_tube_step(&w,DT);
+  CHECK(w.man.x==RI(75)&&w.man.tubeCd==R(.85),"first clear authored lift retains priority");
+  walk_tube_step(&w,DT);
+  CHECK(w.man.x==RI(75)&&w.man.tubeCd<R(.85),"cooldown prevents immediate second transfer");
   /* Exhaust the sample boundaries against the old Cartesian predicate.
      Live, dead and sleeping cells share the same voxel geometry. */
   scene(0);

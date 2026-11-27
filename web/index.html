@@ -1544,17 +1544,20 @@ function walkRescue(m){if(m.walkSafe&&walkPlace(m,m.safeX,m.safeY))return true;c
 function walkTubeStep(m,dt){
   if(m.mode!=='walk'||!tubes.length||m.walkJam>0)return;
   if(m.tubeCd>0){m.tubeCd=Math.max(0,m.tubeCd-dt);return}
+  let blockedExit=false;
   for(const tb of tubes){
     const dx=m.x-tb.ax,dy=m.y-tb.ay;
     if(Math.abs(dx)>tb.r||Math.abs(dy)>tb.r||dx*dx+dy*dy>tb.r*tb.r)continue;
     const safe=m.walkSafe,sx=m.safeX,sy=m.safeY;
     let ok=false;for(let k=0;k<=4;k++)if(walkPlace(m,tb.bx,tb.by-k*V)){ok=true;break}
-    if(!ok){m.tubeCd=.20;return}
+    if(!ok){blockedExit=true;continue}
     m.walkSafe=safe;m.safeX=sx;m.safeY=sy;
     m.vx=clamp(Math.cos(tb.ang)*tb.sp,-176,176);m.vy=-150;m.face=m.vx<0?-1:1;
     m.tubeT=0;m.tubeCd=.85;tb.pulseAt=time;
     ring(tb.ax,tb.ay,50,tb.col);ring(tb.bx,tb.by,50,tb.col);SFX.whoosh();popText(m.x,m.y-30,'TUBE TRANSFER!',tb.col,22);shake=Math.max(shake,3);return;
   }
+  // Throttle retries only when no reachable lift had a clear exit.
+  if(blockedExit)m.tubeCd=.20;
 }
 function enterWalk(){const m=man;m.face=m.vx<0?-1:1;m.mode='walk';m.walked=true;m.turn=0;m.gait=0;m.vx=m.vy=0;m.landFx=0;m.landPower=0;m.gr=false;m.wt=WALK_T;m.parryTimeUsed=0;m.pT=0;m.pCd=0;m.stomp=false;m.ledgeGrace=0;m.jumpHold=0;m.jumpBuffer=0;m.jumpLatched=false;m.walkSafe=false;m.walkJam=0;m.R=14;m.pwr=m.pwr;
   m.x=clamp(m.x,WHW+2,WW-WHW-2);m.y=clamp(m.y,WHH,ROWS*V-WHH);
