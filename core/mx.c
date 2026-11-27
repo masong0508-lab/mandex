@@ -1668,7 +1668,12 @@ void mx_dive(MxWorld *w){
   if(m->mode == MAN_FLY && m->pwr == PW_BEANS && !m->beaned){     /* beans: a fart jet along his flight */
     m->beaned = 1;
     real sp = rsqrt(rmul(m->vx, m->vx) + rmul(m->vy, m->vy));
-    if(sp > 0){ m->vx += rmul(rdiv(m->vx, sp), RI(65)); m->vy += rmul(rdiv(m->vy, sp), RI(65)) - RI(10); }
+    /* A stalled or steeply falling shot can recover instead of firing
+       its one charge straight into the floor. Keep ordinary jets unchanged. */
+    if(sp<R(2)||m->vy>rabs(m->vx)){
+      m->vx+=RI((m->vx<0||(m->vx==0&&m->face<0))?-40:40);
+      m->vy-=RI(45);
+    }else{ m->vx += rmul(rdiv(m->vx, sp), RI(65)); m->vy += rmul(rdiv(m->vy, sp), RI(65)) - RI(10); }
     ev(w, EV_FART, m->x, m->y, 0, 0, 0);
     if(w->shake < R(5)) w->shake = R(5);
     return;
