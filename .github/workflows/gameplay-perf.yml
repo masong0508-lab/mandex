@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build float and fixed-point gameplay profilers
         run: |
           gcc -std=gnu99 -O2 -Icore core/mx.c test/bench.c -lm -o /tmp/mandex_physics_float

@@ -27,7 +27,7 @@ jobs:
     continue-on-error: true
     container: ${{ inputs.image || 'kazade/dreamcast-sdk:latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build mandex.elf
         shell: bash
         run: |

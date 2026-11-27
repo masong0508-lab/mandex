@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Paint cancellation, target allocations and explicit preflight
         run: node test/browser_creator_paint_test.js
       - name: Share codec and valid starter builds

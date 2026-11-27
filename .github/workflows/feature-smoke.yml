@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify rare collapse survivor odds, HP loss and no-invulnerability in both modes
         run: |
           for mode in float fixed; do

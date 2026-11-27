@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Confirm quota, rollback, retry and emergency backup
         run: node test/browser_creator_storage_test.js
       - name: Revalidate creator imports and Unicode codes

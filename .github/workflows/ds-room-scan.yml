@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build identical DS renderers with camera-wide and room-bounded wallpaper scans
         run: |
           for MODE in 0 1; do

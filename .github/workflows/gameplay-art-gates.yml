@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Canonical front, quarter, profile and rear-turn identity checks
         run: python3 test/head_turnaround_test.py
       - name: Canonical side profile and pre-baked console sprite ink parity

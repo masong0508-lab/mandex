@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Exercise wide-finale transition into a 120-column custom level
         run: node test/browser_custom_level_width_test.js
       - name: Creator code compatibility and fixed-grid validation

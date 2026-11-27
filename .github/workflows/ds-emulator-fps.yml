@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 15
     container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build test-only auto-start diagnostic ROMs
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH

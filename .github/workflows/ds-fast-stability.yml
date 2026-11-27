@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate landlord art and travel-based gait
         run: python3 test/landlord_motion_regression.py
       - name: Shared C event overflow and objective signal retention - float and fixed

@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify campaign geometry, walking and legacy saves before packaging
         shell: bash
         run: |
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -91,7 +91,7 @@ jobs:
     timeout-minutes: 20
     container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with: { name: mandex-native-cel-runtime, path: art }
       - run: test -s art/manspr_cel.h && make -C ds
@@ -124,7 +124,7 @@ jobs:
     timeout-minutes: 30
     container: kazade/dreamcast-sdk:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with: { name: mandex-native-cel-runtime, path: art }
       - name: Validate both character atlases before Dreamcast ROM build
@@ -163,7 +163,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify boot capture and readiness rejection cases
         run: python3 test/ds_smoke_test.py
       - uses: actions/download-artifact@v8
@@ -189,7 +189,7 @@ jobs:
     needs: [ds, dreamcast, n3ds, smoke-ds, gameplay-gates]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate latest canonical head-turn sprites and all 71 Wolfman atlas frames
         run: |
           set -eu
@@ -226,7 +226,7 @@ jobs:
     timeout-minutes: 20
     container: devkitpro/devkitarm:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with: { name: mandex-native-cel-runtime, path: art }
       - name: Build the 3DS homebrew (libctru, software rendering)
