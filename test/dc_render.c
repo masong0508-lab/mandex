@@ -78,6 +78,15 @@ static int dc_outfit_memory_probe(void){
            classic,work,camo,restored);
     return 1;
   }
+  mx_meta_init(&stats);mx_options_default(&console_opt);
+  console_opt.art_style=1;recolor_man(0);
+  if(cel_active||dc_hash((const unsigned char *)tx_man,bytes)!=classic){puts("FAIL locked Dreamcast art changed atlas");return 1;}
+  for(int i=0;i<MX_STORY_LEVELS;i++)stats.stars[i]=1;
+  recolor_man(0);unsigned painted=dc_hash((const unsigned char *)tx_man,bytes);
+  if(!cel_active||painted==classic||tx_man!=atlas){puts("FAIL Dreamcast cel atlas not changed in place");return 1;}
+  console_opt.art_style=0;recolor_man(0);
+  if(cel_active||dc_hash((const unsigned char *)tx_man,bytes)!=classic||tx_man!=atlas){puts("FAIL Dreamcast classic atlas restoration");return 1;}
+  puts("DC_GOLDEN_CELS_PASS locked, atlas, restoration");
   printf("ok: Dreamcast outfits round-trip identically in-place, permanent 1 MiB atlas not needed (%08x)\n",classic);
   return 0;
 }
