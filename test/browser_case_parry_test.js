@@ -146,6 +146,22 @@ check(cap.e.man.wt===60&&cap.e.man.parryTimeUsed===1,'exact cap');
 cap.e.man.wt=0;cap.caseAt(337,297);cap.walkPunch();
 check(cap.e.man.wt===0,'expired life cannot revive');
 check(html.includes('m.wt=WALK_T;m.parryTimeUsed=0;'),'fresh life resets budget');
+// Execute the real impact logic and record the exact damage footprint.
+const quakeCode=section('function stick(){','function bounceRubber(){');
+for(const dive of [false,true]){
+  const m={pwr:'quake',dive,splatted:false,x:320,y:240,mode:'fly'};
+  const hits=[],victims=[{alive:true,x:388,y:240}];
+  const env={man:m,V:8,CL:null,targets:victims,shake:0,
+    damageCell:(x,y,d)=>hits.push([x,y,d]),killTarget:t=>{t.alive=false},
+    ring(){},goo(){},popText(){},SFX:{boom(){},splat(){}}};
+  const impact=new Function('e','with(e){'+quakeCode+';return stick;}')(env);
+  impact();
+  check(hits.length===(dive?113:81),'quake footprint');
+  check(hits.every(h=>h[2]===(dive?16:13)),'quake damage');
+  check(victims[0].alive===!dive,'mega quake extends target radius');
+  impact();
+  check(hits.length===(dive?113:81),'quake stays single-use');
+}
 const parseStart=html.indexOf('<script>'),parseEnd=html.indexOf('</script>',parseStart);
 new Function(html.slice(parseStart+8,parseEnd));
 console.log('BROWSER_CASE_PARRY_PASS checks='+checks+
