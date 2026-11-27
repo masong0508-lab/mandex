@@ -97,6 +97,22 @@ check(animated.e.cases.length===0&&animated.e.score===150&&animated.e.hurtCount=
 check(popups(animated.e).includes('PARRY! +150'),
   'late animation-window parry should still show feedback');
 
+// A charge retains its reach for the animation even after slowing down.
+for(const face of [-1,1]){
+  for(const charged of [false,true]){
+    const a=make();a.e.man.face=face;a.e.man.vx=charged?face*120:0;
+    a.walkPunch();a.e.man.vx=0;
+    a.caseAt(320+face*39,297);a.e.cases[0].vx=0;
+    a.updCases(1/60);
+    check(a.e.score===(charged?150:0),'active charge reach '+face+' '+charged);
+    check(a.e.cases.length===(charged?0:1),'ordinary active punch retains reach');
+  }
+}
+const expiredCharge=make();expiredCharge.e.man.vx=120;expiredCharge.walkPunch();
+expiredCharge.e.man.pT=0;expiredCharge.caseAt(359,297);expiredCharge.e.cases[0].vx=0;
+expiredCharge.updCases(1/60);
+check(expiredCharge.e.score===0&&expiredCharge.e.cases.length===1,'expired charge cannot parry');
+
 const expired=make();
 expired.e.man.pT=0;expired.caseAt(337,297);
 expired.updCases(1/60);
