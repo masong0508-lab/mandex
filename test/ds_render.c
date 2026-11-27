@@ -1124,7 +1124,20 @@ static int ds_objective_probe(void){
          many,last,secure,marked);
   return 0;
 }
+static int ds_cel_probe(void){
+  gfx_init();mx_meta_init(&stats);mx_options_default(&opt);app=ST_PLAY;
+  apply_outfit(0);u16 classic[224];memcpy(classic,gfx_pal,sizeof classic);
+  opt.art_style=1;apply_outfit(0);
+  if(memcmp(classic,gfx_pal,sizeof classic)){puts("FAIL locked DS art changed palette");return 1;}
+  for(int i=0;i<MX_STORY_LEVELS;i++)stats.stars[i]=1;
+  apply_outfit(0);
+  if(classic[C_SKY0]==gfx_pal[C_SKY0]||classic[C_MAN0+1]==gfx_pal[C_MAN0+1]){puts("FAIL DS cel style has no character/scenery change");return 1;}
+  opt.art_style=0;apply_outfit(0);
+  if(memcmp(classic,gfx_pal,sizeof classic)){puts("FAIL DS classic art restoration");return 1;}
+  puts("DS_GOLDEN_CELS_PASS locked, skin, sky, restoration");return 0;
+}
 int main(int argc, char **argv){
+  if(getenv("DS_CEL_PROBE"))return ds_cel_probe();
   if(getenv("DS_OBJECTIVE_PROBE"))return ds_objective_probe();
   if(getenv("DS_PARTICLE_EDGE_PROBE"))return particle_edge_probe();
   if(getenv("DS_RUBBLE_DAMAGE_PROBE"))return chunk_damage_probe();
