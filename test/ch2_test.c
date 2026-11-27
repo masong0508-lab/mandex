@@ -35,7 +35,11 @@ int main(void){
     CHECK(walkers == 3 && throwers == 1 && W.targets[5].kind == LK_THROWER,
           "Rent Strike: three walkers plus one telegraphed parry challenge"); }
   mx_load(&W, 38); CHECK(W.ntargets == 6 && W.targets[0].kind == LK_BAT && W.targets[1].kind == LK_BAT && W.men == 7, "Sand Standoff: two bat guards, 6 landlords");
-  CHECK(MX_TRIAL_START == 60 && MX_NUM_LEVELS == 660 && MX_CH3_START == 40 && strcmp(mx_level_name(39), "Landlord HQ") == 0 && strcmp(mx_level_name(36), "Mail Room Mayhem") == 0 && strcmp(mx_level_name(40), "Full Moon Rising") == 0 && strcmp(mx_level_name(59), "Alpha Landlord") == 0, "60 levels: chapter 2 ends with Landlord HQ, chapter 3 is 40-59");
+  CHECK(MX_TRIAL_START == 60 && MX_NUM_LEVELS == 1099 && MX_CH3_START == 40 && strcmp(mx_level_name(39), "Landlord HQ") == 0 && strcmp(mx_level_name(36), "Mail Room Mayhem") == 0 && strcmp(mx_level_name(40), "Full Moon Rising") == 0 && strcmp(mx_level_name(59), "Alpha Landlord") == 0, "60 levels: chapter 2 ends with Landlord HQ, chapter 3 is 40-59");
+  CHECK(mx_level_stage_count(639)==1&&mx_level_stage_count(640)==3&&mx_level_stage_count(659)==3&&mx_level_stage_count(660)==1,"legacy relay boundary");
+  CHECK(mx_level_stage_count(1079)==1&&mx_level_stage_count(1080)==6&&mx_level_stage_count(1098)==6,"grand relay boundary");
+  for(int l=1080;l<1099;l++)for(int d=0;d<6;d++) CHECK(mx_stage_source(l,d)==l-100+20*d,"grand relay stage mapping");
+  CHECK(mx_trial_district_step(0,-1)==1080&&mx_trial_district_step(1098,1)==0,"partial district navigation wraps");
 
   /* ---- a flight onto a walk level ends on his feet ---- */
   mx_load(&W, 22);

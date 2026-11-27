@@ -5160,7 +5160,6 @@ function drawToasts(dt){
 // ---------- screens ----------
 const UISTATES=['menu','select','ach','outfit','options','ending'];
 let selTab=0,trialDistrict=0,trialDirectoryPage=0;
-const trialDistrictSize=d=>Math.max(0,Math.min(20,LEVELS.length-TRIAL_START-d*20));
 // The district summary is derived from existing saves; no new save fields.
 function drawDistrictDirectory(portrait){
   const count=TRIAL_DISTRICTS.length,cols=portrait?3:5,margin=portrait?12:28,gap=8;
@@ -5173,11 +5172,12 @@ function drawDistrictDirectory(portrait){
     trialTextFit(TRIAL_DISTRICTS[i],x+w/2,y+Math.min(23,h*.43),w-12,portrait?14:16,'#fff');
     txt(p.cleared+'/'+trialDistrictSize(i)+'  |  '+p.earned+'/'+(trialDistrictSize(i)*3)+' ★',x+w/2,y+h-9,12,'#cfd','center');
   }
-  btn(12,H-84,88,30,'< PAGE',()=>{trialDirectoryPage=Math.max(0,page-1)},{size:12,disabled:page===0});
+  btn(12,H-88,88,36,'< PAGE',()=>{trialDirectoryPage=Math.max(0,page-1)},{size:12,disabled:page===0});
   txt((page+1)+' / '+pages,W/2,H-63,15,'#fff','center');
-  btn(W-100,H-84,88,30,'PAGE >',()=>{trialDirectoryPage=Math.min(pages-1,page+1)},{size:12,disabled:page===pages-1});
+  btn(W-100,H-88,88,36,'PAGE >',()=>{trialDirectoryPage=Math.min(pages-1,page+1)},{size:12,disabled:page===pages-1});
   btn(W/2-110,H-48,220,36,'BACK TO TRIALS',()=>{WEB_UI.districtPicker=false},{size:15});
 }
+function trialDistrictSize(d){return Math.max(0,Math.min(20,LEVELS.length-TRIAL_START-d*20));}
 function trialDistrictProgress(d,stars=PD.stars){
   const first=TRIAL_START+d*20;let cleared=0,earned=0,next=-1;
   for(let i=first;i<Math.min(first+20,LEVELS.length);i++){

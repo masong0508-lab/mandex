@@ -5,8 +5,8 @@ function checkLandscape(html){
  const pa=html.indexOf('const mobilePage='),pb=html.indexOf('function layoutTick()',pa);
  const p=html.indexOf('function mobilePager('),q=html.indexOf('function mobileTab(',p);
  assert(a>=0&&b>a&&pa>=0&&pb>pa&&p>=0&&q>p);
- const env={W:960,H:540,ctx:{measureText:s=>({width:String(s).length*9}),fillRect(){}},txt(){},selTab:1,trialDistrict:0,TRIAL_START:60,CH1:20,CH2:40,
-  LEVELS:Array.from({length:660},(_,i)=>({name:'Stage '+i})),TRIAL_DISTRICTS:Array.from({length:30},(_,i)=>'District '+i),
+ const env={W:960,H:540,ctx:{measureText:s=>({width:String(s).length*9}),fillRect(){}},txt(){},selTab:1,trialDistrict:0,trialDirectoryPage:0,TRIAL_START:60,CH1:20,CH2:40,
+  LEVELS:Array.from({length:1099},(_,i)=>({name:'Stage '+i})),TRIAL_DISTRICTS:Array.from({length:52},(_,i)=>'District '+i),
   PD:{stars:{},custom:Array.from({length:25},(_,i)=>({n:'Custom '+i}))},WEB_UI:{page:{select:0}},
   actions:[],tiles:[],buttons:[],goMenu(){},startStory(i){env.actions.push(['story',i])},
   startCustom(i){env.actions.push(['play',i])},openEditor(back,i){env.actions.push(['edit',i])},
@@ -24,14 +24,14 @@ function checkLandscape(html){
  click('NEXT >');paint();assert.strictEqual(env.tiles.length,1);click('DEL');paint();assert.strictEqual(env.WEB_UI.page.select,1);assert.strictEqual(env.tiles.length,12);
  click('NEW LEVEL');assert.deepStrictEqual(env.actions.pop(),['edit',-1]);click('IMPORT LEVEL');assert.deepStrictEqual(env.actions.pop(),['import']);
  click('TRIALS');paint();assert.strictEqual(env.tiles.length,20);env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',60]);
- click('< DISTRICT');paint();env.tiles.at(-1).fn();assert.deepStrictEqual(env.actions.pop(),['story',659]);
- env.WEB_UI.districtPicker=true;paint();assert.strictEqual(env.tiles.length,0);assert.strictEqual(env.buttons.filter(b=>b.label==='').length,30);env.buttons.filter(b=>b.label==='')[18].fn();paint();env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',420]);
- for(let i=60;i<660;i++)env.PD.stars[i]=3;
+ click('< DISTRICT');paint();env.tiles.at(-1).fn();assert.deepStrictEqual(env.actions.pop(),['story',1098]);
+ env.WEB_UI.districtPicker=true;env.trialDirectoryPage=0;paint();assert.strictEqual(env.tiles.length,0);assert.strictEqual(env.buttons.filter(b=>b.label==='').length,20);click('PAGE >');paint();assert.strictEqual(env.buttons.filter(b=>b.label==='').length,20);click('PAGE >');paint();assert.strictEqual(env.buttons.filter(b=>b.label==='').length,12);click('< PAGE');click('< PAGE');paint();env.buttons.filter(b=>b.label==='')[18].fn();paint();env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',420]);
+ for(let i=60;i<1099;i++)env.PD.stars[i]=3;
  env.PD.stars[65]=0;env.PD.stars[641]=0;
  env.trialDistrict=18;paint();
  click('PLAY NEXT UNCLEARED DISTRICT');
  assert.deepStrictEqual(env.actions.pop(),['story',641]);
- env.PD.stars[641]=3;env.trialDistrict=29;paint();
+ env.PD.stars[641]=3;env.trialDistrict=51;paint();
  click('PLAY NEXT UNCLEARED DISTRICT');
  assert.deepStrictEqual(env.actions.pop(),['story',65]);
  env.PD.stars[65]=3;paint();
