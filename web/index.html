@@ -1422,7 +1422,7 @@ const toolList=()=>TOOLS.filter(t=>!t.reserved);          // what the player can
 const toolOn=id=>(OPT().tool||'none')===id;                // the air valve exists only after explicit selection
 function toolCycle(){const ids=['none'].concat(toolList().map(t=>t.id)),o=OPT(),i=ids.indexOf(o.tool||'none');o.tool=ids[(i+1)%ids.length]}
 const PWTOOLS=['beans','towel','splat','turbo','quake'];
-function toolArm(){const t=OPT().tool||'none';if(man.mode!=='aim'||man.chug||pw.sel==='burp')return;pw.sel=PWTOOLS.includes(t)&&pw.left[t]>0?t:null}
+function toolArm(){const t=OPT().tool||'none';if(man.mode!=='aim'||man.chug||(pw.sel==='burp'&&pw.left.burp>0))return;pw.sel=PWTOOLS.includes(t)&&pw.left[t]>0?t:null}
 const toolName=()=>{const t=OPT().tool||'none';return t==='none'?'NONE':(TOOLS.find(x=>x.id===t)||{name:'?'}).name};
 function valveOpen(){return PD.unlockAll||storyDone()>=3}   // unlockable: beat 3 story levels (U on the level select unlocks everything)
 function drawValve(){
@@ -1838,10 +1838,13 @@ function manStep(dt){
   manPlow()}
 // The sling can be stretched on past a full pull when you drag toward the air valve (see pointermove); power never exceeds a full pull.
 function pullVec(){let dx=SX-man.x,dy=SY-man.y;const d=Math.hypot(dx,dy);if(d>PULL){dx*=PULL/d;dy*=PULL/d}return[dx,dy]}
-function launch(){const[dx,dy]=pullVec();if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}man.x=SX-dx;man.y=SY-dy;
+function launch(){if(state!=='play'||man.mode!=='aim'||men<=0||man.chug||man.stun>0||man.seated||man.vlv)return;const[dx,dy]=pullVec();if(Math.hypot(dx,dy)<14){man.x=SX;man.y=SY;return}man.x=SX-dx;man.y=SY-dy;
   man.recoilAt=time;man.recoilSX=SX;man.recoilSY=SY;man.recoilDX=dx;man.recoilDY=dy;
   const sp0=1-.5*man.inf-.1*(man.bel||0);man.R=14*(1+.9*man.inf+.35*(man.bel||0));man.vx=dx*9.2*sp0;man.vy=dy*9.2*sp0;man.mode='fly';if(man.inf>.6){ST().inflated++;popText(man.x,man.y-60,'HOT AIR!','#9fd8ff',26)}
-  if(pw.sel){man.pwr=pw.sel;man.bm=pw.sel==='burp'?burpMult(man):1;pw.left[pw.sel]--;ST()['pw_'+pw.sel]++;pw.sel=null}
+  // Validate the selected charge again at launch time.
+  const selected=pw.sel;man.pwr=null;man.bm=1;
+  if((PWTOOLS.includes(selected)||selected==='burp')&&Number.isInteger(pw.left[selected])&&pw.left[selected]>0){man.pwr=selected;man.bm=selected==='burp'?burpMult(man):1;pw.left[selected]--;ST()['pw_'+selected]++}
+  pw.sel=null;
   if(man.pwr==='turbo'){
     man.vx*=1.35;man.vy*=1.35;
     if(man.jg){man.jg.bvx+=Math.sign(man.vx)*24;man.jg.bvy-=11;man.jg.sq=1;man.jg.st=0;}
@@ -4738,7 +4741,7 @@ function openToolPicker(){
 }
 function toolPickerSelect(id){
   if(!WEB_UI.toolPicker||!toolPickerAllowed())return false;
-  if(!Object.hasOwn(TOOL_PICKER_DETAILS,id))return false;
+  if(!Object.prototype.hasOwnProperty.call(TOOL_PICKER_DETAILS,id))return false;
   const status=toolPickerStatus(id);
   if(status.startsWith('LOCKED')||status==='USED')return false;
   OPT().tool=id;toolArm();

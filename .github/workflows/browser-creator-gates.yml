@@ -90,6 +90,8 @@ jobs:
         run: python3 test/browser_canvas_cull_test.py --out-dir out/browser-canvas
       - name: Exercise live keyboard, slingshot and orientation input
         run: python3 test/browser_input_smoke.py --out-dir out/browser-canvas/input
+      - name: Exercise live gadget selection, pause and stock consumption
+        run: python3 test/browser_tool_picker_live.py --out-dir out/browser-canvas/tools
       - name: Render Golden Cels character poses and verify Classic restoration
         run: python3 test/browser_cel_character_live.py --out-dir out/browser-canvas/character
       - name: Real three-stage circuits, HQ rewards and walking transit

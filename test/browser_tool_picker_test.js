@@ -61,6 +61,7 @@ assert(a.WEB_UI.toolPicker&&a.pw.sel==='turbo','slide cannot choose');
 assert(a.toolPickerKey({code:'Escape',preventDefault(){}}));assert(!a.WEB_UI.toolPicker);
 a.drag(true);assert(!a.openToolPicker(),'held pull blocks picker');a.drag(false);
 a.pw.sel='burp';assert(!a.openToolPicker(),'charged soda protected');a.pw.sel=null;
+a.pw.sel='burp';a.pw.left.burp=0;assert(a.openToolPicker());assert(a.toolPickerSelect('turbo'));assert.strictEqual(a.pw.sel,'turbo','stale spent soda cannot prevent arming');
 a.man.mode='walk';assert(!a.openToolPicker(),'no tools during walk');a.man.mode='aim';
 assert(a.openToolPicker());a.toolPickerKey({code:'Digit4',preventDefault(){}});assert(a.WEB_UI.toolPicker,'spent shortcut rejected');
 a.toolPickerKey({code:'Digit5',preventDefault(){}});assert(!a.WEB_UI.toolPicker&&a.pw.sel==='towel','keyboard selects');
@@ -68,5 +69,26 @@ assert(html.includes('if(!WEB_UI.toolPicker)update(WEB_SIM_DT);'),'simulation pa
 assert(html.includes('if(WEB_UI.toolPicker){const p=pt(e);toolPickerUp('),'real pointer-up routed');
 assert(html.includes("if(state==='play'&&WEB_UI.toolPicker){toolPickerDown"),'real pointer-down routed');
 assert(html.includes('WEB_UI.toolPicker=false;WEB_UI.toolPointer=null;\n  cancelAim()'),'gameplay reset closes picker');
+const fire=new Function('stock','selected','pull','mode','status',`
+  const SX=128,SY=362,PULL=92,time=0,state=status;
+  let men=3,hint=1,shots=0;
+  const man={mode,x:SX-pull,y:SY,inf:0,bel:0,pwr:null,face:1};
+  const pw={sel:selected,left:{beans:1,towel:1,splat:1,turbo:stock,quake:1,burp:1}};
+  const PWTOOLS=['beans','towel','splat','turbo','quake'];
+  const stats={pw_turbo:0,pw_burp:0,inflated:0};
+  const ST=()=>stats,burpMult=()=>1.2,ring=()=>{},popText=()=>{},pdTouch=()=>{},onShot=()=>shots++;
+  const SFX={launch(){},wooo(){}},flightFaceFor=()=>1,flightPitch=()=>0;
+  ${cut('function pullVec(','// ---- BURPBURSTER')}
+  launch(); if(mode==='aim'&&pull>=14&&status==='play')launch();
+  return {man,pw,men,shots,stats};
+`);
+let f=fire(1,'turbo',70,'aim','play');
+assert.strictEqual(f.man.pwr,'turbo');assert.strictEqual(f.pw.left.turbo,0);
+assert.strictEqual(f.stats.pw_turbo,1);assert.strictEqual(f.men,2);assert.strictEqual(f.shots,1,'duplicate launch rejected');
+assert(Math.abs(f.man.vx-70*9.2*1.35)<1e-8,'real turbo boost');
+for(const stock of [0,-1,.5,NaN]){f=fire(stock,'turbo',70,'aim','play');assert.strictEqual(f.man.pwr,null);assert(Object.is(f.pw.left.turbo,stock));assert.strictEqual(f.stats.pw_turbo,0);assert.strictEqual(f.shots,1)}
+f=fire(1,'__proto__',70,'aim','play');assert.strictEqual(f.man.pwr,null);assert.strictEqual(f.pw.left.turbo,1);
+f=fire(1,'turbo',7,'aim','play');assert.strictEqual(f.shots,0);assert.strictEqual(f.pw.left.turbo,1);assert.strictEqual(f.pw.sel,'turbo');
+for(const [mode,status] of [['fly','play'],['aim','win']]){f=fire(1,'turbo',70,mode,status);assert.strictEqual(f.shots,0);assert.strictEqual(f.pw.left.turbo,1)}
 new Function(cut('<script>','</script>').slice(8));
-console.log('WEB_TOOL_PICKER_PASS layout_rects='+count+' touch_owner=1 drag_cancel=1 stock=1 valve=1 pause=1 keyboard=1');
+console.log('WEB_TOOL_PICKER_PASS layout_rects='+count+' touch_owner=1 drag_cancel=1 stock=1 valve=1 pause=1 keyboard=1 launch_stock=1 duplicate_launch=1');
