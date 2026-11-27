@@ -67,6 +67,11 @@ static int dc_outfit_memory_probe(void){
   const size_t bytes=(size_t)DCT_MAN_W*DCT_MAN_H*sizeof(unsigned short);
   recolor_man(0);
   unsigned classic=dc_hash((const unsigned char *)tx_man,bytes);
+#if MX_CEL_DC_AVAILABLE
+  if(!tx_wman)return 1;
+  pvr_ptr_t wolf_atlas=tx_wman;
+  unsigned wolf_classic=dc_hash((const unsigned char*)tx_wman,bytes);
+#endif
   recolor_man(11); /* Working Man blue briefs */
   unsigned work=dc_hash((const unsigned char *)tx_man,bytes);
   recolor_man(4);  /* Camo Dad */
@@ -84,7 +89,16 @@ static int dc_outfit_memory_probe(void){
   for(int i=0;i<MX_STORY_LEVELS;i++)stats.stars[i]=1;
   recolor_man(0);unsigned painted=dc_hash((const unsigned char *)tx_man,bytes);
   if(!cel_active||painted==classic||tx_man!=atlas){puts("FAIL Dreamcast cel atlas not changed in place");return 1;}
+#if MX_CEL_DC_AVAILABLE
+  if(!dc_atlas_cel||mx_dc_frame(MSF_IDLE_A,dc_atlas_cel)!=MC_DCM_FR[MSF_IDLE_A]||
+     tx_wman!=wolf_atlas||dc_hash((const unsigned char*)tx_wman,bytes)==wolf_classic){puts("FAIL Dreamcast alternate Wolfman/geometry");return 1;}
+#endif
   console_opt.art_style=0;recolor_man(0);
+#if MX_CEL_DC_AVAILABLE
+  if(dc_atlas_cel||mx_dc_frame(MSF_IDLE_A,dc_atlas_cel)!=DCM_FR[MSF_IDLE_A]||
+     tx_wman!=wolf_atlas||dc_hash((const unsigned char*)tx_wman,bytes)!=wolf_classic){puts("FAIL Dreamcast classic Wolfman restoration");return 1;}
+  puts("DC_LIVE_CEL_ATLAS_PASS");
+#endif
   if(cel_active||dc_hash((const unsigned char *)tx_man,bytes)!=classic||tx_man!=atlas){puts("FAIL Dreamcast classic atlas restoration");return 1;}
   puts("DC_GOLDEN_CELS_PASS locked, atlas, restoration");
   printf("ok: Dreamcast outfits round-trip identically in-place, permanent 1 MiB atlas not needed (%08x)\n",classic);
