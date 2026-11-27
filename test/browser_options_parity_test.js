@@ -22,7 +22,7 @@ const canvasContext=()=>new Proxy({createLinearGradient:()=>gradient,createRadia
 });
 const makeCanvas=(w,h)=>{const c={width:w,height:h,getContext:()=>canvasContext()};canvases.push(c);return c};
 const art=new Function('makeCanvas',`
-let PD={stars:{},opt:{}},CH1=20,SPR=[],bgA,bgB,WW=960,WH=540,GY=480,V=8,CL={},_vig=null,outfitCur={},time=0;
+let PD={stars:{},opt:{}},CH1=20,SPR=[],bgA,bgB,CEL_ACTIVE=false,WW=960,WH=540,GY=480,V=8,CL={},_vig=null,outfitCur={},time=0;
 let rebuilds=0,notices=[];
 const OPT=()=>PD.opt;
 const storyDone=()=>{let n=0;for(let i=0;i<CH1;i++)if((PD.stars[i]||0)>0)n++;return n};
@@ -31,7 +31,7 @@ const document={createElement:()=>makeCanvas(0,0)};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const hsh=(x,y)=>((x*374761393+y*668265263)>>>0);
 const MAT=Array.from({length:9},(_,i)=>({c:'#bca085'}));
-function buildBG(){if(celArt())buildCelBackground()}
+function buildBG(){if(CEL_ACTIVE)buildCelBackground()}
 `+artSource+`
 return {PD,notices,celArt,artUnlocked,cycleArtStyle,buildSprites,buildCelBackground,
   setWidth:w=>WW=w,atlas:()=>SPR,background:()=>[bgA,bgB],rebuilds:()=>rebuilds};
