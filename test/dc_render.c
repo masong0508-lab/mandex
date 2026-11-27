@@ -148,6 +148,7 @@ static int dc_fastpath_probe(void){
       MxCell *c=&near->cells[k];c->m=(k&1)?MX_STONE:MX_WOOD;
       c->h=mx_material_hp(c->m);c->wx=41+(k*7)%24;c->wy=12+(k*11)%19;
       c->lx=c->wx-near->x;c->ly=c->wy-near->y;
+      if(k%5==0){c->m=MX_TNT;c->h=mx_material_hp(MX_TNT);c->fuse=(uint8_t)(k&1?8:24);}
     }
     MxChunk *off=&world.chunks[1];
     off->active=1;off->count=2;off->x=500;off->y=300;off->rad=5;
