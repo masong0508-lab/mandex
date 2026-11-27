@@ -211,6 +211,22 @@ int main(void){
     CHECK(w.hp[center]==RI(dive?84:87),"quake cannot fire twice");
   }
 
+  /* Beans recovery has a bounded impulse and spends only one jet. */
+  for(int face=-1;face<=1;face+=2){
+    setup();w.man.mode=MAN_FLY;w.man.pwr=PW_BEANS;w.man.face=face;
+    w.man.vx=0;w.man.vy=0;mx_dive(&w);
+    CHECK(w.man.vx==RI(40*face)&&w.man.vy==-RI(45),"stationary jet follows facing");
+    CHECK(w.man.beaned&&!w.man.dive,"first jet spends boost without starting dive");
+    mx_dive(&w);
+    CHECK(w.man.dive&&events(EV_FART)==1,"second activation dives instead of boosting");
+    setup();w.man.mode=MAN_FLY;w.man.pwr=PW_BEANS;
+    w.man.vx=RI(5*face);w.man.vy=RI(50);mx_dive(&w);
+    CHECK(w.man.vx==RI(45*face)&&w.man.vy==RI(5),"steep descent recovery");
+  }
+  setup();w.man.mode=MAN_FLY;w.man.pwr=PW_BEANS;w.man.vx=RI(20);w.man.vy=0;
+  mx_dive(&w);
+  CHECK(rabs(w.man.vx-RI(85))<R(.1)&&w.man.vy==-RI(10),"normal jet unchanged");
+
   if(failures){fprintf(stderr,"CASE_PARRY_FAIL %d/%d\n",failures,checks);return 1;}
   printf("CASE_PARRY_PASS checks=%d hit=1 forward_only=1 range=1 multiple=1 slam=1 points=1 vulnerable=1\n",checks);
   return 0;
