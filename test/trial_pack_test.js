@@ -5,11 +5,11 @@ const root=path.join(__dirname,'..');
 const pack=require('../tools/trial_pack.js');
 const levels=pack.generateTrials();
 const out=pack.emitTrials(levels);
-assert.strictEqual(levels.length,1039);
-assert.strictEqual(new Set(levels.map(l=>l.rows.join(''))).size,1039);
-assert.strictEqual(levels.reduce((n,l)=>n+l.rows.join('').length,0),7480800);
-assert(out.commandBytes<1039*7200/5,'compact command payload must fit handheld budget');
-for(let d=0;d<52;d++){
+assert.strictEqual(levels.length,1050);
+assert.strictEqual(new Set(levels.map(l=>l.rows.join(''))).size,1050);
+assert.strictEqual(levels.reduce((n,l)=>n+l.rows.join('').length,0),7560000);
+assert(out.commandBytes<1050*7200/5,'compact command payload must fit handheld budget');
+for(let d=0;d<53;d++){
  const source=fs.readFileSync(path.join(root,'content/trials/district-'+(d+1)+'.json'),'utf8');
  assert.strictEqual(source,out.districts[d],'uncompressed editable source matches generator');
 }
@@ -31,4 +31,10 @@ for(let i=0;i<levels.length;i++){
  assert.strictEqual(p.length,l.pads.length,'browser pads '+i);
  assert.strictEqual(pipes.length,l.tubes.length,'browser tubes '+i);
 }
-console.log('TRIAL_PACK_PASS levels='+levels.length+' raw_cells=7480800 commands='+out.commandBytes);
+const city=levels.slice(-11);
+assert.strictEqual(city[0].id,1099);
+assert.strictEqual(city[10].id,1109);
+assert(city.every(l=>l.walk&&l.tubes.length>=1&&l.rooms.length>=9));
+assert(city.reduce((n,l)=>n+l.targets.length,0)>=90);
+assert.deepStrictEqual(city[10].tubes[0],[29,56,105,6]);
+console.log('TRIAL_PACK_PASS levels='+levels.length+' raw_cells=7560000 commands='+out.commandBytes);

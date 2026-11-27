@@ -109,9 +109,9 @@ int main(void){
   { uint8_t c[MX_SAVE_MAX + 32]; int cn = craft(c, 5); mx_meta_init(&T); for(int i = 0; i < MX_NUM_LEVELS; i++){ T.stars[i] = 3; T.best[i] = 99; }
     CHECK(mx_meta_unpack(&T, &of, c, cn) == 1 && T.stars[4] == 2 && T.best[4] == 504 && T.stars[5] == 0 && T.best[5] == 0 && T.best[19] == 0, "a save from a 5-level build loads: the new levels read as not played"); }
   { uint8_t c[MX_SAVE_MAX]; int cn=craft(c,660); mx_meta_init(&T);
-    CHECK(mx_meta_unpack(&T,&of,c,cn)==1&&T.best[659]==1159&&T.best[660]==0&&T.stars[1098]==0,"660-level progress migrates into 1099-level catalog");
-    for(int i=1080;i<1099;i++)T.stars[i]=3;
-    int stars=0; CHECK(mx_trial_size(1098)==19&&mx_trial_cleared(&T,1098,&stars)==19&&stars==57,"partial last district summary"); }
+    CHECK(mx_meta_unpack(&T,&of,c,cn)==1&&T.best[659]==1159&&T.best[660]==0&&T.stars[1098]==0,"660-level progress migrates into 1110-level catalog");
+    for(int i=1100;i<1110;i++)T.stars[i]=3;
+    int stars=0; CHECK(mx_trial_size(1109)==10&&mx_trial_cleared(&T,1109,&stars)==10&&stars==30,"partial last district summary"); }
   { uint8_t c[MX_SAVE_MAX + 32]; int cn = craft(c, MX_NUM_LEVELS + 5); mx_meta_init(&T);
     CHECK(cn <= (int)sizeof c && mx_meta_unpack(&T, &of, c, cn) == 1 && T.best[MX_NUM_LEVELS - 1] == 500u + MX_NUM_LEVELS - 1 && of == 2, "a save from a build with five additional levels loads: the extra levels are dropped"); }
 
