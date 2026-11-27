@@ -13,6 +13,7 @@
 #include <string.h>
 #include <math.h>
 #include "mx.h"
+#include "sweep_shard.h"
 static MxWorld w;
 enum { FPS=60, ORIGINAL_LIMIT=200*FPS, LIFE_LIMIT=240*FPS };
 /* These exact float-mode failures from CI run 45857763642 must finish.
@@ -86,11 +87,17 @@ int main(int argc,char **argv){
     for(unsigned i=0;i<sizeof regression/sizeof regression[0];i++)play(regression[i][0]-1,regression[i][1],1);
   }else if(argc==1){
     for(int L=0;L<MX_NUM_LEVELS;L++)for(int seq=0;seq<80;seq++)play(L,seq,0);
+  }else if(argc==4&&!strcmp(argv[1],"--shard")){
+    SweepShard shard;
+    if(!sweep_shard_parse(argv[2],argv[3],MX_NUM_LEVELS,&shard))return 2;
+    for(int L=shard.index;L<MX_NUM_LEVELS;L+=shard.count)
+      for(int seq=0;seq<80;seq++)play(L,seq,0);
+    if(runs!=80*((MX_NUM_LEVELS-1-shard.index)/shard.count+1))return 2;
   }else if(argc==3){
     int l=atoi(argv[1]),seq=atoi(argv[2]);
     if(l<1||l>MX_NUM_LEVELS||seq<0||seq>=80)return 2;
     play(l-1,seq,1);
-  }else {fprintf(stderr,"usage: sweep [--replay | level sequence]\n");return 2;}
+  }else {fprintf(stderr,"usage: sweep [--replay | level sequence | --shard index count]\n");return 2;}
   printf("runs=%d wins=%d hangs=%d longest=%d frames extended_sessions=%d (most bodies at once %d of %d, most asleep %d)\n",runs,wins,hang,maxf,extended,peak,MX_MAX_CHUNKS,peakrest);
   return hang!=0;
 }
