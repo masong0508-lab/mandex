@@ -425,11 +425,28 @@ static void shockwave(MxWorld *w, real px, real py, real rad, real power){
 #define HOMEK     R(6)          /* weak pull back to the rest position: sheared-off slabs ease home, nothing stays skewed */
 #define WOB_VMAX  R(45)
 #define WOB_OMAX  R(3)
+#ifndef MX_WOB_JOINT_EARLY_REJECT
+#define MX_WOB_JOINT_EARLY_REJECT 1
+#endif
 static real invd[MX_NMAT];
+#if MX_WOB_JOINT_EARLY_REJECT
+/* Smallest possible fracture strain across all nonempty materials,
+   including the most damaged joints. Derived with the SAME real math. */
+static real wob_min_joint;
+#endif
 static int mats_ready;
 static void init_mats(void){
   if(mats_ready) return;
-  for(int m = 1; m < MX_NMAT; m++) invd[m] = rdiv(RI(1), MATS[m].d);
+#if MX_WOB_JOINT_EARLY_REJECT
+  wob_min_joint = rmul(MATS[1].ymax,R(0.70));
+#endif
+  for(int m = 1; m < MX_NMAT; m++){
+    invd[m] = rdiv(RI(1), MATS[m].d);
+#if MX_WOB_JOINT_EARLY_REJECT
+    real weak = rmul(MATS[m].ymax,R(0.70));
+    if(weak < wob_min_joint) wob_min_joint=weak;
+#endif
+  }
   mats_ready = 1;
 }
 
@@ -650,6 +667,15 @@ static real joint_break_limit(const MxWorld *w,int i,int j,int m,int mj){
     return rmul(lim,R(0.85));
   return lim;
 }
+static inline int joint_should_break(const MxWorld *w,int i,int j,int m,int mj,real strain){
+#if MX_WOB_JOINT_EARLY_REJECT
+  /* The overwhelmingly small strains cannot break even damaged glass.
+     Avoid material/HP threshold work in this case. All other decisions
+     still use the original exact comparisons, including equality. */
+  if(strain<=wob_min_joint) return 0;
+#endif
+  return strain>joint_break_limit(w,i,j,m,mj);
+}
 /* once per frame: snap joints that stretched past their break strain, and detect when everything has stopped */
 #ifndef MX_WOB_JOINT_MASK
 #define MX_WOB_JOINT_MASK 1
@@ -671,8 +697,7 @@ static void wobble_check(MxWorld *w){
 #define MX_CHECK_FORWARD(D, J) do { \
       const int j = (J), mj = w->grid[j]; \
       real s = rabs(w->ox[j] - w->ox[i]) + rabs(w->oy[j] - w->oy[i]); \
-      real lim = joint_break_limit(w,i,j,m,mj); \
-      if(s > lim){ \
+      if(joint_should_break(w,i,j,m,mj,s)){ \
         w->brk[i] |= (uint8_t)(1 << (D)); w->brk[j] |= (uint8_t)(1 << ((D) ^ 1)); \
         dz_touch(w, i); dz_touch(w, j); \
         w->need_support = 1; \
@@ -694,8 +719,7 @@ static void wobble_check(MxWorld *w){
       int mj = w->grid[j];
       if(!mj) continue;
       real s = rabs(w->ox[j] - w->ox[i]) + rabs(w->oy[j] - w->oy[i]);
-      real lim = joint_break_limit(w,i,j,m,mj);
-      if(s > lim){
+      if(joint_should_break(w,i,j,m,mj,s)){
         w->brk[i] |= (uint8_t)(1 << d); w->brk[j] |= (uint8_t)(1 << (d ^ 1));
         dz_touch(w, i); dz_touch(w, j);
         w->need_support = 1;
