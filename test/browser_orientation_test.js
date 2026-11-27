@@ -90,7 +90,7 @@ const env={
   LEVELS:Array.from({length:660},(_,i)=>({name:'District Building '+i})),
   CH1:20,CH2:40,TRIAL_START:60,TRIAL_DISTRICTS:Array.from({length:30},(_,i)=>'District '+i),trialDistrict:0,selTab:0,TRIAL_META:Array.from({length:600},()=>['Trial','TIP',0,0,0,0,0,4,0,0,0,0,6,0]),
   GUIDES:['OFF','SHORT','FULL'],SHAKES:[['OFF',0],['LOW',.5],['FULL',1]],
-  OPT:()=>({}),optVol:()=>.8,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
+  OPT:()=>({}),optVol:()=>.8,celArt:()=>false,artUnlocked:()=>false,cycleArtStyle:()=>false,MAT:[null,...Array.from({length:8},(_,i)=>({n:'Material '+i}))],
   btn:(x,y,w,h,label,fn,o)=>records.push({x,y,w,h,label,fn}),
   panel:()=>{},txt:()=>{},drawSlamScene:()=>{},drawManFrame:()=>{},
   goMenu:()=>{},goSelect:()=>{},startStory:()=>{},startCustom:()=>{},
