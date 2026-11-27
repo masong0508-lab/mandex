@@ -717,14 +717,15 @@ static void wobble_check(MxWorld *w){
 static void sand_step(MxWorld *w){
   int moved = 0, par = w->sand_t & 1;
   for(int y = MX_ROWS - 2; y >= 0; y--){
+    const int row=y*MX_COLS;
     for(int x = 0; x < MX_COLS; x++){
-      int i = IDX(x, y);
+      int i=row+x;
       if(w->grid[i] != MX_SAND) continue;
       int dst = -1;
       if(!w->grid[i + MX_COLS]) dst = i + MX_COLS;
       else for(int k = 0; k < 2 && dst < 0; k++){
-        int nx = x + ((k ^ par) ? 1 : -1);
-        if(nx >= 0 && nx < MX_COLS && !w->grid[IDX(nx, y)] && !w->grid[IDX(nx, y + 1)]) dst = IDX(nx, y + 1);
+        int dx=(k^par)?1:-1,nx=x+dx;
+        if(nx>=0&&nx<MX_COLS&&!w->grid[i+dx]&&!w->grid[i+MX_COLS+dx])dst=i+MX_COLS+dx;
       }
       if(dst < 0) continue;
       w->grid[dst] = MX_SAND; w->hp[dst] = w->hp[i]; w->anch[dst] = 0;
@@ -2293,6 +2294,12 @@ static void upd_targets(MxWorld *w, real dt){
     for(int c = 0; c < MX_MAX_CHUNKS && t->alive; c++){
       MxChunk *ch = &w->chunks[c];
       if(!ch->active) continue;
+      /* Every voxel has zero impact speed if all three rigid-body velocity
+         components are zero. Still check rotating debris and any sleeper
+         that just received an impulse, regardless of its rest flag. */
+#ifndef MX_REFERENCE_STATIONARY_IMPACTS
+      if(!ch->vx&&!ch->vy&&!ch->w)continue;
+#endif
       real dx = ch->x - t->x, dy = ch->y - t->y, reach = ch->rad + r + R(0.5);
       if(rabs(dx)>reach || rabs(dy)>reach)continue;
       if(rmul(dx, dx) + rmul(dy, dy) > rmul(reach, reach)) continue;
