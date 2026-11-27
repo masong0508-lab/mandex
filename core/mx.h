@@ -200,7 +200,7 @@ typedef struct {
      short-hop release after an ordinary player jump. No new buffers. */
   real ledge_grace, jump_hold, jump_buffer;
   real walk_safe_x, walk_safe_y, walk_jam; /* validated temporary recovery point, not a saved checkpoint */
-  uint8_t jump_latched, walk_safe, parry_time_used; /* transient, not serialized */
+  uint8_t jump_latched, walk_safe, parry_time_used, charge_punch; /* transient, not serialized */
   real gait;            /* cosmetic ground distance, modulo 4 cells; no renderer memory or save data */
   int8_t in_ax; uint8_t in_jump, in_punch, in_stomp;
   real tubeT, tubeCd;  /* just posted out of a tube: gravity is 10 % for tubeT seconds, no second tube for tubeCd seconds */
