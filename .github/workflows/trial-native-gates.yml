@@ -39,6 +39,8 @@ jobs:
           /tmp/trials
           gcc "${flags[@]}" test/native_options_test.c core/mx_meta.c -lm -o /tmp/options
           /tmp/options
+          gcc "${flags[@]}" -Wno-unused-function test/native_cel_motion_test.c -lm -o /tmp/cel_motion
+          /tmp/cel_motion
           gcc "${flags[@]}" -Wno-unused-function test/walk_jump_forgiveness_test.c -lm -o /tmp/walk
           /tmp/walk
           gcc "${flags[@]}" test/native_prop_animation_test.c core/mx.c -lm -o /tmp/props
