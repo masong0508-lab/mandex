@@ -23,6 +23,16 @@ SCRIPT = r"""() => {
   ];
   for(let a=0;a<=360;a+=30)
     shots.push(['turn-'+a,()=>drawSpin(a*Math.PI/180,{ld:0,face:'base',dir:1,hip:0})]);
+  // Compare the actual two-bottle sequence, including the release recovery.
+  // Restore global pressure / outfit state after each isolated drawing.
+  for(const t of [CT_A+.12,CT_BK+.10,CT_BK+.31,CT_C+.12,CT_TB+.18,CT_D+.04,CT_END-.02]){
+    const ph=t<CT_BK?1:t<CT_C?2:t<CT_TB?3:t<CT_D?4:5;
+    shots.push(['drink-'+Math.round(t*1000),()=>{
+      const th=ph===1?Math.PI*easeIO((t-CT_A)/(CT_BK-CT_A)):ph===2?Math.PI:ph===3?Math.PI+Math.PI*easeIO((t-CT_C)/(CT_TB-CT_C)):0;
+      drawChugMan({inf:.15,bel:.36,chug:{t,ph,th,keep:0,rel:true}});
+    }]);
+  }
+
   const paint=(fn)=>{
     cv.width=960;cv.height=540;ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,960,540);ctx.save();ctx.translate(480,270);ctx.scale(2,2);
@@ -43,7 +53,10 @@ SCRIPT = r"""() => {
   ok(cycleArtStyle()&&CEL_ACTIVE,'Golden Cels activation');
   for(let i=0;i<shots.length;i++){
     const f=frames[i];f.cel=paint(shots[i][1]);ok(f.classic.hash!==f.cel.hash,'unchanged art: '+f.name);
-    ok(f.cel.count/f.classic.count>.72&&f.cel.count/f.classic.count<1.28,'character proportions changed excessively: '+f.name);
+    // Drinking is new choreography rather than just a reskin, so use a
+    // wider silhouette bound for articulated prop and pressure poses.
+    const lo=f.name.startsWith('drink-')?.45:.72,hi=f.name.startsWith('drink-')?2:1.28;
+    ok(f.cel.count/f.classic.count>lo&&f.cel.count/f.classic.count<hi,'character proportions changed excessively: '+f.name);
   }
   ok(cycleArtStyle()&&!CEL_ACTIVE,'classic restored');
   const restored=paint(shots[0][1]);ok(restored.hash===frames[0].classic.hash,'classic front art changed');
