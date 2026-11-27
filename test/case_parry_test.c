@@ -102,6 +102,22 @@ int main(void){
   expect_parry(1);
   CHECK(events(EV_HURT)==0,"animation-window parry cannot hurt the player");
 
+  /* Charge reach is latched when attacking, not recomputed from speed. */
+  for(int face=-1;face<=1;face+=2){
+    for(int charged=0;charged<=1;charged++){
+      setup();w.man.face=face;w.man.vx=RI(face*(charged?15:0));
+      walk_punch(&w);w.man.vx=0;
+      case_at(0,w.man.x+face*R(4.875),punch_y());
+      w.cases[0].vx=0;upd_cases(&w,DT);
+      CHECK(w.score==(charged?150:0),"active charge keeps wider parry reach");
+      CHECK(w.cases[0].active==!charged,"ordinary active punch keeps normal reach");
+    }
+  }
+  setup();w.man.vx=RI(15);walk_punch(&w);w.man.pT=0;
+  case_at(0,w.man.x+R(4.875),punch_y());w.cases[0].vx=0;
+  upd_cases(&w,DT);
+  CHECK(w.score==0&&w.cases[0].active,"expired charge cannot parry");
+
   setup();w.man.pT=0;case_at(0,punch_x(),punch_y());
   upd_cases(&w,DT);
   CHECK(w.score==0&&events(EV_BONK)==0&&events(EV_HURT)==1,
