@@ -6,6 +6,9 @@ on:
       - "core/mx.c"
       - "web/index.html"
       - "test/walk_jump_forgiveness_test.c"
+      - "test/ch2_test.c"
+      - "core/mx_meta.c"
+      - "core/mx_meta.h"
       - "test/browser_walk_jump_forgiveness_test.js"
       - "test/browser_pad_stomp_test.js"
       - ".github/workflows/walk-jump-controls.yml"
@@ -16,8 +19,12 @@ on:
       - "core/mx.c"
       - "web/index.html"
       - "test/walk_jump_forgiveness_test.c"
+      - "test/ch2_test.c"
+      - "core/mx_meta.c"
+      - "core/mx_meta.h"
       - "test/browser_walk_jump_forgiveness_test.js"
       - "test/browser_pad_stomp_test.js"
+      - ".github/workflows/walk-jump-controls.yml"
   workflow_dispatch:
 jobs:
   jump-and-movement:
@@ -25,6 +32,22 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Chapter 2 campaign regression (both numeric modes)
+        run: |
+          status=0
+          for mode in float fixed; do
+            flags=""
+            if [ "$mode" = fixed ]; then flags="-DMX_FIXED"; fi
+            gcc -std=c99 -O2 -Wall $flags -Icore core/mx.c core/mx_meta.c test/ch2_test.c -lm -o "/tmp/ch2_$mode"
+            if "/tmp/ch2_$mode" > "/tmp/ch2_$mode.log"; then
+              echo "Chapter 2 ($mode): passed"
+            else
+              echo "::error::Chapter 2 ($mode) failed"
+              status=1
+            fi
+            cat "/tmp/ch2_$mode.log"
+          done
+          exit "$status"
       - name: Native walking solver (both numeric modes)
         run: |
           for mode in float fixed; do
