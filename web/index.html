@@ -4360,6 +4360,42 @@ function celRoomColor(p){
   if(m){const n=parseInt(m[1],16),r=n>>16,g=n>>8&255,b=n&255;c='rgb('+Math.round(r*.78+46)+','+Math.round(g*.72+32)+','+Math.round(b*.75+29)+')'}
   if(CEL_ROOM_CACHE.size>128)CEL_ROOM_CACHE.clear();CEL_ROOM_CACHE.set(p,c);return c;
 }
+// Preserve the original room-run boundaries (including torn edges and
+// stripe phase) while avoiding the scan of every completely invisible run.
+// Camera bounds already contain a two-cell pad and the maximum shake.
+function drawWallpaper(xlo,xhi,ylo,yhi){
+  if(xlo>=xhi||ylo>=yhi)return;
+  for(let y=ylo;y<yhi;y++){
+    const row=y*COLS;
+    let x=xlo;
+    // Only rewind when the clipped first cell is inside an actual run.
+    if(x>0){const n=paper[row+x];if(n&&!grid[row+x]){
+      while(x>0&&paper[row+x-1]===n&&!grid[row+x-1])x--;
+    }}
+    while(x<xhi){
+      const i=row+x,n=paper[i];if(!n||grid[i]){x++;continue}
+      let x2=x+1;while(x2<COLS&&paper[row+x2]===n&&!grid[row+x2])x2++;
+      if(x2<=xlo){x=x2;continue}
+      const p=interiors[n-1].p;
+      ctx.fillStyle=CEL_ACTIVE?celRoomColor(p):p;
+      ctx.fillRect(x*V,y*V,(x2-x)*V,V);
+      ctx.fillStyle='rgba(0,0,0,.07)';
+      // Whole 16px stripe positions, never restart the pattern at the
+      // viewport boundary. Retain the complete original visible stripes.
+      const start=x+Math.max(0,Math.floor((xlo-x)/2)*2),end=Math.min(x2,xhi);
+      for(let k=start;k<end;k+=2)ctx.fillRect(k*V,y*V,V,V);
+      if(y+1>=ROWS||!paper[i+COLS]){
+        ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x*V,(y+1)*V-5,(x2-x)*V,5);
+      }
+      if(paperTorn){
+        ctx.fillStyle='rgba(70,47,40,.48)';
+        if(x>0&&!paper[i-1])ctx.fillRect(x*V,y*V,2,V);
+        if(x2<COLS&&!paper[row+x2])ctx.fillRect(x2*V-2,y*V,2,V);
+      }
+      x=x2;
+    }
+  }
+}
 function drawRoomDetails(xlo,xhi,ylo,yhi){
   for(let r=0;r<interiors.length;r++){
     const rm=interiors[r];
@@ -4431,16 +4467,7 @@ function draw(){
   const paperX1=paperCull?Math.min(COLS,Math.ceil((CAM.x+W/CAM.z+paperShake)/V)+2):COLS;
   const paperY0=paperCull?Math.max(0,Math.floor((CAM.y-paperShake)/V)-2):0;
   const paperY1=paperCull?Math.min(ROWS,Math.ceil((CAM.y+H/CAM.z+paperShake)/V)+2):ROWS;
-  for(let y=paperY0;y<paperY1;y++){let x=0;while(x<COLS){const n=paper[idx(x,y)];if(!n||grid[idx(x,y)]){x++;continue}let x2=x;while(x2<COLS&&paper[idx(x2,y)]===n&&!grid[idx(x2,y)])x2++;
-    if(x2<=paperX0||x>=paperX1){x=x2;continue}
-    ctx.fillStyle=CEL_ACTIVE?celRoomColor(interiors[n-1].p):interiors[n-1].p;ctx.fillRect(x*V,y*V,(x2-x)*V,V);ctx.fillStyle='rgba(0,0,0,.07)';for(let k=0;k<(x2-x)*V;k+=16)ctx.fillRect(x*V+k,y*V,8,V);
-    if(!paper[idx(x,y+1)]||y+1>=ROWS){ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(x*V,(y+1)*V-5,(x2-x)*V,5)}
-    // Two short plaster cracks per broken wallpaper run; no extra scan.
-    if(paperTorn){ctx.fillStyle='rgba(70,47,40,.48)';
-      if(x>0&&!paper[idx(x-1,y)])ctx.fillRect(x*V,y*V,2,V);
-      if(x2<COLS&&!paper[idx(x2,y)])ctx.fillRect(x2*V-2,y*V,2,V);
-    }
-    x=x2}}
+  drawWallpaper(paperX0,paperX1,paperY0,paperY1);
   drawRoomDetails(paperX0,paperX1,paperY0,paperY1);
   drawSling(true);drawValve();drawBurpStand();drawPwProp();
   // Bound both tile axes. Include the maximum possible displacement
