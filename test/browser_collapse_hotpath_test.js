@@ -12,6 +12,44 @@ let worlds=0;
 for(const width of [120,360,120])for(const density of [0,.05,.35,1])for(const ties of [false,true])for(const sparse of [false,true]){
   assert(ref(width,density,ties,sparse)===fast(width,density,ties,sparse),'aftershock mismatch '+[width,density,ties,sparse]);worlds++;
 }
+
+const sparseSetup=String.raw`
+const ROWS=60,V=8,SAND=8,DX=[1,-1,0,0],DY=[0,0,1,-1],MAT=Array.from({length:9},()=>({hp:100}));
+let COLS=360,grid,hp,anch,dmg,brk,needSupport=false,shake=0,reads=0,events=[];
+const SFX={thud:v=>events.push(['thud',v])},popText=(...a)=>events.push(a);
+const idx=(x,y)=>y*COLS+x,inb=(x,y)=>x>=0&&x<COLS&&y>=0&&y<ROWS;
+function probe(width,points,steps){
+ COLS=width;const n=ROWS*COLS,raw=new Uint8Array(n);
+ for(let i=0;i<n;i++)raw[i]=i%17===0?8:i%13===0?0:1;
+ grid=new Proxy(raw,{get(a,p){if(p==='length')return a.length;if(typeof p==='string'&&/^\d+$/.test(p))reads++;return a[p]}});
+ hp=new Float32Array(n);for(let i=0;i<n;i++)hp[i]=(i%7)*15;
+ anch=new Uint8Array(n).fill(1);dmg=new Uint8Array(n);brk=new Uint8Array(n);
+ reads=0;needSupport=false;shake=0;events=[];
+ let marked=0;
+ for(let k=0;k<steps;k++){
+   for(const [x,y] of points)dmg[idx(x,y)]=1;
+   const z=new Uint8Array(n);
+   for(let i=0;i<n;i++)if(dmg[i]||brk[i]){
+     const x=i%COLS,y=(i/COLS)|0;
+     for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)
+       if(Math.abs(dx)+Math.abs(dy)<=3&&inb(x+dx,y+dy))z[idx(x+dx,y+dy)]=1;
+   }
+   for(const v of z)marked+=v;
+   aftershock();
+ }
+ return {reads,marked,state:JSON.stringify([Array.from(anch),Array.from(brk),Array.from(dmg),needSupport,shake,events])};
+}
+`;
+const sparseOld=new Function(sparseSetup+oldCrumble+'\nreturn probe;')(),sparseNew=new Function(sparseSetup+section('let AFTERSHOCK_ZONE=','function damageCell(')+'\nreturn probe;')();
+let sparseCases=0,gridReadsBefore=0,gridReadsAfter=0;
+for(const width of [120,360,120])for(const points of [[],[[1,1],[width-2,58]],[[0,30],[width-1,30]],[[0,0],[1,1],[2,2],[3,3]],[[width-1,59]],[[30,30],[32,32],[34,31]]])for(const steps of [1,3]){
+ const a=sparseOld(width,points,steps),b=sparseNew(width,points,steps);
+ assert(a.state===b.state,'sparse damage islands altered structural result '+JSON.stringify([width,points,steps]));
+ assert(b.reads===b.marked,'only marked structural cells should be read '+JSON.stringify([width,points,steps]));
+ gridReadsBefore+=a.reads;gridReadsAfter+=b.reads;sparseCases++;
+}
+console.log('BROWSER_SPARSE_AFTERSHOCK_PASS cases='+sparseCases+' grid_reads='+gridReadsBefore+'->'+gridReadsAfter);
+
 const base=new Function(contactSetup+oldContact+'\nreturn run;')(),opt=new Function(contactSetup+section('const CHUNK_HASH=new Map()','function cleanChunks(dt){')+'\nreturn run;')();
 let before=0,after=0,cases=0;
 for(const frac of [[0,.001,3.999,4,4.001,7.999],[1,2,3,5,6,7]])for(const rest of [false,true]){

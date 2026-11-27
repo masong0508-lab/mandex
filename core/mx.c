@@ -1320,9 +1320,14 @@ static int aftershock(MxWorld *w, real *cxo, real *cyo){
   for(int i = lo; i <= hi; i++){
     if(!w->dmg[i] && !w->brk[i]) continue;
     int x = i % MX_COLS, y = i / MX_COLS;
-    for(int j = -2; j <= 2; j++) for(int k = -2; k <= 2; k++){
-      if((j < 0 ? -j : j) + (k < 0 ? -k : k) > CR_REACH) continue;
-      if(INB(x + k, y + j)){ w->vis[IDX(x + k, y + j)] = 1; any = 1; }
+    for(int j = -2; j <= 2; j++){
+      int yy = y + j; if(yy < 0 || yy >= MX_ROWS) continue;
+      int reach = CR_REACH - (j < 0 ? -j : j); if(reach > 2) reach = 2;
+      int left = x - reach, right = x + reach;
+      if(left < 0) left = 0;
+      if(right >= MX_COLS) right = MX_COLS - 1;
+      for(int p = IDX(left, yy), end = IDX(right, yy); p <= end; p++) w->vis[p] = 1;
+      any = 1;
     }
   }
   memset(w->dmg + lo, 0, (size_t)(hi - lo + 1));
@@ -1332,19 +1337,21 @@ static int aftershock(MxWorld *w, real *cxo, real *cyo){
   if(zhi > N - 1) zhi = N - 1;
   int cnt[70]; memset(cnt, 0, sizeof cnt);
   for(int i = zlo; i <= zhi; i++){
+    if(!w->vis[i]) continue;
     int m = w->grid[i];
-    if(!w->vis[i] || !m || m == MX_SAND) continue;
+    if(!m || m == MX_SAND){ w->vis[i] = 0; continue; }
     w->anch[i] = 0;                                  /* the weld to the ground is gone */
     int b = hp_bucket(w->hp[i], MATS[m].hp);
+    /* The zone scratch now holds bucket+1, or zero for non-candidates.
+       Support traversal clears vis before reuse. No second division or pool. */
+    w->vis[i] = (uint8_t)(b + 1);
     if(b >= 0) cnt[b]++;
   }
   int cut = -1, acc = 0;                             /* everything below bucket `cut` is taken; bucket `cut` supplies the rest */
   for(int b = 0; b < 70; b++){ if(acc + cnt[b] >= CR_MAX){ cut = b; break; } acc += cnt[b]; }
   int room = cut >= 0 ? CR_MAX - acc : 0, n = 0, sx = 0, sy = 0;
   for(int i = zlo; i <= zhi; i++){
-    int m = w->grid[i];
-    if(!w->vis[i] || !m || m == MX_SAND) continue;
-    int b = hp_bucket(w->hp[i], MATS[m].hp);
+    int b = (int)w->vis[i] - 1;
     if(b < 0) continue;
     if(cut >= 0 && (b > cut || (b == cut && room-- <= 0))) continue;
     int x = i % MX_COLS, y = i / MX_COLS;

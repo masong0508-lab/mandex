@@ -31,8 +31,94 @@ static void flag_box(int x0, int y0, int x1, int y1){ for(int y = y0; y <= y1; y
 static int count_chunks(void){ int n = 0; for(int c = 0; c < MX_MAX_CHUNKS; c++) n += W.chunks[c].active; return n; }
 static void fly(real x, real y, real vx, real vy){ W.man.mode = MAN_FLY; W.man.x = x; W.man.y = y; W.man.vx = vx; W.man.vy = vy; W.man.rad = MAN_R0; W.man.gt = 0; if(W.men < 1) W.men = 1; }
 
+
+/* Frozen previous implementation; compare actual shared-engine results. */
+static int aftershock_reference(MxWorld *w, real *cxo, real *cyo){
+  static const int DX4[4] = {1, -1, 0, 0}, DY4[4] = {0, 0, 1, -1};
+  const int N = MX_ROWS * MX_COLS;
+  if(w->dz_hi < w->dz_lo) return 0;
+  int lo = w->dz_lo, hi = w->dz_hi, any = 0;
+  w->dz_lo = N; w->dz_hi = -1;
+  memset(w->vis, 0, sizeof w->vis);                  /* the zone map (vis is scratch: support_pass clears it before it uses it) */
+  for(int i = lo; i <= hi; i++){
+    if(!w->dmg[i] && !w->brk[i]) continue;
+    int x = i % MX_COLS, y = i / MX_COLS;
+    for(int j = -2; j <= 2; j++) for(int k = -2; k <= 2; k++){
+      if((j < 0 ? -j : j) + (k < 0 ? -k : k) > CR_REACH) continue;
+      if(INB(x + k, y + j)){ w->vis[IDX(x + k, y + j)] = 1; any = 1; }
+    }
+  }
+  memset(w->dmg + lo, 0, (size_t)(hi - lo + 1));
+  if(!any) return 0;
+  int zlo = lo - 2 * MX_COLS - 2, zhi = hi + 2 * MX_COLS + 2;
+  if(zlo < 0) zlo = 0;
+  if(zhi > N - 1) zhi = N - 1;
+  int cnt[70]; memset(cnt, 0, sizeof cnt);
+  for(int i = zlo; i <= zhi; i++){
+    int m = w->grid[i];
+    if(!w->vis[i] || !m || m == MX_SAND) continue;
+    w->anch[i] = 0;                                  /* the weld to the ground is gone */
+    int b = hp_bucket(w->hp[i], MATS[m].hp);
+    if(b >= 0) cnt[b]++;
+  }
+  int cut = -1, acc = 0;                             /* everything below bucket `cut` is taken; bucket `cut` supplies the rest */
+  for(int b = 0; b < 70; b++){ if(acc + cnt[b] >= CR_MAX){ cut = b; break; } acc += cnt[b]; }
+  int room = cut >= 0 ? CR_MAX - acc : 0, n = 0, sx = 0, sy = 0;
+  for(int i = zlo; i <= zhi; i++){
+    int m = w->grid[i];
+    if(!w->vis[i] || !m || m == MX_SAND) continue;
+    int b = hp_bucket(w->hp[i], MATS[m].hp);
+    if(b < 0) continue;
+    if(cut >= 0 && (b > cut || (b == cut && room-- <= 0))) continue;
+    int x = i % MX_COLS, y = i / MX_COLS;
+    for(int d = 0; d < 4; d++){
+      int nx = x + DX4[d], ny = y + DY4[d];
+      w->brk[i] |= (uint8_t)(1 << d);
+      if(INB(nx, ny)) w->brk[IDX(nx, ny)] |= (uint8_t)(1 << (d ^ 1));
+    }
+    sx += x; sy += y; n++;
+  }
+  w->need_support = 1;
+  if(n){ *cxo = rdiv(RI(sx), RI(n)) + R(0.5); *cyo = rdiv(RI(sy), RI(n)) + R(0.5); }
+  return n;
+}
+
+static MxWorld refW;
+static uint32_t parity_seed=3231u;
+static uint32_t parity_next(void){ parity_seed=parity_seed*1664525u+1013904223u; return parity_seed>>8; }
+static void aftershock_parity(void){
+  const int cells=MX_ROWS*MX_COLS;
+  const int materials[]={MX_EMPTY,MX_WOOD,MX_BRICK,MX_STEEL,MX_SAND};
+  int comparisons=0, same=1;
+  for(int k=0;k<30;k++){
+    empty();
+    for(int i=0;i<cells;i++){
+      int m=materials[parity_next()%5];
+      W.grid[i]=(uint8_t)m;
+      W.hp[i]=m?rdiv(RI((int)(parity_next()%101)*mx_material_hp(m)),RI(100)):0;
+      W.anch[i]=(uint8_t)(parity_next()%2);
+    }
+    for(int step=0;step<3;step++){
+      for(int i=0;i<cells;i++){
+        int active=k%5==0?(i==0||i==cells-1):k%5==1?(i==MX_COLS*30||i==MX_COLS*31-1):parity_next()%1000<(uint32_t)(k%5==4?1000:1<<(k%5+2));
+        if(!active)continue;
+        if(parity_next()%2)flag(i);else{W.brk[i]|=(uint8_t)(1<<(parity_next()%4));dz_touch(&W,i);}
+      }
+      memcpy(&refW,&W,sizeof W);
+      real x=R(-1),y=R(-1),rx=x,ry=y;
+      int n=aftershock(&W,&x,&y),rn=aftershock_reference(&refW,&rx,&ry);
+      if(n!=rn||x!=rx||y!=ry||W.need_support!=refW.need_support||W.dz_lo!=refW.dz_lo||W.dz_hi!=refW.dz_hi||
+         memcmp(W.grid,refW.grid,sizeof W.grid)||memcmp(W.hp,refW.hp,sizeof W.hp)||
+         memcmp(W.anch,refW.anch,sizeof W.anch)||memcmp(W.dmg,refW.dmg,sizeof W.dmg)||memcmp(W.brk,refW.brk,sizeof W.brk))same=0;
+      comparisons++;
+    }
+  }
+  CHECK(same&&comparisons==90,"sparse/dense native aftershock matches frozen reference across 90 repeated states");
+}
+
 int main(void){
   real cx, cy;
+  aftershock_parity();
 
   /* ---- the exact rules, by calling aftershock() on a hand-made wall ---- */
   empty(); block(40, 40, 20, 19, MX_BRICK); block(30, 59, 40, 1, MX_BRICK);               /* brick hp is 40 */

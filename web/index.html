@@ -970,6 +970,7 @@ function wake(ch){ch.rest=false;ch.sleep=0;ch.restT=0;ch.age=Math.max(ch.age,.2)
 function wakeAt(px,py,r){for(const c of chunks)if(c.rest&&Math.hypot(c.x-px,c.y-py)<c.rad+r)wake(c)}
 function markDmg(x,y){for(let d=0;d<4;d++){const nx=x+DX[d],ny=y+DY[d];if(inb(nx,ny))dmg[idx(nx,ny)]=1}}
 let AFTERSHOCK_ZONE=new Uint8Array(0);
+const AFTERSHOCK_ROW_LO=new Int32Array(ROWS),AFTERSHOCK_ROW_HI=new Int32Array(ROWS);
 const CRUMBLE_LIMIT=80,CRUMBLE_ID=new Uint16Array(CRUMBLE_LIMIT),
       CRUMBLE_RATIO=new Float64Array(CRUMBLE_LIMIT);
 function crumbleWorse(r,i,s,j){return r>s||(r===s&&i>j)}
@@ -997,7 +998,8 @@ function crumbleOffer(n,r,i){
 function aftershock(){
   if(AFTERSHOCK_ZONE.length!==grid.length)AFTERSHOCK_ZONE=new Uint8Array(grid.length);
   else AFTERSHOCK_ZONE.fill(0);
-  const zone=AFTERSHOCK_ZONE;let lo=grid.length,hi=-1;
+  const zone=AFTERSHOCK_ZONE,lo=AFTERSHOCK_ROW_LO,hi=AFTERSHOCK_ROW_HI;
+  lo.fill(COLS);hi.fill(-1);let any=false;
   for(let i=0;i<dmg.length;i++)if(dmg[i]||brk[i]){
     const x=i%COLS,y=(i/COLS)|0;
     for(let dy=-2;dy<=2;dy++){
@@ -1005,14 +1007,21 @@ function aftershock(){
       const reach=Math.min(2,3-Math.abs(dy)),x0=Math.max(0,x-reach),x1=Math.min(COLS-1,x+reach);
       const first=idx(x0,yy),last=idx(x1,yy);
       zone.fill(1,first,last+1);
-      if(first<lo)lo=first;if(last>hi)hi=last;
+      if(x0<lo[yy])lo[yy]=x0;if(x1>hi[yy])hi[yy]=x1;any=true;
     }
   }
-  dmg.fill(0);if(hi<lo)return;
+  dmg.fill(0);if(!any)return;
   let n=0;
-  for(let i=lo;i<=hi;i++){
-    const m=grid[i];if(!zone[i]||!m||m===SAND)continue;
-    anch[i]=0;const r=hp[i]/MAT[m].hp;if(r<.7)n=crumbleOffer(n,r,i);
+  // Distant blasts no longer scan all the intervening rows or read the
+  // materials of unmarked cells. Visit marked cells in original row order.
+  for(let y=0;y<ROWS;y++){
+    if(hi[y]<lo[y])continue;
+    const first=idx(lo[y],y),last=idx(hi[y],y);
+    for(let i=first;i<=last;i++){
+      if(!zone[i])continue;
+      const m=grid[i];if(!m||m===SAND)continue;
+      anch[i]=0;const r=hp[i]/MAT[m].hp;if(r<.7)n=crumbleOffer(n,r,i);
+    }
   }
   // Joint writes are bitwise OR and the centroid sums are integral:
   // selecting the same members is sufficient; their order cannot change
