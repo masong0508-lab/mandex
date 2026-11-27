@@ -451,13 +451,16 @@ function generateTrials(){
     "sand": 0,
     "walk": 1
   }
-]);
+].concat([{label:"Mount Mandex",prefix:"Mountain",wall:6,floor:6,roof:7,kind:[1,2,4,6],tip:"CLIMB THE CITY",tnt:1,pad:1,tube:1,sand:0,walk:2}]));
+  const mountainNames=["Foothill Gate","Lower City","Railway Terrace","Market Slope","Canyon Exchange","Tower Foundations","Skyline Rise","Cloudline Towers","High Alpine District","Crown Approach","Mount Mandex: The Summit"],mountainTips=["BREAK THE FOOTHILL SUPPORTS","CLEAR THE LOWER CITY BLOCKS","CLIMB THE RAIL TERRACES","BANK ABOVE THE MARKET","RIDE TUBES OVER THE CANYON","BREAK THE TOWER FOUNDATIONS","DIVE WITH QUAKE INTO THE SKYLINE","USE BEANS TO RECOVER IN THE AIR","PARRY THE ALPINE GUARDS","CLIMB THE CROWN TERRACES","EVICT ALL; WALK THROUGH THE SUMMIT TUBE"];
   const shapes=["Court","Stacks","Bridge","Terrace"];
   const palettes=["#e8d3a8","#d7dfe9","#d2b6b4","#b9d6be"];
   const levels=[],distinct=new Set();
   const fail=(msg)=>{throw Error(msg)};
   for(let district=0;district<groups.length;district++)for(let shape=0;shape<4;shape++)for(let tier=0;tier<5;tier++){
     if(district===51&&shape===3&&tier===4)continue; // final district has 19 maps
+    if(district===52&&shape*5+tier>=11)continue;
+    const sector=shape*5+tier;
     const g=groups[district],grid=new Uint8Array(WIDTH*HEIGHT),targets=[],rooms=[],pads=[],tubes=[],houses=[];
     const get=(x,y)=>grid[y*WIDTH+x];
     function fill(x,y,w,h,m){
@@ -465,10 +468,10 @@ function generateTrials(){
       for(let j=y;j<y+h;j++)grid.fill(m,j*WIDTH+x,j*WIDTH+x+w);
     }
     function target(x,y,kind,range=6){targets.push([x,y,kind,range])}
-    function house(x,w,floors,fh,wall,floor,roof){
-      const base=58,top=base-floors*fh;
+    function house(x,w,floors,fh,wall,floor,roof,base=58){
+      const top=base-floors*fh;
       const H={x,w,top,base,fh,floors};houses.push(H);
-      fill(x,base,w,2,3);
+      fill(x,base,w,60-base,3);
       for(let f=1;f<=floors;f++){
         const y=base-f*fh,m=f===floors?roof:floor;fill(x,y,w,2,m);
         if(m===4)fill(x,y+1,w,1,6); // load-bearing frame under the glazing
@@ -491,7 +494,25 @@ function generateTrials(){
     // Four different silhouettes per district; difficulty changes heights,
     // widths, spans and occupied floors, not just enemy count or names.
     const x=32+((district*3+tier)%5),fh=8+(tier%3)*2;
-    if(district>=9){
+    if(district===52){
+      // One active 120x60 slice of the rising city. Buildings stand on
+      // destructible rock terraces rather than indestructible scenery.
+      const p=sector,mid=50-2*(p%3),high=p===10?42:44-2*(p%4);
+      const A=house(35+p%3,18,2+p%2,8,p%2?6:2,6,7,58);
+      const B=house(64,16,3+(p%2),8,p%3?6:4,6,7,mid);
+      const C=house(91,20,Math.min(4,Math.floor((high-4)/8)),8,6,6,6,high);
+      // Stepped access between terraces; every tread and buttress is real rock.
+      for(let x=54;x<64;x+=2){const rise=Math.min(60-mid,2+2*((x-54)/2));fill(x,60-rise,2,rise,3);}
+      for(let x=81;x<91;x+=2){const rise=Math.min(60-high,60-mid+2+2*((x-81)/2));fill(x,60-rise,2,rise,3);}
+      // Distinct breakable footing positions and two safe roof pads.
+      for(const H of [A,B,C]){fill(H.x,58,2,2,5);if(p>=3)fill(H.x+H.w-2,58,2,2,5);}
+      for(const H of [A,B]){fill(H.x+3,H.top,4,1,7);pads.push([H.x+3,H.top,4]);}
+      // Low mouth allows an on-foot player to reach the summit even if
+      // the structure has been demolished. Exit is open sky above the roof.
+      tubes.push([29,56,105,Math.max(4,C.top-4)]);
+      tubes.push([59,Math.max(8,mid-5),84,Math.max(7,B.top-4)]);
+      if(p>=8)targets[0][2]=7;
+    }else if(district>=9){
       const d=district-9, fy=8+2*((d+tier)%2);
       if(shape===0){
         house(31+(d%4)+tier%2,16+2*((d+tier)%3),1+(tier>>1),fy,g.wall,g.floor,g.roof);
@@ -580,7 +601,7 @@ function generateTrials(){
     // tread), a breakable entrance and a rubber launch ledge where safe.
     // Geometry stays in the same 120x60 working grid. No invisible
     // platforms, scripted teleports or extra collision systems.
-    if(district>=27){
+    if(district>=27&&district<52){
       const A=houses[0],B=houses[1],left=A.x+A.w+1,right=B.x-1;
       const clearance=(x,y)=>targets.every(([tx,ty])=>x<tx-2||x>tx+2||y<ty-5||y>=ty);
       // Choose a contiguous clear bay rather than overwriting a pier,
@@ -609,15 +630,15 @@ function generateTrials(){
           if(get(x,y)&&get(x,y)!==4&&clearance(x,y))fill(x,y,1,1,1);
       }
     }
-    if(district>=30){
+    if(district>=30&&district<52){
       // Short grounded entry steps: vary the first approach and give
       // walkers a low punchable ledge, without intruding on the sling.
       const d=district-30,h=1+d%3,hh=1+Math.floor(d/3)%3,mat=1+Math.floor(d/9);
       fill(28,60-h,1,h,mat);fill(29,60-hh,1,hh,mat);
     }
-    const name=g.prefix+" "+shapes[shape]+" "+(tier+1);
-    const tip=district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
-    const men=Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
+    const name=district===52?mountainNames[sector]:g.prefix+" "+shapes[shape]+" "+(tier+1);
+    const tip=district===52?mountainTips[sector]:district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
+    const men=district===52?Math.min(18,targets.length+5):Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
     const walk=(district===5||district===7)&&tier>=2 || district===8&&tier>=3 || district>=9&&(g.walk===2||!!g.walk&&tier>=2);
     if(targets.length<2||targets.length>20||rooms.length>20||pads.length>3||tubes.length>3)fail("entity cap "+name);
     const keys=new Set();
