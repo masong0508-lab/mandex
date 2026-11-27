@@ -11,6 +11,7 @@ static int story_done(const MxStats *s){ int n = 0; for(int i = 0; i < MX_STORY_
 static int three_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_STORY_LEVELS; i++) n += s->stars[i] >= 3; return n; }
 static int total_stars(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_LEVELS; i++) n += s->stars[i]; return n; }
 int mx_valve_unlocked(const MxStats *s){ return story_done(s) >= MX_VALVE_UNLOCK_LEVELS; }
+int mx_art_unlocked(const MxStats *s){return story_done(s)==MX_STORY_LEVELS;}
 int mx_ach_count(const MxStats *s){ int n = 0; for(int i = 0; i < MX_NUM_ACH; i++) n += (s->ach >> i) & 1; return n; }
 
 typedef struct { const char *n, *d; } AchDef;
@@ -216,7 +217,7 @@ int mx_meta_pack_opt(const MxStats *s, int outfit, const MxOptions *opt, uint8_t
   *p++ = (uint8_t)(outfit >= 0 && outfit < MX_NUM_OUTFITS ? outfit : 0);
   for(int i = 0; i < MX_NUM_LEVELS; i++){ put32(p, s->best[i]); p += 4; }
   { MxOptions o; mx_options_default(&o); if(opt) o = *opt;
-    *p++ = (uint8_t)((o.collapse ? 1 : 0) | ((o.tool < MX_NUM_TOOLS ? o.tool : MX_TOOL_NONE) << 1) | (o.nofight ? 16 : 0) | (o.monitor ? 32 : 0));
+    *p++ = (uint8_t)((o.collapse ? 1 : 0) | ((o.tool < MX_NUM_TOOLS ? o.tool : MX_TOOL_NONE) << 1) | (o.nofight ? 16 : 0) | (o.monitor ? 32 : 0) | (mx_art_active(s,&o)?64:0));
     *p++ = (uint8_t)((o.profile<4?o.profile:0) | (o.eco?4:0) | ((o.shake<3?o.shake:0)<<3) | (o.no_guide?32:0) | (o.music_off?64:0) | (o.sfx_off?128:0)); }
   put32(p, mx_crc32(out, (int)(p - out)));
   return n;
@@ -243,7 +244,7 @@ int mx_meta_unpack_opt(MxStats *s, int *outfit, MxOptions *opt, const uint8_t *i
   p += 4 * nl;
   if(opt){
     mx_options_default(opt);
-    if(ver >= 2){ int b = *p; opt->collapse = (uint8_t)(b & 1); int t = (b >> 1) & 7; opt->tool = (uint8_t)(t < MX_NUM_TOOLS ? t : MX_TOOL_NONE); opt->nofight = (uint8_t)((b >> 4) & 1); if(ver>=3)opt->monitor=(b>>5)&1; }
+    if(ver >= 2){ int b = *p; opt->collapse = (uint8_t)(b & 1); int t = (b >> 1) & 7; opt->tool = (uint8_t)(t < MX_NUM_TOOLS ? t : MX_TOOL_NONE); opt->nofight = (uint8_t)((b >> 4) & 1); if(ver>=3)opt->monitor=(b>>5)&1; if(ver>=4&&mx_art_unlocked(s))opt->art_style=(b>>6)&1; }
     if(ver>=3){int b=p[1];opt->profile=b&3;opt->eco=(b>>2)&1;opt->shake=(b>>3)&3;if(opt->shake==3)opt->shake=0;opt->no_guide=(b>>5)&1;opt->music_off=(b>>6)&1;opt->sfx_off=(b>>7)&1;}
   }
   s->lv_booms = s->lv_shots = 0; s->seen_st_inflated = s->seen_st_pops = 0;
