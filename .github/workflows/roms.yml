@@ -9,10 +9,10 @@ name: ROMs
 on:
   push:
     branches: [main]
-    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/validate_ds_smoke.py", "tools/run_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
+    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/pack_cel_atlas.py", "tools/gen_manspr.py", "tools/gen_dc_art.py", "test/native_atlas_selection_test.c", "tools/validate_ds_smoke.py", "tools/run_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
   pull_request:
     branches: [main]
-    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/validate_ds_smoke.py", "tools/run_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
+    paths: ["ds/**", "dreamcast/**", "3ds/**", "web/**", "core/**", "art/**", "tools/pack_cel_atlas.py", "tools/gen_manspr.py", "tools/gen_dc_art.py", "test/native_atlas_selection_test.c", "tools/validate_ds_smoke.py", "tools/run_ds_smoke.py", "test/ds_smoke_test.py", ".github/workflows/roms.yml"]
   workflow_dispatch:
 
 # Only the newest commit should occupy heavy build/emulator resources.
@@ -21,13 +21,58 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  cel-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Bake character artwork from the real Golden Cels web rig
+        env:
+          MX_CEL_PREVIEW_DIR: ${{ runner.temp }}/mandex-cel-runtime
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "numpy<3" pillow playwright
+          python -m playwright install --with-deps chromium
+          python3 tools/gen_manspr.py
+          python3 tools/gen_dc_art.py
+          python3 tools/pack_cel_atlas.py "$MX_CEL_PREVIEW_DIR" art
+          gcc -std=c99 -O1 -Wall -Iart test/native_atlas_selection_test.c -o /tmp/atlas
+          /tmp/atlas
+          git diff --exit-code -- art/manspr.h art/dcart.h docs/man_sprites.png docs/dc_art_sheet.png
+      - name: Exercise live style switching on the three production native renderers
+        run: |
+          set -euo pipefail
+          gcc -std=gnu99 -O1 -Wno-unused-function -DMX_FIXED -Itest/stubs -Icore -Iart -Ids/source test/ds_render.c ds/source/gfx.c ds/source/sfx.c ds/source/intro.c core/mx.c core/mx_meta.c core/cloth.c -lm -o /tmp/ds_cel
+          DS_CEL_PROBE=1 /tmp/ds_cel
+          for f in gfx intro; do
+            gcc -std=gnu99 -O1 -DMX_FIXED -D__3DS__ -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source -c "ds/source/$f.c" -o "/tmp/n3d_$f.o"
+            gcc -std=gnu99 -O1 -DMX_FIXED -DMX_SHARED_CUTSCENE -Dgfx_init=ds_gfx_init -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source -c "ds/source/$f.c" -o "/tmp/dc_$f.o"
+          done
+          gcc -std=gnu99 -O1 -D__3DS__ -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source test/n3ds_render.c /tmp/n3d_gfx.o /tmp/n3d_intro.o core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c -lm -o /tmp/n3d_cel
+          N3DS_CEL_PROBE=1 /tmp/n3d_cel
+          gcc -std=gnu99 -O1 -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source /tmp/dc_gfx.o /tmp/dc_intro.o core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c test/dc_render.c -lm -o /tmp/dc_cel
+          DC_OUTFIT_RECOLOR_PROBE=1 /tmp/dc_cel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mandex-native-cel-runtime
+          path: |
+            art/manspr_cel.h
+            art/dcart_cel.h
+          if-no-files-found: error
+
   ds:
+    needs: cel-runtime
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container: devkitpro/devkitarm:latest
     steps:
       - uses: actions/checkout@v4
-      - run: make -C ds
+      - uses: actions/download-artifact@v8
+        with: { name: mandex-native-cel-runtime, path: art }
+      - run: test -s art/manspr_cel.h && make -C ds
       - name: Build the DS ROMs (hardware / bare-metal runtime, ds/bare)
         run: |
           export PATH=$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH
@@ -52,14 +97,18 @@ jobs:
           if-no-files-found: error
 
   dreamcast:
+    needs: cel-runtime
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container: kazade/dreamcast-sdk:latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v8
+        with: { name: mandex-native-cel-runtime, path: art }
       - name: Validate both character atlases before Dreamcast ROM build
         run: |
           set -eu
+          test -s art/dcart_cel.h
           grep -q '^#define DCT_MAN_W 1024' art/dcart.h
           grep -q '^#define DCT_MAN_H 512' art/dcart.h
           grep -q '^#define DCT_WMAN_W 1024' art/dcart.h
@@ -143,16 +192,20 @@ jobs:
         with: { name: mandex-web, path: pack/mandex.html }
 
   n3ds:
+    needs: cel-runtime
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container: devkitpro/devkitarm:latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v8
+        with: { name: mandex-native-cel-runtime, path: art }
       - name: Build the 3DS homebrew (libctru, software rendering)
         run: |
           export DEVKITPRO=${DEVKITPRO:-/opt/devkitpro}
           export DEVKITARM=${DEVKITARM:-$DEVKITPRO/devkitARM}
           [ -f "$DEVKITPRO/libctru/include/3ds.h" ] || dkp-pacman -S --noconfirm 3ds-dev
+          test -s art/manspr_cel.h
           make -C 3ds
           mkdir -p out3ds && cp 3ds/mandex.3dsx 3ds/mandex.elf out3ds/
       - uses: actions/upload-artifact@v4
