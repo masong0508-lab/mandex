@@ -35,7 +35,9 @@ jobs:
         run: |
           gcc -std=gnu99 -O1 -Wno-unused -Wno-misleading-indentation -D__3DS__             -I3ds/shim -Itest/stubs -Icore -Iart -Ids/source             test/n3ds_render.c /tmp/n3d_gfx.o /tmp/n3d_intro.o             core/mx.c core/mx_meta.c core/cloth.c core/mx_snd.c -lm -o /tmp/n3d_pressure
           N3DS_PRESSURE_PROBE=1 /tmp/n3d_pressure
+          N3DS_CEL_PROBE=1 /tmp/n3d_pressure
       - name: Original Dreamcast puff texture with compact oval and live fur tint
         run: |
           gcc -std=gnu99 -O1 -Wno-unused-function -Wno-misleading-indentation             -Idreamcast/shim -Itest/stubs -Icore -Iart -Ids/source             /tmp/dc_gfx.o /tmp/dc_intro.o core/mx.c core/mx_meta.c             core/cloth.c core/mx_snd.c test/dc_render.c -lm -o /tmp/dc_pressure
           DC_PRESSURE_PROBE=1 /tmp/dc_pressure
+          DC_OUTFIT_RECOLOR_PROBE=1 /tmp/dc_pressure
