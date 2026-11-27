@@ -45,8 +45,32 @@ def main():
       const clock=man.wt;walkTubeStep(man,1/60);
       ok(man.mode==='walk'&&man.x===180&&man.y===120&&man.wt===clock&&man.vx===176&&man.tubeCd>.8,'walk tube transfers safely');
       const x=man.x;walkTubeStep(man,1/60);ok(man.x===x,'transfer cooldown');
-      state='select';selTab=4;WEB_UI.districtPicker=true;layoutTick();draw();
-      ok(hits.length>=30,'all 30 districts accessible');
+      state='select';selTab=4;WEB_UI.districtPicker=true;trialDirectoryPage=0;layoutTick();
+      // Exercise each real page and each district callback, redrawing between
+      // gestures exactly as a user does. Never require all 53 on one screen.
+      const savedBtn=btn;
+      let controls=[];
+      btn=function(x,y,w,h,label,fn,o){controls.push({x,y,w,h,label,fn});return savedBtn(x,y,w,h,label,fn,o)};
+      try {
+        let visited=new Set(),pages=0;
+        for(let page=0;page<TRIAL_DISTRICTS.length;page++){
+          WEB_UI.districtPicker=true;trialDirectoryPage=page;controls=[];draw();
+          const districtButtons=controls.filter(c=>c.label==='');
+          ok(districtButtons.length>0,'directory page has district cards');
+          pages++;
+          for(let k=0;k<districtButtons.length;k++){
+            districtButtons[k].fn();
+            ok(trialDistrict>=0&&trialDistrict<TRIAL_DISTRICTS.length&&!visited.has(trialDistrict),'directory visits a distinct district');
+            visited.add(trialDistrict);
+            WEB_UI.districtPicker=true;
+          }
+          const next=controls.find(c=>c.label==='PAGE >');
+          if(visited.size===TRIAL_DISTRICTS.length)break;
+          ok(!!next,'remaining districts have a next-page control');next.fn();
+          ok(trialDirectoryPage===page+1,'directory next page advances once');
+        }
+        ok(visited.size===53&&pages>=3,'all 53 districts accessible');
+      } finally {btn=savedBtn;}
       return {checks,transitions,walkPhases:walks,levels:LEVELS.length}
     }"""
     results=[]

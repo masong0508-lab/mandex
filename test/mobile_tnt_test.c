@@ -41,7 +41,7 @@ int main(void){
   CHECK(gold==8&&red==4,"normal and urgent blink cadence changed");
   visual.dead=1;CHECK(mx_fuse_visual(&visual)==0,"destroyed TNT still flashes");
   visual.dead=0;visual.m=MX_WOOD;CHECK(mx_fuse_visual(&visual)==0,"ordinary wood flashes a fuse");
-  CHECK(MX_TRIAL_START == 60 && MX_NUM_LEVELS == 660,"existing 60 campaign IDs and trial count preserved");
+  CHECK(MX_TRIAL_START == 60 && MX_NUM_LEVELS == 1110,"existing 60 campaign IDs and trial count preserved");
   scene();
   MxChunk *ch=charge(R(20.5),R(20.5));
   CHECK(ch->has_tnt && !ch->tnt_fused,"detached TNT starts alive, unarmed");

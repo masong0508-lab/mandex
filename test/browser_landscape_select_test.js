@@ -25,7 +25,7 @@ function checkLandscape(html){
  click('NEW LEVEL');assert.deepStrictEqual(env.actions.pop(),['edit',-1]);click('IMPORT LEVEL');assert.deepStrictEqual(env.actions.pop(),['import']);
  click('TRIALS');paint();assert.strictEqual(env.tiles.length,20);env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',60]);
  click('< DISTRICT');paint();env.tiles.at(-1).fn();assert.deepStrictEqual(env.actions.pop(),['story',1109]);
- env.WEB_UI.districtPicker=true;env.trialDirectoryPage=0;paint();assert.strictEqual(env.tiles.length,0);assert.strictEqual(env.buttons.filter(b=>b.label==='').length,20);click('PAGE >');paint();assert.strictEqual(env.buttons.filter(b=>b.label==='').length,20);click('PAGE >');paint();assert.strictEqual(env.buttons.filter(b=>b.label==='').length,13);click('< PAGE');click('< PAGE');paint();env.buttons.filter(b=>b.label==='')[18].fn();paint();env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',420]);
+ env.WEB_UI.districtPicker=true;env.trialDirectoryPage=0;paint();assert.strictEqual(env.tiles.length,0);assert.strictEqual(env.buttons.filter(b=>b.label==='').length,20);click('PAGE >');paint();assert.strictEqual(env.buttons.filter(b=>b.label==='').length,20);click('PAGE >');paint();assert.strictEqual(env.buttons.filter(b=>b.label==='').length,13);click('< PAGE');paint();click('< PAGE');paint();env.buttons.filter(b=>b.label==='')[18].fn();paint();env.tiles[0].fn();assert.deepStrictEqual(env.actions.pop(),['story',420]);
  for(let i=60;i<1110;i++)env.PD.stars[i]=3;
  env.PD.stars[65]=0;env.PD.stars[641]=0;
  env.trialDistrict=18;paint();
