@@ -14,26 +14,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        mode: [float, fixed, fixed-no-wobble, float-collapse, fixed-collapse, float-collapse-48]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
         include:
-          - name: float
+          - mode: float
             flags: ""
-          - name: fixed
+          - mode: fixed
             flags: "-DMX_FIXED"
-          - name: fixed-no-wobble
+          - mode: fixed-no-wobble
             flags: "-DMX_FIXED -DSWEEP_NOWOB"
-          - name: float-collapse
+          - mode: float-collapse
             flags: "-DSWEEP_COLLAPSE"
-          - name: fixed-collapse
+          - mode: fixed-collapse
             flags: "-DMX_FIXED -DSWEEP_COLLAPSE"
-          - name: float-collapse-48
+          - mode: float-collapse-48
             flags: "-DMX_MAX_CHUNKS=48 -DSWEEP_COLLAPSE"
-    name: Sweep ${{ matrix.name }}
+    name: Sweep ${{ matrix.mode }} / shard ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build and exercise every level, 80 seeds each
+      - name: Build and exercise assigned levels, 80 seeds each
         shell: bash
         run: |
           set -euo pipefail
           read -r -a flags <<< "${{ matrix.flags }}"
           gcc -std=gnu99 -O2 -Icore "${flags[@]}" core/mx.c test/sweep.c -lm -o /tmp/sweep
-          /tmp/sweep
+          gcc -std=c99 -Wall -Wextra -Werror test/sweep_shard_test.c -o /tmp/sweep_shard_test
+          /tmp/sweep_shard_test
+          /tmp/sweep --shard ${{ matrix.shard }} 8
