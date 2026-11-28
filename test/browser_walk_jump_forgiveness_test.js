@@ -134,6 +134,32 @@ m=ceiling.tick();check(m.y===19&&m.x===16&&m.walkJam>0,'ceiling jam cannot escap
 ceiling.tube(ceiling.e.man,DT);check(ceiling.e.man.x===16,'jammed walker cannot activate tube');
 for(let i=0;i<20;i++)m=ceiling.tick();
 check(m.x===200&&m.y>=19&&!ceiling.blocked(m.x,m.y),'ceiling jam restores a valid safe point');
+// A blocked landing must not hide a second reachable lift mouth.
+const route=make({ground:false}),rm=route.e.man;
+const originX=rm.x,originY=rm.y;
+rm.walkSafe=true;rm.safeX=120;rm.safeY=240;
+for(let y=8;y<=32;y++)for(let x=49;x<=57;x++)route.e.grid[route.e.idx(x,y)]=6;
+const lift=(ax,bx)=>({ax,ay:originY,bx,by:160,r:26,ang:0,sp:480,col:'#fff'});
+const blockedLift=lift(originX,424),openLift=lift(originX+8,720);
+route.e.tubes=[blockedLift,openLift];
+const timeBefore=rm.wt;
+route.tube(rm,DT);
+check(rm.x===720&&rm.y===160&&rm.mode==='walk'&&rm.tubeCd===.85,'blocked first exit must not hide a second clear lift');
+check(rm.wt===timeBefore&&rm.safeX===120&&rm.safeY===240,'transfer preserves time and last grounded recovery point');
+check(blockedLift.pulseAt===undefined&&openLift.pulseAt===route.e.time,'only the successful lift pulses');
+const allBlocked=make({ground:false}),am=allBlocked.e.man;
+for(let y=8;y<=32;y++)for(let x=49;x<=57;x++)allBlocked.e.grid[allBlocked.e.idx(x,y)]=6;
+allBlocked.e.tubes=[lift(originX,424),lift(originX+8,432)];
+allBlocked.tube(am,DT);
+check(am.x===originX&&am.y===originY&&am.tubeCd===.20,'all blocked exits preserve position and use short retry cooldown');
+check(allBlocked.e.events.length===0,'failed transfers do not emit effects');
+const priority=make({ground:false}),pm=priority.e.man;
+priority.e.tubes=[lift(originX,600),lift(originX+8,720)];
+priority.tube(pm,DT);
+check(pm.x===600&&pm.tubeCd===.85,'first clear authored lift retains priority');
+priority.tube(pm,DT);
+check(pm.x===600&&pm.tubeCd<.85,'cooldown prevents immediate second transfer');
+
 const sa=html.indexOf('<script>'),sb=html.indexOf('</script>',sa);
 new Function(html.slice(sa+8,sb));
 console.log('BROWSER_JUMP_FORGIVENESS_PASS cases='+checks+
