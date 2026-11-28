@@ -64,6 +64,22 @@ for(const height of [720,960,1169,1240])for(const wide of [false,true]){
     }
   }
 }
+// A new wide portrait district must expose its sling immediately, rather
+// than showing only distant targets during the initial camera hold.
+for(const height of [720,960,1169,1240])for(let district=0;district<3;district++){
+  const h=boot(scene(true,height,true)),e=h.env;
+  e.slingK=district;e.SX=e.CL.slings[district][0];e.SY=e.CL.slings[district][1];
+  e.man.mode='aim';e.man.x=e.SX;e.man.y=e.SY;
+  e.targets=[{alive:true,x:Math.min(e.WW-20,e.SX+750),zone:district}];
+  const before=JSON.stringify({man:e.man,targets:e.targets});
+  h.tick(0);
+  const p=h.screen(e.man.x,e.man.y);
+  assert(p[0]>=0&&p[0]<=e.W,'wide portrait sling must be visible on its first frame');
+  assert(e.CAM.hold===0,'wide portrait aim must not hold a distant target view');
+  finiteAndBounded(h);
+  for(let f=0;f<75;f++){h.tick(1/60);const q=h.screen(e.man.x,e.man.y);assert(q[0]>=0&&q[0]<=e.W,'idle sling stays visible');finiteAndBounded(h);}
+  assert(JSON.stringify({man:e.man,targets:e.targets})===before,'camera entry never changes the actor or targets');
+}
 // A settled aim view eases in around the existing actor screen position.
 const transition=boot(scene()),e=transition.env;
 e.man.mode='aim';e.man.x=e.SX;e.man.y=e.SY;transition.tick(0);
