@@ -32,23 +32,448 @@ function generateTrials(){
     {"label":"Switchback Depot","prefix":"Switchback","wall":2,"floor":1,"roof":2,"kind":[0,1,2,3],"tip":"CLIMB THE YARD STEPS; PUNCH WOOD","tnt":0,"pad":0,"tube":0,"sand":0,"walk":2},
     {"label":"Rooftop Relay","prefix":"Relay","wall":3,"floor":6,"roof":7,"kind":[1,5,2,4],"tip":"CLIMB THE STEPS; REBOUND OVER WALLS","tnt":0,"pad":1,"tube":1,"sand":0,"walk":2},
     {"label":"Three-Stage Circuit","prefix":"Circuit","wall":6,"floor":2,"roof":7,"kind":[4,6,3,7],"tip":"BREAK THE SUPPORTS; FINISH THE CIRCUIT","tnt":1,"pad":1,"tube":1,"sand":0,"walk":1}
-  ];
+  ].concat([
+  {
+    "label": "Rubble Raceway",
+    "prefix": "Raceway",
+    "wall": 2,
+    "floor": 1,
+    "roof": 7,
+    "kind": [
+      1,
+      5,
+      2,
+      0
+    ],
+    "tip": "BANK AND RUN THROUGH THE RUBBLE",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 0,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Pressure Foundry",
+    "prefix": "Pressure",
+    "wall": 6,
+    "floor": 2,
+    "roof": 1,
+    "kind": [
+      3,
+      2,
+      4,
+      1
+    ],
+    "tip": "DIVE WITH QUAKE AT THE POSTS",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Airship Docks",
+    "prefix": "Airship",
+    "wall": 4,
+    "floor": 6,
+    "roof": 7,
+    "kind": [
+      2,
+      1,
+      5,
+      3
+    ],
+    "tip": "USE THE BEANS RECOVERY JET",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Silt Refinery",
+    "prefix": "Silt",
+    "wall": 3,
+    "floor": 1,
+    "roof": 2,
+    "kind": [
+      0,
+      2,
+      6,
+      4
+    ],
+    "tip": "RELEASE SILT THEN BREAK THE FRAME",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 1,
+    "walk": 1
+  },
+  {
+    "label": "Brick Observatory",
+    "prefix": "Observatory",
+    "wall": 2,
+    "floor": 6,
+    "roof": 4,
+    "kind": [
+      2,
+      3,
+      1,
+      0
+    ],
+    "tip": "SHATTER THE TOWER WINDOWS",
+    "tnt": 0,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Spring Foundry",
+    "prefix": "Springforge",
+    "wall": 6,
+    "floor": 1,
+    "roof": 7,
+    "kind": [
+      5,
+      4,
+      2,
+      6
+    ],
+    "tip": "REBOUND ABOVE THE STEEL FRAME",
+    "tnt": 1,
+    "pad": 1,
+    "tube": 0,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Courier Alley",
+    "prefix": "Courier",
+    "wall": 2,
+    "floor": 2,
+    "roof": 1,
+    "kind": [
+      2,
+      1,
+      5,
+      6
+    ],
+    "tip": "PARRY CASES AND CLIMB THE STEPS",
+    "tnt": 0,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Marble Exchange",
+    "prefix": "Marble",
+    "wall": 3,
+    "floor": 6,
+    "roof": 3,
+    "kind": [
+      4,
+      3,
+      6,
+      7
+    ],
+    "tip": "BREAK SUPPORTS BEFORE THE BOSS",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 1,
+    "walk": 1
+  },
+  {
+    "label": "Glass Viaduct",
+    "prefix": "Viaduct",
+    "wall": 4,
+    "floor": 6,
+    "roof": 4,
+    "kind": [
+      1,
+      2,
+      3,
+      5
+    ],
+    "tip": "CUT THE PIERS UNDER THE BRIDGE",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Sandstone Works",
+    "prefix": "Sandstone",
+    "wall": 3,
+    "floor": 2,
+    "roof": 2,
+    "kind": [
+      0,
+      1,
+      2,
+      4
+    ],
+    "tip": "RELEASE SAND INTO THE YARD",
+    "tnt": 0,
+    "pad": 0,
+    "tube": 0,
+    "sand": 1,
+    "walk": 1
+  },
+  {
+    "label": "Bumper Gardens",
+    "prefix": "Bumper",
+    "wall": 2,
+    "floor": 1,
+    "roof": 7,
+    "kind": [
+      5,
+      6,
+      1,
+      2
+    ],
+    "tip": "USE RUBBER PADS TO CROSS ROOFS",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Iron Courthouse",
+    "prefix": "Ironcourt",
+    "wall": 6,
+    "floor": 6,
+    "roof": 2,
+    "kind": [
+      4,
+      3,
+      2,
+      7
+    ],
+    "tip": "BREAK THE COURT FOUNDATIONS",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 1
+  },
+  {
+    "label": "Night Freight",
+    "prefix": "Nightfreight",
+    "wall": 3,
+    "floor": 6,
+    "roof": 1,
+    "kind": [
+      2,
+      5,
+      6,
+      4
+    ],
+    "tip": "PARRY THE THROWERS ON FOOT",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Shatter Plaza",
+    "prefix": "Shatter",
+    "wall": 4,
+    "floor": 1,
+    "roof": 4,
+    "kind": [
+      1,
+      2,
+      0,
+      3
+    ],
+    "tip": "BREAK GLASS AND DROP THE FLOORS",
+    "tnt": 0,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Floodplain Yard",
+    "prefix": "Floodplain",
+    "wall": 2,
+    "floor": 6,
+    "roof": 7,
+    "kind": [
+      0,
+      5,
+      4,
+      6
+    ],
+    "tip": "BANK ABOVE THE SAND BANK",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 0,
+    "sand": 1,
+    "walk": 1
+  },
+  {
+    "label": "Powder Junction",
+    "prefix": "Junction",
+    "wall": 6,
+    "floor": 2,
+    "roof": 6,
+    "kind": [
+      2,
+      3,
+      4,
+      7
+    ],
+    "tip": "CHAIN TNT THEN DIVE WITH QUAKE",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Finale: Arrival",
+    "prefix": "Arrival",
+    "wall": 2,
+    "floor": 1,
+    "roof": 7,
+    "kind": [
+      1,
+      2,
+      5,
+      0
+    ],
+    "tip": "REBOUND INTO THE FIRST SECTOR",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 0
+  },
+  {
+    "label": "Finale: Furnace",
+    "prefix": "Furnace",
+    "wall": 6,
+    "floor": 2,
+    "roof": 1,
+    "kind": [
+      3,
+      2,
+      4,
+      6
+    ],
+    "tip": "COLLAPSE THE FURNACE SUPPORTS",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 1
+  },
+  {
+    "label": "Finale: Sandbank",
+    "prefix": "Sandbank",
+    "wall": 3,
+    "floor": 1,
+    "roof": 2,
+    "kind": [
+      0,
+      1,
+      2,
+      4
+    ],
+    "tip": "RELEASE THE SAND AND ADVANCE",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 1,
+    "walk": 0
+  },
+  {
+    "label": "Finale: Skybridge",
+    "prefix": "Skybridge",
+    "wall": 4,
+    "floor": 6,
+    "roof": 7,
+    "kind": [
+      2,
+      5,
+      6,
+      3
+    ],
+    "tip": "RECOVER FLIGHT ACROSS THE BRIDGE",
+    "tnt": 0,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Finale: Guardhouse",
+    "prefix": "Guardhouse",
+    "wall": 6,
+    "floor": 6,
+    "roof": 2,
+    "kind": [
+      4,
+      3,
+      2,
+      7
+    ],
+    "tip": "PARRY AND BREAK THE GUARDHOUSE",
+    "tnt": 1,
+    "pad": 0,
+    "tube": 0,
+    "sand": 0,
+    "walk": 2
+  },
+  {
+    "label": "Six-Stage Grand Circuit",
+    "prefix": "Grand Circuit",
+    "wall": 3,
+    "floor": 6,
+    "roof": 7,
+    "kind": [
+      4,
+      6,
+      3,
+      7
+    ],
+    "tip": "FINISH ALL SIX SECTORS",
+    "tnt": 1,
+    "pad": 1,
+    "tube": 1,
+    "sand": 0,
+    "walk": 1
+  }
+].concat([{label:"Mount Mandex",prefix:"Mountain",wall:6,floor:6,roof:7,kind:[1,2,4,6],tip:"CLIMB THE CITY",tnt:1,pad:1,tube:1,sand:0,walk:2},{label:"Metro Mandex",prefix:"Metro",wall:6,floor:6,roof:7,kind:[1,2,4,6],tip:"ENTER THE CITY TOWERS",tnt:1,pad:1,tube:1,sand:0,walk:2}]));
+  const metroNames=["South Gate Borough","Old Financial Strip","Harbor Towers","Glass Midtown","Transit Core","Upper Skyline","Canyon of Towers"],metroHeights=[[500,750,900],[650,1000,1200],[800,1200,1500],[900,1400,1600],[1000,1500,1750],[1200,1650,1900],[1400,1800,2000]];
+  const mountainNames=["Foothill Gate","Lower City","Railway Terrace","Market Slope","Canyon Exchange","Tower Foundations","Skyline Rise","Cloudline Towers","High Alpine District","Crown Approach","Mount Mandex: The Summit"],mountainTips=["BREAK THE FOOTHILL SUPPORTS","CLEAR THE LOWER CITY BLOCKS","CLIMB THE RAIL TERRACES","BANK ABOVE THE MARKET","RIDE TUBES OVER THE CANYON","BREAK THE TOWER FOUNDATIONS","DIVE WITH QUAKE INTO THE SKYLINE","USE BEANS TO RECOVER IN THE AIR","PARRY THE ALPINE GUARDS","CLIMB THE CROWN TERRACES","EVICT ALL; WALK THROUGH THE SUMMIT TUBE"];
   const shapes=["Court","Stacks","Bridge","Terrace"];
   const palettes=["#e8d3a8","#d7dfe9","#d2b6b4","#b9d6be"];
   const levels=[],distinct=new Set();
   const fail=(msg)=>{throw Error(msg)};
   for(let district=0;district<groups.length;district++)for(let shape=0;shape<4;shape++)for(let tier=0;tier<5;tier++){
-    const g=groups[district],grid=new Uint8Array(WIDTH*HEIGHT),targets=[],rooms=[],pads=[],tubes=[],houses=[];
+    if(district===51&&shape===3&&tier===4)continue; // final district has 19 maps
+    if(district===52&&shape*5+tier>=11)continue;
+    if(district===53&&shape*5+tier>=7)continue;
+    const sector=shape*5+tier;
+    const g=groups[district],grid=new Uint8Array(WIDTH*HEIGHT),targets=[],rooms=[],pads=[],tubes=[],houses=[],entries=[],bridges=[];
     const get=(x,y)=>grid[y*WIDTH+x];
     function fill(x,y,w,h,m){
       if(x<28||y<0||x+w>WIDTH||y+h>HEIGHT||w<1||h<1)fail("invalid rectangle "+[district,shape,tier,x,y,w,h,m]);
       for(let j=y;j<y+h;j++)grid.fill(m,j*WIDTH+x,j*WIDTH+x+w);
     }
     function target(x,y,kind,range=6){targets.push([x,y,kind,range])}
-    function house(x,w,floors,fh,wall,floor,roof){
-      const base=58,top=base-floors*fh;
+    function house(x,w,floors,fh,wall,floor,roof,base=58){
+      const top=base-floors*fh;
       const H={x,w,top,base,fh,floors};houses.push(H);
-      fill(x,base,w,2,3);
+      fill(x,base,w,60-base,3);
       for(let f=1;f<=floors;f++){
         const y=base-f*fh,m=f===floors?roof:floor;fill(x,y,w,2,m);
         if(m===4)fill(x,y+1,w,1,6); // load-bearing frame under the glazing
@@ -71,7 +496,33 @@ function generateTrials(){
     // Four different silhouettes per district; difficulty changes heights,
     // widths, spans and occupied floors, not just enemy count or names.
     const x=32+((district*3+tier)%5),fh=8+(tier%3)*2;
-    if(district>=9){
+    if(district===53){
+      const p=sector,fa=2+p%2,fb=4+p%2,fc=5+(p>=3?1:0);
+      const A=house(31+p%2,20,fa,8,p%2?4:6,6,7),B=house(58,22,fb,8,6,6,7),C=house(89,24,fc,8,6,6,6);
+      for(const H of [A,B,C]){fill(H.x+H.w-2,56,2,2,5);}
+      for(const H of [A,B]){fill(H.x+3,H.top,4,1,7);pads.push([H.x+3,H.top,4]);}
+      tubes.push([29,54,47,Math.max(4,A.top-4)]);tubes.push([53,54,68,Math.max(4,B.top-4)]);tubes.push([83,54,102,Math.max(4,C.top-4)]);
+      // Vary the grounded entrance lane without changing the active grid size.
+      fill(28,59,1,1,1+p);
+    }else if(district===52){
+      // One active 120x60 slice of the rising city. Buildings stand on
+      // destructible rock terraces rather than indestructible scenery.
+      const p=sector,mid=50-2*(p%3),high=p===10?42:44-2*(p%4);
+      const A=house(35+p%3,18,2+p%2,8,p%2?6:2,6,7,58);
+      const B=house(64,16,3+(p%2),8,p%3?6:4,6,7,mid);
+      const C=house(91,20,Math.min(4,Math.floor((high-4)/8)),8,6,6,6,high);
+      // Stepped access between terraces; every tread and buttress is real rock.
+      for(let x=54;x<64;x+=2){const rise=Math.min(60-mid,2+2*((x-54)/2));fill(x,60-rise,2,rise,3);}
+      for(let x=81;x<91;x+=2){const rise=Math.min(60-high,60-mid+2+2*((x-81)/2));fill(x,60-rise,2,rise,3);}
+      // Distinct breakable footing positions and two safe roof pads.
+      for(const H of [A,B,C]){fill(H.x,58,2,2,5);if(p>=3)fill(H.x+H.w-2,58,2,2,5);}
+      for(const H of [A,B]){fill(H.x+3,H.top,4,1,7);pads.push([H.x+3,H.top,4]);}
+      // Low mouth allows an on-foot player to reach the summit even if
+      // the structure has been demolished. Exit is open sky above the roof.
+      tubes.push([29,56,105,Math.max(4,C.top-4)]);
+      tubes.push([59,Math.max(8,mid-5),84,Math.max(7,B.top-4)]);
+      if(p>=8)targets[0][2]=7;
+    }else if(district>=9){
       const d=district-9, fy=8+2*((d+tier)%2);
       if(shape===0){
         house(31+(d%4)+tier%2,16+2*((d+tier)%3),1+(tier>>1),fy,g.wall,g.floor,g.roof);
@@ -160,7 +611,7 @@ function generateTrials(){
     // tread), a breakable entrance and a rubber launch ledge where safe.
     // Geometry stays in the same 120x60 working grid. No invisible
     // platforms, scripted teleports or extra collision systems.
-    if(district>=27){
+    if(district>=27&&district<52){
       const A=houses[0],B=houses[1],left=A.x+A.w+1,right=B.x-1;
       const clearance=(x,y)=>targets.every(([tx,ty])=>x<tx-2||x>tx+2||y<ty-5||y>=ty);
       // Choose a contiguous clear bay rather than overwriting a pier,
@@ -189,15 +640,21 @@ function generateTrials(){
           if(get(x,y)&&get(x,y)!==4&&clearance(x,y))fill(x,y,1,1,1);
       }
     }
+    if(district>=30&&district<52){
+      // Short grounded entry steps: vary the first approach and give
+      // walkers a low punchable ledge, without intruding on the sling.
+      const d=district-30,h=1+d%3,hh=1+Math.floor(d/3)%3,mat=1+Math.floor(d/9);
+      fill(28,60-h,1,h,mat);fill(29,60-hh,1,hh,mat);
+    }
     // Late-campaign traversal: open exterior doors and aligned skybridges.
     // A steel underside reinforces the opening without erasing roof pads.
-    if(district>=27){
+    if(district>=27&&district<30){
       function doorway(H,side,low){
         const dx=side==='left'?H.x:H.x+H.w-2;
         for(let yy=low-5;yy<low;yy++)grid.fill(0,yy*WIDTH+dx,yy*WIDTH+dx+2);
         fill(H.x,low-H.fh+1,H.w,1,6);
       }
-      houses.forEach((H,i)=>doorway(H,i===0?'left':'right',H.base));
+      houses.forEach((H,i)=>{const side=i===0?'left':'right';doorway(H,side,H.base);entries.push([side==='left'?H.x:H.x+H.w-2,H.base-5,2,5]);});
       const A=houses[0],B=houses[1],d=district-9;
       const y=58-A.fh*(shape===2?1+((tier+d)%2):1);
       const a=A.x+A.w,b=B.x;
@@ -215,9 +672,31 @@ function generateTrials(){
       const landing=(a+b)>>1;
       tubes.push([A.x-5,57,landing,y-3]);
     }
-    const name=g.prefix+" "+shapes[shape]+" "+(tier+1);
-    const tip=district>=27?(district===27?'LIFT TUBE; CROSS DECK; PUNCH WALLS':district===28?'LIFT TUBE; CROSS ROOFS; REBOUND':'LIFT TUBE; CROSS DECK; BREAK SUPPORTS'):district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
-    const men=Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
+    if(district>=30&&district<52){
+      for(let k=0;k<houses.length;k++){
+        const H=houses[k],x=k===0?H.x:H.x+H.w-2,y=H.base-5;
+        fill(x,y,2,5,0);fill(H.x,H.base-H.fh+1,H.w,1,6);
+        if(k===0)fill(x-2,y,2,5,0); // keep the entry lane below the sill
+        entries.push([x,y,2,5]);
+      }
+    }
+    if(district>=52){
+      // Five clear cells fit the on-foot collision hull.
+      for(const H of houses){const x=H.x,y=H.base-5;fill(x,y,2,5,0);entries.push([x,y,2,5]);}
+      if(district===53){
+        // Connect each shorter tower's roof to the next tower's floor.
+        // Preserve the roof pads and all existing tube routes.
+        for(let k=0;k<houses.length-1;k++){
+          const A=houses[k],B=houses[k+1],y=A.top,a=A.x+A.w,b=B.x;
+          fill(a,y,b-a,2,6);fill(A.x,y+1,A.w,1,6);fill(B.x,y+1,B.w,1,6);
+          if(B.top<y){fill(B.x,y-5,2,5,0);fill(B.x,y-B.fh+1,B.w,1,6);}
+          bridges.push([a,y,b]);
+        }
+      }
+    }
+    const name=district===53?metroNames[sector]:district===52?mountainNames[sector]:g.prefix+" "+shapes[shape]+" "+(tier+1);
+    const tip=district===53?"ENTER TOWERS; ROOFS UP TO "+metroHeights[sector][2]+" FT":district===52?mountainTips[sector]:district>=27&&district<30?(district===27?'LIFT TUBE; CROSS DECK; PUNCH WALLS':district===28?'LIFT TUBE; CROSS ROOFS; REBOUND':'LIFT TUBE; CROSS DECK; BREAK SUPPORTS'):district>=9?g.tip:district===8?(shape===2||shape===3?"TUBE ACROSS; BREAK SUPPORTS":"BLAST SUPPORTS, BANK OFF ROOFS"):shape===2&&district!==5&&district!==6?"CUT THE DECK OR ITS PIERS":g.tip;
+    const men=district>=52?Math.min(18,targets.length+5):Math.min(12,Math.max(5,Math.ceil(targets.length*.8)+tier+4));
     const walk=(district===5||district===7)&&tier>=2 || district===8&&tier>=3 || district>=9&&(g.walk===2||!!g.walk&&tier>=2);
     if(targets.length<2||targets.length>20||rooms.length>20||pads.length>3||tubes.length>3)fail("entity cap "+name);
     const keys=new Set();
@@ -252,7 +731,7 @@ function generateTrials(){
     let occupied=0;for(let i=0;i<grid.length;i++)if(grid[i]){occupied++;if(!seen[i])fail("floating voxel "+name+" "+i)}
     const rows=Array.from({length:HEIGHT},(_,y)=>Array.from(grid.subarray(y*WIDTH,(y+1)*WIDTH)).join(''));
     const key=rows.join('');if(distinct.has(key))fail("duplicate geometry "+name);distinct.add(key);
-    levels.push({id:60+levels.length,name,district:g.label,tip,men,walk,rows,targets,rooms,pads,tubes,occupied});
+    levels.push({id:60+levels.length,name,district:g.label,tip,men,walk,rows,targets,rooms,pads,tubes,occupied,...(entries.length?{entries}:{}),...(bridges.length?{bridges}:{}),...(district===53?{towerFeet:metroHeights[sector],internal:true}:{})});
   }
   return levels;
 }
@@ -278,8 +757,9 @@ function emitTrials(levels){
     return {off,rects:rects.length,roomOff,rooms:l.rooms.length,targetOff,targets:l.targets.length,padOff,pads:l.pads.length,tubeOff,tubes:l.tubes.length,name:l.name,tip:l.tip,men:l.men,walk:l.walk?1:0};
   };
   for(const l of levels)table.push(collect(l));
-  for(let d=0;d<levels.length/20;d++){
-    const rows=levels.slice(d*20,(d+1)*20);
+  const publicLevels=levels.filter(l=>!l.internal),internalLevels=levels.filter(l=>l.internal);
+  for(let d=0;d<publicLevels.length/20;d++){
+    const rows=publicLevels.slice(d*20,(d+1)*20);
     districts.push(JSON.stringify({format:"MXTRIAL1",width:WIDTH,height:HEIGHT,district:rows[0].district,levels:rows},null,1)+"\n");
   }
   const rows=table.map(t=>`  {${JSON.stringify(t.name)},${JSON.stringify(t.tip)},${t.off},${t.rects},${t.roomOff},${t.rooms},${t.targetOff},${t.targets},${t.padOff},${t.pads},${t.tubeOff},${t.tubes},${t.men},${t.walk}}`).join(",\n");
@@ -299,6 +779,7 @@ typedef struct {
 static const uint8_t MX_TRIAL_DATA[] = {
 ${Array.from({length:Math.ceil(commands.length/32)},(_,i)=>"  "+commands.slice(i*32,(i+1)*32).join(",")).join(",\n")}
 };
+static const uint16_t MX_METRO_TOWER_FEET[7][3] = {${internalLevels.map(l=>"{"+l.towerFeet.join(",")+"}").join(",")}};
 static const MxTrialLevel MX_TRIALS[] = {
 ${rows}
 };
@@ -319,7 +800,8 @@ ${rows}
 const TRIAL_START=LEVELS.length;
 const TRIAL_BYTES=${packed};
 const TRIAL_META=${JSON.stringify(table.map(t=>[t.name,t.tip,t.off,t.rects,t.roomOff,t.rooms,t.targetOff,t.targets,t.padOff,t.pads,t.tubeOff,t.tubes,t.men,t.walk]))};
-const TRIAL_DISTRICTS=${JSON.stringify(levels.filter((_,i)=>i%20===0).map(l=>l.district))};
+const TRIAL_DISTRICTS=${JSON.stringify(publicLevels.filter((_,i)=>i%20===0).map(l=>l.district))};
+const METRO_TOWER_FEET=${JSON.stringify(internalLevels.map(l=>l.towerFeet))};
 function buildTrial(i){
   const a=TRIAL_META[i],digit=c=>c>=65&&c<=90?c-65:c>=97&&c<=122?c-71:c>=48&&c<=57?c+4:c===43?62:63,read=j=>{
     const off=Math.floor(j/3)*4,part=j%3,p=digit(TRIAL_BYTES.charCodeAt(off+part)),q=digit(TRIAL_BYTES.charCodeAt(off+part+1));
@@ -331,10 +813,11 @@ function buildTrial(i){
   for(let k=a[8],end=k+a[9]*3;k<end;k+=3)pads.push({x:read(k)*V,y:read(k+1)*V,w:read(k+2)*V});
   for(let k=a[10],end=k+a[11]*4;k<end;k+=4)tube('#ffb45d',read(k)*V,read(k+1)*V,read(k+2)*V,read(k+3)*V,0);
 }
-TRIAL_META.forEach((a,i)=>LEVELS.push({name:a[0],tip:a[1],men:a[12],walk:!!a[13],build(){buildTrial(i)}}));
+function trialLayout(i){const a=TRIAL_META[i];return {name:a[0],tip:a[1],men:a[12],walk:!!a[13],build(){buildTrial(i)}};}
+for(let i=0;i<${publicLevels.length};i++)LEVELS.push(trialLayout(i));
 // END MANDEX TRIAL DATA
 `;
-  return {header,web,districts,commandBytes:commands.length,occupied:levels.reduce((n,l)=>n+l.occupied,0)};
+  return {header,web,districts,city:JSON.stringify({format:"MXTRIAL1",width:WIDTH,height:HEIGHT,district:"Metro Mandex",levels:internalLevels},null,1)+"\n",commandBytes:commands.length,occupied:levels.reduce((n,l)=>n+l.occupied,0)};
 }
 if(typeof module!=='undefined')module.exports={generateTrials,emitTrials};
 
@@ -345,6 +828,7 @@ if(typeof require==='function'&&require.main===module){
   const out=emitTrials(generateTrials());
   const dir=path.join(root,'content/trials');fs.mkdirSync(dir,{recursive:true});
   out.districts.forEach((d,i)=>fs.writeFileSync(path.join(dir,'district-'+(i+1)+'.json'),d));
+  fs.writeFileSync(path.join(dir,'metro-finale.json'),out.city);
   fs.writeFileSync(path.join(root,'core/trial_levels.h'),out.header);
   const webPath=path.join(root,'web/index.html'),html=fs.readFileSync(webPath,'utf8');
   const a=html.indexOf('// BEGIN MANDEX TRIAL DATA'),marker='// END MANDEX TRIAL DATA';

@@ -149,7 +149,7 @@ void mx_meta_events(MxStats *s, const MxWorld *w){
 int mx_level_unlocked(const MxStats *s, int level){
   /* Never advertise an invalid level as playable, even with the unlock cheat
    * or the default all-open configuration. */
-  if(level < 0 || level >= MX_NUM_LEVELS) return 0;
+  if(!mx_level_visible(s,level)) return 0;
 #ifdef MX_LEVEL_LOCKS
   return s->unlock_all || level >= MX_TRIAL_START || level < 3 || s->stars[level - 1] > 0;
 #else

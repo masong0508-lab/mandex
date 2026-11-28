@@ -45,8 +45,50 @@ def main():
       const clock=man.wt;walkTubeStep(man,1/60);
       ok(man.mode==='walk'&&man.x===180&&man.y===120&&man.wt===clock&&man.vx===176&&man.tubeCd>.8,'walk tube transfers safely');
       const x=man.x;walkTubeStep(man,1/60);ok(man.x===x,'transfer cooldown');
-      state='select';selTab=4;WEB_UI.districtPicker=true;layoutTick();draw();
-      ok(hits.length>=30,'all 30 districts accessible');
+      delete PD.stars[1009];delete PD.stars[1098];
+      PD.unlockAll=true;ok(!chapter4Open()&&!trialVisible(1010)&&!trialVisible(1098),'chapter stays hidden even with cheat');
+      ok(startStory(1109)===false,'hidden finale cannot start through selector');
+      PD.unlockAll=false;
+      const savedBtn=btn;let controls=[];
+      btn=function(x,y,w,h,label,fn,o){controls.push({x,y,w,h,label,fn});return savedBtn(x,y,w,h,label,fn,o)};
+      try {
+        const visit=(tab,expected)=>{
+          state='select';selTab=tab;trialDistrict=0;layoutTick();
+          let visited=new Set(),pages=0;
+          for(let page=0;page<expected;page++){
+            WEB_UI.districtPicker=true;trialDirectoryPage=page;controls=[];draw();
+            ok(controls.some(c=>c.label==='CHAPTER 4')===chapter4Open(),'chapter tab visibility');
+            const districtButtons=controls.filter(c=>c.label==='');
+            ok(districtButtons.length>0,'directory page has district cards');pages++;
+            for(const card of districtButtons){
+              card.fn();ok(trialDistrict>=0&&trialDistrict<expected&&!visited.has(trialDistrict),'distinct district');
+              visited.add(trialDistrict);WEB_UI.districtPicker=true;
+            }
+            if(visited.size===expected)break;
+            const next=controls.find(c=>c.label==='PAGE >');ok(!!next,'next-page control');next.fn();
+            ok(trialDirectoryPage===page+1,'directory next page advances');
+          }
+          ok(visited.size===expected,'all visible groups reached');
+        };
+        visit(4,48);
+        PD.stars[1009]=1;ok(trialVisible(1098)&&!chapter4Open()&&!trialVisible(1010),'qualifier alone appears');
+        visit(4,49);
+        ok(startStory(1098)===true,'qualifier starts');const phases=CL.relayCount;
+        ok(phases===6,'qualifier has six stages');
+        for(let d=0;d<phases;d++){
+          ok(level===1098&&CL.relayPhase===d,'qualifier correct phase');
+          nextAfterWin();ok(level===1098&&CL.relayPhase===d&&state==='play','next action cannot skip qualifier phase');
+          for(const t of targets)t.alive=false;
+          winT=1.61;update(1/60);
+          if(d<phases-1)ok(!chapter4Open()&&state==='play','intermediate qualifier does not reveal chapter');
+        }
+        ok(state==='win'&&chapter4Open(),'finishing qualifier reveals chapter');
+        ok(PD.stars[1098]>0,'earned completion persisted');
+        nextAfterWin();ok(level===1010&&selTab===5,'secret city begins at level 1011');
+        visit(4,48);visit(5,5);
+        ok(startStory(1109)===true&&CL.relayCount===18,'finale available after unlock');
+        nextAfterWin();ok(level===1109&&CL.relayPhase===0&&state==='play','next action cannot bypass summit');
+      } finally {btn=savedBtn;}
       return {checks,transitions,walkPhases:walks,levels:LEVELS.length}
     }"""
     results=[]

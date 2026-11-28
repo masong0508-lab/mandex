@@ -13,7 +13,7 @@
 
 enum {
   MX_OBJ_EVICT, MX_OBJ_LAST, MX_OBJ_SECURE, MX_OBJ_DISTRICT,
-  MX_OBJ_COMPLETE, MX_OBJ_FAILED, MX_OBJ_NO_MEN
+  MX_OBJ_COMPLETE, MX_OBJ_FAILED, MX_OBJ_NO_MEN, MX_OBJ_SUMMIT
 };
 typedef struct {
   int phase, remaining, total;
@@ -50,7 +50,9 @@ static inline MxObjective mx_objective_snapshot(const MxWorld *w){
   }
   if(w->state==MX_WIN){ o.phase=MX_OBJ_COMPLETE; return o; }
   if(w->state==MX_LOSE){ o.phase=MX_OBJ_FAILED; return o; }
-  if(o.remaining==0){
+  if(o.remaining==0&&mx_summit_needed(w)){
+    o.phase=w->men<=0&&w->man.mode==MAN_NONE?MX_OBJ_NO_MEN:MX_OBJ_SUMMIT;
+  }else if(o.remaining==0){
     o.phase=(w->district+1<mx_level_stage_count(w->level))
       ? MX_OBJ_DISTRICT : MX_OBJ_SECURE;
   }else if(w->men<=0 && w->man.mode==MAN_NONE){
@@ -65,6 +67,7 @@ static inline MxObjective mx_objective_snapshot(const MxWorld *w){
 
 static inline const char *mx_objective_label(int phase){
   switch(phase){
+    case MX_OBJ_SUMMIT: return "CLIMB TO SUMMIT";
     case MX_OBJ_LAST: return "LAST LANDLORD";
     case MX_OBJ_SECURE: return "SECURING AREA";
     case MX_OBJ_DISTRICT: return "NEXT DISTRICT";

@@ -52,6 +52,14 @@ for(const [label,x,y] of [['behind',296,297],['edge',337+19,297],['too high',337
   check(a.e.cases.length===1&&a.e.score===0&&
     !popups(a.e).includes('PARRY! +150'),'miss must not parry '+label);
 }
+// A charge reaches beyond a standing fist, but only with forward momentum.
+for(const face of [-1,1]){
+  for(const speed of [0,120,-120]){
+    const a=make();a.e.man.face=face;a.e.man.vx=face*speed;
+    a.caseAt(320+face*39,297);a.walkPunch();
+    check(a.e.score===(speed===120?150:0),'shoulder charge reach and facing '+face+' '+speed);
+  }
+}
 const two=make();
 two.caseAt(337,297);two.caseAt(340,298);two.walkPunch();
 check(two.e.cases.length===0&&two.e.score===300,
@@ -89,6 +97,22 @@ check(animated.e.cases.length===0&&animated.e.score===150&&animated.e.hurtCount=
 check(popups(animated.e).includes('PARRY! +150'),
   'late animation-window parry should still show feedback');
 
+// A charge retains its reach for the animation even after slowing down.
+for(const face of [-1,1]){
+  for(const charged of [false,true]){
+    const a=make();a.e.man.face=face;a.e.man.vx=charged?face*120:0;
+    a.walkPunch();a.e.man.vx=0;
+    a.caseAt(320+face*39,297);a.e.cases[0].vx=0;
+    a.updCases(1/60);
+    check(a.e.score===(charged?150:0),'active charge reach '+face+' '+charged);
+    check(a.e.cases.length===(charged?0:1),'ordinary active punch retains reach');
+  }
+}
+const expiredCharge=make();expiredCharge.e.man.vx=120;expiredCharge.walkPunch();
+expiredCharge.e.man.pT=0;expiredCharge.caseAt(359,297);expiredCharge.e.cases[0].vx=0;
+expiredCharge.updCases(1/60);
+check(expiredCharge.e.score===0&&expiredCharge.e.cases.length===1,'expired charge cannot parry');
+
 const expired=make();
 expired.e.man.pT=0;expired.caseAt(337,297);
 expired.updCases(1/60);
@@ -122,6 +146,36 @@ check(cap.e.man.wt===60&&cap.e.man.parryTimeUsed===1,'exact cap');
 cap.e.man.wt=0;cap.caseAt(337,297);cap.walkPunch();
 check(cap.e.man.wt===0,'expired life cannot revive');
 check(html.includes('m.wt=WALK_T;m.parryTimeUsed=0;'),'fresh life resets budget');
+// Execute the real impact logic and record the exact damage footprint.
+const quakeCode=section('function stick(){','function bounceRubber(){');
+for(const dive of [false,true]){
+  const m={pwr:'quake',dive,splatted:false,x:320,y:240,mode:'fly'};
+  const hits=[],victims=[{alive:true,x:388,y:240}];
+  const env={man:m,V:8,CL:null,targets:victims,shake:0,
+    damageCell:(x,y,d)=>hits.push([x,y,d]),killTarget:t=>{t.alive=false},
+    ring(){},goo(){},popText(){},SFX:{boom(){},splat(){}}};
+  const impact=new Function('e','with(e){'+quakeCode+';return stick;}')(env);
+  impact();
+  check(hits.length===(dive?113:81),'quake footprint');
+  check(hits.every(h=>h[2]===(dive?16:13)),'quake damage');
+  check(victims[0].alive===!dive,'mega quake extends target radius');
+  impact();
+  check(hits.length===(dive?113:81),'quake stays single-use');
+}
+// Exercise the production Beans flight activation.
+const diveCode=section('function dive(){','//  TARGETS: grumpy landlords');
+for(const face of [-1,1]){
+  for(const falling of [false,true]){
+    const m={mode:'fly',pwr:'beans',face,x:320,y:200,vx:falling?face*40:0,vy:falling?400:0};
+    const messages=[],env={man:m,shake:0,SFX:{fart(){},pop(){}},P(){},ring(){},rnd:()=>.5,popText:(x,y,t)=>messages.push(t)};
+    const activate=new Function('e','with(e){'+diveCode+'\nreturn dive;}')(env);
+    activate();
+    check(m.vx===face*(falling?360:320)&&m.vy===(falling?40:-360),'beans recovery impulse');
+    check(m.beaned&&!m.dive&&messages.includes('RECOVERY JET!'),'beans recovery feedback');
+    activate();
+    check(m.dive&&messages.length===1,'second activation dives, no repeat jet');
+  }
+}
 const parseStart=html.indexOf('<script>'),parseEnd=html.indexOf('</script>',parseStart);
 new Function(html.slice(parseStart+8,parseEnd));
 console.log('BROWSER_CASE_PARRY_PASS checks='+checks+
